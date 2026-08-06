@@ -198,6 +198,7 @@ const STATE = {
   units: {
     LOJA: makeUnitState("LOJA"),
     QUIOSQUE: makeUnitState("QUIOSQUE"),
+    GRAOPARA: makeUnitState("GRAOPARA"),
   },
 
   checkinDraft: makeCheckinDraft("LOJA"),
@@ -228,8 +229,8 @@ function makeUnitState(unit) {
     maintenanceThresholdHours: 40,
     dailyGoalCents: 150000, // R$1.500 — editável em Configurações > Unidade
     unitInfo: {
-      name: unit === "QUIOSQUE" ? "FaçaAmigos — Circuito" : "FaçaAmigos — Playground",
-      address: "Parque Shopping Belém — Belém/PA",
+      name: unit === "QUIOSQUE" ? "FaçaAmigos — Circuito (Parque Shopping)" : unit === "GRAOPARA" ? "FaçaAmigos — Playground (Bosque Grão-Pará)" : "FaçaAmigos — Playground (Parque Shopping)",
+      address: unit === "GRAOPARA" ? "Shopping Bosque Grão-Pará — Belém/PA" : "Parque Shopping Belém — Belém/PA",
       openTime: "10:00",
       closeTime: "22:00",
       certFileName: "",

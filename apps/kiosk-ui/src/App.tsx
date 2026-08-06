@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
-import { Button } from "@facaamigos/ui";
+import { Button, Badge } from "@facaamigos/ui";
 import { useAppState } from "./state/AppState.js";
+import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
 import { PainelScreen } from "./screens/PainelScreen.js";
 import { PdvScreen } from "./screens/PdvScreen.js";
@@ -33,52 +34,73 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
 };
 
 export function App() {
-  const { units, unit, setUnitId, employee } = useAppState();
+  const { unit, setUnitId, employee } = useAppState();
   const [screen, setScreen] = useState<Screen>("ENTRADA");
 
-  // Tela de login omitida por enquanto (pedido explícito) — AppState
-  // já entra automaticamente com o primeiro colaborador cadastrado.
   if (!employee) return null;
+
+  // Se nenhuma operação/módulo foi selecionado ainda, exibe a Tela Inicial de Seleção de Módulo
+  if (!unit) {
+    return <SelectModuleScreen />;
+  }
 
   const ScreenComponent = SCREEN_COMPONENTS[screen];
 
+  let unitIcon = "📍";
+  const lowerName = unit.name.toLowerCase();
+  if (lowerName.includes("playground")) unitIcon = "🏰";
+  else if (lowerName.includes("circuito")) unitIcon = "🏎️";
+  else if (lowerName.includes("grão") || lowerName.includes("grao")) unitIcon = "🌳";
+
   return (
     <div>
-      <header style={{ display: "flex", alignItems: "center", gap: "16px", padding: "12px 24px", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
-        <strong style={{ fontFamily: "var(--font-display)" }}>FaçaAmigos</strong>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+          padding: "12px 24px",
+          borderBottom: "1px solid var(--border-subtle)",
+          background: "var(--surface-card)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <strong style={{ fontFamily: "var(--font-display)", fontSize: "18px", color: "var(--color-primary)" }}>
+            FaçaAmigos
+          </strong>
 
-        <div style={{ display: "flex", gap: "6px", background: "var(--surface-sunken)", padding: "4px", borderRadius: "12px" }}>
-          {units.map((u) => {
-            const isSelected = unit?.id === u.id;
-            let icon = "📍";
-            if (u.name.toLowerCase().includes("playground")) icon = "🏰";
-            else if (u.name.toLowerCase().includes("circuito")) icon = "🏎️";
-            else if (u.name.toLowerCase().includes("grão-pará") || u.name.toLowerCase().includes("grao")) icon = "🌳";
-
-            return (
-              <Button
-                key={u.id}
-                variant={isSelected ? "primary" : "ghost"}
-                size="sm"
-                onClick={() => setUnitId(u.id)}
-                style={{ borderRadius: "8px", fontWeight: isSelected ? "bold" : "normal" }}
-              >
-                {icon} {u.name}
-              </Button>
-            );
-          })}
+          {/* Badge de Identificação Única do Módulo Ativo */}
+          <Badge variant="teal" style={{ fontSize: "13px", padding: "6px 12px" }}>
+            {unitIcon} {unit.name}
+          </Badge>
         </div>
 
-        <nav style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+        <nav style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginLeft: "12px" }}>
           {SCREENS.map((s) => (
-            <Button key={s.value} variant={screen === s.value ? "teal" : "ghost"} size="sm" onClick={() => setScreen(s.value)}>
+            <Button
+              key={s.value}
+              variant={screen === s.value ? "teal" : "ghost"}
+              size="sm"
+              onClick={() => setScreen(s.value)}
+            >
               {s.label}
             </Button>
           ))}
         </nav>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
-          <span>{employee.full_name}</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{employee.full_name}</span>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setUnitId("")}
+            title="Alternar para a tela inicial de seleção de módulos"
+            style={{ fontSize: "12px", border: "1px solid var(--border-subtle)" }}
+          >
+            🔄 Trocar Módulo
+          </Button>
         </div>
       </header>
 
@@ -88,3 +110,4 @@ export function App() {
     </div>
   );
 }
+

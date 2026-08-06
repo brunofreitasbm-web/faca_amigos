@@ -22,7 +22,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     Api.units().then((list) => {
       setUnits(list);
-      if (list.length > 0) setUnitId((current) => current ?? list[0]!.id);
     });
   }, []);
 

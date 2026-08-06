@@ -29,9 +29,9 @@ export function seedDevData(db: Db, nowMs: number): void {
   const circuitoId = uuidv7(nowMs);
   insertUnit(db, { id: circuitoId, kind: "QUIOSQUE", name: "Circuito (Parque Shopping)" }, nowMs);
 
-  // 3. Módulo Grão-Pará — Shopping Bosque Grão-Pará (Nova Operação Inclusiva)
+  // 3. Módulo Playground — Shopping Bosque Grão-Pará (Nova Operação Inclusiva)
   const graoParaId = uuidv7(nowMs);
-  insertUnit(db, { id: graoParaId, kind: "LOJA", name: "Grão-Pará (Bosque Grão-Pará)" }, nowMs);
+  insertUnit(db, { id: graoParaId, kind: "LOJA", name: "Playground (Bosque Grão-Pará)" }, nowMs);
 
   const adminId = uuidv7(nowMs);
   insertEmployee(db, { id: adminId, full_name: "Admin Dev", role: "ADMIN", pis: null, cpf_last4: null }, nowMs);
@@ -49,11 +49,14 @@ export function seedDevData(db: Db, nowMs: number): void {
   // Planos - Grão-Pará (Bosque Grão-Pará)
   insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "30 minutos", valueCents: 4000, durationValue: 30, durationUnit: "MINUTO", overageCentsPerMinute: 150 }, nowMs);
   insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "1 hora", valueCents: 6000, durationValue: 1, durationUnit: "HORA", overageCentsPerMinute: 150 }, nowMs);
+  insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "Day Use (5h)", valueCents: 27000, durationValue: 5, durationUnit: "HORA", overageCentsPerMinute: 180 }, nowMs);
 
   // Produtos & Suprimentos
   insertProduct(db, { id: uuidv7(nowMs), unit_id: playgroundId, name: "Água mineral", description: "Garrafa 500ml", emoji: "💧", price_cents: 500, stock: 40 }, nowMs);
   insertProduct(db, { id: uuidv7(nowMs), unit_id: playgroundId, name: "Meia antiderrapante", description: "Tamanho único infantil", emoji: "🧦", price_cents: 1500, stock: 25 }, nowMs);
   insertProduct(db, { id: uuidv7(nowMs), unit_id: graoParaId, name: "Água mineral", description: "Garrafa 500ml", emoji: "💧", price_cents: 500, stock: 50 }, nowMs);
+  insertProduct(db, { id: uuidv7(nowMs), unit_id: graoParaId, name: "Meia antiderrapante", description: "Tamanho único infantil", emoji: "🧦", price_cents: 1500, stock: 35 }, nowMs);
+  insertProduct(db, { id: uuidv7(nowMs), unit_id: graoParaId, name: "Suco de Fruta", description: "Caixinha 200ml", emoji: "🧃", price_cents: 700, stock: 30 }, nowMs);
 
   // Frota Carrinhos (Circuito)
   insertAsset(db, { id: uuidv7(nowMs), unit_id: circuitoId, name: "Jipe Rosa", emoji: "🚙", color: "#F0196B", maintenance_threshold_hours: 200 }, nowMs);
@@ -61,5 +64,8 @@ export function seedDevData(db: Db, nowMs: number): void {
 
   // Cupons & Fidelidade
   insertCoupon(db, { id: uuidv7(nowMs), unit_id: playgroundId, code: "AMIGO10", kind: "MINUTOS_EXTRA", value: 10, max_uses: 0, description: "10 minutos extras — avaliação no Google" }, nowMs);
+  insertCoupon(db, { id: uuidv7(nowMs), unit_id: graoParaId, code: "GRAOPARA10", kind: "MINUTOS_EXTRA", value: 10, max_uses: 0, description: "10 minutos extras — inauguração Grão-Pará" }, nowMs);
+  
   insertLoyaltyRule(db, { id: uuidv7(nowMs), unit_id: playgroundId, activity: "PLAYGROUND", trigger_visits: 10, reward_kind: "ENTRADA_GRATIS", reward_value: 1 }, nowMs);
+  insertLoyaltyRule(db, { id: uuidv7(nowMs), unit_id: graoParaId, activity: "PLAYGROUND", trigger_visits: 10, reward_kind: "ENTRADA_GRATIS", reward_value: 1 }, nowMs);
 }
