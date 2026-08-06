@@ -50,8 +50,12 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
           <meta charset="UTF-8">
           <title>Impressão de Pulseira — FaçaAmigos</title>
           <style>
+            /* Sem a palavra "landscape" aqui: combinada com um tamanho
+               explícito width×height ela é redundante (270mm > 20mm já
+               define a orientação) e faz o Chrome travar no "Carregando
+               visualização..." da caixa de impressão indefinidamente. */
             @page {
-              size: 270mm 20mm landscape;
+              size: 270mm 20mm;
               margin: 0;
             }
             html, body {

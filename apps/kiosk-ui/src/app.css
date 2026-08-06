@@ -1,0 +1,24 @@
+/* Shell "sem rolagem de página" do kiosk — protótipo no Painel.
+   Motivo: o operador não deve precisar rolar a tela inteira; o cabeçalho
+   e os controles ficam sempre visíveis, e só a área de conteúdo de cada
+   tela rola internamente quando tem mais itens do que cabem. Não altera
+   o branding (tokens/cores de packages/ui) — só a mecânica de layout. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  /* dvh acompanha a barra de endereço retrátil do Safari/Chrome mobile —
+     100vh sozinho fica maior que a área visível real em iOS/Android e
+     nasce cortando conteúdo ou criando scroll fantasma. */
+  height: 100dvh;
+  /* auto, não hidden: o Painel (e as próximas telas do operador) é
+     dimensionado pra caber exatamente em 100dvh com rolagem só na área
+     de conteúdo interna — então a página nunca precisa rolar. Mas
+     telas ainda não adaptadas (login, seleção de módulo) continuam
+     tendo esse scroll do body como rede de segurança, em vez de cortar
+     conteúdo que não coube. */
+  overflow-y: auto;
+}

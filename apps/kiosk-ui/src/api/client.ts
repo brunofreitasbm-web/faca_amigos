@@ -113,6 +113,7 @@ export interface ActiveSessionEntry {
     wristband_code?: string;
     guardian_name_snapshot?: string;
     guardian_phone_snapshot?: string;
+    child_birth_date?: string;
     notes?: string;
   };
   quote: {
@@ -274,6 +275,7 @@ export interface ActiveSessionsRaw {
   planById: Map<string, Plan>;
   guardianById: Map<string, Record<string, unknown>>;
   assetById: Map<string, Record<string, unknown>>;
+  childById: Map<string, Record<string, unknown>>;
 }
 
 /**
@@ -286,23 +288,26 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
   const sessions = await unwrap<Record<string, unknown>[]>(
     supabase().from("fa_kiosk_sessions").select("*").eq("unit_id", unitId).eq("status", "ATIVA"),
   );
-  if (sessions.length === 0) return { sessions: [], planById: new Map(), guardianById: new Map(), assetById: new Map() };
+  if (sessions.length === 0) return { sessions: [], planById: new Map(), guardianById: new Map(), assetById: new Map(), childById: new Map() };
 
   const planIds = [...new Set(sessions.map((s) => s.plan_id as string))];
   const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
   const assetIds = [...new Set(sessions.map((s) => s.asset_id as string | null).filter((id): id is string => Boolean(id)))];
-  const [plans, guardians, assets] = await Promise.all([
+  const childIds = [...new Set(sessions.map((s) => s.child_id as string))];
+  const [plans, guardians, assets, children] = await Promise.all([
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("*").in("id", planIds)),
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164").in("id", guardianIds)),
     assetIds.length === 0
       ? Promise.resolve([])
       : unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_assets").select("id, name, emoji, photo_url").in("id", assetIds)),
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_children").select("id, birth_date").in("id", childIds)),
   ]);
   return {
     sessions,
     planById: new Map(plans.map((p) => [p.id as string, planFromRow(p)])),
     guardianById: new Map(guardians.map((g) => [g.id as string, g])),
     assetById: new Map(assets.map((a) => [a.id as string, a])),
+    childById: new Map(children.map((c) => [c.id as string, c])),
   };
 }
 
@@ -311,6 +316,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
     const plan = raw.planById.get(row.plan_id as string)!;
     const guardian = raw.guardianById.get(row.guardian_id as string);
     const assetRow = row.asset_id ? raw.assetById.get(row.asset_id as string) : undefined;
+    const childRow = raw.childById.get(row.child_id as string);
     const quote = quoteForSession(
       plan,
       {
@@ -333,6 +339,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         wristband_code: row.wristband_code as string,
         guardian_name_snapshot: (guardian?.full_name as string) ?? undefined,
         guardian_phone_snapshot: (guardian?.phone_e164 as string) ?? undefined,
+        child_birth_date: (childRow?.birth_date as string) ?? undefined,
       },
       quote,
       plan: { id: plan.id, name: plan.name, color: plan.color },

@@ -5,10 +5,8 @@ import type { Asset, ChildMatch, Coupon, Plan } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { normalizePhoneE164, normalizeCpf, isValidCpf, formatCpf, planDurationMinutes, minutesUntilClosing } from "@facaamigos/domain";
-import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import { ReceiptPrintModal } from "../components/ReceiptPrintModal.js";
 
-import type { WristbandData } from "../components/WristbandPrintModal.js";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 import { money } from "../format.js";
 
@@ -47,7 +45,6 @@ export function EntradaScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [printData, setPrintData] = useState<WristbandData | null>(null);
   const [receiptData, setReceiptData] = useState<ReceiptPrintPayload | null>(null);
 
   const [termsOfUse, setTermsOfUse] = useState<string | undefined>(undefined);
@@ -156,19 +153,10 @@ export function EntradaScreen() {
       });
 
       setResult(`Check-in realizado com sucesso! Pulseira código #${res.wristbandCode}`);
-      
-      const entryTime = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-      // Abrir o modal de impressão da pulseira
-      setPrintData({
-        wristbandCode: res.wristbandCode,
-        childName,
-        guardianName,
-        phone,
-        planName: selectedPlan?.name,
-        notes: notesSummary || undefined,
-        entryTime,
-      });
+      // A pulseira NÃO imprime mais automaticamente aqui (a pedido do dono
+      // — só o cupom de entrada dispara sozinho). A impressão da pulseira
+      // agora é sempre manual, pelo botão 🖨️ de cada sessão no Painel.
 
       // Cupom não fiscal com os dados da entrada, impresso automaticamente.
       setReceiptData({
@@ -394,9 +382,9 @@ export function EntradaScreen() {
           disabled={submitting || !planId || !isValidCpf(cpf) || !childName || !guardianName || !phone || !birthDate}
           onClick={submit}
           style={{ borderRadius: "9999px", padding: "16px", flex: 1 }}
-          title={lastGuardianId ? "Confirmar entrada desta criança, mantendo o mesmo responsável" : "Confirmar entrada e imprimir a pulseira"}
+          title={lastGuardianId ? "Confirmar entrada desta criança, mantendo o mesmo responsável — imprime o cupom automaticamente" : "Confirmar entrada — imprime o cupom automaticamente; a pulseira é impressa manualmente pelo Painel"}
         >
-          {lastGuardianId ? "➕ Adicionar Criança & Imprimir Pulseira 🖨️" : "Confirmar entrada & Imprimir Pulseira 🖨️"}
+          {lastGuardianId ? "➕ Adicionar Criança" : "Confirmar Entrada"}
         </Button>
         {lastGuardianId && (
           <Button
@@ -410,13 +398,6 @@ export function EntradaScreen() {
           </Button>
         )}
       </div>
-
-      {printData && (
-        <WristbandPrintModal
-          data={printData}
-          onClose={() => setPrintData(null)}
-        />
-      )}
 
       {receiptData && (
         <ReceiptPrintModal

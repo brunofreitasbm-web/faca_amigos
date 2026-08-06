@@ -71,9 +71,10 @@ export function App() {
   else if (lowerName.includes("grão") || lowerName.includes("grao")) unitIcon = "🌳";
 
   return (
-    <div>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <header
         style={{
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
           gap: "16px",
@@ -122,7 +123,10 @@ export function App() {
         </div>
       </header>
 
-      <main>
+      {/* flex:1 + minHeight:0 é o que faz o filho poder ser 100% de altura
+          sem estourar o pai — sem minHeight:0 um flex item nunca encolhe
+          abaixo do seu conteúdo, e a rolagem "vaza" pra página inteira. */}
+      <main style={{ flex: 1, minHeight: 0 }}>
         <ScreenComponent />
       </main>
     </div>

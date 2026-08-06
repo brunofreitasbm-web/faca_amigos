@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@facaamigos/ui/styles.css";
+import "./app.css";
 import { App } from "./App.js";
 import { AppStateProvider } from "./state/AppState.js";
 import { ToastProvider } from "./state/ToastContext.js";

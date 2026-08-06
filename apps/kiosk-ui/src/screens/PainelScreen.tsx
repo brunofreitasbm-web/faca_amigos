@@ -9,7 +9,7 @@ import { useConfirm } from "../state/ConfirmContext.js";
 import { CheckoutModal } from "../components/CheckoutModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import type { WristbandData } from "../components/WristbandPrintModal.js";
-import { formatElapsed, money } from "../format.js";
+import { formatAge, formatElapsed, money } from "../format.js";
 import { EntradaScreen } from "./EntradaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
 
@@ -161,10 +161,15 @@ export function PainelScreen() {
   const selectedEntries = entries.filter((e) => selected.has(e.session.id));
 
   return (
-    <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+    // height:100% + minHeight:0: o Painel ocupa exatamente o espaço do
+    // <main> do shell (ver App.tsx) e nunca mais que isso — só a lista de
+    // sessões (abaixo) rola internamente quando não cabe tudo. Cabeçalho,
+    // meta do dia e os botões flutuantes ficam sempre visíveis, sem rolar
+    // a página inteira, no computador, tablet ou celular.
+    <div style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", padding: "clamp(12px, 2.5vw, 24px)", gap: "clamp(10px, 2vw, 20px)" }}>
+      <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Painel — {unit.name}</h1>
+          <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 3vw, 28px)" }}>Painel — {unit.name}</h1>
           <p style={{ margin: "4px 0 0 0", color: "var(--text-secondary)", fontSize: "14px" }}>
             Acompanhamento em tempo real das crianças no playground
           </p>
@@ -182,7 +187,9 @@ export function PainelScreen() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px", marginTop: "8px" }}>
+      {/* Única área com rolagem própria da tela — contida, nunca a página toda. */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: "4px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "16px" }}>
         {entries.map((entry) => {
           const { session, quote, plan, asset } = entry;
           const isSelected = selected.has(session.id);
@@ -228,7 +235,15 @@ export function PainelScreen() {
                     )
                   )}
                   <div>
-                    <strong style={{ fontSize: "17px", display: "block" }}>{session.child_name_snapshot}</strong>
+                    <strong style={{ fontSize: "18px", display: "block" }}>
+                      {session.child_name_snapshot}
+                      {session.child_birth_date && (
+                        <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> · {formatAge(session.child_birth_date)}</span>
+                      )}
+                    </strong>
+                    {session.guardian_name_snapshot && (
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Responsável: {session.guardian_name_snapshot}</span>
+                    )}
                     <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Pulseira: #{wristbandCode}</span>
                     {asset && <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Carrinho: {asset.name}</span>}
                     {plan && (
@@ -355,12 +370,13 @@ export function PainelScreen() {
             <p style={{ fontSize: "16px", color: "var(--text-muted)", margin: 0 }}>Nenhuma criança em atividade no momento.</p>
           </div>
         )}
+        </div>
       </div>
 
       {dailyGoalCents > 0 && (
         <div
           title="Progresso do faturamento de hoje em relação à meta diária configurada em Configurações → Meta"
-          style={{ minWidth: "280px" }}
+          style={{ flexShrink: 0, minWidth: "280px" }}
           className="capacity-container"
         >
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-muted)" }}>
