@@ -14,6 +14,7 @@
   "dependencies": {
     "@facaamigos/domain": "workspace:*",
     "@facaamigos/ui": "workspace:*",
+    "@supabase/supabase-js": "^2.47.10",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

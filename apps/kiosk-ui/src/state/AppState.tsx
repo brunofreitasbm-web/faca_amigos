@@ -1,14 +1,24 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Api } from "../api/client.js";
-import type { Employee, Unit } from "../api/client.js";
+import type { Unit } from "../api/client.js";
+import {
+  listTerminalEmployees,
+  fullLogin,
+  quickSwitch,
+  forgetTerminalEmployee,
+  type TerminalEmployee,
+} from "../lib/supabase/terminalAuth.js";
 
 interface AppStateValue {
   units: Unit[];
   unit: Unit | null;
   setUnitId: (id: string) => void;
-  employee: Employee | null;
-  login: (employeeId: string, pin: string) => Promise<void>;
+  employee: TerminalEmployee | null;
+  terminalEmployees: TerminalEmployee[];
+  loginWithPassword: (email: string, password: string, pin: string) => Promise<void>;
+  switchEmployee: (employeeId: string, pin: string) => Promise<void>;
+  forgetEmployee: (employeeId: string) => void;
   logout: () => void;
 }
 
@@ -17,7 +27,8 @@ const AppStateContext = createContext<AppStateValue | null>(null);
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [unitId, setUnitId] = useState<string | null>(null);
-  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [employee, setEmployee] = useState<TerminalEmployee | null>(null);
+  const [terminalEmployees, setTerminalEmployees] = useState<TerminalEmployee[]>(listTerminalEmployees());
 
   useEffect(() => {
     Api.units().then((list) => {
@@ -25,12 +36,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Tela de login omitida por enquanto (pedido explícito) — entra
-  // direto com o primeiro colaborador cadastrado, sem PIN. `login`/
-  // `logout` continuam existindo abaixo para quando a tela voltar.
+  // Login temporariamente oculto a pedido do dono (mesmo padrão já usado no
+  // backoffice antes de haver contas reais) — entra direto com o primeiro
+  // colaborador cadastrado, sem exigir e-mail/senha/PIN. `loginWithPassword`/
+  // `switchEmployee` continuam existindo abaixo para quando o login voltar.
   useEffect(() => {
     Api.employees().then((list) => {
-      if (list.length > 0) setEmployee((current) => current ?? list[0]!);
+      if (list.length > 0) setEmployee((current) => current ?? { id: list[0]!.id, full_name: list[0]!.full_name, role: list[0]!.role });
     });
   }, []);
 
@@ -40,13 +52,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       unit: units.find((u) => u.id === unitId) ?? null,
       setUnitId,
       employee,
-      login: async (employeeId, pin) => {
-        const { employee: emp } = await Api.loginPin(employeeId, pin);
+      terminalEmployees,
+      loginWithPassword: async (email, password, pin) => {
+        const emp = await fullLogin(email, password, pin);
+        setTerminalEmployees(listTerminalEmployees());
         setEmployee(emp);
+      },
+      switchEmployee: async (employeeId, pin) => {
+        const emp = await quickSwitch(employeeId, pin);
+        setEmployee(emp);
+      },
+      forgetEmployee: (employeeId) => {
+        forgetTerminalEmployee(employeeId);
+        setTerminalEmployees(listTerminalEmployees());
       },
       logout: () => setEmployee(null),
     }),
-    [units, unitId, employee],
+    [units, unitId, employee, terminalEmployees],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

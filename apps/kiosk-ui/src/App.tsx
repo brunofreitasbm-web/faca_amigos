@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import { Button, Badge } from "@facaamigos/ui";
 import { useAppState } from "./state/AppState.js";
+import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
 import { PainelScreen } from "./screens/PainelScreen.js";
@@ -37,7 +38,7 @@ export function App() {
   const { unit, setUnitId, employee } = useAppState();
   const [screen, setScreen] = useState<Screen>("ENTRADA");
 
-  if (!employee) return null;
+  if (!employee) return <LoginScreen />;
 
   // Se nenhuma operação/módulo foi selecionado ainda, exibe a Tela Inicial de Seleção de Módulo
   if (!unit) {
@@ -91,7 +92,7 @@ export function App() {
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{employee.full_name}</span>
-          
+
           <Button
             variant="ghost"
             size="sm"

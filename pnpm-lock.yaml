@@ -136,6 +136,9 @@ importers:
       '@facaamigos/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@supabase/supabase-js':
+        specifier: ^2.47.10
+        version: 2.112.1
       react:
         specifier: 'catalog:'
         version: 19.2.8

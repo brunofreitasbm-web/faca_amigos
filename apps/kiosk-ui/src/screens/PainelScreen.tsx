@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, Button, StatusBadge, Badge, Tag } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan } from "../api/client.js";
+import { useActiveSessions } from "../api/useTick.js";
 import { useAppState } from "../state/AppState.js";
 import { CheckoutModal } from "../components/CheckoutModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
@@ -15,7 +16,7 @@ import { formatElapsed, money } from "../format.js";
  */
 export function PainelScreen() {
   const { unit } = useAppState();
-  const [entries, setEntries] = useState<ActiveSessionEntry[]>([]);
+  const entries = useActiveSessions(unit?.id ?? null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [printData, setPrintData] = useState<WristbandData | null>(null);
@@ -24,21 +25,6 @@ export function PainelScreen() {
   const [pendingPlanId, setPendingPlanId] = useState<string>("");
   const [dailyGoalCents, setDailyGoalCents] = useState(0);
   const [todayRevenueCents, setTodayRevenueCents] = useState(0);
-
-  useEffect(() => {
-    if (!unit) return;
-    let cancelled = false;
-    async function poll() {
-      const data = await Api.activeSessions(unit!.id);
-      if (!cancelled) setEntries(data);
-    }
-    poll();
-    const interval = setInterval(poll, 2000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [unit]);
 
   useEffect(() => {
     if (!unit) return;
@@ -52,7 +38,10 @@ export function PainelScreen() {
     let cancelled = false;
     async function poll() {
       try {
-        const [goal, revenue] = await Promise.all([Api.unitSetting(unit!.id, "daily_goal_cents"), Api.todayRevenue(unit!.id)]);
+        const [goal, revenue] = await Promise.all([
+          Api.unitSetting(unit!.id, "daily_goal_cents"),
+          Api.todayRevenue(unit!.id, unit!.business_day_cutoff_hour),
+        ]);
         if (!cancelled) {
           setDailyGoalCents(Number(goal.value) || 0);
           setTodayRevenueCents(revenue.totalCents);
@@ -96,7 +85,7 @@ export function PainelScreen() {
     await Api.changeSessionPlan(sessionId, pendingPlanId);
     setChangingPlanFor(null);
     setPendingPlanId("");
-    if (unit) setEntries(await Api.activeSessions(unit.id));
+    // fa_kiosk_sessions muda -> Realtime dispara refetch em useActiveSessions automaticamente.
   }
 
   function toggle(sessionId: string) {

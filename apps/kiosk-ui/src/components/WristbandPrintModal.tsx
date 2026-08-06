@@ -119,7 +119,7 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
           <h2 style={{ fontFamily: "var(--font-display)", margin: 0, color: "var(--color-primary)" }}>
             Impressão de Pulseira
           </h2>
-          <Tag variant="info">Gainscha GS-2208D (20mm × 270mm Paisagem)</Tag>
+          <Tag color="var(--color-teal)">Gainscha GS-2208D (20mm × 270mm Paisagem)</Tag>
         </div>
 
         {/* Pré-visualização na tela em modo paisagem */}

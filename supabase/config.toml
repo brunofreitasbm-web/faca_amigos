@@ -1,0 +1,18 @@
+# Config do Supabase CLI para o projeto compartilhado `ivjvpdzsfjdpyabbzzuj`
+# (mesmo projeto já usado por apps/backoffice — ver apps/backoffice/README.md).
+#
+# Este projeto NÃO foi criado com `supabase init` neste ambiente porque a CLI
+# não está instalada aqui e o link exige credenciais (access token / db
+# password) que não devem ser digitadas por um agente automatizado.
+#
+# Para linkar e aplicar as migrations manualmente:
+#   npm install -g supabase
+#   supabase login
+#   supabase link --project-ref ivjvpdzsfjdpyabbzzuj
+#   supabase db pull        # reconcilia com o schema já criado via dashboard
+#   supabase db push        # aplica supabase/migrations/*.sql
+
+project_id = "faca-amigos-kiosk"
+
+[db]
+major_version = 15

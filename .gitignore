@@ -1,6 +1,10 @@
 # === Local tooling ===
 .claude/
 
+# === Supabase CLI local cache ===
+supabase/.temp/
+supabase/.branches/
+
 # === Dependencies & build ===
 node_modules/
 .pnpm-store/
@@ -97,3 +101,6 @@ view-source_*.html
 /pop_01_impress_o_a4.html
 /pop_02_impress_o_a4.html
 /pop_03_impress_o_a4.html
+
+.vercel
+.env*
