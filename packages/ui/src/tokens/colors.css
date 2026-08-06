@@ -73,4 +73,14 @@
   --text-muted:      var(--color-gray-500);
   --text-on-primary: #FFFFFF;   /* texto sobre botão/badge preenchido de cor de marca */
   --text-on-dark:    #FFFFFF;
+
+  /* ── Cores de gráfico (dado de visualização, não semântico) — mesmo
+       mapeamento usado em apps/backoffice/src/app/globals.css, centralizado
+       aqui para que apps/kiosk-ui (sem CSS global próprio) tenha as mesmas
+       cores de BI nos relatórios do quiosque. ── */
+  --chart-1: var(--color-teal);
+  --chart-2: var(--color-primary-hover);
+  --chart-3: var(--color-amber);
+  --chart-4: var(--color-gray-600);
+  --chart-grid: var(--color-gray-200);
 }

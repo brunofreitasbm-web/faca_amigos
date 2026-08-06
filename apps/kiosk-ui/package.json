@@ -16,7 +16,8 @@
     "@facaamigos/ui": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "recharts": "^2.15.0"
   },
   "devDependencies": {
     "@facaamigos/config": "workspace:*",

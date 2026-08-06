@@ -663,13 +663,118 @@ export const Api = {
   createEmployee: (body: unknown) => api.post<{ id: string }>("/api/employees", body),
   setEmployeeActive: (id: string, active: boolean) => api.patch(`/api/employees/${id}/active`, { active }),
 
-  reportSales: (unitId: string, from: string, to: string) =>
-    api.get<{ byDay: DailySales[]; byMethod: RevenueByMethod[] }>(`/api/reports/sales?unitId=${unitId}&from=${from}&to=${to}`),
-  reportVisits: (unitId: string, from: string, to: string) =>
-    api.get<DailyVisits[]>(`/api/reports/visits?unitId=${unitId}&from=${from}&to=${to}`),
-  reportBirthdays: (month: number) => api.get<BirthdayChild[]>(`/api/reports/birthdays?month=${month}`),
-  reportShifts: (unitId: string) => api.get<ShiftSummary[]>(`/api/reports/shifts?unitId=${unitId}`),
-  reportAssetUsage: (unitId: string, from: string, to: string) =>
-    api.get<AssetUsage[]>(`/api/reports/asset-usage?unitId=${unitId}&from=${from}&to=${to}`),
-  reportPonto: (fromMs: number, toMs: number) => api.get<FolhaPontoRow[]>(`/api/reports/ponto?fromMs=${fromMs}&toMs=${toMs}`),
+  // Os relatórios abaixo chamavam `/api/reports/...` (servidor Fastify
+  // local, apps/kiosk) — removido na migração para Supabase (commit
+  // cafbda6), então todo relatório voltava 404. Reescritos como consultas
+  // diretas ao Supabase, agregadas no cliente (mesmo padrão de
+  // apps/backoffice/.../relatorios/page.tsx).
+  reportSales: async (unitId: string, from: string, to: string) => {
+    const orders = await unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_orders")
+        .select("id, business_date, total_cents")
+        .eq("unit_id", unitId)
+        .eq("status", "PAGA")
+        .gte("business_date", from)
+        .lte("business_date", to),
+    );
+    const byDayMap = new Map<string, { orders_count: number; total_cents: number }>();
+    for (const o of orders) {
+      const d = o.business_date as string;
+      const cur = byDayMap.get(d) ?? { orders_count: 0, total_cents: 0 };
+      cur.orders_count += 1;
+      cur.total_cents += o.total_cents as number;
+      byDayMap.set(d, cur);
+    }
+    const byDay: DailySales[] = [...byDayMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([business_date, v]) => ({ business_date, ...v }));
+
+    const orderIds = orders.map((o) => o.id as string);
+    let byMethod: RevenueByMethod[] = [];
+    if (orderIds.length > 0) {
+      const payments = await unwrap<Record<string, unknown>[]>(
+        supabase().from("fa_kiosk_payments").select("method, amount_cents").in("order_id", orderIds),
+      );
+      const methodMap = new Map<string, number>();
+      for (const p of payments) {
+        const m = p.method as string;
+        methodMap.set(m, (methodMap.get(m) ?? 0) + (p.amount_cents as number));
+      }
+      byMethod = [...methodMap.entries()].map(([method, total_cents]) => ({ method, total_cents }));
+    }
+    return { byDay, byMethod };
+  },
+  reportVisits: async (unitId: string, from: string, to: string) => {
+    const sessions = await unwrap<Record<string, unknown>[]>(
+      supabase().from("fa_kiosk_sessions").select("business_date").eq("unit_id", unitId).gte("business_date", from).lte("business_date", to),
+    );
+    const map = new Map<string, number>();
+    for (const s of sessions) {
+      const d = s.business_date as string;
+      map.set(d, (map.get(d) ?? 0) + 1);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([business_date, sessions_count]) => ({ business_date, sessions_count }));
+  },
+  reportBirthdays: async (month: number) => {
+    const children = await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_children").select("id, full_name, birth_date"));
+    return children
+      .filter((c) => new Date(c.birth_date as string).getUTCMonth() + 1 === month)
+      .map((c) => ({ id: c.id as string, full_name: c.full_name as string, birth_date: c.birth_date as string }));
+  },
+  reportShifts: (unitId: string) =>
+    unwrap<ShiftSummary[]>(
+      supabase()
+        .from("fa_kiosk_shifts")
+        .select("id, opened_at_ms, closed_at_ms, status, declared_json, expected_json")
+        .eq("unit_id", unitId)
+        .order("opened_at_ms", { ascending: false }),
+    ),
+  reportAssetUsage: async (unitId: string, from: string, to: string) => {
+    const [assets, sessions] = await Promise.all([
+      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_assets").select("id, name, emoji, color").eq("unit_id", unitId)),
+      unwrap<Record<string, unknown>[]>(
+        supabase()
+          .from("fa_kiosk_sessions")
+          .select("asset_id, checkin_at_ms, checkout_at_ms")
+          .eq("unit_id", unitId)
+          .eq("activity", "CARRINHO")
+          .not("asset_id", "is", null)
+          .gte("business_date", from)
+          .lte("business_date", to),
+      ),
+    ]);
+    const usageByAsset = new Map<string, { sessions_count: number; total_minutes: number }>();
+    const nowMs = Date.now();
+    for (const s of sessions) {
+      const assetId = s.asset_id as string;
+      const checkin = s.checkin_at_ms as number;
+      const checkout = (s.checkout_at_ms as number | null) ?? nowMs;
+      const cur = usageByAsset.get(assetId) ?? { sessions_count: 0, total_minutes: 0 };
+      cur.sessions_count += 1;
+      cur.total_minutes += Math.max(0, Math.round((checkout - checkin) / 60000));
+      usageByAsset.set(assetId, cur);
+    }
+    return assets.map((a) => {
+      const usage = usageByAsset.get(a.id as string) ?? { sessions_count: 0, total_minutes: 0 };
+      return { id: a.id as string, name: a.name as string, emoji: a.emoji as string, color: a.color as string, ...usage };
+    }) as AssetUsage[];
+  },
+  reportPonto: async (fromMs: number, toMs: number) => {
+    const rows = await unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_ponto_records")
+        .select("employee_id, kind, at_ms, nsr, fa_kiosk_employees(full_name)")
+        .gte("at_ms", fromMs)
+        .lte("at_ms", toMs)
+        .order("at_ms", { ascending: false }),
+    );
+    return rows.map((r) => ({
+      employee_id: r.employee_id as string,
+      full_name: (r.fa_kiosk_employees as unknown as { full_name: string } | null)?.full_name ?? "—",
+      kind: r.kind as string,
+      at_ms: r.at_ms as number,
+      nsr: r.nsr as number,
+    })) as FolhaPontoRow[];
+  },
 };

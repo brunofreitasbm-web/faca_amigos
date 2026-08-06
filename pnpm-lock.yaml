@@ -151,6 +151,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.8(react@19.2.8)
+      recharts:
+        specifier: ^2.15.0
+        version: 2.15.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     devDependencies:
       '@facaamigos/config':
         specifier: workspace:*

@@ -4,6 +4,7 @@ import { Api } from "../api/client.js";
 import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, RevenueByMethod, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
+import { AssetUsageChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
 
 type Tab = "VENDAS" | "VISITAS" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 
@@ -80,6 +81,10 @@ function VendasTab({ unitId }: { unitId: string }) {
           </div>
         ))}
       </Card>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "16px" }}>
+        <RevenueByDayChart data={byDay} />
+        <RevenueByMethodChart data={byMethod} />
+      </div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
@@ -113,6 +118,9 @@ function VisitasTab({ unitId }: { unitId: string }) {
   return (
     <div>
       <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} />
+      <div style={{ margin: "16px 0" }}>
+        <VisitsByDayChart data={visits} />
+      </div>
       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "16px" }}>
         <thead>
           <tr>
@@ -244,6 +252,9 @@ function FrotaHeatmapTab({ unitId }: { unitId: string }) {
       <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: "12px 0" }} title="Quanto mais escuro/intenso, mais o carrinho foi alocado no período — ajuda a identificar quais carrinhos se pagam mais rápido e quais ficam parados">
         Intensidade da cor = frequência de uso no período selecionado.
       </p>
+      <div style={{ marginBottom: "16px" }}>
+        <AssetUsageChart data={usage} />
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px" }}>
         {usage.map((u) => {
           const intensity = u.sessions_count / maxSessions;
