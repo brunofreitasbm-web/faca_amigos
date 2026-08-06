@@ -31,11 +31,9 @@ export async function updateSession(request: NextRequest) {
 
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
 
-  if (!user && !isLoginRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
+  // TODO: login temporariamente desativado a pedido do dono — nenhum usuário
+  // Supabase Auth foi criado ainda. Reativar o bloco abaixo assim que houver
+  // login: reintroduz o redirect para /login quando !user && !isLoginRoute.
 
   if (user && isLoginRoute) {
     const url = request.nextUrl.clone();
