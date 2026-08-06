@@ -47,12 +47,26 @@ export function App() {
       <header style={{ display: "flex", alignItems: "center", gap: "16px", padding: "12px 24px", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
         <strong style={{ fontFamily: "var(--font-display)" }}>FaçaAmigos</strong>
 
-        <div style={{ display: "flex", gap: "4px" }}>
-          {units.map((u) => (
-            <Button key={u.id} variant={unit?.id === u.id ? "primary" : "ghost"} size="sm" onClick={() => setUnitId(u.id)}>
-              {u.name}
-            </Button>
-          ))}
+        <div style={{ display: "flex", gap: "6px", background: "var(--surface-sunken)", padding: "4px", borderRadius: "12px" }}>
+          {units.map((u) => {
+            const isSelected = unit?.id === u.id;
+            let icon = "📍";
+            if (u.name.toLowerCase().includes("playground")) icon = "🏰";
+            else if (u.name.toLowerCase().includes("circuito")) icon = "🏎️";
+            else if (u.name.toLowerCase().includes("grão-pará") || u.name.toLowerCase().includes("grao")) icon = "🌳";
+
+            return (
+              <Button
+                key={u.id}
+                variant={isSelected ? "primary" : "ghost"}
+                size="sm"
+                onClick={() => setUnitId(u.id)}
+                style={{ borderRadius: "8px", fontWeight: isSelected ? "bold" : "normal" }}
+              >
+                {icon} {u.name}
+              </Button>
+            );
+          })}
         </div>
 
         <nav style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>

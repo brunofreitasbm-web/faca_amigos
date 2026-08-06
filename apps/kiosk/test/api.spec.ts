@@ -117,11 +117,11 @@ describe("fluxo completo via HTTP", () => {
 });
 
 describe("listUnits/listAssets via repositórios (sanidade do seed)", () => {
-  it("cria as duas unidades e a frota do quiosque", () => {
+  it("cria as três unidades operacionais e a frota do quiosque", () => {
     const db = openDatabase(":memory:");
     migrate(db);
     seedDevData(db, nowMs);
-    expect(listUnits(db)).toHaveLength(2);
+    expect(listUnits(db)).toHaveLength(3);
     const quiosque = listUnits(db).find((u) => u.kind === "QUIOSQUE")!;
     expect(listAssets(db, quiosque.id).length).toBeGreaterThan(0);
   });
