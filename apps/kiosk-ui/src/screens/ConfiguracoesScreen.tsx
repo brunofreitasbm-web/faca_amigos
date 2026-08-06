@@ -4,6 +4,8 @@ import { Api } from "../api/client.js";
 import type { Asset, BonusRule, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
+import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
+import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { money } from "../format.js";
 
 type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES";
@@ -655,26 +657,66 @@ function FrotaTab({ unitId }: { unitId: string }) {
   );
 }
 
+const CONTRACT_TYPE_LABEL: Record<NonNullable<Employee["contract_type"]>, string> = {
+  CLT: "CLT",
+  ESTAGIO: "Estágio",
+  AUTONOMO: "Autônomo",
+};
+
 function ColaboradoresTab() {
+  const toast = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [admin, setAdmin] = useState<TerminalEmployee | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<Employee["role"]>("OPERADOR");
-  const [pin, setPin] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [admissionDate, setAdmissionDate] = useState("");
+  const [position, setPosition] = useState("");
+  const [contractType, setContractType] = useState<NonNullable<Employee["contract_type"]>>("CLT");
+  const [weeklyHours, setWeeklyHours] = useState("44");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function load() {
-    Api.employees().then(setEmployees);
+    Api.allEmployees().then(setEmployees);
   }
   useEffect(load, []);
+
+  function resetForm() {
+    setFullName("");
+    setCpf("");
+    setEmail("");
+    setBirthDate("");
+    setAdmissionDate("");
+    setPosition("");
+    setContractType("CLT");
+    setWeeklyHours("44");
+    setRole("OPERADOR");
+  }
 
   async function create() {
     setBusy(true);
     setError(null);
     try {
-      await Api.createEmployee({ fullName, role, pin });
-      setFullName("");
-      setPin("");
+      const res = await Api.createEmployee({
+        fullName,
+        role,
+        cpf,
+        email,
+        birthDate,
+        admissionDate,
+        position,
+        contractType,
+        weeklyHoursContracted: Number(weeklyHours),
+      });
+      setTemporaryPassword(res.temporaryPassword);
+      resetForm();
+      setShowForm(false);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar colaborador");
@@ -683,28 +725,96 @@ function ColaboradoresTab() {
     }
   }
 
+  async function toggleActive(emp: Employee) {
+    try {
+      await Api.setEmployeeActive(emp.id, !emp.active);
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível atualizar o colaborador");
+    }
+  }
+
+  const formValid = fullName && cpf && email && birthDate && admissionDate && position && Number(weeklyHours) > 0;
+
   return (
     <div>
-      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2>Novo colaborador</h2>
-        <Input label="Nome completo" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-        <div>
-          <label>Papel</label>
-          <select value={role} onChange={(e) => setRole(e.target.value as Employee["role"])}>
-            <option value="OPERADOR">Operador</option>
-            <option value="GERENTE">Gerente</option>
-            <option value="ADMIN">Admin</option>
-          </select>
-        </div>
-        <Input label="PIN (6 dígitos)" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} />
-        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
-        <Button variant="primary" disabled={busy || !fullName || pin.length !== 6} onClick={create}>
-          Criar colaborador
+      {temporaryPassword && (
+        <Card style={{ padding: "16px", marginBottom: "16px", border: "2px solid var(--color-amber)" }}>
+          <strong>⚠️ Anote e entregue ao colaborador — esta senha só aparece uma vez:</strong>
+          <div style={{ fontFamily: "monospace", fontSize: "18px", margin: "8px 0" }}>{temporaryPassword}</div>
+          <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>
+            Ele deve entrar com e-mail e esta senha na tela de Ponto (ou Login) e escolher um PIN — a senha pode ser trocada depois.
+          </p>
+          <Button variant="ghost" size="sm" onClick={() => setTemporaryPassword(null)}>
+            ok, já anotei
+          </Button>
+        </Card>
+      )}
+
+      {!showForm && !admin && (
+        <Button variant="primary" onClick={() => setShowForm(true)} style={{ marginBottom: "16px" }}>
+          + Novo colaborador
         </Button>
-      </Card>
+      )}
+
+      {showForm && !admin && (
+        <Card style={{ padding: "16px", marginBottom: "16px" }}>
+          <p style={{ marginTop: 0, color: "var(--text-muted)" }}>Só um ADMIN pode cadastrar colaborador — confirme sua conta.</p>
+          <EmployeeAuthGate requireRole="ADMIN" onAuthenticated={setAdmin} onCancel={() => setShowForm(false)} />
+        </Card>
+      )}
+
+      {showForm && admin && (
+        <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <h2>Novo colaborador</h2>
+          <Input label="Nome completo" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <Input label="CPF" value={cpf} onChange={(e) => setCpf(e.target.value)} />
+          <Input label="E-mail (vira a conta de login)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input label="Data de nascimento" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+          <Input label="Data de admissão" type="date" value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
+          <Input label="Cargo / função" value={position} onChange={(e) => setPosition(e.target.value)} />
+          <div>
+            <label>Tipo de contrato</label>
+            <select value={contractType} onChange={(e) => setContractType(e.target.value as typeof contractType)}>
+              <option value="CLT">CLT</option>
+              <option value="ESTAGIO">Estágio</option>
+              <option value="AUTONOMO">Autônomo</option>
+            </select>
+          </div>
+          <Input label="Jornada semanal contratada (horas)" type="number" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} />
+          <div>
+            <label>Papel</label>
+            <select value={role} onChange={(e) => setRole(e.target.value as Employee["role"])}>
+              <option value="OPERADOR">Operador</option>
+              <option value="GERENTE">Gerente</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+          {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
+          <div style={{ display: "flex", gap: "8px" }}>
+            <Button variant="primary" disabled={busy || !formValid} onClick={create}>
+              Criar colaborador
+            </Button>
+            <Button variant="ghost" onClick={() => { setShowForm(false); setAdmin(null); }}>
+              cancelar
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {employees.map((e) => (
-        <Card key={e.id} style={{ padding: "12px", marginBottom: "8px" }}>
-          {e.full_name} — {e.role}
+        <Card key={e.id} style={{ padding: "12px", marginBottom: "8px", opacity: e.active === false ? 0.5 : 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <strong>{e.full_name}</strong> — {e.role}
+              {e.position && <span style={{ color: "var(--text-muted)" }}> · {e.position}</span>}
+              {e.contract_type && <span style={{ color: "var(--text-muted)" }}> · {CONTRACT_TYPE_LABEL[e.contract_type]}</span>}
+              {e.admission_date && <span style={{ color: "var(--text-muted)" }}> · admitido em {new Date(e.admission_date).toLocaleDateString("pt-BR")}</span>}
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => toggleActive(e)}>
+              {e.active === false ? "reativar" : "desativar"}
+            </Button>
+          </div>
         </Card>
       ))}
     </div>

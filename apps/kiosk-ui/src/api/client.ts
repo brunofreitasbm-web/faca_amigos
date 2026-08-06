@@ -52,6 +52,26 @@ export interface Employee {
   id: string;
   full_name: string;
   role: "OPERADOR" | "GERENTE" | "ADMIN";
+  cpf?: string | null;
+  email?: string | null;
+  birth_date?: string | null;
+  admission_date?: string | null;
+  position?: string | null;
+  contract_type?: "CLT" | "ESTAGIO" | "AUTONOMO" | null;
+  weekly_hours_contracted?: number | null;
+  active?: boolean;
+}
+
+export interface NewEmployeeInput {
+  fullName: string;
+  role: Employee["role"];
+  cpf: string;
+  email: string;
+  birthDate: string;
+  admissionDate: string;
+  position: string;
+  contractType: NonNullable<Employee["contract_type"]>;
+  weeklyHoursContracted: number;
 }
 
 export interface Plan {
@@ -229,6 +249,7 @@ export interface ShiftSummary {
 export interface FolhaPontoRow {
   employee_id: string;
   full_name: string;
+  weekly_hours_contracted: number | null;
   kind: string;
   at_ms: number;
   nsr: number;
@@ -398,7 +419,21 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
 
 export const Api = {
   units: () => unwrap<Unit[]>(supabase().from("fa_kiosk_units").select("id, kind, name, business_day_cutoff_hour")),
-  employees: () => unwrap<Employee[]>(supabase().from("fa_kiosk_employees").select("id, full_name, role").eq("active", true)),
+  employees: () =>
+    unwrap<Employee[]>(
+      supabase()
+        .from("fa_kiosk_employees")
+        .select("id, full_name, role, cpf, email, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
+        .eq("active", true)
+        .order("full_name"),
+    ),
+  allEmployees: () =>
+    unwrap<Employee[]>(
+      supabase()
+        .from("fa_kiosk_employees")
+        .select("id, full_name, role, cpf, email, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
+        .order("full_name"),
+    ),
   plans: async (unitId: string, activity: string) => {
     const rows = await unwrap<Record<string, unknown>[]>(
       supabase().from("fa_kiosk_plans").select("*").eq("unit_id", unitId).eq("activity", activity).eq("active", true),
@@ -808,11 +843,14 @@ export const Api = {
     const { data } = supabase().storage.from("carrinho-fotos").getPublicUrl(path);
     return data.publicUrl;
   },
-  // Criação de funcionário exige uma conta real no Supabase Auth (não dá
-  // para ser feita com a chave anônima do cliente) — segue pelo servidor
-  // local até a Fase 1 ganhar um fluxo de convite via backoffice/admin API.
-  createEmployee: (body: unknown) => api.post<{ id: string }>("/api/employees", body),
-  setEmployeeActive: (id: string, active: boolean) => api.patch(`/api/employees/${id}/active`, { active }),
+  // Criação de funcionário exige uma conta real no Supabase Auth — não dá
+  // para ser feita com a chave anônima/de sessão do cliente, só com a
+  // service role. A Edge Function `admin-create-employee` confere que
+  // quem chama é ADMIN autenticado e faz o resto (auth.users + linha em
+  // fa_kiosk_employees) do lado do servidor.
+  createEmployee: (body: NewEmployeeInput) =>
+    unwrap<{ id: string; temporaryPassword: string }>(supabase().functions.invoke("admin-create-employee", { body })),
+  setEmployeeActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_employees").update({ active }).eq("id", id).select().single()),
 
   // Os relatórios abaixo chamavam `/api/reports/...` (servidor Fastify
   // local, apps/kiosk) — removido na migração para Supabase (commit
@@ -915,14 +953,16 @@ export const Api = {
     const rows = await unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_ponto_records")
-        .select("employee_id, kind, at_ms, nsr, fa_kiosk_employees(full_name)")
+        .select("employee_id, kind, at_ms, nsr, fa_kiosk_employees(full_name, weekly_hours_contracted)")
         .gte("at_ms", fromMs)
         .lte("at_ms", toMs)
         .order("at_ms", { ascending: false }),
     );
     return rows.map((r) => ({
       employee_id: r.employee_id as string,
-      full_name: (r.fa_kiosk_employees as unknown as { full_name: string } | null)?.full_name ?? "—",
+      full_name: (r.fa_kiosk_employees as unknown as { full_name: string; weekly_hours_contracted: number | null } | null)?.full_name ?? "—",
+      weekly_hours_contracted:
+        (r.fa_kiosk_employees as unknown as { full_name: string; weekly_hours_contracted: number | null } | null)?.weekly_hours_contracted ?? null,
       kind: r.kind as string,
       at_ms: r.at_ms as number,
       nsr: r.nsr as number,
