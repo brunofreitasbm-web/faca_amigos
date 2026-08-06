@@ -293,6 +293,66 @@ function TurnosTab({ unitId }: { unitId: string }) {
   );
 }
 
+interface DailyHoursSummary {
+  employeeId: string;
+  fullName: string;
+  dateLabel: string;
+  workedMs: number;
+  targetMs: number | null;
+}
+
+/**
+ * Pareia ENTRADA→SAIDA e INTERVALO_INICIO→INTERVALO_FIM por colaborador e
+ * dia civil, no fuso do navegador (mesmo critério visual do "Marcações de
+ * hoje" em PontoScreen). Marcação sem par (esqueceu de bater a saída, por
+ * exemplo) não entra na soma — aparece só na tabela bruta abaixo, que
+ * continua sendo o registro de auditoria de verdade.
+ */
+function summarizeDailyHours(rows: FolhaPontoRow[]): DailyHoursSummary[] {
+  const byGroup = new Map<string, FolhaPontoRow[]>();
+  for (const r of rows) {
+    const dateLabel = new Date(r.at_ms).toLocaleDateString("pt-BR");
+    const key = `${r.employee_id}|${dateLabel}`;
+    byGroup.set(key, [...(byGroup.get(key) ?? []), r]);
+  }
+
+  const summaries: DailyHoursSummary[] = [];
+  for (const [key, group] of byGroup) {
+    const [, dateLabel] = key.split("|") as [string, string];
+    const sorted = [...group].sort((a, b) => a.at_ms - b.at_ms);
+    let workedMs = 0;
+    let entradaAt: number | null = null;
+    let intervaloAt: number | null = null;
+    for (const r of sorted) {
+      if (r.kind === "ENTRADA") entradaAt = r.at_ms;
+      else if (r.kind === "SAIDA" && entradaAt !== null) {
+        workedMs += r.at_ms - entradaAt;
+        entradaAt = null;
+      } else if (r.kind === "INTERVALO_INICIO") intervaloAt = r.at_ms;
+      else if (r.kind === "INTERVALO_FIM" && intervaloAt !== null) {
+        workedMs -= r.at_ms - intervaloAt;
+        intervaloAt = null;
+      }
+    }
+    const first = sorted[0]!;
+    summaries.push({
+      employeeId: first.employee_id,
+      fullName: first.full_name,
+      dateLabel,
+      workedMs: Math.max(0, workedMs),
+      targetMs: first.weekly_hours_contracted ? (first.weekly_hours_contracted / 5) * 60 * 60 * 1000 : null,
+    });
+  }
+  return summaries.sort((a, b) => a.fullName.localeCompare(b.fullName) || a.dateLabel.localeCompare(b.dateLabel));
+}
+
+function formatDurationMs(ms: number): string {
+  const totalMinutes = Math.round(ms / 60_000);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}h${String(m).padStart(2, "0")}`;
+}
+
 function PontoTab() {
   const { from, setFrom, to, setTo } = useDateRange();
   const [rows, setRows] = useState<FolhaPontoRow[]>([]);
@@ -301,9 +361,54 @@ function PontoTab() {
     Api.reportPonto(new Date(from).getTime(), new Date(to).getTime() + 86_400_000).then(setRows);
   }, [from, to]);
 
+  const dailySummaries = summarizeDailyHours(rows);
+
   return (
     <div>
       <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} />
+
+      <h3 style={{ marginTop: "20px" }}>Resumo de horas por colaborador/dia</h3>
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "24px" }}>
+        <thead>
+          <tr>
+            <th style={{ textAlign: "left" }}>Colaborador</th>
+            <th>Dia</th>
+            <th>Horas trabalhadas</th>
+            <th>Jornada contratada (dia)</th>
+            <th>Diferença</th>
+          </tr>
+        </thead>
+        <tbody>
+          {dailySummaries.map((s) => {
+            const diffMs = s.targetMs !== null ? s.workedMs - s.targetMs : null;
+            return (
+              <tr key={`${s.employeeId}|${s.dateLabel}`}>
+                <td>{s.fullName}</td>
+                <td style={{ textAlign: "center" }}>{s.dateLabel}</td>
+                <td style={{ textAlign: "center" }}>{formatDurationMs(s.workedMs)}</td>
+                <td style={{ textAlign: "center" }}>{s.targetMs !== null ? formatDurationMs(s.targetMs) : "—"}</td>
+                <td
+                  style={{
+                    textAlign: "center",
+                    color: diffMs === null ? undefined : diffMs < -15 * 60_000 ? "var(--color-error-text)" : diffMs > 15 * 60_000 ? "var(--color-amber)" : "var(--color-teal-text)",
+                  }}
+                >
+                  {diffMs === null ? "—" : `${diffMs >= 0 ? "+" : "-"}${formatDurationMs(Math.abs(diffMs))}`}
+                </td>
+              </tr>
+            );
+          })}
+          {dailySummaries.length === 0 && (
+            <tr>
+              <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)" }}>
+                Nenhuma marcação no período.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      <h3>Marcações (registro de auditoria)</h3>
       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "16px" }}>
         <thead>
           <tr>
