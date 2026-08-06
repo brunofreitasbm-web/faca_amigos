@@ -3,6 +3,12 @@
    e os controles ficam sempre visíveis, e só a área de conteúdo de cada
    tela rola internamente quando tem mais itens do que cabem. Não altera
    o branding (tokens/cores de packages/ui) — só a mecânica de layout. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
@@ -21,4 +27,22 @@ body {
      tendo esse scroll do body como rede de segurança, em vez de cortar
      conteúdo que não coube. */
   overflow-y: auto;
+  /* Larguras fixas (px) que sobram de telas antigas não devem gerar
+     barra de rolagem lateral em tablets/celulares menores. */
+  overflow-x: hidden;
+}
+
+/* Breakpoints alinhados a --screen-max-mobile / --screen-max-tablet
+   (packages/ui/src/tokens/spacing.css) — reduz a escala base de fonte em
+   telas menores para caber mais conteúdo sem cortar nem exigir zoom. */
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 390px) {
+  html {
+    font-size: 14px;
+  }
 }

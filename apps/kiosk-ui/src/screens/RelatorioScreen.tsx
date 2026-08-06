@@ -29,7 +29,7 @@ export function RelatorioScreen() {
   ];
 
   return (
-    <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
+    <div style={{ padding: "clamp(12px, 3vw, 24px)", maxWidth: "900px", margin: "0 auto" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Relatório — {unit.name}</h1>
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "16px 0" }}>
         {tabs.map((t) => (
@@ -287,7 +287,7 @@ function FrotaHeatmapTab({ unitId }: { unitId: string }) {
 
 function DateRangePicker({ from, to, setFrom, setTo }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void }) {
   return (
-    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
       <label>
         De: <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
       </label>

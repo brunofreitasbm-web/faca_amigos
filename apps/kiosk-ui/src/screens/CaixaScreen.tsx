@@ -119,7 +119,7 @@ export function CaixaScreen() {
 
   if (shift === null) {
     return (
-      <div style={{ maxWidth: "420px", margin: "60px auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ maxWidth: "420px", margin: "clamp(16px, 8vh, 60px) auto", padding: "0 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno — {unit.name}</h1>
         <Input label="Troco inicial (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
         {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
@@ -132,7 +132,7 @@ export function CaixaScreen() {
 
   if (closeResult) {
     return (
-      <div style={{ maxWidth: "480px", margin: "40px auto" }}>
+      <div style={{ maxWidth: "480px", margin: "clamp(16px, 6vh, 40px) auto", padding: "0 16px" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Turno fechado</h1>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -165,13 +165,13 @@ export function CaixaScreen() {
 
   if (closing) {
     return (
-      <div style={{ maxWidth: "420px", margin: "40px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div style={{ maxWidth: "420px", margin: "clamp(16px, 6vh, 40px) auto", padding: "0 16px", display: "flex", flexDirection: "column", gap: "12px" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Fechar turno</h1>
         <p>Digite o que foi contado por método (o sistema já mostra o esperado ao lado — sem fechamento cego):</p>
         {METHODS.map((method) => (
-          <div key={method} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ width: "100px" }}>{method}</span>
-            <span style={{ width: "100px", color: "var(--text-secondary)" }}>
+          <div key={method} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
+            <span style={{ minWidth: "100px" }}>{method}</span>
+            <span style={{ minWidth: "100px", color: "var(--text-secondary)" }}>
               esperado {money(expectedHint(method, revenue, movements))}
             </span>
             <Input
@@ -195,7 +195,7 @@ export function CaixaScreen() {
   }
 
   return (
-    <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div style={{ maxWidth: "900px", margin: "0 auto", padding: "clamp(12px, 3vw, 24px)", display: "flex", flexDirection: "column", gap: "20px" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Caixa — {unit.name}</h1>
 
       <Card style={{ padding: "16px" }}>
