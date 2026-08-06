@@ -10,6 +10,16 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, "title">
   title?: ReactNode;
   subtitle?: ReactNode;
   children?: ReactNode;
+  /**
+   * Estilo do miolo, onde os filhos realmente moram.
+   *
+   * Existe porque `style` cai no elemento externo, e os filhos ficam num
+   * wrapper com padding próprio — então um `display:flex` passado em
+   * `style` nunca alcançava o conteúdo, e layouts que dependiam disso
+   * (colunas com `gap`, rodapé empurrado com `marginTop:auto`) viravam
+   * empilhamento de bloco sem espaçamento, silenciosamente.
+   */
+  bodyStyle?: CSSProperties;
 }
 
 /**
@@ -27,6 +37,7 @@ export function Card({
   children,
   onClick,
   style: styleProp,
+  bodyStyle,
   ...rest
 }: CardProps) {
   const [hovered, setHovered] = useState(false);
@@ -83,7 +94,7 @@ export function Card({
       {...rest}
     >
       {imageSrc && <img src={imageSrc} alt={imageAlt} style={imageStyle} />}
-      <div style={{ padding: "16px 20px 20px" }}>
+      <div style={{ padding: "16px 20px 20px", ...bodyStyle }}>
         {title && <p style={titleStyle}>{title}</p>}
         {subtitle && <p style={subtitleStyle}>{subtitle}</p>}
         {children}

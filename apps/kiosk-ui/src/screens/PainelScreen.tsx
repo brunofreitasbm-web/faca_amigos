@@ -237,7 +237,7 @@ export function PainelScreen() {
 
       {/* Única área com rolagem própria da tela — contida, nunca a página toda. */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: "4px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "16px" }}>
+        <div className="painel-grid">
         {entries.map((entry) => {
           const { session, quote, plan, asset } = entry;
           const isSelected = selected.has(session.id);
@@ -251,13 +251,25 @@ export function PainelScreen() {
             <Card
               key={session.id}
               onClick={() => !isPaused && toggle(session.id)}
-              className={(isExceeded && !isPaused) || isPausedTooLong ? "blinking" : undefined}
-              style={{
-                cursor: isPaused ? "default" : "pointer",
-                padding: "16px",
+              // painel-card cuida de padding/gap/raio de forma fluida (app.css);
+              // aqui ficam só os estilos que dependem do estado da sessão.
+              className={`painel-card${(isExceeded && !isPaused) || isPausedTooLong ? " blinking" : ""}`}
+              // O respiro do card acompanha a largura do próprio card (cqi),
+              // não a da janela — ver .painel-card em app.css. Vai em
+              // bodyStyle porque é lá que os filhos ficam; `flex:1` é o que
+              // permite ao rodapé de valor grudar embaixo com marginTop:auto.
+              bodyStyle={{
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                gap: "10px",
+                gap: "clamp(8px, 2.5cqi, 12px)",
+                padding: "clamp(12px, 4.5cqi, 18px)",
+              }}
+              style={{
+                cursor: isPaused ? "default" : "pointer",
+                display: "flex",
+                flexDirection: "column",
+                borderRadius: "16px",
                 border: isPaused
                   ? "2px dashed var(--color-amber)"
                   : isSelected
@@ -266,7 +278,6 @@ export function PainelScreen() {
                   ? "2px solid var(--color-error)"
                   : "1px solid var(--border-subtle)",
                 borderLeft: `6px solid ${plan?.color ?? "var(--border-subtle)"}`,
-                borderRadius: "16px",
                 background: isPaused ? "rgba(201, 144, 32, 0.06)" : isSelected ? "rgba(240, 25, 107, 0.04)" : "var(--surface-card)",
                 opacity: isPaused ? 0.85 : 1,
               }}
@@ -279,16 +290,17 @@ export function PainelScreen() {
                         src={asset.photo_url}
                         alt={asset.name}
                         title={`Carrinho: ${asset.name}`}
-                        style={{ width: "44px", height: "44px", objectFit: "cover", borderRadius: "12px", border: "1px solid var(--border-subtle)", flexShrink: 0 }}
+                        className="painel-card-thumb-img"
+                        style={{ objectFit: "cover", borderRadius: "12px", border: "1px solid var(--border-subtle)", flexShrink: 0 }}
                       />
                     ) : (
-                      <span title={`Carrinho: ${asset.name}`} style={{ fontSize: "32px", lineHeight: "44px" }}>
+                      <span title={`Carrinho: ${asset.name}`} className="painel-card-thumb-emoji">
                         {asset.emoji}
                       </span>
                     )
                   )}
-                  <div>
-                    <strong style={{ fontSize: "18px", display: "block" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <strong className="painel-card-name" style={{ display: "block" }}>
                       {session.child_name_snapshot}
                       {session.child_birth_date && (
                         <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> · {formatAge(session.child_birth_date)}</span>
@@ -473,7 +485,7 @@ export function PainelScreen() {
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto", paddingTop: "8px", borderTop: "1px dashed var(--border-subtle)" }}>
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Valor Atual:</span>
-                <strong style={{ fontSize: "18px", color: "var(--color-primary)" }}>{money(quote.totalCents)}</strong>
+                <strong className="painel-card-total" style={{ color: "var(--color-primary)" }}>{money(quote.totalCents)}</strong>
               </div>
             </Card>
           );

@@ -83,7 +83,7 @@ function VendasTab({ unitId }: { unitId: string }) {
           </div>
         ))}
       </Card>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: "16px", marginBottom: "16px" }}>
         <RevenueByDayChart data={byDay} />
         <RevenueByMethodChart data={byMethod} />
       </div>
@@ -151,7 +151,7 @@ function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
           Nenhum plano vendido {title.toLowerCase()}.
         </Card>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: "16px" }}>
           <PlansSoldChart title={`Participação — ${title.toLowerCase()}`} data={data} />
 
           <Card style={{ padding: "16px" }}>

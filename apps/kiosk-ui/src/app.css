@@ -22,3 +22,64 @@ body {
      conteúdo que não coube. */
   overflow-y: auto;
 }
+
+/* ---------- Painel: cards fluidos ----------
+
+   O tamanho do card não é fixo: ele acompanha o espaço que sobra, do
+   celular em uma coluna ao balcão com cinco ou mais.
+
+   `minmax(min(100%, 260px), 1fr)` é o miolo disso. O `min(100%, 260px)`
+   evita o estouro clássico do grid em tela estreita — uma faixa mínima de
+   260px é maior que a viewport de um celular pequeno e criaria rolagem
+   horizontal. O `1fr` faz os cards dividirem toda a largura disponível em
+   vez de deixarem canaleta sobrando à direita.
+
+   Continua `auto-fill`, e não `auto-fit`, de propósito: com `auto-fit` as
+   faixas vazias colapsam e uma única criança em atividade viraria um card
+   ocupando a tela inteira. */
+.painel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: clamp(10px, 1.5vw, 18px);
+}
+
+/* Cada card é um container de consulta: quem decide o respiro e o corpo
+   do texto é a largura QUE O CARD RECEBEU, não a da janela. É o que
+   mantém o card legível tanto sozinho num celular quanto espremido numa
+   coluna estreita de um monitor grande — dois casos em que a largura da
+   janela diz coisas opostas sobre o espaço real do card. */
+.painel-card {
+  container-type: inline-size;
+}
+
+.painel-card-name {
+  font-size: clamp(15px, 6.5cqi, 19px);
+}
+
+.painel-card-total {
+  font-size: clamp(15px, 6.5cqi, 19px);
+}
+
+.painel-card-thumb-img {
+  width: 44px;
+  height: 44px;
+}
+
+.painel-card-thumb-emoji {
+  font-size: 32px;
+  line-height: 44px;
+}
+
+/* Abaixo de ~210px de card, foto e texto lado a lado não cabem sem picotar
+   o nome da criança em várias linhas: a miniatura do carrinho encolhe. */
+@container (max-width: 210px) {
+  .painel-card-thumb-img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .painel-card-thumb-emoji {
+    font-size: 24px;
+    line-height: 32px;
+  }
+}

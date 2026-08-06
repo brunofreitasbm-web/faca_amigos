@@ -61,7 +61,19 @@ export function StatusBadge({ phase, detail, size = "md", style: styleProp, ...r
           <span>{LABELS[phase]}</span>
         </span>
         {detail && (
-          <span style={{ fontSize: "30px", fontWeight: "var(--weight-bold)" as unknown as number, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>
+          <span
+            style={{
+              // cqi: acompanha a largura do card que contém o badge, não a
+              // da janela — num monitor grande com muitas colunas estreitas
+              // a janela é larga mas o card é pequeno, e é o card que manda.
+              // Sem um container de consulta em volta, cqi cai na viewport
+              // e o clamp segura no teto, que é o comportamento antigo.
+              fontSize: "clamp(22px, 11cqi, 34px)",
+              fontWeight: "var(--weight-bold)" as unknown as number,
+              fontVariantNumeric: "tabular-nums",
+              lineHeight: 1.1,
+            }}
+          >
             {detail}
           </span>
         )}
