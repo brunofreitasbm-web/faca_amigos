@@ -1,0 +1,9 @@
+{
+  "extends": "@facaamigos/config/tsconfig-react.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["vite/client"]
+  },
+  "include": ["src"]
+}

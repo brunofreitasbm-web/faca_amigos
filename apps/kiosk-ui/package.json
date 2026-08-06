@@ -1,0 +1,30 @@
+{
+  "name": "@facaamigos/kiosk-ui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SPA React (D1 do plano) — mesma UI para o Electron e para os tablets da LAN, servida pelo apps/kiosk.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@facaamigos/domain": "workspace:*",
+    "@facaamigos/ui": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@facaamigos/config": "workspace:*",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vite": "^5.4.11",
+    "vitest": "catalog:"
+  }
+}

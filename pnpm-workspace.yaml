@@ -4,6 +4,7 @@ packages:
   - "tools/*"
 
 allowBuilds:
+  electron: true
   esbuild: true
 
 # Versão única de dependências-chave em todo o monorepo (D1 do plano:

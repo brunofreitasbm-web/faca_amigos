@@ -1,0 +1,409 @@
+import { useEffect, useState } from "react";
+import { Button, Card, Input } from "@facaamigos/ui";
+import { Api } from "../api/client.js";
+import type { Asset, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
+import { useAppState } from "../state/AppState.js";
+import { money } from "../format.js";
+
+type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "FROTA" | "COLABORADORES";
+
+export function ConfiguracoesScreen() {
+  const { unit } = useAppState();
+  const isQuiosque = unit?.kind === "QUIOSQUE";
+  const [tab, setTab] = useState<Tab>("PLANOS");
+
+  if (!unit) return null;
+
+  const tabs: { value: Tab; label: string }[] = [
+    { value: "PLANOS", label: "Planos de Preços" },
+    { value: "PRODUTOS", label: "Produtos" },
+    { value: "CUPONS", label: "Cupons" },
+    { value: "FIDELIDADE", label: "Fidelidade" },
+    ...(isQuiosque ? ([{ value: "FROTA", label: "Frota" }] as const) : []),
+    { value: "COLABORADORES", label: "Colaboradores" },
+  ];
+
+  return (
+    <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
+      <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações — {unit.name}</h1>
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "16px 0" }}>
+        {tabs.map((t) => (
+          <Button key={t.value} variant={tab === t.value ? "primary" : "ghost"} size="sm" onClick={() => setTab(t.value)}>
+            {t.label}
+          </Button>
+        ))}
+      </div>
+
+      {tab === "PLANOS" && <PlanosTab unitId={unit.id} activity={isQuiosque ? "CARRINHO" : "PLAYGROUND"} />}
+      {tab === "PRODUTOS" && <ProdutosTab unitId={unit.id} />}
+      {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
+      {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
+      {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
+      {tab === "COLABORADORES" && <ColaboradoresTab />}
+    </div>
+  );
+}
+
+function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND" | "CARRINHO" }) {
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [name, setName] = useState("");
+  const [valueReais, setValueReais] = useState("0");
+  const [durationValue, setDurationValue] = useState("15");
+  const [durationUnit, setDurationUnit] = useState<"MINUTO" | "HORA">("MINUTO");
+  const [overageReais, setOverageReais] = useState("1");
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    Api.plans(unitId, activity).then(setPlans);
+  }
+  useEffect(load, [unitId, activity]);
+
+  async function create() {
+    setBusy(true);
+    try {
+      await Api.createPlan({
+        unitId,
+        activity,
+        name,
+        valueCents: Math.round(Number(valueReais) * 100),
+        durationValue: Number(durationValue),
+        durationUnit,
+        overageCentsPerMinute: Math.round(Number(overageReais) * 100),
+      });
+      setName("");
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2>Novo plano</h2>
+        <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input label="Valor (R$)" type="number" value={valueReais} onChange={(e) => setValueReais(e.target.value)} />
+        <div style={{ display: "flex", gap: "8px" }}>
+          <Input label="Duração" type="number" value={durationValue} onChange={(e) => setDurationValue(e.target.value)} />
+          <div>
+            <label>Unidade</label>
+            <select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value as "MINUTO" | "HORA")}>
+              <option value="MINUTO">minuto(s)</option>
+              <option value="HORA">hora(s)</option>
+            </select>
+          </div>
+        </div>
+        <Input label="Excedente por minuto (R$)" type="number" value={overageReais} onChange={(e) => setOverageReais(e.target.value)} />
+        <Button variant="primary" disabled={busy || !name} onClick={create}>
+          Criar plano
+        </Button>
+      </Card>
+
+      {plans.map((p) => (
+        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
+          <span>
+            {p.name} — {p.durationValue} {p.durationUnit.toLowerCase()}
+          </span>
+          <span>
+            {money(p.valueCents)} + {money(p.overageCentsPerMinute)}/min excedente
+          </span>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ProdutosTab({ unitId }: { unitId: string }) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [name, setName] = useState("");
+  const [priceReais, setPriceReais] = useState("0");
+  const [stock, setStock] = useState("0");
+  const [emoji, setEmoji] = useState("🛍️");
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    Api.products(unitId).then(setProducts);
+  }
+  useEffect(load, [unitId]);
+
+  async function create() {
+    setBusy(true);
+    try {
+      await Api.createProduct({ unitId, name, emoji, priceCents: Math.round(Number(priceReais) * 100), stock: Number(stock) });
+      setName("");
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2>Novo produto</h2>
+        <Input label="Emoji" value={emoji} onChange={(e) => setEmoji(e.target.value)} />
+        <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input label="Preço (R$)" type="number" value={priceReais} onChange={(e) => setPriceReais(e.target.value)} />
+        <Input label="Estoque" type="number" value={stock} onChange={(e) => setStock(e.target.value)} />
+        <Button variant="primary" disabled={busy || !name} onClick={create}>
+          Criar produto
+        </Button>
+      </Card>
+      {products.map((p) => (
+        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
+          <span>
+            {p.emoji} {p.name}
+          </span>
+          <span>
+            {money(p.price_cents)} — {p.stock} un.
+          </span>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function CuponsTab({ unitId }: { unitId: string }) {
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [code, setCode] = useState("");
+  const [kind, setKind] = useState<Coupon["kind"]>("MINUTOS_EXTRA");
+  const [value, setValue] = useState("10");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    Api.coupons(unitId).then(setCoupons);
+  }
+  useEffect(load, [unitId]);
+
+  async function create() {
+    setBusy(true);
+    try {
+      await Api.createCoupon({ unitId, code, kind, value: Number(value), description: description || undefined });
+      setCode("");
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2>Novo cupom</h2>
+        <Input label="Código" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+        <div>
+          <label>Tipo</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as Coupon["kind"])}>
+            <option value="MINUTOS_EXTRA">Minutos extras</option>
+            <option value="DESCONTO_PCT">Desconto %</option>
+            <option value="DESCONTO_VALOR">Desconto em R$</option>
+          </select>
+        </div>
+        <Input label="Valor" type="number" value={value} onChange={(e) => setValue(e.target.value)} />
+        <Input label="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} />
+        <Button variant="primary" disabled={busy || !code} onClick={create}>
+          Criar cupom
+        </Button>
+      </Card>
+      {coupons.map((c) => (
+        <Card key={c.id} style={{ padding: "12px", marginBottom: "8px" }}>
+          <strong>{c.code}</strong> — {c.kind} ({c.value}) — usado {c.used_count}× {c.description ? `— ${c.description}` : ""}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function FidelidadeTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }) {
+  const [rules, setRules] = useState<LoyaltyRule[]>([]);
+  const [triggerVisits, setTriggerVisits] = useState("10");
+  const [rewardKind, setRewardKind] = useState<LoyaltyRule["rewardKind"]>("ENTRADA_GRATIS");
+  const [rewardValue, setRewardValue] = useState("1");
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    Api.loyaltyRules(unitId).then(setRules);
+  }
+  useEffect(load, [unitId]);
+
+  async function create() {
+    setBusy(true);
+    try {
+      await Api.createLoyaltyRule({
+        unitId,
+        activity: isQuiosque ? "CARRINHO" : "PLAYGROUND",
+        triggerVisits: Number(triggerVisits),
+        rewardKind,
+        rewardValue: Number(rewardValue),
+      });
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2>Nova regra</h2>
+        <Input label="A cada X visitas" type="number" value={triggerVisits} onChange={(e) => setTriggerVisits(e.target.value)} />
+        <div>
+          <label>Recompensa</label>
+          <select value={rewardKind} onChange={(e) => setRewardKind(e.target.value as LoyaltyRule["rewardKind"])}>
+            <option value="ENTRADA_GRATIS">Entrada grátis</option>
+            <option value="DESCONTO_PCT">Desconto %</option>
+            <option value="MINUTOS_EXTRA">Minutos extras</option>
+          </select>
+        </div>
+        <Input label="Valor" type="number" value={rewardValue} onChange={(e) => setRewardValue(e.target.value)} />
+        <Button variant="primary" disabled={busy} onClick={create}>
+          Criar regra
+        </Button>
+      </Card>
+      {rules.map((r) => (
+        <Card key={r.id} style={{ padding: "12px", marginBottom: "8px" }}>
+          A cada {r.triggerVisits} visitas ({r.activity}) → {r.rewardKind} ({r.rewardValue})
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+const CART_EMOJI_OPTIONS = ["🚙", "🚗", "🏎️", "🏍️", "🏁", "🚜", "🛺", "🚕"];
+const CART_COLOR_OPTIONS = ["#F0196B", "#2ECFB5", "#FFE234", "#1A3F35", "#FF7A00", "#A020EE"];
+
+function FrotaTab({ unitId }: { unitId: string }) {
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [name, setName] = useState("");
+  const [emoji, setEmoji] = useState(CART_EMOJI_OPTIONS[0]!);
+  const [color, setColor] = useState(CART_COLOR_OPTIONS[0]!);
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    Api.assets(unitId).then(setAssets);
+  }
+  useEffect(load, [unitId]);
+
+  async function create() {
+    setBusy(true);
+    try {
+      await Api.createAsset({ unitId, name, emoji, color, maintenanceThresholdHours: 200 });
+      setName("");
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setStatus(id: string, status: Asset["status"]) {
+    await Api.setAssetStatus(id, status);
+    load();
+  }
+
+  return (
+    <div>
+      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2>Novo carrinho</h2>
+        <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
+        <div>
+          <label>Emoji</label>
+          <div style={{ display: "flex", gap: "4px" }}>
+            {CART_EMOJI_OPTIONS.map((em) => (
+              <Button key={em} variant={emoji === em ? "primary" : "ghost"} size="sm" onClick={() => setEmoji(em)}>
+                {em}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label>Cor</label>
+          <div style={{ display: "flex", gap: "4px" }}>
+            {CART_COLOR_OPTIONS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                style={{ width: "28px", height: "28px", borderRadius: "50%", background: c, border: color === c ? "3px solid black" : "1px solid var(--border-subtle)" }}
+              />
+            ))}
+          </div>
+        </div>
+        <Button variant="primary" disabled={busy || !name} onClick={create}>
+          Criar carrinho
+        </Button>
+      </Card>
+
+      {assets.map((a) => (
+        <Card key={a.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>
+            {a.emoji} {a.name} — {a.status} — {Math.round(a.odometer_minutes / 60)}h de uso
+          </span>
+          <div style={{ display: "flex", gap: "4px" }}>
+            <Button variant="ghost" size="sm" onClick={() => setStatus(a.id, "DISPONIVEL")}>
+              disponível
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setStatus(a.id, "MANUTENCAO")}>
+              manutenção
+            </Button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ColaboradoresTab() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState<Employee["role"]>("OPERADOR");
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function load() {
+    Api.employees().then(setEmployees);
+  }
+  useEffect(load, []);
+
+  async function create() {
+    setBusy(true);
+    setError(null);
+    try {
+      await Api.createEmployee({ fullName, role, pin });
+      setFullName("");
+      setPin("");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao criar colaborador");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2>Novo colaborador</h2>
+        <Input label="Nome completo" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        <div>
+          <label>Papel</label>
+          <select value={role} onChange={(e) => setRole(e.target.value as Employee["role"])}>
+            <option value="OPERADOR">Operador</option>
+            <option value="GERENTE">Gerente</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </div>
+        <Input label="PIN (6 dígitos)" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+        {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
+        <Button variant="primary" disabled={busy || !fullName || pin.length !== 6} onClick={create}>
+          Criar colaborador
+        </Button>
+      </Card>
+      {employees.map((e) => (
+        <Card key={e.id} style={{ padding: "12px", marginBottom: "8px" }}>
+          {e.full_name} — {e.role}
+        </Card>
+      ))}
+    </div>
+  );
+}

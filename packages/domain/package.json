@@ -1,0 +1,24 @@
+{
+  "name": "@facaamigos/domain",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Regras de negócio puras (D5) — motor de tempo, preço, fidelidade e RBAC. Sem node:*, sem fetch, sem Date.now() direto.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@facaamigos/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@facaamigos/config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

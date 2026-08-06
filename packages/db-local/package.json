@@ -1,0 +1,25 @@
+{
+  "name": "@facaamigos/db-local",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SQLite local (D2: só o PC servidor escreve) — conexão, migrations e repositórios das tabelas operacionais.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node -e \"require('fs').cpSync('src/migrations','dist/migrations',{recursive:true})\"",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@facaamigos/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@facaamigos/config": "workspace:*",
+    "@types/node": "^22.10.0",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
