@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { CashMovement, RevenueByMethod, Shift } from "../api/client.js";
+import type { CashMovement, RevenueByMethod, Shift, ShiftSale } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useConfirm } from "../state/ConfirmContext.js";
@@ -20,6 +20,7 @@ export function CaixaScreen() {
 
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [revenue, setRevenue] = useState<RevenueByMethod[]>([]);
+  const [sales, setSales] = useState<ShiftSale[]>([]);
   const [movementKind, setMovementKind] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
   const [movementAmount, setMovementAmount] = useState("0");
   const [movementReason, setMovementReason] = useState("");
@@ -35,6 +36,7 @@ export function CaixaScreen() {
     if (current) {
       setMovements(await Api.cashMovements(current.id));
       setRevenue(await Api.revenueByMethod(current.id));
+      setSales(await Api.shiftSales(current.id));
     }
   }
 
@@ -193,7 +195,7 @@ export function CaixaScreen() {
   }
 
   return (
-    <div style={{ maxWidth: "640px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Caixa — {unit.name}</h1>
 
       <Card style={{ padding: "16px" }}>
@@ -205,6 +207,48 @@ export function CaixaScreen() {
             <span>{money(r.total_cents)}</span>
           </div>
         ))}
+      </Card>
+
+      <Card style={{ padding: "16px" }} title="Cada linha é uma venda paga neste turno — código único gerado no fechamento, para auditoria e rastreamento">
+        <h2>Vendas do turno</h2>
+        {sales.length === 0 && <p>Nenhuma venda registrada ainda.</p>}
+        {sales.length > 0 && (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <thead>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-subtle)" }}>
+                  <th style={{ padding: "6px 8px" }}>Código</th>
+                  <th style={{ padding: "6px 8px" }}>Hora</th>
+                  <th style={{ padding: "6px 8px" }}>Criança / Responsável</th>
+                  <th style={{ padding: "6px 8px" }}>Pagamento</th>
+                  <th style={{ padding: "6px 8px", textAlign: "right" }}>Desconto</th>
+                  <th style={{ padding: "6px 8px", textAlign: "right" }}>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map((s) => (
+                  <tr key={s.orderId} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                    <td style={{ padding: "6px 8px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{s.orderCode ?? s.orderId.slice(0, 8).toUpperCase()}</td>
+                    <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>{new Date(s.createdAtMs).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
+                    <td style={{ padding: "6px 8px" }}>
+                      {s.kind === "SESSAO" ? (
+                        <>
+                          <strong>{s.childNames}</strong>
+                          {s.guardianName && <span style={{ display: "block", fontSize: "12px", color: "var(--text-muted)" }}>Resp: {s.guardianName}</span>}
+                        </>
+                      ) : (
+                        <span title={s.productsSummary ?? undefined}>🛒 {s.productsSummary}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "6px 8px" }}>{s.method}</td>
+                    <td style={{ padding: "6px 8px", textAlign: "right" }}>{s.discountCents > 0 ? `−${money(s.discountCents)}` : "—"}</td>
+                    <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}>{money(s.amountCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <Card style={{ padding: "16px" }}>

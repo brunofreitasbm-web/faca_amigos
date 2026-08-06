@@ -137,6 +137,19 @@ export interface CashMovement {
   reason: string | null;
 }
 
+export interface ShiftSale {
+  orderId: string;
+  orderCode: string | null;
+  kind: "SESSAO" | "PDV";
+  createdAtMs: number;
+  method: string;
+  amountCents: number;
+  discountCents: number;
+  childNames: string;
+  guardianName: string | null;
+  productsSummary: string | null;
+}
+
 export interface BonusRule {
   id: string;
   unitId: string;
@@ -445,14 +458,14 @@ export const Api = {
     payments: { method: string; amountCents: number; nsu?: string; authorization?: string; pixTxid?: string }[];
     redeemRewardIds?: string[];
   }) =>
-    callResilient<{ orderId: string; totalCents: number }>("fa_checkout", {
+    callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_checkout", {
       p_session_ids: body.sessionIds,
       p_payments: body.payments,
       p_redeem_reward_ids: body.redeemRewardIds ?? [],
       p_employee_id: body.employeeId,
     }),
   pdvOrder: (body: { unitId: string; employeeId: string; items: { productId: string; quantity: number }[]; payments: unknown[] }) =>
-    callResilient<{ orderId: string; totalCents: number }>("fa_create_pdv_order", {
+    callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_create_pdv_order", {
       p_unit_id: body.unitId,
       p_employee_id: body.employeeId,
       p_items: body.items,
@@ -489,6 +502,96 @@ export const Api = {
     const totals = new Map<string, number>();
     for (const row of rows) totals.set(row.method, (totals.get(row.method) ?? 0) + row.amount_cents);
     return [...totals.entries()].map(([method, total_cents]) => ({ method, total_cents }));
+  },
+  // Extrato de cada venda do turno (a pedido do dono, para auditoria): uma
+  // linha por pedido pago — código único, criança(s)/responsável para
+  // check-outs, produtos para vendas de PDV, forma de pagamento, desconto
+  // (fa_kiosk_sessions.coupon_discount_cents) e valor.
+  shiftSales: async (shiftId: string): Promise<ShiftSale[]> => {
+    // fa_kiosk_orders é a tabela-stub original (ver migration 05): tem
+    // `created_at` (timestamptz), não `created_at_ms` como as tabelas
+    // criadas do zero nesta fase.
+    const orders = await unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_orders")
+        .select("id, order_code, kind, total_cents, created_at")
+        .eq("shift_id", shiftId)
+        .eq("status", "PAGA")
+        .order("created_at", { ascending: false }),
+    );
+    if (orders.length === 0) return [];
+    const orderIds = orders.map((o) => o.id as string);
+
+    const [payments, items] = await Promise.all([
+      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_payments").select("order_id, method, amount_cents").in("order_id", orderIds)),
+      unwrap<Record<string, unknown>[]>(
+        supabase().from("fa_kiosk_order_items").select("order_id, session_id, description, quantity").in("order_id", orderIds),
+      ),
+    ]);
+
+    const sessionIds = [...new Set(items.map((i) => i.session_id as string | null).filter((id): id is string => Boolean(id)))];
+    const sessions =
+      sessionIds.length === 0
+        ? []
+        : await unwrap<Record<string, unknown>[]>(
+            supabase().from("fa_kiosk_sessions").select("id, child_name_snapshot, guardian_id, coupon_discount_cents").in("id", sessionIds),
+          );
+    const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
+    const guardians =
+      guardianIds.length === 0
+        ? []
+        : await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name").in("id", guardianIds));
+
+    const sessionById = new Map(sessions.map((s) => [s.id as string, s]));
+    const guardianById = new Map(guardians.map((g) => [g.id as string, g]));
+    const paymentByOrder = new Map(payments.map((p) => [p.order_id as string, p]));
+    const itemsByOrder = new Map<string, Record<string, unknown>[]>();
+    for (const item of items) {
+      const list = itemsByOrder.get(item.order_id as string) ?? [];
+      list.push(item);
+      itemsByOrder.set(item.order_id as string, list);
+    }
+
+    return orders.map((order) => {
+      const orderId = order.id as string;
+      const kind = order.kind as "SESSAO" | "PDV";
+      const payment = paymentByOrder.get(orderId);
+      const orderItems = itemsByOrder.get(orderId) ?? [];
+
+      if (kind === "SESSAO") {
+        const uniqueSessionIds = [...new Set(orderItems.map((i) => i.session_id as string | null).filter((id): id is string => Boolean(id)))];
+        const sessionsForOrder = uniqueSessionIds.map((id) => sessionById.get(id)).filter((s): s is Record<string, unknown> => Boolean(s));
+        const childNames = sessionsForOrder.map((s) => s.child_name_snapshot as string).join(", ");
+        const firstGuardian = sessionsForOrder[0] ? guardianById.get(sessionsForOrder[0].guardian_id as string) : undefined;
+        const discountCents = sessionsForOrder.reduce((sum, s) => sum + ((s.coupon_discount_cents as number) ?? 0), 0);
+        return {
+          orderId,
+          orderCode: (order.order_code as string) ?? null,
+          kind,
+          createdAtMs: new Date(order.created_at as string).getTime(),
+          method: (payment?.method as string) ?? "—",
+          amountCents: order.total_cents as number,
+          discountCents,
+          childNames: childNames || "—",
+          guardianName: (firstGuardian?.full_name as string) ?? null,
+          productsSummary: null,
+        };
+      }
+
+      const productsSummary = orderItems.map((i) => `${i.quantity}× ${i.description as string}`).join(", ");
+      return {
+        orderId,
+        orderCode: (order.order_code as string) ?? null,
+        kind,
+        createdAtMs: order.created_at_ms as number,
+        method: (payment?.method as string) ?? "—",
+        amountCents: order.total_cents as number,
+        discountCents: 0,
+        childNames: "—",
+        guardianName: null,
+        productsSummary: productsSummary || "—",
+      };
+    });
   },
 
   ponto: (body: { unitId: string; employeeId: string; kind: PontoRecord["kind"]; registeredByEmployeeId: string }) =>

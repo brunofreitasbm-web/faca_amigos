@@ -3,6 +3,8 @@ export interface ReceiptPrintPayload {
   unitName: string;
   employeeName?: string;
   dateTime?: string;
+  /** Código único da venda (fa_kiosk_orders.order_code), para auditoria/rastreamento. */
+  code?: string;
   items: Array<{ description: string; quantity?: number; amountCents: number }>;
   totalCents: number;
   payments?: Array<{ method: string; amountCents: number }>;
@@ -25,6 +27,7 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   lines.push(`           ${payload.unitName.toUpperCase()}`);
   lines.push("================================================");
   lines.push(`*** ${payload.title.toUpperCase()} ***`);
+  if (payload.code) lines.push(`Código: ${payload.code}`);
   lines.push(`Data/Hora: ${dateTime}`);
   if (payload.employeeName) lines.push(`Atendente: ${payload.employeeName}`);
   lines.push("------------------------------------------------");

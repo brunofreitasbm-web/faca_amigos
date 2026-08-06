@@ -55,13 +55,13 @@ export function PdvScreen() {
     setBusy(true);
     setError(null);
     try {
-      await Api.pdvOrder({
+      const result = await Api.pdvOrder({
         unitId: unit.id,
         employeeId: employee.id,
         items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
         payments: [{ method, amountCents: totalCents }],
       });
-      setSuccess("Venda registrada!");
+      setSuccess(`Venda registrada! Código: ${result.orderCode}`);
       setCart([]);
       Api.products(unit.id).then(setProducts); // atualiza estoque na tela
     } catch (err) {
