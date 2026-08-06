@@ -6,6 +6,8 @@ import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { money } from "../format.js";
 import { CashPaymentPad } from "../components/CashPaymentPad.js";
+import { ReceiptPrintModal } from "../components/ReceiptPrintModal.js";
+import type { ReceiptPrintPayload } from "@facaamigos/domain";
 
 interface CartLine {
   product: Product;
@@ -24,6 +26,7 @@ export function PdvScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptPrintPayload | null>(null);
 
   useEffect(() => {
     if (!unit) return;
@@ -62,6 +65,26 @@ export function PdvScreen() {
         payments: [{ method, amountCents: totalCents }],
       });
       setSuccess(`Venda registrada! Código: ${result.orderCode}`);
+
+      // Um clique em "Confirmar venda" já dispara a sequência inteira: cobra
+      // o pagamento, limpa o carrinho, atualiza o estoque na tela e abre o
+      // cupom (que se imprime sozinho — ver ReceiptPrintModal), sem exigir
+      // um clique extra do operador para cada etapa.
+      setReceipt({
+        title: "Comprovante PDV",
+        unitName: unit.name,
+        employeeName: employee.full_name,
+        dateTime: new Date().toLocaleString("pt-BR"),
+        code: result.orderCode,
+        items: cart.map((line) => ({
+          description: line.product.name,
+          quantity: line.quantity,
+          amountCents: line.product.price_cents * line.quantity,
+        })),
+        totalCents,
+        payments: [{ method, amountCents: totalCents }],
+      });
+
       setCart([]);
       Api.products(unit.id).then(setProducts); // atualiza estoque na tela
     } catch (err) {
@@ -76,8 +99,8 @@ export function PdvScreen() {
   if (!unit) return null;
 
   return (
-    <div style={{ display: "flex", gap: "24px", padding: "24px" }}>
-      <div style={{ flex: 2 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "24px", padding: "24px" }}>
+      <div style={{ flex: 2, minWidth: "280px" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>PDV — {unit.name}</h1>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px", marginTop: "16px" }}>
           {products.map((p) => (
@@ -91,7 +114,7 @@ export function PdvScreen() {
         </div>
       </div>
 
-      <Card style={{ flex: 1, padding: "16px", height: "fit-content" }}>
+      <Card style={{ flex: 1, minWidth: "280px", padding: "16px", height: "fit-content" }}>
         <h2>Carrinho</h2>
         {cart.length === 0 && <p>Vazio</p>}
         {cart.map((line) => (
@@ -145,6 +168,8 @@ export function PdvScreen() {
           </Button>
         )}
       </Card>
+
+      {receipt && <ReceiptPrintModal data={receipt} onClose={() => setReceipt(null)} />}
     </div>
   );
 }

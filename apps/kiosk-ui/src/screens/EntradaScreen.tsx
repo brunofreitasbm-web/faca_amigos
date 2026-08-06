@@ -209,7 +209,7 @@ export function EntradaScreen() {
   if (!unit) return null;
 
   return (
-    <div style={{ maxWidth: "720px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div style={{ maxWidth: "720px", margin: "0 auto", padding: "clamp(12px, 3vw, 24px)", display: "flex", flexDirection: "column", gap: "20px" }}>
       <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Entrada — {unit.name}</h1>
 
       <section>

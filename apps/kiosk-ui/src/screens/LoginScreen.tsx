@@ -59,7 +59,7 @@ export function LoginScreen() {
   }
 
   return (
-    <div style={{ maxWidth: "480px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+    <div style={{ maxWidth: "480px", margin: "clamp(24px, 12vh, 80px) auto", padding: "0 16px", display: "flex", flexDirection: "column", gap: "12px" }}>
       <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center" }}>Quem está operando?</h1>
       {terminalEmployees.map((emp) => (
         <Card key={emp.id} style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -93,7 +93,7 @@ function PinEntry({
 }) {
   const [pin, setPin] = useState("");
   return (
-    <div style={{ maxWidth: "360px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
+    <div style={{ maxWidth: "360px", margin: "clamp(24px, 12vh, 80px) auto", padding: "0 16px", display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>{employee.full_name}</h1>
       {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
       <PinPad
@@ -128,7 +128,7 @@ function NewEmployeeLogin({
   const [pin, setPin] = useState("");
 
   return (
-    <div style={{ maxWidth: "360px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+    <div style={{ maxWidth: "360px", margin: "clamp(24px, 12vh, 80px) auto", padding: "0 16px", display: "flex", flexDirection: "column", gap: "12px" }}>
       <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center" }}>Entrar</h1>
       {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
       <input placeholder="e-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
