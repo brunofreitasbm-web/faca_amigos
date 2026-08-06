@@ -3,7 +3,17 @@ import { Card, Button, Input, Tag } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Plan } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
+import type { WristbandData } from "../components/WristbandPrintModal.js";
 import { money } from "../format.js";
+
+const SENSORY_TAG_OPTIONS = [
+  "Sensível a Ruído Alto",
+  "Usa Abafador",
+  "Acompanhante / Mediador 1:1",
+  "Preferência pelo Cantinho da Calma",
+  "Alergia Alimentar / Cuidados Especializados",
+] as const;
 
 export function EntradaScreen() {
   const { unit, employee } = useAppState();
@@ -21,10 +31,14 @@ export function EntradaScreen() {
   const [matches, setMatches] = useState<ChildMatch[]>([]);
   const [matchedChild, setMatchedChild] = useState<ChildMatch | null>(null);
 
+  const [selectedSensoryTags, setSelectedSensoryTags] = useState<string[]>([]);
+  const [customNotes, setCustomNotes] = useState("");
   const [couponCode, setCouponCode] = useState("");
+  
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [printData, setPrintData] = useState<WristbandData | null>(null);
 
   useEffect(() => {
     if (!unit) return;
@@ -33,7 +47,7 @@ export function EntradaScreen() {
     if (activity === "CARRINHO") Api.assets(unit.id).then(setAssets);
   }, [unit, activity]);
 
-  // Autocomplete ao vivo (princípio: digitar o mínimo) — bate por nome da criança OU telefone do responsável.
+  // Autocomplete ao vivo — por nome da criança OU telefone do responsável
   useEffect(() => {
     const query = childName.length >= 2 ? childName : phone.length >= 4 ? phone : "";
     if (!query) {
@@ -54,6 +68,12 @@ export function EntradaScreen() {
     setMatches([]);
   }
 
+  function toggleSensoryTag(tag: string) {
+    setSelectedSensoryTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  }
+
   async function submit() {
     if (!unit || !employee || !planId) return;
     if (activity === "CARRINHO" && !assetId) {
@@ -62,7 +82,14 @@ export function EntradaScreen() {
     }
     setSubmitting(true);
     setError(null);
+
+    const notesSummary = [
+      ...selectedSensoryTags,
+      customNotes.trim()
+    ].filter(Boolean).join(" | ");
+
     try {
+      const selectedPlan = plans.find((p) => p.id === planId);
       const res = await Api.checkin({
         unitId: unit.id,
         activity,
@@ -73,11 +100,27 @@ export function EntradaScreen() {
         guardian: { fullName: guardianName, phoneE164: phone },
         couponCode: couponCode || undefined,
       });
-      setResult(`Check-in feito! Pulseira ${res.wristbandCode}`);
+
+      setResult(`Check-in realizado com sucesso! Pulseira código #${res.wristbandCode}`);
+      
+      // Abrir o modal de impressão da pulseira
+      setPrintData({
+        wristbandCode: res.wristbandCode,
+        childName,
+        guardianName,
+        phone,
+        planName: selectedPlan?.name,
+        notes: notesSummary || undefined,
+        entryTime: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      });
+
+      // Limpar formulário
       setChildName("");
       setBirthDate("");
       setGuardianName("");
       setPhone("");
+      setSelectedSensoryTags([]);
+      setCustomNotes("");
       setMatchedChild(null);
       setPlanId(null);
       setAssetId(null);
@@ -93,10 +136,10 @@ export function EntradaScreen() {
 
   return (
     <div style={{ maxWidth: "720px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>Entrada — {unit.name}</h1>
+      <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Entrada — {unit.name}</h1>
 
       <section>
-        <h2>Plano</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px" }}>1. Plano de Permanência</h2>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           {plans.map((plan) => (
             <Card
@@ -106,11 +149,15 @@ export function EntradaScreen() {
                 cursor: "pointer",
                 padding: "16px",
                 minWidth: "160px",
+                borderRadius: "16px",
                 border: planId === plan.id ? "2px solid var(--color-primary)" : "1px solid var(--border-subtle)",
+                background: planId === plan.id ? "rgba(240, 25, 107, 0.05)" : "var(--surface-card)",
               }}
             >
-              <strong>{plan.name}</strong>
-              <div>{money(plan.valueCents)}</div>
+              <strong style={{ fontSize: "16px", display: "block" }}>{plan.name}</strong>
+              <div style={{ fontSize: "18px", color: "var(--color-primary)", fontWeight: "bold", marginTop: "4px" }}>
+                {money(plan.valueCents)}
+              </div>
             </Card>
           ))}
         </div>
@@ -118,7 +165,7 @@ export function EntradaScreen() {
 
       {activity === "CARRINHO" && (
         <section>
-          <h2>Carrinho</h2>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px" }}>Carrinho</h2>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {assets.map((asset) => (
               <Card
@@ -128,6 +175,7 @@ export function EntradaScreen() {
                   cursor: asset.status === "DISPONIVEL" ? "pointer" : "not-allowed",
                   opacity: asset.status === "DISPONIVEL" ? 1 : 0.4,
                   padding: "16px",
+                  borderRadius: "16px",
                   border: assetId === asset.id ? "2px solid var(--color-primary)" : "1px solid var(--border-subtle)",
                 }}
               >
@@ -139,37 +187,91 @@ export function EntradaScreen() {
       )}
 
       <section style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        <h2>Criança e responsável</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px" }}>2. Identificação da Criança e Responsável</h2>
         <div style={{ position: "relative" }}>
-          <Input label="Nome da criança" value={childName} onChange={(e) => { setChildName(e.target.value); setMatchedChild(null); }} />
+          <Input
+            label="Nome da criança"
+            placeholder="Digite o nome da criança..."
+            value={childName}
+            onChange={(e) => { setChildName(e.target.value); setMatchedChild(null); }}
+          />
           {matches.length > 0 && (
-            <div className="match-suggestions" style={{ position: "absolute", zIndex: 10, background: "var(--surface-card)", border: "1px solid var(--border-subtle)", borderRadius: "8px", width: "100%" }}>
+            <div className="match-suggestions" style={{ position: "absolute", zIndex: 10, background: "var(--surface-card)", border: "1px solid var(--border-subtle)", borderRadius: "12px", width: "100%", boxShadow: "var(--shadow-md)" }}>
               {matches.map((m) => (
-                <div key={m.id} onClick={() => pickMatch(m)} style={{ padding: "8px 12px", cursor: "pointer" }}>
-                  {m.full_name} {m.phone_e164 ? `— ${m.phone_e164}` : ""}
+                <div key={m.id} onClick={() => pickMatch(m)} style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border-subtle)" }}>
+                  <strong>{m.full_name}</strong> {m.phone_e164 ? `— ${m.phone_e164}` : ""}
                 </div>
               ))}
             </div>
           )}
         </div>
+
         {matchedChild && <Tag color="var(--color-teal)">criança já cadastrada — dados preenchidos</Tag>}
+        
         <Input label="Data de nascimento" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-        <Input label="Nome do responsável" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} />
+        <Input label="Nome do responsável" placeholder="Nome do pai, mãe ou acompanhante" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} />
         <Input label="WhatsApp do responsável" placeholder="+5591999999999" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        <Input label="Cupom (opcional)" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} />
       </section>
 
-      {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
-      {result && <p style={{ color: "var(--color-teal)" }}>{result}</p>}
+      {/* Seção Inclusiva: Tags Sensoriais e Cuidados */}
+      <section style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-card)", padding: "16px", borderRadius: "16px", border: "1px solid var(--border-subtle)" }}>
+        <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "16px", color: "var(--color-dark)" }}>
+          🧩 Cuidados Inclusivos & Tags Sensoriais
+        </h3>
+        <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>
+          Selecione preferências para orientar a mediação dos monitores no playground:
+        </p>
+
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+          {SENSORY_TAG_OPTIONS.map((tag) => {
+            const isSelected = selectedSensoryTags.includes(tag);
+            return (
+              <Button
+                key={tag}
+                type="button"
+                variant={isSelected ? "teal" : "ghost"}
+                size="sm"
+                onClick={() => toggleSensoryTag(tag)}
+                style={{ borderRadius: "9999px" }}
+              >
+                {isSelected ? "✓ " : "+ "}{tag}
+              </Button>
+            );
+          })}
+        </div>
+
+        <Input
+          label="Outras observações (opcional)"
+          placeholder="Ex: Alergia a corantes, brinquedo favorito..."
+          value={customNotes}
+          onChange={(e) => setCustomNotes(e.target.value)}
+        />
+      </section>
+
+      <section>
+        <Input label="Cupom de Desconto / Parceria (opcional)" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} />
+      </section>
+
+      {error && <p style={{ color: "var(--color-error)", margin: 0, fontWeight: "bold" }}>{error}</p>}
+      {result && <p style={{ color: "var(--color-teal)", margin: 0, fontWeight: "bold" }}>{result}</p>}
 
       <Button
         variant="primary"
         size="lg"
         disabled={submitting || !planId || !childName || !guardianName || !phone || !birthDate}
         onClick={submit}
+        style={{ borderRadius: "9999px", padding: "16px" }}
       >
-        Confirmar entrada
+        Confirmar entrada & Imprimir Pulseira 🖨️
       </Button>
+
+      {printData && (
+        <WristbandPrintModal
+          data={printData}
+          onClose={() => setPrintData(null)}
+        />
+      )}
     </div>
   );
 }
+

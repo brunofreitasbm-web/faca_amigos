@@ -85,6 +85,10 @@ export interface ActiveSessionEntry {
     activity: "PLAYGROUND" | "CARRINHO";
     checkin_at_ms: number;
     asset_id: string | null;
+    wristband_code?: string;
+    guardian_name_snapshot?: string;
+    guardian_phone_snapshot?: string;
+    notes?: string;
   };
   quote: {
     lines: QuoteLine[];

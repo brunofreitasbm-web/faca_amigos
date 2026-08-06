@@ -1,0 +1,63 @@
+/* FaçaAmigos — Print & Utility Styles */
+
+/* Animação para sessões excedentes/alertas */
+@keyframes blink-border {
+  0% { box-shadow: 0 0 0 0 rgba(232, 48, 48, 0.4); border-color: var(--color-error); }
+  50% { box-shadow: 0 0 12px 4px rgba(232, 48, 48, 0.8); border-color: #ff0000; }
+  100% { box-shadow: 0 0 0 0 rgba(232, 48, 48, 0.4); border-color: var(--color-error); }
+}
+
+.blinking {
+  animation: blink-border 1.5s infinite;
+}
+
+/* Barra de capacidade do parque */
+.capacity-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface-card);
+  padding: 16px 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.capacity-bar-track {
+  height: 12px;
+  width: 100%;
+  background: var(--color-gray-200);
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.capacity-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+/* Estilos de impressão da pulseira térmica 80mm */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .wristband-printable, .wristband-printable * {
+    visibility: visible;
+  }
+
+  .wristband-printable {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 76mm;
+    padding: 4mm;
+    margin: 0;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Nunito', sans-serif !important;
+    border: 1px dashed #000;
+  }
+}

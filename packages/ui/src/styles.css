@@ -9,6 +9,7 @@
 @import "./tokens/typography.css";
 @import "./tokens/spacing.css";
 @import "./tokens/effects.css";
+@import "./tokens/print.css";
 
 /* Reset mínimo — o design system fonte não trazia um, mas telas de
    operação real (não só protótipo solto) precisam de um baseline
