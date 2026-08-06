@@ -1,0 +1,20 @@
+/* FaçaAmigos — Foco de teclado.
+   Existe porque Button.tsx e outros componentes desligavam `outline` sem
+   nunca colocar nada no lugar — resultado: zero indicador de foco visível
+   em qualquer botão do produto, nos dois apps. `:focus-visible` (não
+   `:focus`) é o seletor certo aqui: mostra o anel só para navegação por
+   teclado, sem aparecer em todo clique de mouse — que é exatamente o
+   comportamento que os componentes tentavam emular com JS antes disso. */
+
+:focus-visible {
+  outline: 3px solid var(--color-primary-hover);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* Sobre fundo escuro (variant="dark" de Card/Button, print.css etc) o
+   anel rosa perde contraste — troca para branco nesses contêineres. */
+[data-fa-dark] :focus-visible,
+.fa-dark-surface :focus-visible {
+  outline-color: #ffffff;
+}

@@ -100,7 +100,10 @@ export function Input({
           style={{
             fontFamily: "var(--font-body)",
             fontSize: "12px",
-            color: "var(--color-error)",
+            // -text, não --color-error puro: aqui é texto (4.29:1,
+            // abaixo de AA), a borda logo acima pode continuar com a
+            // cor de marca porque contraste de borda exige só 3:1.
+            color: "var(--color-error-text)",
             fontWeight: "var(--weight-medium)" as unknown as number,
           }}
         >

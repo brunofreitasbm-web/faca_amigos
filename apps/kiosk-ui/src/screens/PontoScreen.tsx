@@ -3,6 +3,7 @@ import { Button, Card } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Employee, PontoRecord } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { useToast } from "../state/ToastContext.js";
 
 const KINDS = [
   { value: "ENTRADA", label: "Entrada" },
@@ -22,6 +23,7 @@ function formatTime(ms: number): string {
  */
 export function PontoScreen() {
   const { unit, employee: loggedEmployee } = useAppState();
+  const toast = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selected, setSelected] = useState<Employee | null>(null);
   const [today, setToday] = useState<PontoRecord[]>([]);
@@ -45,6 +47,11 @@ export function PontoScreen() {
     try {
       const res = await Api.ponto({ unitId: unit.id, employeeId: selected.id, kind, registeredByEmployeeId: loggedEmployee.id });
       setMessage(`Registrado às ${formatTime(res.atMs)} — NSR ${res.nsr}`);
+    } catch (err) {
+      // Sem catch aqui, uma falha ficava muda: a marcação (registro
+      // legal, Portaria MTP 671/2021) podia não ter sido gravada e o
+      // colaborador saía achando que bateu ponto.
+      toast.error(err instanceof Error ? err.message : "Não foi possível registrar a marcação de ponto. Tente novamente.");
     } finally {
       setBusy(false);
     }
@@ -73,7 +80,7 @@ export function PontoScreen() {
             ))}
           </div>
 
-          {message && <p style={{ color: "var(--color-teal)" }}>{message}</p>}
+          {message && <p style={{ color: "var(--color-teal-text)" }}>{message}</p>}
 
           <h3>Marcações de hoje</h3>
           <ul>

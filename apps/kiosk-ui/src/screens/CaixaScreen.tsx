@@ -3,7 +3,6 @@ import { Button, Card, Input } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { CashMovement, RevenueByMethod, Shift, ShiftSale } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
-import { useToast } from "../state/ToastContext.js";
 import { useConfirm } from "../state/ConfirmContext.js";
 import { money } from "../format.js";
 
@@ -11,7 +10,6 @@ const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
 export function CaixaScreen() {
   const { unit, employee } = useAppState();
-  const toast = useToast();
   const confirm = useConfirm();
   const [shift, setShift] = useState<Shift | null | undefined>(undefined);
   const [openingCash, setOpeningCash] = useState("0");
@@ -28,15 +26,25 @@ export function CaixaScreen() {
   const [closing, setClosing] = useState(false);
   const [declared, setDeclared] = useState<Record<string, string>>({ DINHEIRO: "0", PIX: "0", CREDITO: "0", DEBITO: "0" });
   const [closeResult, setCloseResult] = useState<{ expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number> } | null>(null);
+  const [refreshError, setRefreshError] = useState(false);
 
   async function refresh() {
     if (!unit) return;
-    const current = await Api.currentShift(unit.id);
-    setShift(current);
-    if (current) {
-      setMovements(await Api.cashMovements(current.id));
-      setRevenue(await Api.revenueByMethod(current.id));
-      setSales(await Api.shiftSales(current.id));
+    try {
+      const current = await Api.currentShift(unit.id);
+      setShift(current);
+      if (current) {
+        setMovements(await Api.cashMovements(current.id));
+        setRevenue(await Api.revenueByMethod(current.id));
+        setSales(await Api.shiftSales(current.id));
+      }
+      setRefreshError(false);
+    } catch {
+      // Repolla a cada 5s (setInterval abaixo) sem try/catch aqui virava
+      // uma rejeição não tratada a cada falha, e a tela ficava com dado
+      // velho sem nenhum sinal disso. Mantém o último bom na tela — só
+      // acende o aviso; não troca o turno/movimentos por um vazio.
+      setRefreshError(true);
     }
   }
 
@@ -57,7 +65,6 @@ export function CaixaScreen() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao abrir turno";
       setError(msg);
-      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -80,7 +87,6 @@ export function CaixaScreen() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao registrar movimentação";
       setError(msg);
-      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -98,7 +104,6 @@ export function CaixaScreen() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao fechar turno";
       setError(msg);
-      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -122,7 +127,7 @@ export function CaixaScreen() {
       <div style={{ maxWidth: "420px", margin: "60px auto", display: "flex", flexDirection: "column", gap: "16px" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno</h1>
         <Input label="Troco inicial (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
-        {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
+        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
           Abrir turno
         </Button>
@@ -134,26 +139,43 @@ export function CaixaScreen() {
     return (
       <div style={{ maxWidth: "480px", margin: "40px auto" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Turno fechado</h1>
+        {/* Cabeçalho e células precisam do MESMO alinhamento — antes o
+            cabeçalho ficava centralizado (padrão do navegador) sobre
+            valores em dinheiro sem textAlign nenhum (também padrão,
+            mas "left"), então título e número nunca ficavam um sobre o
+            outro nesta tabela de conferência de caixa. */}
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
               <th style={{ textAlign: "left" }}>Método</th>
-              <th>Esperado</th>
-              <th>Declarado</th>
-              <th>Diferença</th>
+              <th style={{ textAlign: "right" }}>Esperado</th>
+              <th style={{ textAlign: "right" }}>Declarado</th>
+              <th style={{ textAlign: "right" }}>Diferença</th>
             </tr>
           </thead>
           <tbody>
-            {Object.keys(closeResult.divergence).map((method) => (
-              <tr key={method}>
-                <td>{method}</td>
-                <td>{money(closeResult.expected[method] ?? 0)}</td>
-                <td>{money(closeResult.declared[method] ?? 0)}</td>
-                <td style={{ color: closeResult.divergence[method] === 0 ? "var(--color-teal)" : "var(--color-error)" }}>
-                  {money(closeResult.divergence[method] ?? 0)}
-                </td>
-              </tr>
-            ))}
+            {Object.keys(closeResult.divergence).map((method) => {
+              const balanced = closeResult.divergence[method] === 0;
+              return (
+                <tr key={method}>
+                  <td>{method}</td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{money(closeResult.expected[method] ?? 0)}</td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{money(closeResult.declared[method] ?? 0)}</td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                      color: balanced ? "var(--color-teal-text)" : "var(--color-error-text)",
+                    }}
+                  >
+                    {/* Texto além da cor: "bateu"/"faltou" é o que decide
+                        se o caixa fecha limpo — não pode depender só de
+                        enxergar a cor. */}
+                    {balanced ? "✓ bateu" : `⚠ ${money(closeResult.divergence[method] ?? 0)}`}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         <Button variant="primary" onClick={() => { setCloseResult(null); setClosing(false); refresh(); }} style={{ marginTop: "16px" }}>
@@ -181,7 +203,7 @@ export function CaixaScreen() {
             />
           </div>
         ))}
-        {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
+        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         <div style={{ display: "flex", gap: "8px" }}>
           <Button variant="ghost" onClick={() => setClosing(false)} disabled={busy}>
             Cancelar
@@ -197,6 +219,15 @@ export function CaixaScreen() {
   return (
     <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Caixa</h1>
+
+      {refreshError && (
+        <div
+          role="alert"
+          style={{ fontSize: "13px", color: "var(--color-error-text)", background: "rgba(232,48,48,0.08)", border: "1px solid var(--color-error)", borderRadius: "10px", padding: "8px 12px" }}
+        >
+          ⚠️ Não foi possível atualizar o caixa agora — os valores abaixo podem estar desatualizados.
+        </div>
+      )}
 
       <Card style={{ padding: "16px" }}>
         <h2>Faturamento do turno</h2>
@@ -276,7 +307,7 @@ export function CaixaScreen() {
         </ul>
       </Card>
 
-      {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
 
       <Button variant="primary" size="lg" onClick={() => setClosing(true)}>
         Fechar turno

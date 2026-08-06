@@ -1,15 +1,13 @@
 /* FaçaAmigos — Print & Utility Styles */
 
-/* Animação para sessões excedentes/alertas */
-@keyframes blink-border {
-  0% { box-shadow: 0 0 0 0 rgba(232, 48, 48, 0.4); border-color: var(--color-error); }
-  50% { box-shadow: 0 0 12px 4px rgba(232, 48, 48, 0.8); border-color: #ff0000; }
-  100% { box-shadow: 0 0 0 0 rgba(232, 48, 48, 0.4); border-color: var(--color-error); }
-}
-
-.blinking {
-  animation: blink-border 1.5s infinite;
-}
+/* .blinking existiu aqui como um pulso vermelho infinito nos cards de
+   sessão excedente/pausa longa no Painel. Removido, não "consertado com
+   prefers-reduced-motion", porque a regra da marca é categórica —
+   Branding/fa-aamigos-design-system/project/readme.md: "No infinite
+   loops on UI content" — e o produto é um playground para crianças
+   neurodivergentes, o público mais sensível a isso. O alerta continua
+   existindo (borda mais grossa + selo de texto sempre visível, ver
+   PainelScreen.tsx), só não pulsa mais para sempre. */
 
 /* Barra de capacidade do parque */
 .capacity-container {

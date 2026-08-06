@@ -47,7 +47,9 @@ export function Badge({ variant = "pink", children, style: styleProp, ...rest }:
     },
     green: {
       background: "rgba(40,200,128,0.15)",
-      color: "#1a9c5e",
+      // Era #1a9c5e (3.52:1 sobre branco — falha AA). --color-success-text
+      // é a mesma família de verde escurecida até passar (4.69:1).
+      color: "var(--color-success-text)",
       border: "1px solid rgba(40,200,128,0.35)",
     },
     neutral: {
@@ -55,9 +57,15 @@ export function Badge({ variant = "pink", children, style: styleProp, ...rest }:
       color: "var(--text-secondary)",
       border: "1px solid var(--border-subtle)",
     },
-    solid_pink: { background: "var(--color-pink)", color: "#fff", border: "none" },
-    solid_teal: { background: "var(--color-teal)", color: "#fff", border: "none" },
-    solid_amber: { background: "var(--color-amber)", color: "#fff", border: "none" },
+    // Os três "solid_*" são texto branco sobre cor cheia — e as cores
+    // cheias da marca (pink 4.15:1, teal 1.96:1, amber 2.80:1) não têm
+    // luminância suficiente pra sustentar branco em cima com AA. Em vez
+    // de trocar a cor do texto (que ficaria inconsistente com o resto
+    // do badge), o fundo usa a variante -text de cada cor — a mesma
+    // tonalidade, só escura o bastante pra branco em cima passar.
+    solid_pink: { background: "var(--color-primary-hover)", color: "#fff", border: "none" },
+    solid_teal: { background: "var(--color-teal-text)", color: "#fff", border: "none" },
+    solid_amber: { background: "var(--color-amber-text)", color: "#fff", border: "none" },
   };
 
   const style: CSSProperties = {

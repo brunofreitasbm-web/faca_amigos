@@ -9,6 +9,8 @@
 @import "./tokens/typography.css";
 @import "./tokens/spacing.css";
 @import "./tokens/effects.css";
+@import "./tokens/focus.css";
+@import "./tokens/a11y.css";
 @import "./tokens/print.css";
 
 /* Reset mínimo — o design system fonte não trazia um, mas telas de

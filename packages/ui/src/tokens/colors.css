@@ -47,6 +47,22 @@
   --color-warning:         #E83030;
   --color-error:           #E83030;
 
+  /* ── Variantes "-text": mesma cor de marca, escurecida só o
+       suficiente pra passar AA (4.5:1) como TEXTO sobre branco. Existem
+       porque --color-teal (1.96:1), --color-success (2.17:1) e
+       --color-amber (2.80:1) foram auditados e falham catastroficamente
+       como texto/preenchimento sólido com texto branco em cima — e
+       --color-error (4.29:1) fica bem perto do limite. As cores de
+       marca em si NÃO mudam (preenchimento, borda, gráfico, --chart-*
+       continuam com o valor original); só o que é literalmente TEXTO
+       (ou fundo sólido com texto branco por cima, ex. Badge solid_*)
+       deve trocar para a variante -text. Medido com a mesma fórmula de
+       packages/ui/src/tokens/contrast.ts, coberto em test/status.spec.ts. */
+  --color-teal-text:    #1D8273;  /* 4.69:1 sobre branco (base #2ECFB5 é 1.96:1) */
+  --color-amber-text:   #996D18;  /* 4.60:1 sobre branco (base #C99020 é 2.80:1) */
+  --color-success-text: #1A8454;  /* 4.69:1 sobre branco (base #28C880 é 2.17:1) */
+  --color-error-text:   #E61E1E;  /* 4.60:1 sobre branco (base #E83030 é 4.29:1, abaixo do limite) */
+
   /* ── Texto sobre fundo escuro (para as poucas superfícies dark,
        ex. tela de emergência, se optarmos por alto contraste) ── */
   --color-text-primary-dark:  #FFFFFF;
@@ -70,7 +86,11 @@
 
   --text-primary:    var(--color-dark);
   --text-secondary:  var(--color-gray-600);
-  --text-muted:      var(--color-gray-500);
+  /* Era var(--color-gray-500) = 3.80:1 sobre branco — falha AA (4.5:1),
+     e era o texto mais usado do produto (25 referências). #6C7682 é o
+     mesmo cinza escurecido até 4.61:1; --color-gray-500 continua
+     existindo pra qualquer uso não-textual que precise do tom original. */
+  --text-muted:      #6C7682;
   --text-on-primary: #FFFFFF;   /* texto sobre botão/badge preenchido de cor de marca */
   --text-on-dark:    #FFFFFF;
 

@@ -38,3 +38,35 @@ describe("semáforo operacional — contraste WCAG AA", () => {
     expect(contrastRatio("#7A0E24", "#FFFFFF")).toBeGreaterThan(contrastRatio("#C21F3A", "#FFFFFF"));
   });
 });
+
+/**
+ * MANTER EM SINCRONIA COM src/tokens/colors.css.
+ *
+ * Nasceu de uma auditoria de design que mediu a paleta de marca (não só
+ * o semáforo acima) e achou --color-teal (1.96:1), --color-success
+ * (2.17:1), --color-amber (2.80:1) e --color-error (4.29:1) todas
+ * falhando AA quando usadas como TEXTO — --text-muted (3.80:1) era o
+ * pior: a cor de texto mais repetida do produto. As cores de marca em
+ * si continuam iguais (preenchimento/borda/gráfico usam a mesma
+ * fórmula do WCAG 1.4.11, que só exige 3:1); é só a variante -text —
+ * pensada para texto — que precisa do teto de 4.5:1 daqui pra frente.
+ */
+const TEXT_SAFE_PAIRS: Array<[label: string, fg: string, bg: string]> = [
+  ["--text-muted sobre --surface-card", "#6C7682", "#FFFFFF"],
+  ["--color-teal-text sobre --surface-card", "#1D8273", "#FFFFFF"],
+  ["--color-amber-text sobre --surface-card", "#996D18", "#FFFFFF"],
+  ["--color-success-text sobre --surface-card", "#1A8454", "#FFFFFF"],
+  ["--color-error-text sobre --surface-card", "#E61E1E", "#FFFFFF"],
+  ["--color-primary-hover sobre --surface-card", "#C8155A", "#FFFFFF"],
+  // Badge solid_*: texto branco sobre a variante -text usada como fundo
+  // cheio (packages/ui/src/components/Badge.tsx).
+  ["branco sobre solid_pink (--color-primary-hover)", "#FFFFFF", "#C8155A"],
+  ["branco sobre solid_teal (--color-teal-text)", "#FFFFFF", "#1D8273"],
+  ["branco sobre solid_amber (--color-amber-text)", "#FFFFFF", "#996D18"],
+];
+
+describe("paleta de texto da interface — contraste WCAG AA", () => {
+  it.each(TEXT_SAFE_PAIRS)("%s atinge ao menos 4.5:1", (_label, fg, bg) => {
+    expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
+  });
+});

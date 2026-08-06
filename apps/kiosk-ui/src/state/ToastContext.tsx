@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useState } from "react";
 import type { ReactNode } from "react";
-import { Card } from "@facaamigos/ui";
+import { Card, XIcon } from "@facaamigos/ui";
 
 type ToastVariant = "success" | "error";
 
@@ -58,6 +58,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <Card
             key={t.id}
+            // role="status" (sucesso) e role="alert" (erro) em vez de
+            // aria-live no container: cada toast é inserido de novo no
+            // DOM, e um elemento com esses roles já-presente-no-DOM é
+            // anunciado sozinho pelo leitor de tela ao entrar — não
+            // depende de "a região mudou". É o mesmo padrão de libs como
+            // sonner/react-hot-toast. Sem isso, nenhum sucesso/erro do
+            // quiosque (que hoje só aparece visualmente e some sozinho)
+            // chegava a quem usa leitor de tela.
+            role={t.variant === "error" ? "alert" : "status"}
             style={{
               padding: "12px 16px",
               minWidth: "280px",
@@ -68,10 +77,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               boxShadow: "var(--shadow-lg)",
             }}
           >
-            <span style={{ fontSize: "16px", lineHeight: 1 }}>{t.variant === "success" ? "✓" : "⚠"}</span>
-            <span style={{ flex: 1, fontSize: "13px", color: "var(--text-primary)" }}>{t.message}</span>
+            <span aria-hidden="true" style={{ fontSize: "16px", lineHeight: 1 }}>{t.variant === "success" ? "✓" : "⚠"}</span>
+            <span style={{ flex: 1, fontSize: "13px", color: "var(--text-primary)" }}>
+              <span className="sr-only">{t.variant === "success" ? "Sucesso: " : "Erro: "}</span>
+              {t.message}
+            </span>
             <button
               onClick={() => dismiss(t.id)}
+              aria-label="Fechar aviso"
               title="Fechar aviso"
               style={{
                 background: "none",
@@ -83,7 +96,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 padding: 0,
               }}
             >
-              ×
+              <XIcon />
             </button>
           </Card>
         ))}

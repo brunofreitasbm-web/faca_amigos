@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, StatusBadge, Badge, Tag } from "@facaamigos/ui";
+import { Card, Button, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
@@ -33,7 +33,7 @@ export function PainelScreen() {
   const { unit } = useAppState();
   const toast = useToast();
   const confirm = useConfirm();
-  const entries = useActiveSessions(unit?.id ?? null);
+  const { entries, status: sessionsStatus, errorMessage: sessionsError } = useActiveSessions(unit?.id ?? null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionBusy, setActionBusy] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -196,13 +196,20 @@ export function PainelScreen() {
   const currentOccupancy = entries.length;
   const occupancyPercent = Math.min(100, Math.round((currentOccupancy / maxCapacity) * 100));
 
+  // capacityColor pinta a barra (preenchimento — a cor de marca serve,
+  // só precisa de 3:1); capacityTextColor é o mesmo rótulo, mas como
+  // TEXTO ao lado, que precisa de 4.5:1. --color-success (2.17:1) e
+  // --color-amber (2.80:1) puros como texto falhavam os dois.
   let capacityColor = "var(--color-success)";
+  let capacityTextColor = "var(--color-success-text)";
   let capacityLabel = "Capacidade Tranquila";
   if (occupancyPercent >= 90) {
     capacityColor = "var(--color-error)";
+    capacityTextColor = "var(--color-error-text)";
     capacityLabel = "Capacidade Máxima / Lotação";
   } else if (occupancyPercent >= 75) {
     capacityColor = "var(--color-amber)";
+    capacityTextColor = "var(--color-amber-text)";
     capacityLabel = "Alta Ocupação";
   }
 
@@ -227,13 +234,26 @@ export function PainelScreen() {
         <div style={{ minWidth: "280px" }} className="capacity-container">
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: "bold" }}>
             <span>Ocupação: {currentOccupancy} / {maxCapacity} crianças</span>
-            <span style={{ color: capacityColor }}>{occupancyPercent}% ({capacityLabel})</span>
+            <span style={{ color: capacityTextColor }}>{occupancyPercent}% ({capacityLabel})</span>
           </div>
           <div className="capacity-bar-track">
             <div className="capacity-bar-fill" style={{ width: `${occupancyPercent}%`, backgroundColor: capacityColor }} />
           </div>
         </div>
       </div>
+
+      {/* Se já havia sessões na tela e a última reconsulta falhou (ex: uma
+          troca de Realtime disparou refetch e a rede caiu), mantém o
+          último dado bom visível — mas avisa, em vez de deixar a tela
+          parar de atualizar em silêncio sem nenhum sinal disso. */}
+      {sessionsStatus === "error" && entries.length > 0 && (
+        <div
+          role="alert"
+          style={{ flexShrink: 0, fontSize: "13px", color: "var(--color-error-text)", background: "rgba(232,48,48,0.08)", border: "1px solid var(--color-error)", borderRadius: "10px", padding: "8px 12px" }}
+        >
+          ⚠️ Não foi possível atualizar o painel — os dados abaixo podem estar desatualizados.
+        </div>
+      )}
 
       {/* Única área com rolagem própria da tela — contida, nunca a página toda. */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: "4px" }}>
@@ -251,9 +271,18 @@ export function PainelScreen() {
             <Card
               key={session.id}
               onClick={() => !isPaused && toggle(session.id)}
+              // "Selecionada para cobrança" antes só existia como borda
+              // rosa + fundo 4% rosa — nenhum texto/ícone de apoio, e é
+              // o estado que decide quem paga. aria-pressed marca o
+              // alternador pra leitor de tela; o selo "✓ Selecionada"
+              // abaixo é o reforço visual que não depende só de cor.
+              aria-pressed={!isPaused ? isSelected : undefined}
               // painel-card cuida de padding/gap/raio de forma fluida (app.css);
               // aqui ficam só os estilos que dependem do estado da sessão.
-              className={`painel-card${(isExceeded && !isPaused) || isPausedTooLong ? " blinking" : ""}`}
+              // Sem animação: a marca proíbe loop infinito em UI (ver
+              // print.css), então a urgência é só borda mais grossa +
+              // selo de texto sempre visível (abaixo), nunca movimento.
+              className="painel-card"
               // O respiro do card acompanha a largura do próprio card (cqi),
               // não a da janela — ver .painel-card em app.css. Vai em
               // bodyStyle porque é lá que os filhos ficam; `flex:1` é o que
@@ -270,12 +299,14 @@ export function PainelScreen() {
                 display: "flex",
                 flexDirection: "column",
                 borderRadius: "16px",
-                border: isPaused
+                border: isPausedTooLong
+                  ? "3px solid var(--color-amber)"
+                  : isPaused
                   ? "2px dashed var(--color-amber)"
                   : isSelected
                   ? "2px solid var(--color-primary)"
                   : isExceeded
-                  ? "2px solid var(--color-error)"
+                  ? "3px solid var(--color-error)"
                   : "1px solid var(--border-subtle)",
                 borderLeft: `6px solid ${plan?.color ?? "var(--border-subtle)"}`,
                 background: isPaused ? "rgba(201, 144, 32, 0.06)" : isSelected ? "rgba(240, 25, 107, 0.04)" : "var(--surface-card)",
@@ -316,10 +347,17 @@ export function PainelScreen() {
                     )}
                   </div>
                 </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                  {isSelected && !isPaused && (
+                    <Badge variant="solid_pink" title="Esta sessão entra no próximo fechamento">
+                      ✓ Selecionada
+                    </Badge>
+                  )}
                 <Button
                   variant="ghost"
                   size="sm"
                   title="Imprimir Pulseira Térmica"
+                  aria-label="Imprimir Pulseira Térmica"
                   onClick={(e) => {
                     e.stopPropagation();
                     setPrintData({
@@ -332,8 +370,9 @@ export function PainelScreen() {
                     });
                   }}
                 >
-                  🖨️
+                  <PrinterIcon />
                 </Button>
+                </div>
               </div>
 
               <StatusBadge
@@ -350,6 +389,7 @@ export function PainelScreen() {
                   title="Relógio parado — retome quando a criança voltar"
                 >
                   ⏸ Pausada há {formatElapsed(quote.timing.pausedForMs)}
+                  {isPausedTooLong ? " — retome agora" : ""}
                 </Badge>
               )}
 
@@ -485,15 +525,24 @@ export function PainelScreen() {
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto", paddingTop: "8px", borderTop: "1px dashed var(--border-subtle)" }}>
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Valor Atual:</span>
-                <strong className="painel-card-total" style={{ color: "var(--color-primary)" }}>{money(quote.totalCents)}</strong>
+                <strong className="painel-card-total" style={{ color: "var(--color-primary-hover)" }}>{money(quote.totalCents)}</strong>
               </div>
             </Card>
           );
         })}
-        {entries.length === 0 && (
-          <div style={{ gridColumn: "1 / -1", padding: "48px", textAlign: "center", background: "var(--surface-card)", borderRadius: "16px", border: "1px dashed var(--border-subtle)" }}>
-            <p style={{ fontSize: "16px", color: "var(--text-muted)", margin: 0 }}>Nenhuma criança em atividade no momento.</p>
-          </div>
+        {entries.length === 0 && sessionsStatus === "loading" && (
+          <AsyncState kind="loading" title="Carregando sessões ativas…" style={{ gridColumn: "1 / -1" }} />
+        )}
+        {entries.length === 0 && sessionsStatus === "ready" && (
+          <AsyncState kind="empty" title="Nenhuma criança em atividade no momento." style={{ gridColumn: "1 / -1" }} />
+        )}
+        {entries.length === 0 && sessionsStatus === "error" && (
+          <AsyncState
+            kind="error"
+            title="Não foi possível carregar as sessões ativas."
+            detail={sessionsError ?? undefined}
+            style={{ gridColumn: "1 / -1" }}
+          />
         )}
         </div>
       </div>
@@ -553,65 +602,33 @@ export function PainelScreen() {
           size="lg"
           onClick={() => setPdvOpen(true)}
           title="Abrir PDV flutuante e fechar vendas sem sair do Painel"
+          aria-label="Abrir PDV"
           style={{ borderRadius: "9999px", width: "64px", height: "64px", fontSize: "26px", boxShadow: "var(--shadow-lg)", padding: 0 }}
         >
-          🛒
+          <ShoppingCartIcon />
         </Button>
         <Button
           variant="primary"
           size="lg"
           onClick={() => setEntradaOpen(true)}
           title="Fazer nova entrada sem sair do Painel"
+          aria-label="Fazer nova entrada"
           style={{ borderRadius: "9999px", width: "64px", height: "64px", fontSize: "26px", boxShadow: "var(--shadow-lg)", padding: 0 }}
         >
-          ➕
+          <PlusIcon />
         </Button>
       </div>
 
       {entradaOpen && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 150, display: "flex", justifyContent: "center", overflowY: "auto", padding: "24px" }}
-          onClick={() => setEntradaOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--surface-bg, var(--surface-card))", borderRadius: "24px", maxWidth: "820px", width: "100%", height: "fit-content", position: "relative", boxShadow: "var(--shadow-lg)" }}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setEntradaOpen(false)}
-              title="Fechar e voltar ao Painel"
-              style={{ position: "absolute", top: "12px", right: "12px", zIndex: 1 }}
-            >
-              ✕
-            </Button>
-            <EntradaScreen />
-          </div>
-        </div>
+        <Modal onClose={() => setEntradaOpen(false)} ariaLabel="Entrada" maxWidth="820px" padding="0" zIndex={150}>
+          <EntradaScreen />
+        </Modal>
       )}
 
       {pdvOpen && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 150, display: "flex", justifyContent: "center", overflowY: "auto", padding: "24px" }}
-          onClick={() => setPdvOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--surface-bg, var(--surface-card))", borderRadius: "24px", maxWidth: "1100px", width: "100%", height: "fit-content", position: "relative", boxShadow: "var(--shadow-lg)" }}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPdvOpen(false)}
-              title="Fechar e voltar ao Painel"
-              style={{ position: "absolute", top: "12px", right: "12px", zIndex: 1 }}
-            >
-              ✕
-            </Button>
-            <PdvScreen />
-          </div>
-        </div>
+        <Modal onClose={() => setPdvOpen(false)} ariaLabel="PDV" maxWidth="1100px" padding="0" zIndex={150}>
+          <PdvScreen />
+        </Modal>
       )}
     </div>
   );

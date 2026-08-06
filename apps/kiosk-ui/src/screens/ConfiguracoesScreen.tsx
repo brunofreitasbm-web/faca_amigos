@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input } from "@facaamigos/ui";
+import { Button, Card, Input, Tabs } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, BonusRule, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { useToast } from "../state/ToastContext.js";
 import { money } from "../format.js";
 
 type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES";
@@ -27,26 +28,23 @@ export function ConfiguracoesScreen() {
   return (
     <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações</h1>
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "16px 0" }}>
-        {tabs.map((t) => (
-          <Button key={t.value} variant={tab === t.value ? "primary" : "ghost"} size="sm" onClick={() => setTab(t.value)} title={`Abrir aba ${t.label}`}>
-            {t.label}
-          </Button>
-        ))}
-      </div>
+      <Tabs value={tab} onChange={setTab} tabs={tabs} />
 
-      {tab === "PLANOS" && <PlanosTab unitId={unit.id} activity={isQuiosque ? "CARRINHO" : "PLAYGROUND"} />}
-      {tab === "PRODUTOS" && <ProdutosTab unitId={unit.id} />}
-      {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
-      {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
-      {tab === "META" && <MetaTab unitId={unit.id} isQuiosque={isQuiosque} />}
-      {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
-      {tab === "COLABORADORES" && <ColaboradoresTab />}
+      <div role="tabpanel">
+        {tab === "PLANOS" && <PlanosTab unitId={unit.id} activity={isQuiosque ? "CARRINHO" : "PLAYGROUND"} />}
+        {tab === "PRODUTOS" && <ProdutosTab unitId={unit.id} />}
+        {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
+        {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
+        {tab === "META" && <MetaTab unitId={unit.id} isQuiosque={isQuiosque} />}
+        {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
+        {tab === "COLABORADORES" && <ColaboradoresTab />}
+      </div>
     </div>
   );
 }
 
 function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }) {
+  const toast = useToast();
   const [goalReais, setGoalReais] = useState("0");
   const [savingGoal, setSavingGoal] = useState(false);
   const [rules, setRules] = useState<BonusRule[]>([]);
@@ -75,10 +73,19 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
   useEffect(loadTerms, [unitId, isQuiosque]);
   useEffect(loadClosingTime, [unitId]);
 
+  // As 4 funções abaixo eram só `try { await api() } finally { setBusy(false) }`
+  // — sem catch e sem nenhum retorno visual em caso de sucesso. Salvar a
+  // meta do dia e falhar era indistinguível de salvar e dar certo: o
+  // operador tocava "Salvar", nada mudava na tela, e não tinha como saber
+  // qual dos dois aconteceu. toast.success/error cobre os dois lados.
+
   async function saveGoal() {
     setSavingGoal(true);
     try {
       await Api.setUnitSetting(unitId, "daily_goal_cents", String(Math.round(Number(goalReais) * 100)));
+      toast.success("Meta diária salva.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a meta.");
     } finally {
       setSavingGoal(false);
     }
@@ -90,6 +97,9 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
       await Api.createBonusRule({ unitId, description: ruleDescription, rewardValueCents: Math.round(Number(ruleValueReais) * 100) });
       setRuleDescription("");
       loadRules();
+      toast.success("Regra de bonificação criada.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível criar a regra.");
     } finally {
       setBusyRule(false);
     }
@@ -99,6 +109,9 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
     setSavingTerms(true);
     try {
       await Api.setUnitSetting(unitId, "terms_of_use", termsOfUse);
+      toast.success("Termos de uso salvos.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar os termos de uso.");
     } finally {
       setSavingTerms(false);
     }
@@ -108,6 +121,9 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
     setSavingClosingTime(true);
     try {
       await Api.setUnitSetting(unitId, "closing_time", closingTime);
+      toast.success("Horário de fechamento salvo.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o horário de fechamento.");
     } finally {
       setSavingClosingTime(false);
     }
@@ -193,9 +209,23 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
   );
 }
 
+// Nome de cada hex da paleta — os seletores de cor (plano e carrinho)
+// eram 6 botões redondos sem nenhum nome: nem aria-label, nem title, só
+// a cor de fundo. Sem isso um leitor de tela anuncia "botão", 6 vezes
+// seguidas, sem dizer qual é qual.
+const COLOR_NAMES: Record<string, string> = {
+  "#2ECFB5": "Teal",
+  "#F0196B": "Rosa",
+  "#FFE234": "Amarelo",
+  "#FF7A00": "Laranja",
+  "#A020EE": "Roxo",
+  "#1A3F35": "Verde-escuro",
+};
+
 const PLAN_COLOR_OPTIONS = ["#2ECFB5", "#F0196B", "#FFE234", "#FF7A00", "#A020EE", "#1A3F35"];
 
 function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND" | "CARRINHO" }) {
+  const toast = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [name, setName] = useState("");
   const [valueReais, setValueReais] = useState("0");
@@ -225,6 +255,9 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
       });
       setName("");
       load();
+      toast.success("Plano criado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível criar o plano.");
     } finally {
       setBusy(false);
     }
@@ -253,8 +286,12 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
             {PLAN_COLOR_OPTIONS.map((c) => (
               <button
                 key={c}
+                type="button"
                 onClick={() => setColor(c)}
-                style={{ width: "28px", height: "28px", borderRadius: "50%", background: c, border: color === c ? "3px solid black" : "1px solid var(--border-subtle)" }}
+                aria-label={`Cor ${COLOR_NAMES[c] ?? c}`}
+                aria-pressed={color === c}
+                title={COLOR_NAMES[c] ?? c}
+                style={{ width: "28px", height: "28px", borderRadius: "50%", background: c, border: color === c ? "3px solid var(--color-dark)" : "1px solid var(--border-subtle)" }}
               />
             ))}
           </div>
@@ -280,6 +317,7 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
 }
 
 function ProdutosTab({ unitId }: { unitId: string }) {
+  const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [name, setName] = useState("");
   const [priceReais, setPriceReais] = useState("0");
@@ -298,6 +336,9 @@ function ProdutosTab({ unitId }: { unitId: string }) {
       await Api.createProduct({ unitId, name, emoji, priceCents: Math.round(Number(priceReais) * 100), stock: Number(stock) });
       setName("");
       load();
+      toast.success("Produto criado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível criar o produto.");
     } finally {
       setBusy(false);
     }
@@ -330,6 +371,7 @@ function ProdutosTab({ unitId }: { unitId: string }) {
 }
 
 function CuponsTab({ unitId }: { unitId: string }) {
+  const toast = useToast();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [code, setCode] = useState("");
   const [kind, setKind] = useState<Coupon["kind"]>("MINUTOS_EXTRA");
@@ -348,6 +390,9 @@ function CuponsTab({ unitId }: { unitId: string }) {
       await Api.createCoupon({ unitId, code, kind, value: Number(value), description: description || undefined });
       setCode("");
       load();
+      toast.success("Cupom criado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível criar o cupom.");
     } finally {
       setBusy(false);
     }
@@ -382,6 +427,7 @@ function CuponsTab({ unitId }: { unitId: string }) {
 }
 
 function FidelidadeTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }) {
+  const toast = useToast();
   const [rules, setRules] = useState<LoyaltyRule[]>([]);
   const [triggerVisits, setTriggerVisits] = useState("10");
   const [rewardKind, setRewardKind] = useState<LoyaltyRule["rewardKind"]>("ENTRADA_GRATIS");
@@ -404,6 +450,9 @@ function FidelidadeTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boo
         rewardValue: Number(rewardValue),
       });
       load();
+      toast.success("Regra de fidelidade criada.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível criar a regra de fidelidade.");
     } finally {
       setBusy(false);
     }
@@ -521,7 +570,14 @@ function FrotaTab({ unitId }: { unitId: string }) {
           <label>Emoji</label>
           <div style={{ display: "flex", gap: "4px" }}>
             {CART_EMOJI_OPTIONS.map((em) => (
-              <Button key={em} variant={emoji === em ? "primary" : "ghost"} size="sm" onClick={() => setEmoji(em)}>
+              <Button
+                key={em}
+                variant={emoji === em ? "primary" : "ghost"}
+                size="sm"
+                onClick={() => setEmoji(em)}
+                aria-pressed={emoji === em}
+                aria-label={`Usar ${em} para este carrinho`}
+              >
                 {em}
               </Button>
             ))}
@@ -533,8 +589,12 @@ function FrotaTab({ unitId }: { unitId: string }) {
             {CART_COLOR_OPTIONS.map((c) => (
               <button
                 key={c}
+                type="button"
                 onClick={() => setColor(c)}
-                style={{ width: "28px", height: "28px", borderRadius: "50%", background: c, border: color === c ? "3px solid black" : "1px solid var(--border-subtle)" }}
+                aria-label={`Cor ${COLOR_NAMES[c] ?? c}`}
+                aria-pressed={color === c}
+                title={COLOR_NAMES[c] ?? c}
+                style={{ width: "28px", height: "28px", borderRadius: "50%", background: c, border: color === c ? "3px solid var(--color-dark)" : "1px solid var(--border-subtle)" }}
               />
             ))}
           </div>
@@ -548,7 +608,7 @@ function FrotaTab({ unitId }: { unitId: string }) {
             <input type="file" accept={CART_PHOTO_ACCEPT} onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)} />
           </div>
         </div>
-        {error && <p style={{ color: "var(--color-error)", margin: 0 }}>{error}</p>}
+        {error && <p style={{ color: "var(--color-error-text)", margin: 0 }}>{error}</p>}
         <Button variant="primary" loading={busy} disabled={busy || !name} onClick={create}>
           Criar carrinho
         </Button>
@@ -569,10 +629,15 @@ function FrotaTab({ unitId }: { unitId: string }) {
           <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
             <label style={{ fontSize: "12px", color: "var(--text-secondary)", cursor: "pointer" }} title="Trocar a foto deste carrinho">
               {photoBusyFor === a.id ? "Enviando…" : "🖼️ Trocar foto"}
+              {/* .sr-only em vez de display:none: display:none tira o
+                  input da ordem de tabulação — o upload de foto virava
+                  mouse-only. .sr-only esconde visualmente mas mantém
+                  focável, então Tab + Enter ainda abre o seletor de
+                  arquivo do sistema. */}
               <input
                 type="file"
                 accept={CART_PHOTO_ACCEPT}
-                style={{ display: "none" }}
+                className="sr-only"
                 disabled={photoBusyFor === a.id}
                 onChange={(e) => replacePhoto(a, e.target.files?.[0] ?? null)}
               />
@@ -632,7 +697,7 @@ function ColaboradoresTab() {
           </select>
         </div>
         <Input label="PIN (6 dígitos)" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} />
-        {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
+        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         <Button variant="primary" disabled={busy || !fullName || pin.length !== 6} onClick={create}>
           Criar colaborador
         </Button>

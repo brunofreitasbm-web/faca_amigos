@@ -1,0 +1,18 @@
+/* FaçaAmigos — utilitário de acessibilidade.
+
+   .sr-only: esconde visualmente mantendo o texto no fluxo de leitura de
+   tela — para prefixos como "Erro: " antes de uma mensagem de toast, ou
+   texto de contexto que a marca não quer exibir mas o leitor de tela
+   precisa. `display:none`/`visibility:hidden` removeriam do fluxo de
+   acessibilidade também; esta é a técnica padrão que não faz isso. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

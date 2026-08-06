@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, DateInput } from "@facaamigos/ui";
+import { Card, DateInput, Tabs, contrastRatio } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
 import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -32,21 +32,17 @@ export function RelatorioScreen() {
   return (
     <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Relatório</h1>
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "16px 0" }}>
-        {tabs.map((t) => (
-          <Button key={t.value} variant={tab === t.value ? "primary" : "ghost"} size="sm" onClick={() => setTab(t.value)}>
-            {t.label}
-          </Button>
-        ))}
-      </div>
+      <Tabs value={tab} onChange={setTab} tabs={tabs} />
 
-      {tab === "VENDAS" && <VendasTab unitId={unit.id} />}
-      {tab === "PLANOS" && <PlanosTab unitId={unit.id} cutoffHour={unit.business_day_cutoff_hour} />}
-      {tab === "VISITAS" && <VisitasTab unitId={unit.id} />}
-      {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
-      {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
-      {tab === "PONTO" && <PontoTab />}
-      {tab === "FROTA" && isQuiosque && <FrotaHeatmapTab unitId={unit.id} />}
+      <div role="tabpanel">
+        {tab === "VENDAS" && <VendasTab unitId={unit.id} />}
+        {tab === "PLANOS" && <PlanosTab unitId={unit.id} cutoffHour={unit.business_day_cutoff_hour} />}
+        {tab === "VISITAS" && <VisitasTab unitId={unit.id} />}
+        {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
+        {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
+        {tab === "PONTO" && <PontoTab />}
+        {tab === "FROTA" && isQuiosque && <FrotaHeatmapTab unitId={unit.id} />}
+      </div>
     </div>
   );
 }
@@ -355,6 +351,14 @@ function FrotaHeatmapTab({ unitId }: { unitId: string }) {
         {usage.map((u) => {
           const intensity = u.sessions_count / maxSessions;
           const idle = u.sessions_count === 0;
+          // A cor do carrinho é escolhida livremente em Configurações
+          // (6 opções, algumas claras — ex. #FFE234) — texto branco fixo
+          // por cima falhava contraste por construção pra qualquer cor
+          // clara. Em vez de mais um hex fixo, escolhe em tempo real
+          // qual dos dois (branco ou o escuro da marca) rende mais
+          // contraste contra a cor real deste carrinho.
+          const textColor =
+            !idle && contrastRatio("#1A3F35", u.color) > contrastRatio("#FFFFFF", u.color) ? "#1A3F35" : "#fff";
           return (
             <Card
               key={u.id}
@@ -364,7 +368,7 @@ function FrotaHeatmapTab({ unitId }: { unitId: string }) {
                 textAlign: "center",
                 opacity: idle ? 0.35 : 0.4 + intensity * 0.6,
                 background: idle ? "var(--surface-card)" : u.color,
-                color: idle ? "var(--text-primary)" : "#fff",
+                color: idle ? "var(--text-primary)" : textColor,
               }}
             >
               <div style={{ fontSize: "28px" }}>{u.emoji}</div>

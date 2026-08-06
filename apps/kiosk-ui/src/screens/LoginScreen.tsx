@@ -95,7 +95,7 @@ function PinEntry({
   return (
     <div style={{ maxWidth: "360px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>{employee.full_name}</h1>
-      {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
       <PinPad
         value={pin}
         onChange={setPin}
@@ -130,7 +130,7 @@ function NewEmployeeLogin({
   return (
     <div style={{ maxWidth: "360px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
       <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center" }}>Entrar</h1>
-      {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
       <input placeholder="e-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input placeholder="senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
       <input

@@ -3,6 +3,21 @@ import { supabase } from "../lib/supabase/client.js";
 import { fetchActiveSessionsRaw, computeActiveSessionEntries } from "./client.js";
 import type { ActiveSessionEntry, ActiveSessionsRaw } from "./client.js";
 
+export type ActiveSessionsStatus = "loading" | "ready" | "error";
+
+export interface ActiveSessionsResult {
+  entries: ActiveSessionEntry[];
+  /**
+   * "loading" só é verdade na primeira busca de uma unidade. Existe
+   * porque `entries` começa como `[]` e o Painel usava esse `[]` pra
+   * decidir "nenhuma criança em atividade" — um estado vazio confiante e
+   * ERRADO toda vez que a tela abria, na tela que controla quem paga.
+   */
+  status: ActiveSessionsStatus;
+  /** Mensagem da última falha de busca, se `status === "error"`. */
+  errorMessage: string | null;
+}
+
 /**
  * Fase 3: substitui o antigo canal WS de 1Hz (apps/kiosk/src/server/ws-tick.ts,
  * que reconsultava o SQLite local a cada segundo). Agora:
@@ -14,7 +29,7 @@ import type { ActiveSessionEntry, ActiveSessionsRaw } from "./client.js";
  *    uma troca de plano/checkout aparece na hora, via Realtime, em vez de
  *    esperar o próximo tick do servidor.
  */
-export function useActiveSessions(unitId: string | null): ActiveSessionEntry[] {
+export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
   const [raw, setRaw] = useState<ActiveSessionsRaw>({
     sessions: [],
     planById: new Map(),
@@ -23,16 +38,35 @@ export function useActiveSessions(unitId: string | null): ActiveSessionEntry[] {
     childById: new Map(),
   });
   const [entries, setEntries] = useState<ActiveSessionEntry[]>([]);
+  const [status, setStatus] = useState<ActiveSessionsStatus>("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const rawRef = useRef(raw);
   rawRef.current = raw;
+  const loadedOnce = useRef(false);
 
   useEffect(() => {
     if (!unitId) return;
     let cancelled = false;
+    loadedOnce.current = false;
+    setStatus("loading");
 
     async function refetch() {
-      const data = await fetchActiveSessionsRaw(unitId!);
-      if (!cancelled) setRaw(data);
+      try {
+        const data = await fetchActiveSessionsRaw(unitId!);
+        if (cancelled) return;
+        setRaw(data);
+        setStatus("ready");
+        setErrorMessage(null);
+        loadedOnce.current = true;
+      } catch (err) {
+        if (cancelled) return;
+        // Numa falha depois de já ter carregado uma vez (ex: reconsulta
+        // disparada pelo Realtime), mantém o último dado bom na tela em
+        // vez de trocar por um estado vazio — só a mensagem de erro
+        // aparece, pra não fingir que a lista esvaziou sozinha.
+        setStatus("error");
+        setErrorMessage(err instanceof Error ? err.message : "Não foi possível atualizar o painel.");
+      }
     }
     refetch();
 
@@ -53,5 +87,5 @@ export function useActiveSessions(unitId: string | null): ActiveSessionEntry[] {
     return () => clearInterval(interval);
   }, [raw]);
 
-  return entries;
+  return { entries, status, errorMessage };
 }

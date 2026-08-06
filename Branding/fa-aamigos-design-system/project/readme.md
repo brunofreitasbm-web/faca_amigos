@@ -83,8 +83,9 @@ The palette is bold, primary and saturated. No pastels; no muted earth tones.
 
 ### Backgrounds
 
-- **App:** Near-black `#141414`. No gradients, no texture — pure dark.
-- **Cards (app):** Slightly lighter `#262626`.
+- **App (marketing/info reference material):** Near-black `#141414`. No gradients, no texture — pure dark.
+- **Cards (dark app surfaces):** Slightly lighter `#262626`.
+- **Operator kiosk (`apps/kiosk-ui`):** Deliberately **light**, not dark — a real product decision (see `packages/ui/src/components/Card.tsx` and `Input.tsx` for the "light is the kiosk default" comments), because it's the densest, most text-heavy screen operators read all shift. The `--color-bg-app`/`-surface`/`-card`/`-raised` dark tokens exist in `packages/ui` for any future dark surface, but nothing in the shipped kiosk uses them today.
 - **Marketing posts:** Full-bleed photography always. Text overlaid directly on photo using bold color. Warm, golden-toned imagery preferred (children playing in natural/warm lighting).
 - **Accent corners:** Yellow diagonal shape cut into corners of marketing posts (see `marketing-curta.jpeg`).
 

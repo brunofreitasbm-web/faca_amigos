@@ -54,8 +54,14 @@ export function StatusBadge({ phase, detail, size = "md", style: styleProp, ...r
       fontFamily: "var(--font-body)",
       ...styleProp,
     };
+    // Sem role="status" aqui: `detail` neste tamanho é o cronômetro do
+    // Painel, recalculado a 1 Hz para cada card (useTick.ts) — um
+    // role="status" fica reanunciando "22:14... 22:15... 22:16..." pra
+    // sempre em leitor de tela, pra cada sessão ativa. É enchente, não
+    // uma live region útil. O valor continua legível sob demanda; só
+    // não empurra sozinho a cada segundo.
     return (
-      <span style={style} role="status" {...rest}>
+      <span style={style} {...rest}>
         <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: "var(--weight-bold)" as unknown as number, textTransform: "uppercase", letterSpacing: "0.04em", opacity: 0.9 }}>
           <span aria-hidden="true">{GLYPHS[phase]}</span>
           <span>{LABELS[phase]}</span>

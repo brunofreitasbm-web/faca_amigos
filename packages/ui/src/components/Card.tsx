@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, MouseEvent, ReactNode } from "react";
 
 export type CardVariant = "light" | "dark";
 
@@ -38,10 +38,24 @@ export function Card({
   onClick,
   style: styleProp,
   bodyStyle,
+  role: roleProp,
+  tabIndex: tabIndexProp,
+  onKeyDown: onKeyDownProp,
   ...rest
 }: CardProps) {
   const [hovered, setHovered] = useState(false);
   const isDark = variant === "dark";
+  // Card com onClick é a superfície de interação mais usada do quiosque
+  // (selecionar sessão, plano, carrinho, funcionário...) e sempre foi um
+  // <div> puro — sem role, sem tabIndex, sem tecla. Ou seja: nenhum desses
+  // fluxos era alcançável por teclado. Como o corpo do card costuma conter
+  // botões reais próprios (imprimir, ações da sessão), virar um <button>
+  // de verdade aninharia controle-em-controle; o padrão correto aqui é
+  // div com role="button" + tabIndex + Enter/Espaço, igual a um card de
+  // "ação primária" nas WAI-ARIA Authoring Practices.
+  const isInteractive = Boolean(onClick);
+  const role = roleProp ?? (isInteractive ? "button" : undefined);
+  const tabIndex = tabIndexProp ?? (isInteractive ? 0 : undefined);
 
   const cardStyle: CSSProperties = {
     borderRadius: "var(--radius-card)",
@@ -89,6 +103,18 @@ export function Card({
     <div
       style={cardStyle}
       onClick={onClick}
+      role={role}
+      tabIndex={tabIndex}
+      onKeyDown={(e) => {
+        onKeyDownProp?.(e);
+        if (e.defaultPrevented) return;
+        if (isInteractive && (e.key === "Enter" || e.key === " ")) {
+          // Espaço rola a página em elementos focáveis por padrão do
+          // navegador — precisa do preventDefault antes de disparar.
+          e.preventDefault();
+          onClick!(e as unknown as MouseEvent<HTMLDivElement>);
+        }
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       {...rest}

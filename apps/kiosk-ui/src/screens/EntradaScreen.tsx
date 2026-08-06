@@ -193,16 +193,26 @@ export function EntradaScreen() {
       setCouponCode("");
 
       if (activity === "CARRINHO" && unit) {
-        const freshAssets = await Api.assets(unit.id);
-        setAssets(freshAssets);
-        setAssetId(freshAssets.find((a) => a.status === "DISPONIVEL")?.id ?? null);
+        // Fora do try do check-in de propósito: o check-in já deu certo
+        // acima (result/receiptData já setados) — se só esta recarga de
+        // carrinhos falhar, isso não pode virar "Erro ao fazer
+        // check-in" no catch de baixo, que era o que acontecia antes.
+        try {
+          const freshAssets = await Api.assets(unit.id);
+          setAssets(freshAssets);
+          setAssetId(freshAssets.find((a) => a.status === "DISPONIVEL")?.id ?? null);
+        } catch {
+          toast.error("Check-in feito, mas não foi possível atualizar a lista de carrinhos — atualize a tela antes da próxima entrada.");
+        }
       } else {
         setAssetId(null);
       }
     } catch (err) {
+      // Só o <p> abaixo, sem toast: a mesma mensagem duas vezes (uma que
+      // some sozinha, outra que fica) não ajudava — e o <p> é o que
+      // continua na tela se o operador não viu o toast a tempo.
       const msg = err instanceof Error ? err.message : "Erro ao fazer check-in";
       setError(msg);
-      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -251,10 +261,10 @@ export function EntradaScreen() {
                 }}
               >
                 <strong style={{ fontSize: "16px", display: "block" }}>{plan.name}</strong>
-                <div style={{ fontSize: "18px", color: "var(--color-primary)", fontWeight: "bold", marginTop: "4px" }}>
+                <div style={{ fontSize: "18px", color: "var(--color-primary-hover)", fontWeight: "bold", marginTop: "4px" }}>
                   {money(plan.valueCents)}
                 </div>
-                {!fits && <div style={{ fontSize: "11px", color: "var(--color-error)", fontWeight: "bold" }}>Não cabe até o fechamento</div>}
+                {!fits && <div style={{ fontSize: "11px", color: "var(--color-error-text)", fontWeight: "bold" }}>Não cabe até o fechamento</div>}
               </Card>
             );
           })}
@@ -391,8 +401,8 @@ export function EntradaScreen() {
         </select>
       </section>
 
-      {error && <p style={{ color: "var(--color-error)", margin: 0, fontWeight: "bold" }}>{error}</p>}
-      {result && <p style={{ color: "var(--color-teal)", margin: 0, fontWeight: "bold" }}>{result}</p>}
+      {error && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{error}</p>}
+      {result && <p style={{ color: "var(--color-teal-text)", margin: 0, fontWeight: "bold" }}>{result}</p>}
 
       {lastGuardianId && (
         <Tag color="var(--color-teal)" title="Os dados do responsável abaixo continuam preenchidos para agilizar o cadastro de mais uma criança">

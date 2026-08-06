@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Button, Card, Tag } from "@facaamigos/ui";
+import { Button, Modal, Tag } from "@facaamigos/ui";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 import { systemStatus } from "../api/client.js";
@@ -57,27 +57,18 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
   }, []);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 9999,
-        padding: "16px",
-      }}
-    >
-      <Card style={{ maxWidth: "420px", width: "100%", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", margin: 0, color: "var(--color-primary)" }}>Cupom Não Fiscal</h2>
+    <Modal
+      title={
+        <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontFamily: "var(--font-display)", color: "var(--color-primary-hover)" }}>Cupom Não Fiscal</span>
           <Tag color="var(--color-teal)" title="Impressão disparada automaticamente ao abrir esta janela">80mm</Tag>
-        </div>
-
+        </span>
+      }
+      onClose={onClose}
+      maxWidth="420px"
+      zIndex={9999}
+      bodyStyle={{ display: "flex", flexDirection: "column", gap: "16px" }}
+    >
         <pre
           style={{
             background: "#ffffff",
@@ -96,14 +87,11 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
         </pre>
 
         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-          <Button variant="ghost" onClick={onClose} title="Fechar esta janela">
-            Fechar
-          </Button>
+          {/* "Fechar" some — o ✕ do Modal já faz o mesmo, sem duplicar. */}
           <Button variant="primary" onClick={handlePrint} title="Reimprimir caso o pop-up de impressão tenha sido bloqueado">
             🖨️ Reimprimir
           </Button>
         </div>
-      </Card>
-    </div>
+    </Modal>
   );
 }

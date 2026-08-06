@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Card, Tag } from "@facaamigos/ui";
+import { Button, Modal, Tag } from "@facaamigos/ui";
 import { generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import { systemStatus } from "../api/client.js";
 
@@ -103,29 +103,18 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 9999,
-        padding: "16px",
-      }}
-    >
-      <Card style={{ maxWidth: "780px", width: "100%", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", margin: 0, color: "var(--color-primary)" }}>
-            Impressão de Pulseira
-          </h2>
+    <Modal
+      title={
+        <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontFamily: "var(--font-display)", color: "var(--color-primary-hover)" }}>Impressão de Pulseira</span>
           <Tag color="var(--color-teal)">Gainscha GS-2208D (20mm × 270mm Paisagem)</Tag>
-        </div>
-
+        </span>
+      }
+      onClose={onClose}
+      maxWidth="780px"
+      zIndex={9999}
+      bodyStyle={{ display: "flex", flexDirection: "column", gap: "16px" }}
+    >
         {/* Pré-visualização na tela em modo paisagem */}
         <div
           style={{
@@ -195,16 +184,13 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
           )}
 
           <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
-            <Button variant="ghost" onClick={onClose}>
-              Fechar
-            </Button>
+            {/* "Fechar" some — o ✕ do Modal já faz o mesmo, sem duplicar. */}
             <Button variant="primary" onClick={handlePrint}>
               🖨️ Imprimir Pulseira (Gainscha)
             </Button>
           </div>
         </div>
-      </Card>
-    </div>
+    </Modal>
   );
 }
 

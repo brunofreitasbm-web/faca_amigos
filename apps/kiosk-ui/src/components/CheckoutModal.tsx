@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card } from "@facaamigos/ui";
+import { Button, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -124,9 +124,12 @@ export function CheckoutModal({
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-      <Card style={{ padding: "24px", width: "420px", maxWidth: "90vw" }}>
-        <h2>Fechar atendimento</h2>
+    // closeOnBackdrop={false}: era assim antes (o fundo escurecido não
+    // fechava o diálogo) — um clique perdido no meio de um pagamento não
+    // pode descartar a tela sem querer. O "Cancelar" explícito continua
+    // sendo o único jeito de sair sem cobrar.
+    <Modal title="Fechar atendimento" onClose={onClose} closeOnBackdrop={false} maxWidth="420px" zIndex={100}>
+      <>
         {entries.map((e) => (
           <div key={e.session.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
             <span>{e.session.child_name_snapshot}</span>
@@ -153,7 +156,7 @@ export function CheckoutModal({
           </div>
         )}
 
-        {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
+        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
 
         {method === "DINHEIRO" ? (
           <>
@@ -180,7 +183,7 @@ export function CheckoutModal({
             </Button>
           </div>
         )}
-      </Card>
-    </div>
+      </>
+    </Modal>
   );
 }

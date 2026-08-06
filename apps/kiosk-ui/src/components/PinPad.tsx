@@ -1,4 +1,4 @@
-import { Button } from "@facaamigos/ui";
+import { Button, BackspaceIcon } from "@facaamigos/ui";
 
 interface PinPadProps {
   value: string;
@@ -35,8 +35,8 @@ export function PinPad({ value, onChange, onSubmit, disabled }: PinPadProps) {
         <Button variant="secondary" size="lg" disabled={disabled} onClick={() => press("0")}>
           0
         </Button>
-        <Button variant="ghost" size="lg" disabled={disabled} onClick={() => onChange(value.slice(0, -1))}>
-          ⌫
+        <Button variant="ghost" size="lg" disabled={disabled} onClick={() => onChange(value.slice(0, -1))} aria-label="Apagar último dígito">
+          <BackspaceIcon />
         </Button>
       </div>
       <Button variant="primary" size="lg" fullWidth disabled={disabled || value.length !== 6} onClick={onSubmit}>

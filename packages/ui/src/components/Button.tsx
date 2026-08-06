@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 
 export type ButtonVariant = "primary" | "teal" | "secondary" | "ghost" | "amber" | "dark";
@@ -28,7 +28,7 @@ const SIZES: Record<ButtonSize, CSSProperties> = {
  * nunca texto solto — porque #F0196B sobre branco não passa em AA para
  * texto normal (~4.15:1). Ver packages/ui/src/tokens/colors.css.
  */
-export function Button({
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   variant = "primary",
   size = "md",
   disabled = false,
@@ -37,7 +37,7 @@ export function Button({
   children,
   style: styleProp,
   ...rest
-}: ButtonProps) {
+}, ref) {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
 
@@ -101,7 +101,10 @@ export function Button({
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.45 : 1,
     transition: "all var(--transition-fast)",
-    outline: "none",
+    // Sem `outline: none` aqui de propósito — packages/ui/src/tokens/focus.css
+    // é quem desenha o anel de foco (só em :focus-visible, ou seja, só
+    // para navegação por teclado). Removê-lo aqui sem repor nada era
+    // exatamente por que nenhum botão do produto tinha foco visível.
     whiteSpace: "nowrap",
     width: fullWidth ? "100%" : "auto",
     ...SIZES[size],
@@ -111,6 +114,7 @@ export function Button({
 
   return (
     <button
+      ref={ref}
       type="button"
       style={style}
       disabled={disabled}
@@ -126,4 +130,4 @@ export function Button({
       {loading ? <span style={{ opacity: 0.7 }}>…</span> : children}
     </button>
   );
-}
+});

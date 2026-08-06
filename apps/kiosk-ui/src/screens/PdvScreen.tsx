@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Button, Card } from "@facaamigos/ui";
+import { Button, Card, MinusIcon } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
-import { useToast } from "../state/ToastContext.js";
 import { money } from "../format.js";
 import { CashPaymentPad } from "../components/CashPaymentPad.js";
 
@@ -16,7 +15,6 @@ const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
 export function PdvScreen() {
   const { unit, employee } = useAppState();
-  const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [hasOpenShift, setHasOpenShift] = useState<boolean | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -63,11 +61,15 @@ export function PdvScreen() {
       });
       setSuccess(`Venda registrada! Código: ${result.orderCode}`);
       setCart([]);
-      Api.products(unit.id).then(setProducts); // atualiza estoque na tela
+      // A venda já está feita — se só esta atualização de estoque falhar,
+      // a tela continua com o estoque antigo até a próxima ação; não é
+      // motivo pra reportar erro na venda que na verdade deu certo.
+      Api.products(unit.id).then(setProducts).catch(() => {});
     } catch (err) {
+      // Só o <p> abaixo (sem toast redundante): a mesma mensagem duas
+      // vezes — uma que some sozinha, outra que fica — não ajudava.
       const msg = err instanceof Error ? err.message : "Erro ao vender";
       setError(msg);
-      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -101,8 +103,8 @@ export function PdvScreen() {
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span>{money(line.product.price_cents * line.quantity)}</span>
-              <Button variant="ghost" size="sm" onClick={() => removeFromCart(line.product.id)}>
-                −
+              <Button variant="ghost" size="sm" onClick={() => removeFromCart(line.product.id)} aria-label={`Remover uma unidade de ${line.product.name}`}>
+                <MinusIcon />
               </Button>
             </div>
           </div>
@@ -127,8 +129,8 @@ export function PdvScreen() {
           </div>
         )}
 
-        {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
-        {success && <p style={{ color: "var(--color-teal)" }}>{success}</p>}
+        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
+        {success && <p style={{ color: "var(--color-teal-text)" }}>{success}</p>}
 
         {method === "DINHEIRO" ? (
           <CashPaymentPad totalCents={totalCents} busy={busy || cart.length === 0 || hasOpenShift === false} onConfirm={() => confirm()} />
