@@ -184,7 +184,7 @@ export function PainelScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px", marginTop: "8px" }}>
         {entries.map((entry) => {
-          const { session, quote, plan } = entry;
+          const { session, quote, plan, asset } = entry;
           const isSelected = selected.has(session.id);
           const isExceeded = quote.timing.phase === "EXCEDENTE" || quote.timing.phase === "VERMELHO";
           const overageLine = quote.lines.find((l) => l.label.startsWith("Excedente"));
@@ -212,12 +212,29 @@ export function PainelScreen() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <strong style={{ fontSize: "17px", display: "block" }}>{session.child_name_snapshot}</strong>
-                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Pulseira: #{wristbandCode}</span>
-                  {plan && (
-                    <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>
+                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                  {asset && (
+                    asset.photo_url ? (
+                      <img
+                        src={asset.photo_url}
+                        alt={asset.name}
+                        title={`Carrinho: ${asset.name}`}
+                        style={{ width: "44px", height: "44px", objectFit: "cover", borderRadius: "12px", border: "1px solid var(--border-subtle)", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <span title={`Carrinho: ${asset.name}`} style={{ fontSize: "32px", lineHeight: "44px" }}>
+                        {asset.emoji}
+                      </span>
+                    )
                   )}
+                  <div>
+                    <strong style={{ fontSize: "17px", display: "block" }}>{session.child_name_snapshot}</strong>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Pulseira: #{wristbandCode}</span>
+                    {asset && <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Carrinho: {asset.name}</span>}
+                    {plan && (
+                      <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>
+                    )}
+                  </div>
                 </div>
                 <Button
                   variant="ghost"

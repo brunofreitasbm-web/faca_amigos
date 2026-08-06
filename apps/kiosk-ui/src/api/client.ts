@@ -73,6 +73,7 @@ export interface Asset {
   color: string;
   status: "DISPONIVEL" | "EM_USO" | "MANUTENCAO";
   odometer_minutes: number;
+  photo_url: string | null;
 }
 
 export interface Product {
@@ -102,6 +103,7 @@ export interface QuoteLine {
 
 export interface ActiveSessionEntry {
   plan: { id: string; name: string; color: string };
+  asset: { id: string; name: string; emoji: string; photo_url: string | null } | null;
   session: {
     id: string;
     child_name_snapshot: string;
@@ -271,6 +273,7 @@ export interface ActiveSessionsRaw {
   sessions: Record<string, unknown>[];
   planById: Map<string, Plan>;
   guardianById: Map<string, Record<string, unknown>>;
+  assetById: Map<string, Record<string, unknown>>;
 }
 
 /**
@@ -283,18 +286,23 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
   const sessions = await unwrap<Record<string, unknown>[]>(
     supabase().from("fa_kiosk_sessions").select("*").eq("unit_id", unitId).eq("status", "ATIVA"),
   );
-  if (sessions.length === 0) return { sessions: [], planById: new Map(), guardianById: new Map() };
+  if (sessions.length === 0) return { sessions: [], planById: new Map(), guardianById: new Map(), assetById: new Map() };
 
   const planIds = [...new Set(sessions.map((s) => s.plan_id as string))];
   const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
-  const [plans, guardians] = await Promise.all([
+  const assetIds = [...new Set(sessions.map((s) => s.asset_id as string | null).filter((id): id is string => Boolean(id)))];
+  const [plans, guardians, assets] = await Promise.all([
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("*").in("id", planIds)),
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164").in("id", guardianIds)),
+    assetIds.length === 0
+      ? Promise.resolve([])
+      : unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_assets").select("id, name, emoji, photo_url").in("id", assetIds)),
   ]);
   return {
     sessions,
     planById: new Map(plans.map((p) => [p.id as string, planFromRow(p)])),
     guardianById: new Map(guardians.map((g) => [g.id as string, g])),
+    assetById: new Map(assets.map((a) => [a.id as string, a])),
   };
 }
 
@@ -302,6 +310,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
   return raw.sessions.map((row) => {
     const plan = raw.planById.get(row.plan_id as string)!;
     const guardian = raw.guardianById.get(row.guardian_id as string);
+    const assetRow = row.asset_id ? raw.assetById.get(row.asset_id as string) : undefined;
     const quote = quoteForSession(
       plan,
       {
@@ -327,6 +336,14 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
       },
       quote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
+      asset: assetRow
+        ? {
+            id: assetRow.id as string,
+            name: assetRow.name as string,
+            emoji: assetRow.emoji as string,
+            photo_url: (assetRow.photo_url as string | null) ?? null,
+          }
+        : null,
     };
   });
 }
@@ -346,7 +363,10 @@ export const Api = {
   },
   assets: (unitId: string) =>
     unwrap<Asset[]>(
-      supabase().from("fa_kiosk_assets").select("id, unit_id, name, emoji, color, status, odometer_minutes").eq("unit_id", unitId),
+      supabase()
+        .from("fa_kiosk_assets")
+        .select("id, unit_id, name, emoji, color, status, odometer_minutes, photo_url")
+        .eq("unit_id", unitId),
     ),
   products: (unitId: string) =>
     unwrap<Product[]>(
@@ -598,7 +618,14 @@ export const Api = {
         .select("id")
         .single(),
     ),
-  createAsset: (body: { unitId: string; name: string; emoji: string; color: string; maintenanceThresholdHours: number }) =>
+  createAsset: (body: {
+    unitId: string;
+    name: string;
+    emoji: string;
+    color: string;
+    maintenanceThresholdHours: number;
+    photoUrl?: string | null;
+  }) =>
     unwrap<{ id: string }>(
       supabase()
         .from("fa_kiosk_assets")
@@ -608,11 +635,28 @@ export const Api = {
           emoji: body.emoji,
           color: body.color,
           maintenance_threshold_hours: body.maintenanceThresholdHours,
+          photo_url: body.photoUrl ?? null,
         })
         .select("id")
         .single(),
     ),
   setAssetStatus: (id: string, status: Asset["status"]) => unwrap(supabase().from("fa_kiosk_assets").update({ status }).eq("id", id)),
+  setAssetPhoto: (id: string, photoUrl: string | null) =>
+    unwrap(supabase().from("fa_kiosk_assets").update({ photo_url: photoUrl }).eq("id", id)),
+  // Upload direto para o bucket público `carrinho-fotos` (ver migration
+  // fa_kiosk_asset_photos) — aceita apenas JPG/PNG, nome do arquivo prefixado
+  // com timestamp para evitar colisão ao trocar a foto de um mesmo carrinho.
+  uploadAssetPhoto: async (unitId: string, file: File): Promise<string> => {
+    const ext = file.type === "image/png" ? "png" : "jpg";
+    const path = `${unitId}/${Date.now()}.${ext}`;
+    const { error } = await supabase().storage.from("carrinho-fotos").upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    const { data } = supabase().storage.from("carrinho-fotos").getPublicUrl(path);
+    return data.publicUrl;
+  },
   // Criação de funcionário exige uma conta real no Supabase Auth (não dá
   // para ser feita com a chave anônima do cliente) — segue pelo servidor
   // local até a Fase 1 ganhar um fluxo de convite via backoffice/admin API.

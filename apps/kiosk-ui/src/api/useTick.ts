@@ -15,7 +15,7 @@ import type { ActiveSessionEntry, ActiveSessionsRaw } from "./client.js";
  *    esperar o próximo tick do servidor.
  */
 export function useActiveSessions(unitId: string | null): ActiveSessionEntry[] {
-  const [raw, setRaw] = useState<ActiveSessionsRaw>({ sessions: [], planById: new Map(), guardianById: new Map() });
+  const [raw, setRaw] = useState<ActiveSessionsRaw>({ sessions: [], planById: new Map(), guardianById: new Map(), assetById: new Map() });
   const [entries, setEntries] = useState<ActiveSessionEntry[]>([]);
   const rawRef = useRef(raw);
   rawRef.current = raw;

@@ -439,24 +439,50 @@ function FidelidadeTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boo
 const CART_EMOJI_OPTIONS = ["🚙", "🚗", "🏎️", "🏍️", "🏁", "🚜", "🛺", "🚕"];
 const CART_COLOR_OPTIONS = ["#F0196B", "#2ECFB5", "#FFE234", "#1A3F35", "#FF7A00", "#A020EE"];
 
+const CART_PHOTO_ACCEPT = "image/jpeg,image/png";
+
 function FrotaTab({ unitId }: { unitId: string }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(CART_EMOJI_OPTIONS[0]!);
   const [color, setColor] = useState(CART_COLOR_OPTIONS[0]!);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [photoBusyFor, setPhotoBusyFor] = useState<string | null>(null);
 
   function load() {
     Api.assets(unitId).then(setAssets);
   }
   useEffect(load, [unitId]);
 
+  function pickPhoto(file: File | null) {
+    setError(null);
+    if (!file) {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+    if (file.type !== "image/jpeg" && file.type !== "image/png") {
+      setError("A foto precisa ser um arquivo JPG ou PNG.");
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+
   async function create() {
     setBusy(true);
+    setError(null);
     try {
-      await Api.createAsset({ unitId, name, emoji, color, maintenanceThresholdHours: 200 });
+      const photoUrl = photoFile ? await Api.uploadAssetPhoto(unitId, photoFile) : null;
+      await Api.createAsset({ unitId, name, emoji, color, maintenanceThresholdHours: 200, photoUrl });
       setName("");
+      pickPhoto(null);
       load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível criar o carrinho.");
     } finally {
       setBusy(false);
     }
@@ -465,6 +491,25 @@ function FrotaTab({ unitId }: { unitId: string }) {
   async function setStatus(id: string, status: Asset["status"]) {
     await Api.setAssetStatus(id, status);
     load();
+  }
+
+  async function replacePhoto(asset: Asset, file: File | null) {
+    if (!file) return;
+    if (file.type !== "image/jpeg" && file.type !== "image/png") {
+      setError("A foto precisa ser um arquivo JPG ou PNG.");
+      return;
+    }
+    setPhotoBusyFor(asset.id);
+    setError(null);
+    try {
+      const photoUrl = await Api.uploadAssetPhoto(unitId, file);
+      await Api.setAssetPhoto(asset.id, photoUrl);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível trocar a foto.");
+    } finally {
+      setPhotoBusyFor(null);
+    }
   }
 
   return (
@@ -494,17 +539,44 @@ function FrotaTab({ unitId }: { unitId: string }) {
             ))}
           </div>
         </div>
-        <Button variant="primary" disabled={busy || !name} onClick={create}>
+        <div>
+          <label>Foto do carrinho (opcional — JPG ou PNG)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
+            {photoPreview && (
+              <img src={photoPreview} alt="Pré-visualização" style={{ width: "56px", height: "56px", objectFit: "cover", borderRadius: "12px", border: "1px solid var(--border-subtle)" }} />
+            )}
+            <input type="file" accept={CART_PHOTO_ACCEPT} onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)} />
+          </div>
+        </div>
+        {error && <p style={{ color: "var(--color-error)", margin: 0 }}>{error}</p>}
+        <Button variant="primary" loading={busy} disabled={busy || !name} onClick={create}>
           Criar carrinho
         </Button>
       </Card>
 
       {assets.map((a) => (
-        <Card key={a.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>
-            {a.emoji} {a.name} — {a.status} — {Math.round(a.odometer_minutes / 60)}h de uso
-          </span>
-          <div style={{ display: "flex", gap: "4px" }}>
+        <Card key={a.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {a.photo_url ? (
+              <img src={a.photo_url} alt={a.name} style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "10px", border: "1px solid var(--border-subtle)" }} />
+            ) : (
+              <span style={{ fontSize: "24px" }}>{a.emoji}</span>
+            )}
+            <span>
+              {a.name} — {a.status} — {Math.round(a.odometer_minutes / 60)}h de uso
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <label style={{ fontSize: "12px", color: "var(--text-secondary)", cursor: "pointer" }} title="Trocar a foto deste carrinho">
+              {photoBusyFor === a.id ? "Enviando…" : "🖼️ Trocar foto"}
+              <input
+                type="file"
+                accept={CART_PHOTO_ACCEPT}
+                style={{ display: "none" }}
+                disabled={photoBusyFor === a.id}
+                onChange={(e) => replacePhoto(a, e.target.files?.[0] ?? null)}
+              />
+            </label>
             <Button variant="ghost" size="sm" onClick={() => setStatus(a.id, "DISPONIVEL")}>
               disponível
             </Button>
