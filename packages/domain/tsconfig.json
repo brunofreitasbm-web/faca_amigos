@@ -2,7 +2,8 @@
   "extends": "@facaamigos/config/tsconfig-base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src"]
 }

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { normalizePhoneE164 } from "@facaamigos/domain";
+
 
 /**
  * DTOs específicos de Configurações/gestão que ainda não vivem em
@@ -84,7 +86,10 @@ export const checkinBodySchema = z.object({
   guardian: z.object({
     id: z.string().uuid().optional(),
     fullName: z.string().min(2),
-    phoneE164: z.string().regex(/^\+55\d{10,11}$/),
+    phoneE164: z
+      .string()
+      .transform(normalizePhoneE164)
+      .pipe(z.string().regex(/^\+55\d{10,11}$/, "Telefone deve conter DDD + número (ex: 91999999999)")),
   }),
   couponCode: z.string().optional(),
 });

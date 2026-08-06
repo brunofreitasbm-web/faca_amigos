@@ -38,26 +38,45 @@
   transition: width 0.3s ease, background-color 0.3s ease;
 }
 
-/* Estilos de impressão da pulseira térmica 80mm */
+/* Estilos de impressão da pulseira térmica em modo paisagem (20mm x 270mm / Gainscha GS-2208D) */
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    size: 270mm 20mm landscape;
+    margin: 0;
   }
-  
-  .wristband-printable, .wristband-printable * {
-    visibility: visible;
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  /* Oculta a árvore principal da aplicação para acelerar o preview do Chrome/Edge */
+  #root > *:not(.wristband-printable) {
+    display: none !important;
   }
 
   .wristband-printable {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 76mm;
-    padding: 4mm;
-    margin: 0;
+    visibility: visible !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 270mm !important;
+    height: 20mm !important;
+    padding: 1mm 4mm !important;
+    margin: 0 !important;
     background: #ffffff !important;
     color: #000000 !important;
-    font-family: 'Nunito', sans-serif !important;
-    border: 1px dashed #000;
+    font-family: Arial, Helvetica, sans-serif !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 }
+
+
+

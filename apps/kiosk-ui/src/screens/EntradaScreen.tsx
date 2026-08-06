@@ -3,7 +3,9 @@ import { Card, Button, Input, Tag } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Plan } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { normalizePhoneE164 } from "@facaamigos/domain";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
+
 import type { WristbandData } from "../components/WristbandPrintModal.js";
 import { money } from "../format.js";
 
@@ -88,6 +90,8 @@ export function EntradaScreen() {
       customNotes.trim()
     ].filter(Boolean).join(" | ");
 
+    const normalizedPhone = normalizePhoneE164(phone);
+
     try {
       const selectedPlan = plans.find((p) => p.id === planId);
       const res = await Api.checkin({
@@ -97,7 +101,7 @@ export function EntradaScreen() {
         planId,
         employeeId: employee.id,
         child: { id: matchedChild?.id, fullName: childName, birthDate, inclusiveEligible: false },
-        guardian: { fullName: guardianName, phoneE164: phone },
+        guardian: { fullName: guardianName, phoneE164: normalizedPhone },
         couponCode: couponCode || undefined,
       });
 

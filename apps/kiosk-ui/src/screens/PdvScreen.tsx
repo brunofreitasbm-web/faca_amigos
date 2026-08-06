@@ -15,6 +15,7 @@ const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 export function PdvScreen() {
   const { unit, employee } = useAppState();
   const [products, setProducts] = useState<Product[]>([]);
+  const [hasOpenShift, setHasOpenShift] = useState<boolean | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState<(typeof METHODS)[number]>("PIX");
   const [busy, setBusy] = useState(false);
@@ -24,7 +25,9 @@ export function PdvScreen() {
   useEffect(() => {
     if (!unit) return;
     Api.products(unit.id).then(setProducts);
+    Api.currentShift(unit.id).then((shift) => setHasOpenShift(!!shift));
   }, [unit]);
+
 
   function addToCart(product: Product) {
     setCart((prev) => {
@@ -113,10 +116,16 @@ export function PdvScreen() {
           ))}
         </div>
 
+        {hasOpenShift === false && (
+          <div style={{ background: "#FEF3C7", color: "#92400E", padding: "12px 16px", borderRadius: "8px", border: "1px solid #F59E0B", marginBottom: "16px", fontSize: "14px" }}>
+            ⚠️ <strong>Caixa fechado:</strong> Não há turno de caixa aberto nesta unidade. Abra o turno na tela de <strong>Caixa</strong> para realizar vendas no PDV.
+          </div>
+        )}
+
         {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
         {success && <p style={{ color: "var(--color-teal)" }}>{success}</p>}
 
-        <Button variant="primary" fullWidth disabled={busy || cart.length === 0} onClick={confirm}>
+        <Button variant="primary" fullWidth disabled={busy || cart.length === 0 || hasOpenShift === false} onClick={confirm}>
           Confirmar venda
         </Button>
       </Card>

@@ -22,10 +22,21 @@ describe("checkinRequestSchema", () => {
     expect(checkinRequestSchema.safeParse(base).success).toBe(true);
   });
 
-  it("rejeita telefone fora do formato E.164 brasileiro", () => {
+  it("normaliza telefone brasileiro de 11 dígitos sem +55", () => {
     const result = checkinRequestSchema.safeParse({
       ...base,
       guardian: { ...base.guardian, phoneE164: "91982501215" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.guardian.phoneE164).toBe("+5591982501215");
+    }
+  });
+
+  it("rejeita telefone com número de dígitos inválido", () => {
+    const result = checkinRequestSchema.safeParse({
+      ...base,
+      guardian: { ...base.guardian, phoneE164: "123" },
     });
     expect(result.success).toBe(false);
   });

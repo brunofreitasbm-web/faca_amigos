@@ -1,4 +1,6 @@
-import { Button, Card } from "@facaamigos/ui";
+import { useState } from "react";
+import { Button, Card, Tag } from "@facaamigos/ui";
+import { generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 
 export interface WristbandData {
   wristbandCode: string;
@@ -17,9 +19,80 @@ interface WristbandPrintModalProps {
 
 export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps) {
   const nowStr = data.entryTime || new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const [showTspl, setShowTspl] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const tsplCommands = generateGainschaGS2208DTSPL({
+    ...data,
+    entryTime: nowStr,
+  });
 
   function handlePrint() {
-    window.print();
+    const printableElement = document.querySelector(".wristband-printable");
+    if (!printableElement) {
+      setTimeout(() => window.print(), 50);
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=800,height=300");
+    if (!printWindow) {
+      setTimeout(() => window.print(), 50);
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <title>Impressão de Pulseira — FaçaAmigos</title>
+          <style>
+            @page {
+              size: 270mm 20mm landscape;
+              margin: 0;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              font-family: Arial, Helvetica, sans-serif !important;
+              -webkit-print-color-adjust: exact;
+            }
+            .wristband-printable {
+              width: 270mm;
+              height: 20mm;
+              padding: 1mm 4mm;
+              margin: 0;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              justify-content: space-between;
+              background: #ffffff;
+              color: #000000;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="wristband-printable">
+            ${printableElement.innerHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
+  function handleCopyTspl() {
+    navigator.clipboard.writeText(tsplCommands);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -38,80 +111,93 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
         padding: "16px",
       }}
     >
-      <Card style={{ maxWidth: "420px", width: "100%", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", margin: 0, color: "var(--color-primary)" }}>
-          Impressão de Pulseira
-        </h2>
+      <Card style={{ maxWidth: "780px", width: "100%", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", margin: 0, color: "var(--color-primary)" }}>
+            Impressão de Pulseira
+          </h2>
+          <Tag variant="info">Gainscha GS-2208D (20mm × 270mm Paisagem)</Tag>
+        </div>
 
-        {/* Pré-visualização na tela */}
+        {/* Pré-visualização na tela em modo paisagem */}
         <div
           style={{
             background: "#ffffff",
             color: "#141414",
-            padding: "16px",
+            padding: "8px 16px",
             borderRadius: "12px",
             border: "2px dashed var(--border-subtle)",
             fontFamily: "var(--font-body)",
+            overflowX: "auto",
           }}
         >
-          <div className="wristband-printable">
-            <div style={{ textAlign: "center", borderBottom: "2px solid #141414", paddingBottom: "8px", marginBottom: "12px" }}>
-              <strong style={{ fontFamily: "Fredoka, sans-serif", fontSize: "20px", display: "block", color: "#F0196B" }}>
+          <div className="wristband-printable" style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: "16px", minWidth: "680px" }}>
+            <div style={{ borderRight: "2px solid #141414", paddingRight: "12px" }}>
+              <strong style={{ fontFamily: "Fredoka, sans-serif", fontSize: "16px", color: "#F0196B", display: "block" }}>
                 FaçaAmigos
               </strong>
-              <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>
+              <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>
                 Playground Inclusivo
               </span>
             </div>
 
-            <div style={{ fontSize: "26px", fontWeight: "bold", textAlign: "center", margin: "8px 0", letterSpacing: "2px", background: "#f0f0f0", padding: "4px", borderRadius: "6px" }}>
-              #{data.wristbandCode}
-            </div>
-
-            <div style={{ margin: "12px 0", display: "flex", flexDirection: "column", gap: "4px" }}>
-              <div style={{ fontSize: "13px", color: "#666" }}>Criança:</div>
-              <div style={{ fontSize: "18px", fontWeight: "800" }}>{data.childName}</div>
-            </div>
-
-            <div style={{ margin: "12px 0", display: "flex", flexDirection: "column", gap: "4px" }}>
-              <div style={{ fontSize: "13px", color: "#666" }}>Responsável / WhatsApp:</div>
-              <div style={{ fontSize: "14px", fontWeight: "700" }}>
-                {data.guardianName} ({data.phone})
+            <div style={{ textAlign: "center", borderRight: "2px solid #141414", paddingRight: "12px" }}>
+              <div style={{ fontSize: "18px", fontWeight: "bold", letterSpacing: "1px", background: "#f0f0f0", padding: "2px 8px", borderRadius: "4px" }}>
+                #{data.wristbandCode}
               </div>
             </div>
 
-            {data.planName && (
-              <div style={{ fontSize: "13px", margin: "8px 0" }}>
-                <strong>Plano:</strong> {data.planName}
+            <div style={{ borderRight: "2px solid #141414", paddingRight: "12px" }}>
+              <div style={{ fontSize: "11px", color: "#666" }}>Criança:</div>
+              <div style={{ fontSize: "15px", fontWeight: "800" }}>{data.childName}</div>
+              <div style={{ fontSize: "11px", fontWeight: "600", color: "#444" }}>
+                Resp: {data.guardianName} ({data.phone})
               </div>
-            )}
-
-            <div style={{ fontSize: "13px", margin: "8px 0" }}>
-              <strong>Entrada:</strong> {nowStr}
             </div>
 
-            {data.notes && (
-              <div style={{ marginTop: "12px", paddingTop: "8px", borderTop: "1px dashed #ccc", fontSize: "12px", color: "#d9534f" }}>
-                <strong>⚠️ Cuidados / Tags Sensoriais:</strong>
-                <div>{data.notes}</div>
+            <div>
+              <div style={{ fontSize: "11px" }}>
+                <strong>Entrada:</strong> {nowStr} {data.planName ? `| ${data.planName}` : ""}
               </div>
-            )}
-
-            <div style={{ marginTop: "16px", textAlign: "center", fontSize: "10px", color: "#888" }}>
-              Guarde esta pulseira até o checkout.
+              {data.notes && (
+                <div style={{ fontSize: "10px", color: "#d9534f", fontWeight: "bold" }}>
+                  ⚠️ OBS: {data.notes}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-          <Button variant="ghost" onClick={onClose}>
-            Fechar
+        {showTspl && (
+          <div style={{ background: "#1e1e1e", color: "#4af626", padding: "12px", borderRadius: "8px", fontFamily: "monospace", fontSize: "11px", whiteSpace: "pre-wrap", maxHeight: "160px", overflowY: "auto" }}>
+            <strong>Comandos Gainscha TSPL (RAW):</strong>
+            <br />
+            {tsplCommands}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>
+          <Button variant="ghost" size="sm" onClick={() => setShowTspl(!showTspl)}>
+            {showTspl ? "Ocultar TSPL" : "Ver Código TSPL"}
           </Button>
-          <Button variant="primary" onClick={handlePrint}>
-            🖨️ Imprimir Pulseira (80mm)
-          </Button>
+
+          {showTspl && (
+            <Button variant="secondary" size="sm" onClick={handleCopyTspl}>
+              {copied ? "Copiado! ✓" : "Copiar TSPL"}
+            </Button>
+          )}
+
+          <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
+            <Button variant="ghost" onClick={onClose}>
+              Fechar
+            </Button>
+            <Button variant="primary" onClick={handlePrint}>
+              🖨️ Imprimir Pulseira (Gainscha)
+            </Button>
+          </div>
         </div>
       </Card>
     </div>
   );
 }
+

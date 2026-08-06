@@ -5,3 +5,9 @@ export * from "./pricing/pricing-engine.js";
 export * from "./loyalty/loyalty-engine.js";
 export * from "./loyalty/visit-frequency.js";
 export * from "./rbac/permissions.js";
+export * from "./phone.js";
+export * from "./printers/gainscha.js";
+export * from "./printers/escpos.js";
+
+
+
