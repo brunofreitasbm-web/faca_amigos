@@ -1,0 +1,32 @@
+<!-- @dsCard group="Colors" viewport="700x140" name="App Dark Palette" subtitle="Dark theme surfaces — bg, surface, card, raised" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--color-bg-app); padding: 20px; font-family: var(--font-body); }
+    .swatches { display: flex; gap: 12px; }
+    .swatch { flex: 1; border-radius: 12px; height: 72px; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.07); }
+    .swatch-name { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); letter-spacing: 0.03em; }
+    .swatch-hex  { font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.35); margin-top: 2px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="swatches">
+    <div class="swatch" style="background:var(--color-bg-app)">
+      <span class="swatch-name">App BG</span><span class="swatch-hex">#141414</span>
+    </div>
+    <div class="swatch" style="background:var(--color-bg-surface)">
+      <span class="swatch-name">Surface</span><span class="swatch-hex">#1E1E1E</span>
+    </div>
+    <div class="swatch" style="background:var(--color-bg-card)">
+      <span class="swatch-name">Card</span><span class="swatch-hex">#262626</span>
+    </div>
+    <div class="swatch" style="background:var(--color-bg-raised)">
+      <span class="swatch-name">Raised</span><span class="swatch-hex">#2E2E2E</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,66 @@
+/* FaçaAmigos — Status Tokens (semáforo operacional)
+   ═══════════════════════════════════════════════════════════════════
+   Paleta SEPARADA da paleta de marca — ver seção 3.1 do plano de
+   arquitetura. Duas razões concretas para não reaproveitar os tokens
+   de marca aqui:
+
+   1. `--color-warning` e `--color-error` são a MESMA cor (#E83030) na
+      paleta de marca. O painel de acompanhamento precisa distinguir
+      claramente "acabando" (AMARELO) de "estourou o tempo" (VERMELHO)
+      de "em excedente cobrável" (EXCEDENTE) — três estados que não
+      podem colidir visualmente.
+   2. `--color-yellow` (#FFE234) da marca, com texto branco em cima,
+      não passa em contraste AA nenhum. Testado: 8.96:1 COM texto
+      escuro (#1A3F35) — ou seja, funcionaria, mas obrigaria a UI a
+      trocar a cor do texto por estado (branco no verde/âmbar/vermelho,
+      escuro no amarelo), o que é uma fonte fácil de bug. Preferimos
+      uma escala de âmbar/vermelho com contraste ≥4.5:1 usando SEMPRE
+      texto branco — mais simples de implementar sem erro.
+
+   O card do dashboard nunca comunica o estado só pela cor: ícone +
+   rótulo textual são obrigatórios (Card component já impõe isso).
+   Isso importa duas vezes aqui — acessibilidade (daltonismo) e leitura
+   de relance a alguns metros de distância no balcão.
+
+   Contraste verificado (WCAG 2.1, texto branco #FFFFFF por cima):
+     verde     #17803F  → 5.00:1  (AA texto normal)
+     amarelo   #A85D00  → 4.96:1  (AA texto normal) — é âmbar/laranja
+                                    queimado, não amarelo puro; ver nota
+     vermelho  #C21F3A  → 5.91:1  (AA texto normal)
+     excedente #7A0E24  → 10.96:1 (AAA) — mais escuro e saturado que
+                                    vermelho de propósito, para ficar
+                                    inconfundível ao lado dele
+
+   `--status-verde-text` usa um verde mais escuro (#136836) que
+   `--status-verde-bg` especificamente para manter ≥4.5:1 sobre
+   `--status-verde-soft` — com #17803F o par ficava em 4.42:1, abaixo
+   do limite AA. Os demais pares texto/soft já passavam com folga.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Fundo de badge/card preenchido — sempre com --status-*-fg em cima */
+  --status-verde-bg:        #17803F;
+  --status-amarelo-bg:      #A85D00;
+  --status-vermelho-bg:     #C21F3A;
+  --status-excedente-bg:    #7A0E24;
+
+  /* Texto/ícone sobre os fundos acima — uma cor só, sempre branco,
+     por design (ver racional acima) */
+  --status-verde-fg:        #FFFFFF;
+  --status-amarelo-fg:      #FFFFFF;
+  --status-vermelho-fg:     #FFFFFF;
+  --status-excedente-fg:    #FFFFFF;
+
+  /* Variante "texto colorido sobre superfície clara" (rótulos
+     pequenos fora de um badge preenchido — ex. legenda, filtro) */
+  --status-verde-text:      #136836;  /* 6.06:1 sobre --status-verde-soft */
+  --status-amarelo-text:    #8A4B00;  /* 6.29:1 sobre --surface-page */
+  --status-vermelho-text:   #B0142F;  /* 6.50:1 sobre --surface-page */
+  --status-excedente-text:  #7A0E24;
+
+  /* Fundo suave (chip/tag não preenchido, uso discreto) */
+  --status-verde-soft:      #E4F5EA;
+  --status-amarelo-soft:    #FBEADB;
+  --status-vermelho-soft:   #FBE3E7;
+  --status-excedente-soft:  #F3DDE1;
+}

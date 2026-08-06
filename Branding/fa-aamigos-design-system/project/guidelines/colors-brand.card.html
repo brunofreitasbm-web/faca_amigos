@@ -1,0 +1,41 @@
+<!-- @dsCard group="Colors" viewport="700x160" name="Brand Colors" subtitle="The 5 primary brand colors" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #fff; padding: 20px; font-family: var(--font-body); }
+    .swatches { display: flex; gap: 12px; }
+    .swatch { flex: 1; border-radius: 12px; height: 80px; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px 12px; }
+    .swatch-name { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.9); letter-spacing: 0.04em; }
+    .swatch-hex  { font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.65); margin-top: 2px; font-family: monospace; }
+    .swatch-dark .swatch-name, .swatch-dark .swatch-hex { color: rgba(0,0,0,0.5); }
+  </style>
+</head>
+<body>
+  <div class="swatches">
+    <div class="swatch" style="background:var(--color-pink)">
+      <span class="swatch-name">Pink</span>
+      <span class="swatch-hex">#F0196B</span>
+    </div>
+    <div class="swatch" style="background:var(--color-teal)">
+      <span class="swatch-name">Teal</span>
+      <span class="swatch-hex">#2ECFB5</span>
+    </div>
+    <div class="swatch" style="background:var(--color-amber)">
+      <span class="swatch-name">Amber</span>
+      <span class="swatch-hex">#C99020</span>
+    </div>
+    <div class="swatch swatch-dark" style="background:var(--color-yellow)">
+      <span class="swatch-name">Yellow</span>
+      <span class="swatch-hex">#FFE234</span>
+    </div>
+    <div class="swatch" style="background:var(--color-dark)">
+      <span class="swatch-name">Dark</span>
+      <span class="swatch-hex">#1A3F35</span>
+    </div>
+  </div>
+</body>
+</html>

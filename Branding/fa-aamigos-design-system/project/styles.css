@@ -1,0 +1,9 @@
+/* FaçaAmigos Design System — Global Stylesheet
+   This file is the single entry point for consumers.
+   It only @imports; no rules live here directly. */
+
+@import './tokens/fonts.css';
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/effects.css';

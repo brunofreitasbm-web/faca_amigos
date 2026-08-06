@@ -1,0 +1,7 @@
+/* FaçaAmigos — Web Font Imports */
+/* Substitution note: Using Google Fonts approximations.
+   Fredoka One → closest match to the bubbly rounded display type seen in marketing materials.
+   Nunito → matches the clean rounded sans used in logo and UI labels.
+   Please provide .ttf/.otf files if the actual brand fonts differ. */
+
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;500;600;700;800;900&display=swap');

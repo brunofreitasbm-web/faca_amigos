@@ -1,0 +1,10 @@
+node_modules
+dist
+out
+build
+.turbo
+pnpm-lock.yaml
+prototype/**/*.html
+Branding/
+*.mp4
+*.mov

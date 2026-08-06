@@ -1,0 +1,95 @@
+# === Dependencies & build ===
+node_modules/
+.pnpm-store/
+dist/
+build/
+out/
+release/
+.turbo/
+*.tsbuildinfo
+
+# === Electron packaging ===
+apps/kiosk/dist/
+apps/kiosk/out/
+apps/kiosk/release/
+*.exe
+*.msi
+*.dmg
+*.AppImage
+
+# === Env / secrets ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# === Local databases ===
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+!**/seed/*.sqlite
+
+# === Logs ===
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# === OS / editor ===
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# === Coverage / test artifacts ===
+coverage/
+.nyc_output/
+
+# === Business assets: large binaries kept out of git history ===
+# Vídeos e material bruto de marketing/negócio — não pertencem ao
+# histórico do código. Mantidos no disco, versionados fora do git
+# (Drive/backup próprio) ou movidos para Git LFS se precisarem entrar.
+*.mp4
+*.mov
+*.mkv
+*.avi
+
+# Arquivos .gdoc/.gsheet são apenas ponteiros do Google Drive, sem
+# conteúdo — inofensivos de versionar, mas não fazem sentido em diffs.
+# Mantidos fora por padrão; remova esta linha se quiser rastreá-los.
+*.gdoc
+*.gsheet
+
+# Snapshots de página salvos localmente (não são código-fonte)
+view-source_*.html
+
+# === Material de negócio/operação fora do escopo do repositório de código ===
+# Decisão: este repositório é só código + documentação técnica.
+# Planilhas de meta/bonificação, POPs em PDF/HTML, áudio, portfólio
+# comercial e imagens soltas de marketing ficam no disco (Drive/backup
+# próprio da operação), não no histórico do git. `Branding/` é exceção
+# — é a fonte de packages/ui, entra normalmente. `plano-negocio-
+# facaamigos.md` também é exceção — é documentação de projeto citada
+# no plano de arquitetura.
+/Agente Amigo/
+/Controle/
+/FAixas/
+/Faça Amigos Circuito/
+/Branding.zip
+/Bonificação.jpeg
+/Padrão de Venda.jpeg
+/Preços.jpeg
+/Logotipo.png
+/FacaAmigos_POPs.pdf
+/FacaAmigos_POPs (1).pdf
+/PlanoAcao_FacaAmigos.pdf
+/Portfolio Clinicas LEADS.pdf
+/POP 01 — Operação e PDV — FaçaAmigos
+/pop_01_impress_o_a4.html
+/pop_02_impress_o_a4.html
+/pop_03_impress_o_a4.html

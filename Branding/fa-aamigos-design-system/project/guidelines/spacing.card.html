@@ -1,0 +1,36 @@
+<!-- @dsCard group="Spacing" viewport="700x200" name="Spacing Scale" subtitle="4px base grid — space-1 through space-32" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #141414; padding: 20px 24px; }
+    .track { display: flex; gap: 2px; align-items: flex-end; height: 120px; }
+    .bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .bar { background: var(--color-teal); border-radius: 3px 3px 0 0; width: 28px; opacity: 0.85; }
+    .label { font-family: var(--font-body); font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.35); letter-spacing: 0.04em; }
+    .px { font-family: monospace; font-size: 9px; color: rgba(255,255,255,0.25); }
+  </style>
+</head>
+<body>
+  <div class="track">
+    <div class="bar-wrap"><div class="bar" style="height:4px"></div><span class="label">1</span><span class="px">4</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:8px"></div><span class="label">2</span><span class="px">8</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:12px"></div><span class="label">3</span><span class="px">12</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:16px; background:var(--color-pink)"></div><span class="label">4</span><span class="px">16</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:20px"></div><span class="label">5</span><span class="px">20</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:24px; background:var(--color-pink)"></div><span class="label">6</span><span class="px">24</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:28px"></div><span class="label">7</span><span class="px">28</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:32px; background:var(--color-pink)"></div><span class="label">8</span><span class="px">32</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:40px"></div><span class="label">10</span><span class="px">40</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:48px; background:var(--color-pink)"></div><span class="label">12</span><span class="px">48</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:56px"></div><span class="label">14</span><span class="px">56</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:64px; background:var(--color-pink)"></div><span class="label">16</span><span class="px">64</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:80px"></div><span class="label">20</span><span class="px">80</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:96px; background:var(--color-pink)"></div><span class="label">24</span><span class="px">96</span></div>
+    <div class="bar-wrap"><div class="bar" style="height:108px"></div><span class="label">32</span><span class="px">128</span></div>
+  </div>
+</body>
+</html>

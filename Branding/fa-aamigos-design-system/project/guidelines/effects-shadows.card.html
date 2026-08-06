@@ -1,0 +1,22 @@
+<!-- @dsCard group="Brand" viewport="700x180" name="Shadows" subtitle="Neutral, pink glow, and teal glow" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #141414; padding: 28px 24px; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+    .card { background: var(--color-bg-card); border-radius: 16px; padding: 16px 20px; min-width: 120px; }
+    .lbl  { font-family: var(--font-body); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+    .sub  { font-family: monospace; font-size: 9px; color: rgba(255,255,255,0.25); }
+  </style>
+</head>
+<body>
+  <div class="card" style="box-shadow:var(--shadow-sm)"><p class="lbl">shadow-sm</p><p class="sub">0 1px 4px</p></div>
+  <div class="card" style="box-shadow:var(--shadow-md)"><p class="lbl">shadow-md</p><p class="sub">0 4px 16px</p></div>
+  <div class="card" style="box-shadow:var(--shadow-lg)"><p class="lbl">shadow-lg</p><p class="sub">0 8px 32px</p></div>
+  <div class="card" style="box-shadow:var(--shadow-pink)"><p class="lbl" style="color:var(--color-pink)">shadow-pink</p><p class="sub">pink glow</p></div>
+  <div class="card" style="box-shadow:var(--shadow-teal)"><p class="lbl" style="color:var(--color-teal)">shadow-teal</p><p class="sub">teal glow</p></div>
+</body>
+</html>

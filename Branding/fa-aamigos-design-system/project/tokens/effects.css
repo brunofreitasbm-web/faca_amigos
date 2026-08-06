@@ -1,0 +1,66 @@
+/* FaçaAmigos — Effects Tokens (radii, shadows, gradients) */
+
+:root {
+  /* ── Border Radius ── */
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-2xl:  32px;
+  --radius-full: 9999px;
+
+  /* ── Semantic Radii ── */
+  --radius-btn:    var(--radius-full);   /* pills */
+  --radius-card:   var(--radius-xl);
+  --radius-input:  var(--radius-md);
+  --radius-badge:  var(--radius-full);
+  --radius-circle: 50%;
+
+  /* ── Shadows ── */
+  --shadow-sm:  0 1px 4px rgba(0,0,0,0.15);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.20);
+  --shadow-lg:  0 8px 32px rgba(0,0,0,0.25);
+  --shadow-xl:  0 16px 48px rgba(0,0,0,0.30);
+  --shadow-pink: 0 4px 20px rgba(240,25,107,0.35);
+  --shadow-teal: 0 4px 20px rgba(46,207,181,0.30);
+
+  /* ── Brand Gradients ── */
+  /* The Instagram-style conic ring used on app circle buttons */
+  --gradient-ring: conic-gradient(
+    from 200deg,
+    #A020EE 0%,
+    #F0196B 20%,
+    #FF7A00 50%,
+    #FFD700 75%,
+    #FF7A00 85%,
+    #F0196B 95%,
+    #A020EE 100%
+  ); /* @kind other */
+
+  /* Linear version for banners, backgrounds */
+  --gradient-brand: linear-gradient(135deg, #F0196B 0%, #FF7A00 50%, #FFE234 100%); /* @kind other */
+  --gradient-brand-reverse: linear-gradient(135deg, #FFE234 0%, #FF7A00 50%, #F0196B 100%); /* @kind other */
+
+  /* Teal-to-pink */
+  --gradient-cool: linear-gradient(135deg, #2ECFB5 0%, #F0196B 100%); /* @kind other */
+
+  /* Dark overlay for photo backgrounds */
+  --gradient-photo-overlay: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.0) 0%,
+    rgba(0,0,0,0.5) 60%,
+    rgba(0,0,0,0.85) 100%
+  ); /* @kind other */
+
+  /* ── Blur / Frosted ── */
+  --blur-sm: blur(4px); /* @kind other */
+  --blur-md: blur(12px); /* @kind other */
+  --blur-lg: blur(24px); /* @kind other */
+
+  /* ── Transitions ── */
+  --transition-fast:   150ms ease; /* @kind other */
+  --transition-normal: 250ms ease; /* @kind other */
+  --transition-slow:   400ms ease; /* @kind other */
+  --transition-bounce: 300ms cubic-bezier(0.34, 1.56, 0.64, 1); /* @kind other */
+}

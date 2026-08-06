@@ -1,0 +1,107 @@
+<!-- @dsCard group="Components" viewport="700x600" name="Core Components" subtitle="Button · CircleButton · Badge · Tag · Input · Avatar · Card" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../../styles.css">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <style>
+    body { background: #141414; margin: 0; padding: 20px; font-family: var(--font-body); }
+    .section-label { color: rgba(255,255,255,0.35); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 8px; font-family: var(--font-body); font-weight: 600; }
+    .section { margin-bottom: 20px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { Button, CircleButton, Badge, Tag, Input, Avatar, Card } = window.FaAAmigosDesignSystem_e4904a;
+
+    function Demo() {
+      return (
+        <div style={{display:'flex', flexDirection:'column', gap:0}}>
+
+          <div className="section">
+            <p className="section-label">Button</p>
+            <div className="row">
+              <Button variant="primary">Entrar</Button>
+              <Button variant="teal">Ver Horários</Button>
+              <Button variant="secondary">Saiba mais</Button>
+              <Button variant="ghost">Cancelar</Button>
+              <Button variant="amber">Reservar</Button>
+              <Button variant="primary" size="sm">Small</Button>
+              <Button variant="primary" size="lg">Large</Button>
+              <Button variant="primary" disabled>Disabled</Button>
+            </div>
+          </div>
+
+          <div className="section">
+            <p className="section-label">CircleButton</p>
+            <div className="row" style={{gap:28}}>
+              <CircleButton color="#F05870" label="Horários" size={72} />
+              <CircleButton color="#2ECFB5" label="Dúvidas" size={72} />
+              <CircleButton color="#FFFFFF" label="Inclusão" size={72} />
+              <CircleButton color="#F0C030" label="Localização" size={72} />
+            </div>
+          </div>
+
+          <div className="section">
+            <p className="section-label">Badge · Tag</p>
+            <div className="row">
+              <Badge variant="pink">Inclusivo</Badge>
+              <Badge variant="teal">Aberto</Badge>
+              <Badge variant="amber">Destaque</Badge>
+              <Badge variant="yellow">Promoção</Badge>
+              <Badge variant="solid_pink">Novo</Badge>
+              <Badge variant="neutral">Em breve</Badge>
+              <Tag>Piscina de Bolinhas</Tag>
+              <Tag color="var(--color-pink)">Festa</Tag>
+              <Tag color="var(--color-amber)">Escalada</Tag>
+            </div>
+          </div>
+
+          <div className="section">
+            <p className="section-label">Input</p>
+            <div style={{display:'flex', gap:12, maxWidth:620}}>
+              <Input label="Nome" placeholder="Como você se chama?" style={{flex:1}} />
+              <Input label="Campo com erro" placeholder="E-mail" error="Campo obrigatório" style={{flex:1}} />
+            </div>
+          </div>
+
+          <div className="section">
+            <p className="section-label">Avatar</p>
+            <div className="row" style={{gap:14}}>
+              <Avatar name="Ana Lima" size={32} />
+              <Avatar name="Carlos Souza" size={40} />
+              <Avatar name="Maria" size={48} variant="ring" />
+              <Avatar name="João Pedro" size={56} />
+              <Avatar name="Beatriz" size={64} variant="ring" />
+            </div>
+          </div>
+
+          <div className="section">
+            <p className="section-label">Card</p>
+            <div className="row" style={{alignItems:'flex-start'}}>
+              <Card variant="dark" title="Piscina de Bolinhas" subtitle="Crianças de 2–10 anos" style={{width:195}}>
+                <Badge variant="teal">Aberto</Badge>
+              </Card>
+              <Card variant="dark" title="Área de Escalada" subtitle="Supervisionada por monitores" style={{width:195}}>
+                <Badge variant="pink">Inclusivo</Badge>
+              </Card>
+              <Card variant="dark" title="Parque de Aventura" subtitle="A partir de 5 anos" style={{width:195}}>
+                <Badge variant="amber">Destaque</Badge>
+              </Card>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "tools/*"
+
+allowBuilds:
+  esbuild: true
+
+# Versão única de dependências-chave em todo o monorepo (D1 do plano:
+# uma só SPA, um só motor de domínio — não faz sentido ter React ou
+# TypeScript divergindo entre kiosk-ui, backoffice e ui).
+catalog:
+  react: ^19.0.0
+  react-dom: ^19.0.0
+  typescript: ^5.7.0
+  vitest: ^2.1.0
+  zod: ^3.24.0
+  eslint: ^9.17.0

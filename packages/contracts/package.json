@@ -1,0 +1,24 @@
+{
+  "name": "@facaamigos/contracts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fonte única de verdade dos DTOs trocados entre kiosk, tablets, back-office e Supabase — validados com Zod",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@facaamigos/config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

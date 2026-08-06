@@ -1,0 +1,29 @@
+/* FaçaAmigos — Design System — Ponto de entrada único.
+   Consumidores (kiosk-ui, backoffice) importam só este arquivo.
+   Nenhuma regra vive aqui diretamente, só @imports — mesmo padrão do
+   design system original. */
+
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/status.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/effects.css";
+
+/* Reset mínimo — o design system fonte não trazia um, mas telas de
+   operação real (não só protótipo solto) precisam de um baseline
+   para não herdar estilo de user-agent inconsistente entre Chromium
+   do Electron e o navegador dos tablets Android/iOS. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}

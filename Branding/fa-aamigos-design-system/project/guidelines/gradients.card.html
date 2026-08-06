@@ -1,0 +1,37 @@
+<!-- @dsCard group="Brand" viewport="700x160" name="Gradient Ring" subtitle="Conic ring used on circle buttons + linear variants" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--color-bg-app); padding: 20px 24px; display: flex; gap: 20px; align-items: center; }
+    .ring-demo { width: 100px; height: 100px; border-radius: 50%; background: var(--gradient-ring); display: flex; align-items: center; justify-content: center; }
+    .ring-inner { width: 86px; height: 86px; border-radius: 50%; background: #F05870; }
+    .gradient-strip { flex: 1; height: 48px; border-radius: 12px; }
+    .label { font-family: var(--font-body); font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.4); letter-spacing: 0.06em; margin-bottom: 6px; text-transform: uppercase; }
+    .col { display: flex; flex-direction: column; }
+  </style>
+</head>
+<body>
+  <div>
+    <p class="label">Ring</p>
+    <div class="ring-demo"><div class="ring-inner"></div></div>
+  </div>
+  <div class="col" style="flex:1; gap:10px;">
+    <div>
+      <p class="label">Brand Linear</p>
+      <div class="gradient-strip" style="background:var(--gradient-brand)"></div>
+    </div>
+    <div>
+      <p class="label">Brand Reverse</p>
+      <div class="gradient-strip" style="background:var(--gradient-brand-reverse)"></div>
+    </div>
+    <div>
+      <p class="label">Cool (Teal → Pink)</p>
+      <div class="gradient-strip" style="background:var(--gradient-cool); height:32px"></div>
+    </div>
+  </div>
+</body>
+</html>

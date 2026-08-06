@@ -1,0 +1,54 @@
+/* FaçaAmigos — Color Tokens */
+
+:root {
+  /* ── Brand Primaries ── */
+  --color-pink:        #F0196B;  /* "Amigos" logo text, primary action */
+  --color-teal:        #2ECFB5;  /* logo mark right shape, secondary */
+
+  --color-yellow:      #FFE234;  /* marketing headlines */
+  --color-dark:        #1A3F35;  /* "Faça" logo text, deep forest */
+
+  /* ── Neutrals ── */
+  --color-white:       #FFFFFF;
+  --color-gray-100:    #F5F6F7;
+  --color-gray-200:    #E8EAEC;
+  --color-gray-300:    #CDD1D6;
+  --color-gray-400:    #A0A8B2;
+  --color-gray-500:    #7A8490;
+  --color-gray-600:    #5A636E;
+  --color-gray-700:    #3A4149;
+  --color-gray-800:    #262C32;
+  --color-gray-900:    #141719;
+
+  /* ── App Dark Theme ── */
+  --color-bg-app:      #141414;
+  --color-bg-surface:  #1E1E1E;
+  --color-bg-card:     #262626;
+  --color-bg-raised:   #2E2E2E;
+
+  /* ── Circle Button Fills (app) ── */
+  --color-btn-horarios:    #F05870;  /* coral pink */
+  --color-btn-duvidas:     #2ECFB5;  /* teal */
+  --color-btn-inclusao:    #FFFFFF;  /* white */
+  --color-btn-localizacao: #FFE234;  /* yellow */
+
+  /* ── Semantic ── */
+  --color-primary:         var(--color-pink);
+  --color-primary-hover:   #C8155A;
+  --color-primary-active:  #A01248;
+  --color-secondary:       var(--color-teal);
+  --color-secondary-hover: #26B09B;
+  --color-accent:          var(--color-yellow);
+  --color-success:         #28C880;
+  --color-warning:         #E83030;
+  --color-error:           #E83030;
+
+  /* ── Text on dark bg ── */
+  --color-text-primary-dark:  #FFFFFF;
+  --color-text-muted-dark:    rgba(255,255,255,0.55);
+
+  /* ── Text on light bg ── */
+  --color-text-primary-light: var(--color-dark);
+  --color-text-muted-light:   var(--color-gray-500);
+  --color-text-subtitle:      #808C94;  /* "PLAYGROUND INCLUSIVO" gray */
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  }
+  // Apps que usam Vite (kiosk-ui, backoffice) adicionam
+  // "types": ["vite/client"] no próprio tsconfig.json — não pertence
+  // a este preset porque packages/ui é uma lib sem runtime de bundler.
+}
+

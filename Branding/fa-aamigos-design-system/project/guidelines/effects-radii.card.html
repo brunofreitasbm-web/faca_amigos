@@ -1,0 +1,27 @@
+<!-- @dsCard group="Brand" viewport="700x160" name="Corner Radii" subtitle="Radius scale — xs (4px) through full (pill)" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #141414; padding: 20px 24px; display: flex; gap: 14px; align-items: flex-end; }
+    .shape { background: var(--color-bg-raised); border: 1.5px solid rgba(255,255,255,0.12); width: 72px; height: 72px; flex-shrink: 0; }
+    .info { font-family: var(--font-body); }
+    .name  { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.65); margin-top: 8px; }
+    .value { font-size: 10px; color: rgba(255,255,255,0.3); font-family: monospace; }
+    .item  { display: flex; flex-direction: column; }
+  </style>
+</head>
+<body>
+  <div class="item"><div class="shape" style="border-radius:var(--radius-xs)"></div><span class="name">xs</span><span class="value">4px</span></div>
+  <div class="item"><div class="shape" style="border-radius:var(--radius-sm)"></div><span class="name">sm</span><span class="value">8px</span></div>
+  <div class="item"><div class="shape" style="border-radius:var(--radius-md)"></div><span class="name">md</span><span class="value">12px</span></div>
+  <div class="item"><div class="shape" style="border-radius:var(--radius-lg)"></div><span class="name">lg</span><span class="value">16px</span></div>
+  <div class="item"><div class="shape" style="border-radius:var(--radius-xl)"></div><span class="name">xl · card</span><span class="value">24px</span></div>
+  <div class="item"><div class="shape" style="border-radius:var(--radius-2xl)"></div><span class="name">2xl</span><span class="value">32px</span></div>
+  <div class="item"><div class="shape" style="border-radius:var(--radius-full); width:72px; height:36px; margin-bottom:18px; background:var(--color-pink)"></div><span class="name">full · btn</span><span class="value">9999px</span></div>
+  <div class="item"><div class="shape" style="border-radius:50%; background:var(--color-teal)"></div><span class="name">circle</span><span class="value">50%</span></div>
+</body>
+</html>

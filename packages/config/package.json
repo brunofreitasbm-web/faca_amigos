@@ -1,0 +1,22 @@
+{
+  "name": "@facaamigos/config",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Presets compartilhados de ESLint, TypeScript, Vitest e Prettier",
+  "type": "module",
+  "exports": {
+    "./eslint-base": "./eslint/base.js",
+    "./eslint-domain": "./eslint/domain.js",
+    "./eslint-react": "./eslint/react.js",
+    "./tsconfig-base.json": "./tsconfig/base.json",
+    "./tsconfig-node.json": "./tsconfig/node.json",
+    "./tsconfig-react.json": "./tsconfig/react.json",
+    "./vitest-base": "./vitest/base.js"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "catalog:",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "typescript-eslint": "^8.18.0"
+  }
+}

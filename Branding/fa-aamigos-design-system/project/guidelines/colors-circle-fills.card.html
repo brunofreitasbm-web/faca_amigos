@@ -1,0 +1,36 @@
+<!-- @dsCard group="Colors" viewport="700x140" name="Circle Button Fills" subtitle="Category colors used inside app circle buttons" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--color-bg-app); padding: 20px; font-family: var(--font-body); }
+    .swatches { display: flex; gap: 16px; }
+    .item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .circle { width: 72px; height: 72px; border-radius: 50%; }
+    .lbl { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.75); font-family: var(--font-body); }
+  </style>
+</head>
+<body>
+  <div class="swatches">
+    <div class="item">
+      <div class="circle" style="background:var(--color-btn-horarios)"></div>
+      <span class="lbl">Horários</span>
+    </div>
+    <div class="item">
+      <div class="circle" style="background:var(--color-btn-duvidas)"></div>
+      <span class="lbl">Dúvidas</span>
+    </div>
+    <div class="item">
+      <div class="circle" style="background:var(--color-btn-inclusao); border:1px solid rgba(255,255,255,0.15)"></div>
+      <span class="lbl">Inclusão</span>
+    </div>
+    <div class="item">
+      <div class="circle" style="background:var(--color-btn-localizacao)"></div>
+      <span class="lbl">Localização</span>
+    </div>
+  </div>
+</body>
+</html>
