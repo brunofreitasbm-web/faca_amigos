@@ -69,6 +69,7 @@ export function CashPaymentPad({ totalCents, busy, onConfirm }: CashPaymentPadPr
       <Button
         variant="primary"
         fullWidth
+        loading={busy}
         disabled={busy || !canConfirm}
         onClick={() => onConfirm(tenderedCents)}
         title="Confirmar o pagamento em dinheiro com o valor recebido informado"

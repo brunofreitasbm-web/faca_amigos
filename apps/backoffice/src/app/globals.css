@@ -1,11 +1,14 @@
 :root {
-  color-scheme: light dark;
-  --bg: #0f1115;
-  --panel: #171a21;
-  --border: #2a2e38;
-  --text: #e8eaed;
-  --muted: #9aa1ac;
-  --accent: #ff8a3d;
+  color-scheme: light;
+
+  /* Cores de gráfico (dado de visualização, não token de design system —
+     packages/ui não define isso). Derivadas da paleta de marca sobre
+     fundo claro, ver colors.css. */
+  --chart-1: var(--color-teal);
+  --chart-2: var(--color-primary-hover);
+  --chart-3: var(--color-amber);
+  --chart-4: var(--color-gray-600);
+  --chart-grid: var(--color-gray-200);
 }
 
 * {
@@ -14,55 +17,32 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: var(--font-body);
+  background: var(--surface-page);
+  color: var(--text-primary);
 }
 
 a {
   color: inherit;
 }
 
-input,
-select {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 8px 10px;
-  font-size: 14px;
+/* Estilo local para <select> nativo — packages/ui ainda não tem um
+   componente Select. Imita visualmente o Input do design system.
+   TODO: substituir por um Select oficial do design system se/quando
+   existir um, em vez de manter esta classe aqui. */
+.fa-select {
+  height: 48px;
+  padding: 0 16px;
+  border-radius: var(--radius-input);
+  border: 1.5px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 16px;
+  outline: none;
 }
 
-button {
-  cursor: pointer;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--accent);
-  color: #1a1200;
-  font-weight: 600;
-  padding: 8px 14px;
-  font-size: 14px;
-}
-
-button.secondary {
-  background: transparent;
-  color: var(--text);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px;
-}
-
-th {
-  color: var(--muted);
-  font-weight: 500;
+.fa-select:focus {
+  border-color: var(--color-pink);
+  box-shadow: 0 0 0 3px rgba(240, 25, 107, 0.18);
 }

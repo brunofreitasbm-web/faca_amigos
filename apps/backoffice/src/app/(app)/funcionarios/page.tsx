@@ -1,45 +1,102 @@
+import { Badge, Input } from "@/components/design-system";
 import { createClient } from "@/lib/supabase/server";
 import { createEmployee } from "../actions";
+import { DataTable } from "@/components/DataTable";
+import { EntityForm } from "@/components/EntityForm";
+import { LabeledSelect } from "@/components/LabeledSelect";
+import { PageTitle, SectionTitle } from "@/components/Typography";
+
+interface Employee {
+  id: string;
+  full_name: string;
+  role: string;
+  active: boolean;
+  cpf: string | null;
+  email: string | null;
+  birth_date: string | null;
+  phone: string | null;
+  fa_kiosk_units: { name: string } | null;
+}
 
 export default async function FuncionariosPage() {
   const supabase = await createClient();
-  const { data: employees } = await supabase
-    .from("fa_kiosk_employees")
-    .select("id, full_name, role, active")
-    .order("created_at", { ascending: false });
+  const [{ data: employees }, { data: units }] = await Promise.all([
+    supabase
+      .from("fa_kiosk_employees")
+      .select("id, full_name, role, active, cpf, email, birth_date, phone, fa_kiosk_units(name)")
+      .order("created_at", { ascending: false }),
+    supabase.from("fa_kiosk_units").select("id, name"),
+  ]);
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Funcionários</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Função</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(employees ?? []).map((e) => (
-            <tr key={e.id}>
-              <td>{e.full_name}</td>
-              <td>{e.role}</td>
-              <td>{e.active ? "Ativo" : "Inativo"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <PageTitle>Funcionários</PageTitle>
 
-      <h2 style={{ fontSize: 15, marginTop: 32 }}>Novo funcionário</h2>
-      <form action={createEmployee} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <input name="full_name" placeholder="Nome completo" required />
-        <select name="role" required defaultValue="OPERADOR">
+      <DataTable<Employee>
+        columns={[
+          { key: "name", header: "Nome", render: (e) => e.full_name },
+          {
+            key: "cpf",
+            header: "CPF",
+            render: (e) => e.cpf ?? <span style={{ color: "var(--text-muted)" }}>—</span>,
+          },
+          {
+            key: "email",
+            header: "E-mail",
+            render: (e) => e.email ?? <span style={{ color: "var(--text-muted)" }}>—</span>,
+          },
+          {
+            key: "birth_date",
+            header: "Nascimento",
+            render: (e) =>
+              e.birth_date ? (
+                new Date(e.birth_date).toLocaleDateString("pt-BR")
+              ) : (
+                <span style={{ color: "var(--text-muted)" }}>—</span>
+              ),
+          },
+          {
+            key: "phone",
+            header: "Telefone",
+            render: (e) => e.phone ?? <span style={{ color: "var(--text-muted)" }}>—</span>,
+          },
+          { key: "unit", header: "Unidade", render: (e) => e.fa_kiosk_units?.name ?? "—" },
+          { key: "role", header: "Função", render: (e) => e.role },
+          {
+            key: "status",
+            header: "Status",
+            render: (e) => (
+              <Badge variant={e.active ? "green" : "neutral"}>
+                {e.active ? "Ativo" : "Inativo"}
+              </Badge>
+            ),
+          },
+        ]}
+        rows={(employees ?? []) as unknown as Employee[]}
+        rowKey={(e) => e.id}
+        emptyMessage="Nenhum funcionário cadastrado."
+      />
+
+      <SectionTitle>Novo funcionário</SectionTitle>
+      <EntityForm action={createEmployee} submitLabel="Adicionar">
+        <Input name="full_name" label="Nome completo" required />
+        <Input name="cpf" label="CPF" />
+        <Input name="email" type="email" label="E-mail" />
+        <Input name="birth_date" type="date" label="Nascimento" />
+        <Input name="phone" label="Telefone" />
+        <LabeledSelect label="Unidade" name="unit_id" required>
+          {(units ?? []).map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </LabeledSelect>
+        <LabeledSelect label="Função" name="role" required defaultValue="OPERADOR">
           <option value="OPERADOR">Operador</option>
           <option value="GERENTE">Gerente</option>
           <option value="ADMIN">Admin</option>
-        </select>
-        <button type="submit">Adicionar</button>
-      </form>
+        </LabeledSelect>
+      </EntityForm>
     </div>
   );
 }

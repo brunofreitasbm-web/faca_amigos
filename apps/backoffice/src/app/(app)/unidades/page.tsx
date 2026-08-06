@@ -1,5 +1,17 @@
+import { Input } from "@/components/design-system";
 import { createClient } from "@/lib/supabase/server";
+import { DataTable } from "@/components/DataTable";
+import { EntityForm } from "@/components/EntityForm";
+import { LabeledSelect } from "@/components/LabeledSelect";
+import { PageTitle, SectionTitle } from "@/components/Typography";
 import { createUnit } from "../actions";
+
+interface Unit {
+  id: string;
+  name: string;
+  kind: string;
+  timezone: string;
+}
 
 export default async function UnidadesPage() {
   const supabase = await createClient();
@@ -10,35 +22,27 @@ export default async function UnidadesPage() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Unidades</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Tipo</th>
-            <th>Fuso</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(units ?? []).map((u) => (
-            <tr key={u.id}>
-              <td>{u.name}</td>
-              <td>{u.kind}</td>
-              <td>{u.timezone}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <PageTitle>Unidades</PageTitle>
 
-      <h2 style={{ fontSize: 15, marginTop: 32 }}>Nova unidade</h2>
-      <form action={createUnit} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <input name="name" placeholder="Nome" required />
-        <select name="kind" required defaultValue="LOJA">
+      <DataTable<Unit>
+        columns={[
+          { key: "name", header: "Nome", render: (u) => u.name },
+          { key: "kind", header: "Tipo", render: (u) => u.kind },
+          { key: "timezone", header: "Fuso", render: (u) => u.timezone },
+        ]}
+        rows={units ?? []}
+        rowKey={(u) => u.id}
+        emptyMessage="Nenhuma unidade cadastrada."
+      />
+
+      <SectionTitle>Nova unidade</SectionTitle>
+      <EntityForm action={createUnit} submitLabel="Adicionar">
+        <Input name="name" label="Nome" required />
+        <LabeledSelect label="Tipo" name="kind" required defaultValue="LOJA">
           <option value="LOJA">Loja</option>
           <option value="QUIOSQUE">Quiosque</option>
-        </select>
-        <button type="submit">Adicionar</button>
-      </form>
+        </LabeledSelect>
+      </EntityForm>
     </div>
   );
 }

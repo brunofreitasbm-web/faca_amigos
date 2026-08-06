@@ -3,6 +3,7 @@ import { Button, Card } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { useToast } from "../state/ToastContext.js";
 import { money } from "../format.js";
 import { CashPaymentPad } from "../components/CashPaymentPad.js";
 
@@ -15,6 +16,7 @@ const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
 export function PdvScreen() {
   const { unit, employee } = useAppState();
+  const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [hasOpenShift, setHasOpenShift] = useState<boolean | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -63,7 +65,9 @@ export function PdvScreen() {
       setCart([]);
       Api.products(unit.id).then(setProducts); // atualiza estoque na tela
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao vender");
+      const msg = err instanceof Error ? err.message : "Erro ao vender";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -129,7 +133,14 @@ export function PdvScreen() {
         {method === "DINHEIRO" ? (
           <CashPaymentPad totalCents={totalCents} busy={busy || cart.length === 0 || hasOpenShift === false} onConfirm={() => confirm()} />
         ) : (
-          <Button variant="primary" fullWidth disabled={busy || cart.length === 0 || hasOpenShift === false} onClick={confirm} title="Confirmar a venda com o método selecionado">
+          <Button
+            variant="primary"
+            fullWidth
+            loading={busy}
+            disabled={busy || cart.length === 0 || hasOpenShift === false}
+            onClick={confirm}
+            title="Confirmar a venda com o método selecionado"
+          >
             Confirmar venda
           </Button>
         )}

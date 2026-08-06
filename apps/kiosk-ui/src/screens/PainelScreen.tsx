@@ -4,10 +4,14 @@ import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { useAppState } from "../state/AppState.js";
+import { useToast } from "../state/ToastContext.js";
+import { useConfirm } from "../state/ConfirmContext.js";
 import { CheckoutModal } from "../components/CheckoutModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import type { WristbandData } from "../components/WristbandPrintModal.js";
 import { formatElapsed, money } from "../format.js";
+import { EntradaScreen } from "./EntradaScreen.js";
+import { PdvScreen } from "./PdvScreen.js";
 
 /**
  * Painel do parque (seção 1.3/6 do plano): contagem ascendente,
@@ -16,8 +20,11 @@ import { formatElapsed, money } from "../format.js";
  */
 export function PainelScreen() {
   const { unit } = useAppState();
+  const toast = useToast();
+  const confirm = useConfirm();
   const entries = useActiveSessions(unit?.id ?? null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [actionBusy, setActionBusy] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [printData, setPrintData] = useState<WristbandData | null>(null);
   const [planOptions, setPlanOptions] = useState<Plan[]>([]);
@@ -25,6 +32,8 @@ export function PainelScreen() {
   const [pendingPlanId, setPendingPlanId] = useState<string>("");
   const [dailyGoalCents, setDailyGoalCents] = useState(0);
   const [todayRevenueCents, setTodayRevenueCents] = useState(0);
+  const [entradaOpen, setEntradaOpen] = useState(false);
+  const [pdvOpen, setPdvOpen] = useState(false);
 
   useEffect(() => {
     if (!unit) return;
@@ -59,21 +68,45 @@ export function PainelScreen() {
   }, [unit]);
 
   async function notifyGuardian(entry: ActiveSessionEntry, channel: "WHATSAPP" | "SMS", customMessage?: string) {
+    const sessionId = entry.session.id;
     const guardianName = entry.session.guardian_name_snapshot || "Responsável";
     const message =
       customMessage ??
       `Olá ${guardianName}! ${entry.session.child_name_snapshot} está no plano ${entry.plan.name} — valor atual: ${money(entry.quote.totalCents)}.`;
-    if (channel === "WHATSAPP") {
-      const digits = (entry.session.guardian_phone_snapshot || "").replace(/\D/g, "");
-      if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, "_blank");
+    setActionBusy((prev) => new Set(prev).add(sessionId));
+    try {
+      if (channel === "WHATSAPP") {
+        const digits = (entry.session.guardian_phone_snapshot || "").replace(/\D/g, "");
+        if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, "_blank");
+      }
+      await Api.notifySession(sessionId, { channel, message });
+      if (channel === "SMS") {
+        toast.success("SMS simulado — nenhum provedor configurado ainda. Registrado no histórico da sessão.");
+      } else {
+        toast.success("Responsável notificado.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível registrar a notificação.");
+    } finally {
+      setActionBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
     }
-    await Api.notifySession(entry.session.id, { channel, message });
-    if (channel === "SMS") alert("SMS simulado — nenhum provedor configurado ainda. Registrado no histórico da sessão.");
   }
 
-  function callGuardianBack(entry: ActiveSessionEntry) {
+  async function callGuardianBack(entry: ActiveSessionEntry) {
     const guardianName = entry.session.guardian_name_snapshot || "Responsável";
-    notifyGuardian(
+    const ok = await confirm({
+      title: "Chamar responsável com urgência?",
+      message: `Isso envia uma mensagem urgente pelo WhatsApp para o responsável de ${entry.session.child_name_snapshot} pedindo para comparecer agora.`,
+      confirmLabel: "Enviar chamado",
+      cancelLabel: "Cancelar",
+      variant: "danger",
+    });
+    if (!ok) return;
+    await notifyGuardian(
       entry,
       "WHATSAPP",
       `URGENTE: ${guardianName}, por favor compareça ao parque — ${entry.session.child_name_snapshot} precisa de você (banheiro / quer ir embora).`,
@@ -82,10 +115,22 @@ export function PainelScreen() {
 
   async function confirmChangePlan(sessionId: string) {
     if (!pendingPlanId) return;
-    await Api.changeSessionPlan(sessionId, pendingPlanId);
-    setChangingPlanFor(null);
-    setPendingPlanId("");
-    // fa_kiosk_sessions muda -> Realtime dispara refetch em useActiveSessions automaticamente.
+    setActionBusy((prev) => new Set(prev).add(sessionId));
+    try {
+      await Api.changeSessionPlan(sessionId, pendingPlanId);
+      setChangingPlanFor(null);
+      setPendingPlanId("");
+      toast.success("Plano atualizado.");
+      // fa_kiosk_sessions muda -> Realtime dispara refetch em useActiveSessions automaticamente.
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível trocar o plano.");
+    } finally {
+      setActionBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
   }
 
   function toggle(sessionId: string) {
@@ -214,6 +259,8 @@ export function PainelScreen() {
                 <Button
                   variant="primary"
                   size="sm"
+                  loading={actionBusy.has(session.id)}
+                  disabled={actionBusy.has(session.id)}
                   title="Chamado de retorno urgente — o responsável precisa vir buscar/atender a criança agora (banheiro, quer ir embora)"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -225,6 +272,7 @@ export function PainelScreen() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  disabled={actionBusy.has(session.id)}
                   title="Abrir WhatsApp com mensagem pronta para o responsável"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -236,6 +284,7 @@ export function PainelScreen() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  disabled={actionBusy.has(session.id)}
                   title="Trocar o plano de permanência desta sessão"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -267,7 +316,8 @@ export function PainelScreen() {
                   <Button
                     variant="primary"
                     size="sm"
-                    disabled={!pendingPlanId}
+                    loading={actionBusy.has(session.id)}
+                    disabled={!pendingPlanId || actionBusy.has(session.id)}
                     title="Confirmar a troca de plano desta sessão"
                     onClick={() => confirmChangePlan(session.id)}
                   >
@@ -336,6 +386,74 @@ export function PainelScreen() {
           data={printData}
           onClose={() => setPrintData(null)}
         />
+      )}
+
+      {/* Botões flutuantes: Painel é a tela principal — Entrada e PDV abrem por cima, sem sair dele */}
+      <div style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 90, display: "flex", flexDirection: "column", gap: "14px", alignItems: "flex-end" }}>
+        <Button
+          variant="teal"
+          size="lg"
+          onClick={() => setPdvOpen(true)}
+          title="Abrir PDV flutuante e fechar vendas sem sair do Painel"
+          style={{ borderRadius: "9999px", width: "64px", height: "64px", fontSize: "26px", boxShadow: "var(--shadow-lg)", padding: 0 }}
+        >
+          🛒
+        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={() => setEntradaOpen(true)}
+          title="Fazer nova entrada sem sair do Painel"
+          style={{ borderRadius: "9999px", width: "64px", height: "64px", fontSize: "26px", boxShadow: "var(--shadow-lg)", padding: 0 }}
+        >
+          ➕
+        </Button>
+      </div>
+
+      {entradaOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 150, display: "flex", justifyContent: "center", overflowY: "auto", padding: "24px" }}
+          onClick={() => setEntradaOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--surface-bg, var(--surface-card))", borderRadius: "24px", maxWidth: "820px", width: "100%", height: "fit-content", position: "relative", boxShadow: "var(--shadow-lg)" }}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setEntradaOpen(false)}
+              title="Fechar e voltar ao Painel"
+              style={{ position: "absolute", top: "12px", right: "12px", zIndex: 1 }}
+            >
+              ✕
+            </Button>
+            <EntradaScreen />
+          </div>
+        </div>
+      )}
+
+      {pdvOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 150, display: "flex", justifyContent: "center", overflowY: "auto", padding: "24px" }}
+          onClick={() => setPdvOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--surface-bg, var(--surface-card))", borderRadius: "24px", maxWidth: "1100px", width: "100%", height: "fit-content", position: "relative", boxShadow: "var(--shadow-lg)" }}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPdvOpen(false)}
+              title="Fechar e voltar ao Painel"
+              style={{ position: "absolute", top: "12px", right: "12px", zIndex: 1 }}
+            >
+              ✕
+            </Button>
+            <PdvScreen />
+          </div>
+        </div>
       )}
     </div>
   );

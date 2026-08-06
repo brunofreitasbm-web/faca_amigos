@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { Button, Badge } from "@facaamigos/ui";
 import { useAppState } from "./state/AppState.js";
+import { useConfirm } from "./state/ConfirmContext.js";
 import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
@@ -36,7 +37,23 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
 
 export function App() {
   const { unit, setUnitId, employee } = useAppState();
-  const [screen, setScreen] = useState<Screen>("ENTRADA");
+  const confirm = useConfirm();
+  const [screen, setScreen] = useState<Screen>("PAINEL");
+
+  // Cada módulo/unidade selecionado sempre abre direto no Painel (tela principal do sistema).
+  useEffect(() => {
+    if (unit) setScreen("PAINEL");
+  }, [unit?.id]);
+
+  async function handleChangeModule() {
+    const ok = await confirm({
+      title: "Trocar módulo?",
+      message: "Você vai sair da tela atual e voltar para a seleção de módulo.",
+      confirmLabel: "Trocar módulo",
+      cancelLabel: "Cancelar",
+    });
+    if (ok) setUnitId("");
+  }
 
   if (!employee) return <LoginScreen />;
 
@@ -96,7 +113,7 @@ export function App() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setUnitId("")}
+            onClick={handleChangeModule}
             title="Alternar para a tela inicial de seleção de módulos"
             style={{ fontSize: "12px", border: "1px solid var(--border-subtle)" }}
           >

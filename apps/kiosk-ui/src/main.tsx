@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import "@facaamigos/ui/styles.css";
 import { App } from "./App.js";
 import { AppStateProvider } from "./state/AppState.js";
+import { ToastProvider } from "./state/ToastContext.js";
+import { ConfirmProvider } from "./state/ConfirmContext.js";
 import { SystemStatusOverlay } from "./components/SystemStatusOverlay.js";
 import { flushOfflineQueue } from "./lib/supabase/offlineQueue.js";
 
@@ -15,9 +17,13 @@ if (!container) throw new Error("#root não encontrado");
 
 createRoot(container).render(
   <StrictMode>
-    <AppStateProvider>
-      <App />
-    </AppStateProvider>
-    <SystemStatusOverlay />
+    <ToastProvider>
+      <ConfirmProvider>
+        <AppStateProvider>
+          <App />
+        </AppStateProvider>
+        <SystemStatusOverlay />
+      </ConfirmProvider>
+    </ToastProvider>
   </StrictMode>,
 );

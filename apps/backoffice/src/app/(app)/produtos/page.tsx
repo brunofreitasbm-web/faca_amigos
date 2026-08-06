@@ -1,5 +1,18 @@
+import { Input } from "@/components/design-system";
 import { createClient } from "@/lib/supabase/server";
+import { DataTable } from "@/components/DataTable";
+import { EntityForm } from "@/components/EntityForm";
+import { LabeledSelect } from "@/components/LabeledSelect";
+import { PageTitle, SectionTitle } from "@/components/Typography";
 import { createProduct } from "../actions";
+
+interface Product {
+  id: string;
+  name: string;
+  price_cents: number;
+  stock: number;
+  fa_kiosk_units: { name: string } | null;
+}
 
 export default async function ProdutosPage() {
   const supabase = await createClient();
@@ -13,42 +26,37 @@ export default async function ProdutosPage() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Produtos</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Preço</th>
-            <th>Estoque</th>
-            <th>Unidade</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(products ?? []).map((p) => (
-            <tr key={p.id}>
-              <td>{p.name}</td>
-              <td>R$ {(p.price_cents / 100).toFixed(2)}</td>
-              <td>{p.stock}</td>
-              <td>{(p.fa_kiosk_units as unknown as { name: string } | null)?.name}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <PageTitle>Produtos</PageTitle>
 
-      <h2 style={{ fontSize: 15, marginTop: 32 }}>Novo produto</h2>
-      <form action={createProduct} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <select name="unit_id" required>
+      <DataTable<Product>
+        columns={[
+          { key: "name", header: "Nome", render: (p) => p.name },
+          {
+            key: "price",
+            header: "Preço",
+            render: (p) => `R$ ${(p.price_cents / 100).toFixed(2)}`,
+          },
+          { key: "stock", header: "Estoque", render: (p) => p.stock },
+          { key: "unit", header: "Unidade", render: (p) => p.fa_kiosk_units?.name ?? "—" },
+        ]}
+        rows={(products ?? []) as unknown as Product[]}
+        rowKey={(p) => p.id}
+        emptyMessage="Nenhum produto cadastrado."
+      />
+
+      <SectionTitle>Novo produto</SectionTitle>
+      <EntityForm action={createProduct} submitLabel="Adicionar">
+        <LabeledSelect label="Unidade" name="unit_id" required>
           {(units ?? []).map((u) => (
             <option key={u.id} value={u.id}>
               {u.name}
             </option>
           ))}
-        </select>
-        <input name="name" placeholder="Nome" required />
-        <input name="price" type="number" step="0.01" placeholder="Preço (R$)" required />
-        <input name="stock" type="number" placeholder="Estoque" />
-        <button type="submit">Adicionar</button>
-      </form>
+        </LabeledSelect>
+        <Input name="name" label="Nome" required />
+        <Input name="price" type="number" step="0.01" label="Preço (R$)" required />
+        <Input name="stock" type="number" label="Estoque" />
+      </EntityForm>
     </div>
   );
 }

@@ -1,4 +1,6 @@
+import { Card } from "@/components/design-system";
 import { createClient } from "@/lib/supabase/server";
+import { PageTitle } from "@/components/Typography";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -19,29 +21,34 @@ export default async function DashboardPage() {
   const revenueToday = (orders.data ?? []).reduce((sum, o) => sum + (o.total_cents ?? 0), 0);
 
   const cards = [
-    { label: "Unidades cadastradas", value: units.count ?? 0 },
-    { label: "Check-ins hoje", value: sessionsToday.count ?? 0 },
+    { label: "Unidades cadastradas", value: String(units.count ?? 0) },
+    { label: "Check-ins hoje", value: String(sessionsToday.count ?? 0) },
     { label: "Faturamento hoje", value: `R$ ${(revenueToday / 100).toFixed(2)}` },
   ];
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Painel</h1>
-      <div style={{ display: "flex", gap: 16 }}>
+      <PageTitle>Painel</PageTitle>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "var(--gap-lg)",
+        }}
+      >
         {cards.map((c) => (
-          <div
-            key={c.label}
-            style={{
-              background: "var(--panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 10,
-              padding: 20,
-              minWidth: 180,
-            }}
-          >
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>{c.label}</div>
-            <div style={{ fontSize: 28, fontWeight: 700, marginTop: 6 }}>{c.value}</div>
-          </div>
+          <Card key={c.label} variant="light" subtitle={c.label}>
+            <div
+              style={{
+                fontFamily: "var(--font-body)",
+                fontWeight: "var(--weight-extrabold)" as unknown as number,
+                fontSize: "28px",
+                color: "var(--text-primary)",
+              }}
+            >
+              {c.value}
+            </div>
+          </Card>
         ))}
       </div>
     </div>

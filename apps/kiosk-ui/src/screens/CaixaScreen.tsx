@@ -3,12 +3,16 @@ import { Button, Card, Input } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { CashMovement, RevenueByMethod, Shift } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { useToast } from "../state/ToastContext.js";
+import { useConfirm } from "../state/ConfirmContext.js";
 import { money } from "../format.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
 export function CaixaScreen() {
   const { unit, employee } = useAppState();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [shift, setShift] = useState<Shift | null | undefined>(undefined);
   const [openingCash, setOpeningCash] = useState("0");
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +53,9 @@ export function CaixaScreen() {
       await Api.openShift({ unitId: unit.id, employeeId: employee.id, openingCashCents: Math.round(Number(openingCash) * 100) });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao abrir turno");
+      const msg = err instanceof Error ? err.message : "Erro ao abrir turno";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -70,7 +76,9 @@ export function CaixaScreen() {
       setMovementReason("");
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao registrar movimentação");
+      const msg = err instanceof Error ? err.message : "Erro ao registrar movimentação";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -86,10 +94,23 @@ export function CaixaScreen() {
       const result = await Api.closeShift(shift.id, { employeeId: employee.id, declared: declaredCents });
       setCloseResult(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao fechar turno");
+      const msg = err instanceof Error ? err.message : "Erro ao fechar turno";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleConfirmClose() {
+    const ok = await confirm({
+      title: "Fechar turno de caixa?",
+      message: "Essa ação é irreversível e vai encerrar o turno atual. Confira os valores declarados antes de continuar.",
+      confirmLabel: "Fechar turno",
+      cancelLabel: "Revisar valores",
+      variant: "danger",
+    });
+    if (ok) await confirmClose();
   }
 
   if (!unit || shift === undefined) return null;
@@ -100,7 +121,7 @@ export function CaixaScreen() {
         <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno — {unit.name}</h1>
         <Input label="Troco inicial (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
         {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
-        <Button variant="primary" size="lg" disabled={busy} onClick={openShift}>
+        <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
           Abrir turno
         </Button>
       </div>
@@ -163,7 +184,7 @@ export function CaixaScreen() {
           <Button variant="ghost" onClick={() => setClosing(false)} disabled={busy}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={confirmClose} disabled={busy}>
+          <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy}>
             Confirmar fechamento
           </Button>
         </div>
@@ -198,7 +219,7 @@ export function CaixaScreen() {
         </div>
         <Input label="Valor (R$)" type="number" value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} />
         <Input label="Motivo" value={movementReason} onChange={(e) => setMovementReason(e.target.value)} />
-        <Button variant="secondary" disabled={busy} onClick={addMovement} style={{ marginTop: "8px" }}>
+        <Button variant="secondary" loading={busy} disabled={busy} onClick={addMovement} style={{ marginTop: "8px" }}>
           Registrar
         </Button>
 

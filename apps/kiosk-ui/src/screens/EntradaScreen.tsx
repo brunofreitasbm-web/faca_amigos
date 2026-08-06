@@ -3,6 +3,7 @@ import { Card, Button, Input, Tag } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { useToast } from "../state/ToastContext.js";
 import { normalizePhoneE164, normalizeCpf, isValidCpf, formatCpf, planDurationMinutes, minutesUntilClosing } from "@facaamigos/domain";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import { ReceiptPrintModal } from "../components/ReceiptPrintModal.js";
@@ -21,6 +22,7 @@ const SENSORY_TAG_OPTIONS = [
 
 export function EntradaScreen() {
   const { unit, employee } = useAppState();
+  const toast = useToast();
   const activity = unit?.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
 
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -200,7 +202,9 @@ export function EntradaScreen() {
         setAssetId(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao fazer check-in");
+      const msg = err instanceof Error ? err.message : "Erro ao fazer check-in";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -386,6 +390,7 @@ export function EntradaScreen() {
         <Button
           variant="primary"
           size="lg"
+          loading={submitting}
           disabled={submitting || !planId || !isValidCpf(cpf) || !childName || !guardianName || !phone || !birthDate}
           onClick={submit}
           style={{ borderRadius: "9999px", padding: "16px", flex: 1 }}

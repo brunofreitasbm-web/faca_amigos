@@ -122,7 +122,7 @@ export function CheckoutModal({
             <Button variant="ghost" onClick={onClose} disabled={busy} title="Cancelar o fechamento sem cobrar">
               Cancelar
             </Button>
-            <Button variant="primary" onClick={confirm} disabled={busy} title="Confirmar pagamento e imprimir cupom de saída">
+            <Button variant="primary" onClick={confirm} loading={busy} disabled={busy} title="Confirmar pagamento e imprimir cupom de saída">
               Confirmar pagamento
             </Button>
           </div>

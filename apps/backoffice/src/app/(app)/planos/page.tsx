@@ -1,5 +1,20 @@
+import { Input } from "@/components/design-system";
 import { createClient } from "@/lib/supabase/server";
+import { DataTable } from "@/components/DataTable";
+import { EntityForm } from "@/components/EntityForm";
+import { LabeledSelect } from "@/components/LabeledSelect";
+import { PageTitle, SectionTitle } from "@/components/Typography";
 import { createPlan } from "../actions";
+
+interface Plan {
+  id: string;
+  name: string;
+  activity: string;
+  value_cents: number;
+  duration_value: number;
+  duration_unit: string;
+  fa_kiosk_units: { name: string } | null;
+}
 
 export default async function PlanosPage() {
   const supabase = await createClient();
@@ -13,58 +28,51 @@ export default async function PlanosPage() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Planos</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Atividade</th>
-            <th>Duração</th>
-            <th>Valor</th>
-            <th>Unidade</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(plans ?? []).map((p) => (
-            <tr key={p.id}>
-              <td>{p.name}</td>
-              <td>{p.activity}</td>
-              <td>
-                {p.duration_value} {p.duration_unit}
-              </td>
-              <td>R$ {(p.value_cents / 100).toFixed(2)}</td>
-              <td>{(p.fa_kiosk_units as unknown as { name: string } | null)?.name}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <PageTitle>Planos</PageTitle>
 
-      <h2 style={{ fontSize: 15, marginTop: 32 }}>Novo plano</h2>
-      <form
-        action={createPlan}
-        style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}
-      >
-        <select name="unit_id" required>
+      <DataTable<Plan>
+        columns={[
+          { key: "name", header: "Nome", render: (p) => p.name },
+          { key: "activity", header: "Atividade", render: (p) => p.activity },
+          {
+            key: "duration",
+            header: "Duração",
+            render: (p) => `${p.duration_value} ${p.duration_unit}`,
+          },
+          {
+            key: "value",
+            header: "Valor",
+            render: (p) => `R$ ${(p.value_cents / 100).toFixed(2)}`,
+          },
+          { key: "unit", header: "Unidade", render: (p) => p.fa_kiosk_units?.name ?? "—" },
+        ]}
+        rows={(plans ?? []) as unknown as Plan[]}
+        rowKey={(p) => p.id}
+        emptyMessage="Nenhum plano cadastrado."
+      />
+
+      <SectionTitle>Novo plano</SectionTitle>
+      <EntityForm action={createPlan} submitLabel="Adicionar">
+        <LabeledSelect label="Unidade" name="unit_id" required>
           {(units ?? []).map((u) => (
             <option key={u.id} value={u.id}>
               {u.name}
             </option>
           ))}
-        </select>
-        <select name="activity" required defaultValue="PLAYGROUND">
+        </LabeledSelect>
+        <LabeledSelect label="Atividade" name="activity" required defaultValue="PLAYGROUND">
           <option value="PLAYGROUND">Playground</option>
           <option value="CARRINHO">Carrinho</option>
-        </select>
-        <input name="name" placeholder="Nome" required />
-        <input name="value" type="number" step="0.01" placeholder="Valor (R$)" required />
-        <input name="duration_value" type="number" placeholder="Duração" required />
-        <select name="duration_unit" required defaultValue="MINUTO">
+        </LabeledSelect>
+        <Input name="name" label="Nome" required />
+        <Input name="value" type="number" step="0.01" label="Valor (R$)" required />
+        <Input name="duration_value" type="number" label="Duração" required />
+        <LabeledSelect label="Unidade de tempo" name="duration_unit" required defaultValue="MINUTO">
           <option value="MINUTO">Minuto</option>
           <option value="HORA">Hora</option>
-        </select>
-        <input name="overage" type="number" step="0.01" placeholder="Excedente/min (R$)" />
-        <button type="submit">Adicionar</button>
-      </form>
+        </LabeledSelect>
+        <Input name="overage" type="number" step="0.01" label="Excedente/min (R$)" />
+      </EntityForm>
     </div>
   );
 }
