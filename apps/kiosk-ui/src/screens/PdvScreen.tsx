@@ -78,7 +78,7 @@ export function PdvScreen() {
   return (
     <div style={{ display: "flex", gap: "24px", padding: "24px" }}>
       <div style={{ flex: 2 }}>
-        <h1 style={{ fontFamily: "var(--font-display)" }}>PDV — {unit.name}</h1>
+        <h1 style={{ fontFamily: "var(--font-display)" }}>PDV</h1>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px", marginTop: "16px" }}>
           {products.map((p) => (
             <Card key={p.id} onClick={() => p.stock > 0 && addToCart(p)} style={{ cursor: p.stock > 0 ? "pointer" : "not-allowed", opacity: p.stock > 0 ? 1 : 0.4, padding: "12px" }}>

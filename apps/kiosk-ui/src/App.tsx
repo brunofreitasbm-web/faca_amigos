@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
-import { Button, Badge } from "@facaamigos/ui";
+import { Button, BrandLockup } from "@facaamigos/ui";
+import { unitBrandFor } from "./branding/unitBrand.js";
 import { useAppState } from "./state/AppState.js";
 import { useConfirm } from "./state/ConfirmContext.js";
 import { LoginScreen } from "./screens/LoginScreen.js";
@@ -63,37 +64,32 @@ export function App() {
   }
 
   const ScreenComponent = SCREEN_COMPONENTS[screen];
-
-  let unitIcon = "📍";
-  const lowerName = unit.name.toLowerCase();
-  if (lowerName.includes("playground")) unitIcon = "🏰";
-  else if (lowerName.includes("circuito")) unitIcon = "🏎️";
-  else if (lowerName.includes("grão") || lowerName.includes("grao")) unitIcon = "🌳";
+  const brand = unitBrandFor(unit.name);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      {/* Régua da operação: a faixa de cor mais persistente da tela, para
+          o operador saber em que unidade está sem precisar ler nada. */}
+      <div style={{ flexShrink: 0, height: "3px", background: brand.accent }} />
+
       <header
         style={{
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
           gap: "16px",
-          padding: "12px 24px",
+          padding: "10px 24px",
           borderBottom: "1px solid var(--border-subtle)",
           background: "var(--surface-card)",
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <strong style={{ fontFamily: "var(--font-display)", fontSize: "18px", color: "var(--color-primary)" }}>
-            FaçaAmigos
-          </strong>
-
-          {/* Badge de Identificação Única do Módulo Ativo */}
-          <Badge variant="teal" style={{ fontSize: "13px", padding: "6px 12px" }}>
-            {unitIcon} {unit.name}
-          </Badge>
-        </div>
+        <BrandLockup
+          operation={brand.operation}
+          accent={brand.accent}
+          size="sm"
+          title={`${brand.icon} ${unit.name}`}
+        />
 
         <nav style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginLeft: "12px" }}>
           {SCREENS.map((s) => (

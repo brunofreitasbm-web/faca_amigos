@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Input, Tag } from "@facaamigos/ui";
+import { Card, Button, Input, DateInput, Tag } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
-import { normalizePhoneE164, normalizeCpf, isValidCpf, formatCpf, planDurationMinutes, minutesUntilClosing } from "@facaamigos/domain";
+import { normalizePhoneE164, formatPhoneBr, isValidPhoneBr, phoneDigitsBr, normalizeCpf, isValidCpf, formatCpf, planDurationMinutes, minutesUntilClosing } from "@facaamigos/domain";
 import { ReceiptPrintModal } from "../components/ReceiptPrintModal.js";
 
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
@@ -85,8 +85,12 @@ export function EntradaScreen() {
   // Autocomplete ao vivo — por CPF, nome da criança/responsável OU telefone do responsável
   useEffect(() => {
     const cpfDigits = normalizeCpf(cpf);
+    // Busca por telefone precisa ir só com dígitos: a coluna é E.164
+    // ("+5591982501215") e a consulta é um ilike '%...%' — mandar o texto
+    // mascarado "(91) 98250-…" nunca casaria com nada.
+    const phoneDigits = phoneDigitsBr(phone);
     const query =
-      cpfDigits.length >= 3 ? cpfDigits : guardianName.length >= 2 ? guardianName : childName.length >= 2 ? childName : phone.length >= 4 ? phone : "";
+      cpfDigits.length >= 3 ? cpfDigits : guardianName.length >= 2 ? guardianName : childName.length >= 2 ? childName : phoneDigits.length >= 4 ? phoneDigits : "";
     if (!query) {
       setMatches([]);
       return;
@@ -101,7 +105,7 @@ export function EntradaScreen() {
     setMatchedChild(match);
     setChildName(match.full_name);
     setBirthDate(match.birth_date);
-    if (match.phone_e164) setPhone(match.phone_e164);
+    if (match.phone_e164) setPhone(formatPhoneBr(match.phone_e164));
     if (match.guardian_name) setGuardianName(match.guardian_name);
     if (match.cpf) setCpf(formatCpf(match.cpf));
     setMatches([]);
@@ -127,6 +131,10 @@ export function EntradaScreen() {
     }
     if (!isValidCpf(cpf)) {
       setError("CPF do responsável inválido");
+      return;
+    }
+    if (!isValidPhoneBr(phone)) {
+      setError("WhatsApp do responsável inválido — informe DDD + número (ex: (91) 98250-1215)");
       return;
     }
     setSubmitting(true);
@@ -166,7 +174,9 @@ export function EntradaScreen() {
         dateTime: new Date().toLocaleString("pt-BR"),
         items: [{ description: selectedPlan?.name ?? "Plano", amountCents: selectedPlan?.valueCents ?? 0 }],
         totalCents: selectedPlan?.valueCents ?? 0,
-        customerInfo: { childName, guardianName, phone },
+        // normalizedPhone (E.164), não o texto mascarado do campo: é o que
+        // o comprovante de fechamento também imprime (ver CheckoutModal).
+        customerInfo: { childName, guardianName, phone: normalizedPhone },
         footerNote: unit.kind === "QUIOSQUE" && termsOfUse ? termsOfUse : undefined,
       });
 
@@ -208,9 +218,17 @@ export function EntradaScreen() {
 
   if (!unit) return null;
 
+  // Só acusa telefone inválido quando o número já tem tamanho de completo:
+  // todo celular passa por 10 dígitos a caminho dos 11, e avisar ali faria
+  // a mensagem piscar no meio de cada digitação.
+  const phoneDigits = phoneDigitsBr(phone);
+  const phoneLooksComplete =
+    phoneDigits.length === 11 || (phoneDigits.length === 10 && !phoneDigits.slice(2).startsWith("9"));
+  const phoneInvalid = phoneLooksComplete && !isValidPhoneBr(phone);
+
   return (
     <div style={{ maxWidth: "720px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
-      <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Entrada — {unit.name}</h1>
+      <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Entrada</h1>
 
       <section>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px" }}>1. Plano de Permanência</h2>
@@ -295,7 +313,7 @@ export function EntradaScreen() {
               {matches.map((m) => (
                 <div key={m.id} onClick={() => pickMatch(m)} style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border-subtle)" }}>
                   <strong>{m.guardian_name ?? m.full_name}</strong>{" "}
-                  {m.cpf ? `— ${formatCpf(m.cpf)}` : ""} {m.phone_e164 ? `— ${m.phone_e164}` : ""}
+                  {m.cpf ? `— ${formatCpf(m.cpf)}` : ""} {m.phone_e164 ? `— ${formatPhoneBr(m.phone_e164)}` : ""}
                   <br />
                   <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>criança: {m.full_name}</span>
                 </div>
@@ -314,8 +332,16 @@ export function EntradaScreen() {
           value={childName}
           onChange={(e) => { setChildName(e.target.value); setMatchedChild(null); setFavoriteAssetId(null); }}
         />
-        <Input label="Data de nascimento" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-        <Input label="WhatsApp do responsável" placeholder="+5591999999999" value={phone} onChange={(e) => { setPhone(e.target.value); setLastGuardianId(null); }} />
+        <DateInput label="Data de nascimento" value={birthDate} onChange={setBirthDate} />
+        <Input
+          label="WhatsApp do responsável"
+          placeholder="(91) 98250-1215"
+          inputMode="numeric"
+          maxLength={15}
+          value={phone}
+          onChange={(e) => { setPhone(formatPhoneBr(e.target.value)); setLastGuardianId(null); }}
+        />
+        {phoneInvalid && <Tag color="var(--color-error)">WhatsApp inválido — DDD + número, com o 9 do celular</Tag>}
       </section>
 
       {/* Seção Inclusiva: Tags Sensoriais e Cuidados */}
@@ -379,7 +405,7 @@ export function EntradaScreen() {
           variant="primary"
           size="lg"
           loading={submitting}
-          disabled={submitting || !planId || !isValidCpf(cpf) || !childName || !guardianName || !phone || !birthDate}
+          disabled={submitting || !planId || !isValidCpf(cpf) || !childName || !guardianName || !isValidPhoneBr(phone) || !birthDate}
           onClick={submit}
           style={{ borderRadius: "9999px", padding: "16px", flex: 1 }}
           title={lastGuardianId ? "Confirmar entrada desta criança, mantendo o mesmo responsável — imprime o cupom automaticamente" : "Confirmar entrada — imprime o cupom automaticamente; a pulseira é impressa manualmente pelo Painel"}

@@ -56,6 +56,8 @@ export function registerCheckoutRoutes(app: FastifyInstance, ctx: AppContext): v
           couponDiscountCents: session.coupon_discount_cents,
           couponCode: null,
           freeFromLoyalty,
+          pausedAtMs: null,
+          pausedMsTotal: 0,
         },
         nowMs,
       );

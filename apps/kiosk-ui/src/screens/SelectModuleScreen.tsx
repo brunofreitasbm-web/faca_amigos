@@ -1,59 +1,15 @@
-import { Card, Button, Badge } from "@facaamigos/ui";
+import { Card, Button, Badge, BrandLockup } from "@facaamigos/ui";
+import { UNIT_BRANDS, unitMatchesBrand } from "../branding/unitBrand.js";
 import { useAppState } from "../state/AppState.js";
-
-interface ModuleConfig {
-  idKey: string;
-  icon: string;
-  title: string;
-  subtitle: string;
-  location: string;
-  details: string;
-  color: string;
-}
-
-const DEFAULT_MODULES: ModuleConfig[] = [
-  {
-    idKey: "playground",
-    icon: "🏰",
-    title: "Playground (Parque Shopping)",
-    subtitle: "Operação Loja — Brinquedoteca Física & Regulação Sensorial",
-    location: "Parque Shopping Belém",
-    details: "Ambiente regulado com neuroarquitetura, mediação ABA, Cantinho da Calma e brinquedos adaptados.",
-    color: "var(--color-primary)",
-  },
-  {
-    idKey: "circuito",
-    icon: "🏎️",
-    title: "Circuito (Parque Shopping)",
-    subtitle: "Operação Quiosque — Pista & Carrinhos Elétricos",
-    location: "Parque Shopping Belém",
-    details: "Pista de carrinhos elétricos no corredor principal, controle de frota e cotação por minutos.",
-    color: "var(--color-secondary)",
-  },
-  {
-    idKey: "grão-pará",
-    icon: "🌳",
-    title: "Playground (Bosque Grão-Pará)",
-    subtitle: "Operação Loja — Brinquedoteca Física & Regulação Sensorial",
-    location: "Shopping Bosque Grão-Pará",
-    details: "Unidade ampliada com espaço de socialização inclusiva para o público da região metropolitana.",
-    color: "var(--color-amber)",
-  },
-];
 
 export function SelectModuleScreen() {
   const { units, setUnitId } = useAppState();
 
-  const displayModules = DEFAULT_MODULES.map((mod) => {
-    const matchedUnit = units.find((u) => {
-      const lower = u.name.toLowerCase();
-      if (mod.idKey === "circuito") return lower.includes("circuito");
-      if (mod.idKey === "grão-pará") return lower.includes("grão") || lower.includes("grao");
-      return lower.includes("playground");
-    });
+  const displayModules = UNIT_BRANDS.map((mod) => {
+    const matchedUnit = units.find((u) => unitMatchesBrand(mod.key, u.name));
     return {
       ...mod,
-      unitId: matchedUnit?.id || mod.idKey,
+      unitId: matchedUnit?.id || mod.key,
     };
   });
 
@@ -70,9 +26,7 @@ export function SelectModuleScreen() {
       }}
     >
       <div style={{ textAlign: "center", maxWidth: "600px", marginBottom: "36px" }}>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "36px", color: "var(--color-primary)", margin: "0 0 8px 0" }}>
-          FaçaAmigos
-        </h1>
+        <BrandLockup size="lg" style={{ justifyContent: "center", marginBottom: "16px" }} />
         <p style={{ fontSize: "18px", color: "var(--text-primary)", fontWeight: "bold", margin: "0 0 8px 0" }}>
           Sistema Operacional — Seleção de Módulo
         </p>
@@ -93,7 +47,7 @@ export function SelectModuleScreen() {
         {displayModules.map((meta) => {
           return (
             <Card
-              key={meta.idKey}
+              key={meta.key}
               onClick={() => setUnitId(meta.unitId)}
               style={{
                 display: "flex",
@@ -101,6 +55,9 @@ export function SelectModuleScreen() {
                 padding: "24px",
                 borderRadius: "24px",
                 border: "2px solid var(--border-subtle)",
+                // Régua da operação também no cartão: é a mesma cor que
+                // vai ficar no topo do sistema depois de entrar.
+                borderTop: `6px solid ${meta.accent}`,
                 transition: "all 0.25s ease",
                 cursor: "pointer",
                 position: "relative",
@@ -118,16 +75,14 @@ export function SelectModuleScreen() {
                 >
                   {meta.icon}
                 </div>
-                <Badge variant={meta.idKey === "circuito" ? "teal" : meta.idKey === "grão-pará" ? "amber" : "pink"}>
-                  {meta.location}
-                </Badge>
+                <Badge variant={meta.badge}>{meta.location}</Badge>
               </div>
 
               <h2 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
                 {meta.title}
               </h2>
 
-              <p style={{ fontSize: "14px", fontWeight: "bold", color: meta.color, margin: "0 0 12px 0" }}>
+              <p style={{ fontSize: "14px", fontWeight: "bold", color: meta.accent, margin: "0 0 12px 0" }}>
                 {meta.subtitle}
               </p>
 

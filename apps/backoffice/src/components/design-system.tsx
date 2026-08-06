@@ -7,4 +7,4 @@
 // servidor e quebraria nos hooks internos (useState/useId). Este wrapper
 // estabelece a fronteira de Client Component uma única vez — importar
 // daqui em vez de "@facaamigos/ui" em qualquer arquivo do backoffice.
-export { Button, Card, Badge, StatusBadge, Tag, Input } from "@facaamigos/ui";
+export { Button, Card, Badge, StatusBadge, Tag, Input, DateInput, BrandLockup } from "@facaamigos/ui";

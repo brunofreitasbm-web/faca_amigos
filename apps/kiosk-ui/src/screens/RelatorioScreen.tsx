@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Button, Card } from "@facaamigos/ui";
-import { Api } from "../api/client.js";
-import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, RevenueByMethod, ShiftSummary } from "../api/client.js";
+import { Button, Card, DateInput } from "@facaamigos/ui";
+import { Api, businessDateFor } from "../api/client.js";
+import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
-import { AssetUsageChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
+import { AssetUsageChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
 
-type Tab = "VENDAS" | "VISITAS" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
+type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -21,6 +21,7 @@ export function RelatorioScreen() {
 
   const tabs: { value: Tab; label: string }[] = [
     { value: "VENDAS", label: "Vendas" },
+    { value: "PLANOS", label: "Planos vendidos" },
     { value: "VISITAS", label: "Visitas" },
     { value: "ANIVERSARIANTES", label: "Crianças (aniversário)" },
     { value: "TURNOS", label: "Movimentação de Caixa" },
@@ -30,7 +31,7 @@ export function RelatorioScreen() {
 
   return (
     <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>Relatório — {unit.name}</h1>
+      <h1 style={{ fontFamily: "var(--font-display)" }}>Relatório</h1>
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "16px 0" }}>
         {tabs.map((t) => (
           <Button key={t.value} variant={tab === t.value ? "primary" : "ghost"} size="sm" onClick={() => setTab(t.value)}>
@@ -40,6 +41,7 @@ export function RelatorioScreen() {
       </div>
 
       {tab === "VENDAS" && <VendasTab unitId={unit.id} />}
+      {tab === "PLANOS" && <PlanosTab unitId={unit.id} cutoffHour={unit.business_day_cutoff_hour} />}
       {tab === "VISITAS" && <VisitasTab unitId={unit.id} />}
       {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
       {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
@@ -103,6 +105,100 @@ function VendasTab({ unitId }: { unitId: string }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * Tipos de plano × quantidade vendida, no dia e no mês.
+ *
+ * Os dois períodos aparecem juntos de propósito: a leitura útil não é
+ * "quantos vendi hoje", e sim se a mistura de planos de hoje está fora do
+ * padrão do mês — é isso que indica se vale mexer em preço ou duração.
+ */
+function PlanosTab({ unitId, cutoffHour }: { unitId: string; cutoffHour: number }) {
+  const [today, setToday] = useState<PlanSold[]>([]);
+  const [month, setMonth] = useState<PlanSold[]>([]);
+
+  useEffect(() => {
+    // Dia operacional da unidade (respeita o horário de corte), não a data
+    // do relógio — é a mesma régua que o banco usa em business_date.
+    const dayIso = businessDateFor(Date.now(), cutoffHour);
+    const monthStartIso = `${dayIso.slice(0, 7)}-01`;
+    Api.reportPlansSold(unitId, dayIso, dayIso).then(setToday);
+    Api.reportPlansSold(unitId, monthStartIso, dayIso).then(setMonth);
+  }, [unitId, cutoffHour]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <PlansSoldBlock title="Hoje" data={today} />
+      <PlansSoldBlock title="No mês" data={month} />
+    </div>
+  );
+}
+
+function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
+  const total = data.reduce((sum, p) => sum + p.sessions_count, 0);
+
+  return (
+    <div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: "0 0 12px 0" }}>
+        {title} — {total} {total === 1 ? "venda" : "vendas"}
+      </h2>
+
+      {total === 0 ? (
+        <Card style={{ padding: "24px", textAlign: "center", color: "var(--text-muted)" }}>
+          Nenhum plano vendido {title.toLowerCase()}.
+        </Card>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+          <PlansSoldChart title={`Participação — ${title.toLowerCase()}`} data={data} />
+
+          <Card style={{ padding: "16px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>Plano</th>
+                  <th style={{ textAlign: "right" }}>Qtd.</th>
+                  <th style={{ textAlign: "right" }}>%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((p) => {
+                  const pct = (p.sessions_count / total) * 100;
+                  return (
+                    <tr key={p.plan_id}>
+                      <td style={{ padding: "6px 0" }}>
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: "10px",
+                            height: "10px",
+                            borderRadius: "50%",
+                            background: p.plan_color,
+                            marginRight: "8px",
+                          }}
+                        />
+                        {p.plan_name}
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: "bold" }}>{p.sessions_count}</td>
+                      <td style={{ textAlign: "right", color: "var(--text-secondary)" }}>{pct.toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                  <td style={{ paddingTop: "8px", color: "var(--text-secondary)" }}>Total</td>
+                  <td style={{ textAlign: "right", paddingTop: "8px", fontWeight: "bold" }}>{total}</td>
+                  <td style={{ textAlign: "right", paddingTop: "8px", color: "var(--text-secondary)" }}>100%</td>
+                </tr>
+              </tfoot>
+            </table>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
@@ -287,13 +383,13 @@ function FrotaHeatmapTab({ unitId }: { unitId: string }) {
 
 function DateRangePicker({ from, to, setFrom, setTo }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void }) {
   return (
-    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-      <label>
-        De: <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-      </label>
-      <label>
-        Até: <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-      </label>
+    <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ flex: "1 1 150px", maxWidth: "200px" }}>
+        <DateInput label="De" value={from} onChange={setFrom} />
+      </div>
+      <div style={{ flex: "1 1 150px", maxWidth: "200px" }}>
+        <DateInput label="Até" value={to} onChange={setTo} />
+      </div>
     </div>
   );
 }

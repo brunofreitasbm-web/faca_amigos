@@ -115,11 +115,13 @@ export interface ActiveSessionEntry {
     guardian_phone_snapshot?: string;
     child_birth_date?: string;
     notes?: string;
+    paused_at_ms: number | null;
+    paused_ms_total: number;
   };
   quote: {
     lines: QuoteLine[];
     totalCents: number;
-    timing: { phase: SessionPhase; elapsedMs: number; durationMs: number; overMinutes: number };
+    timing: { phase: SessionPhase; elapsedMs: number; durationMs: number; overMinutes: number; isPaused: boolean; pausedForMs: number };
   };
 }
 
@@ -231,6 +233,24 @@ export interface FolhaPontoRow {
   at_ms: number;
   nsr: number;
 }
+export interface PlanSold {
+  plan_id: string;
+  plan_name: string;
+  plan_color: string;
+  activity: "PLAYGROUND" | "CARRINHO";
+  sessions_count: number;
+}
+
+/**
+ * Data do dia operacional (AAAA-MM-DD) de uma unidade. O dia só vira
+ * depois do `business_day_cutoff_hour`, então um check-in de 1h da manhã
+ * ainda conta para o movimento do dia anterior. Espelha a função SQL
+ * `fa_kiosk_business_date`, que é quem grava `business_date` nas tabelas.
+ */
+export function businessDateFor(nowMs: number, cutoffHour: number): string {
+  const shifted = new Date(nowMs - cutoffHour * 3600_000);
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}-${String(shifted.getDate()).padStart(2, "0")}`;
+}
 
 function planFromRow(row: Record<string, unknown>): Plan {
   return {
@@ -339,6 +359,8 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         couponDiscountCents: row.coupon_discount_cents as number,
         couponCode: null,
         freeFromLoyalty: Boolean(row.free_from_loyalty),
+        pausedAtMs: (row.paused_at_ms as number | null) ?? null,
+        pausedMsTotal: (row.paused_ms_total as number) ?? 0,
       },
       nowMs,
     );
@@ -353,6 +375,8 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         guardian_name_snapshot: (guardian?.full_name as string) ?? undefined,
         guardian_phone_snapshot: (guardian?.phone_e164 as string) ?? undefined,
         child_birth_date: (childRow?.birth_date as string) ?? undefined,
+        paused_at_ms: (row.paused_at_ms as number | null) ?? null,
+        paused_ms_total: (row.paused_ms_total as number) ?? 0,
       },
       quote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
@@ -636,12 +660,25 @@ export const Api = {
         .upsert({ unit_id: unitId, key, value, updated_at_ms: Date.now() }, { onConflict: "unit_id,key" }),
     ),
   todayRevenue: async (unitId: string, cutoffHour: number) => {
-    const shifted = new Date(Date.now() - cutoffHour * 3600_000);
-    const businessDate = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}-${String(shifted.getDate()).padStart(2, "0")}`;
     const totalCents = await unwrap<number>(
-      supabase().rpc("fa_kiosk_today_revenue", { p_unit_id: unitId, p_business_date: businessDate }),
+      supabase().rpc("fa_kiosk_today_revenue", { p_unit_id: unitId, p_business_date: businessDateFor(Date.now(), cutoffHour) }),
     );
     return { totalCents };
+  },
+  /** Quantidade de sessões vendidas por tipo de plano no intervalo de dias operacionais. */
+  reportPlansSold: async (unitId: string, from: string, to: string) => {
+    const rows = await unwrap<Record<string, unknown>[]>(
+      supabase().rpc("fa_kiosk_plans_sold", { p_unit_id: unitId, p_from: from, p_to: to }),
+    );
+    return rows.map((r) => ({
+      plan_id: r.plan_id as string,
+      plan_name: r.plan_name as string,
+      plan_color: r.plan_color as string,
+      activity: r.activity as PlanSold["activity"],
+      // count() do Postgres volta como bigint, que o supabase-js entrega
+      // string quando passa de 2^53 — Number() aqui evita "3" + 1 = "31".
+      sessions_count: Number(r.sessions_count),
+    })) as PlanSold[];
   },
   notifySession: async (sessionId: string, body: { channel: "WHATSAPP" | "SMS"; message: string }) => {
     await unwrap(
@@ -656,6 +693,10 @@ export const Api = {
   },
   changeSessionPlan: (sessionId: string, planId: string) =>
     unwrap(supabase().rpc("fa_kiosk_change_session_plan", { p_session_id: sessionId, p_plan_id: planId })),
+  pauseSession: (sessionId: string, reason: string) =>
+    unwrap(supabase().rpc("fa_kiosk_pause_session", { p_session_id: sessionId, p_reason: reason })),
+  resumeSession: (sessionId: string) =>
+    unwrap(supabase().rpc("fa_kiosk_resume_session", { p_session_id: sessionId })),
 
   coupons: (unitId: string) =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_coupons").select("*").eq("unit_id", unitId)).then((rows) =>

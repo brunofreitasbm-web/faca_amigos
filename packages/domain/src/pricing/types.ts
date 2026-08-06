@@ -22,6 +22,10 @@ export interface SessionForQuote {
   couponCode: string | null;
   /** Resgate de cortesia de fidelidade — zera o total. */
   freeFromLoyalty: boolean;
+  /** Timestamp de quando a sessão foi pausada; null = não está pausada agora. */
+  pausedAtMs: number | null;
+  /** Soma de todos os períodos pausados já encerrados (não inclui a pausa em curso). */
+  pausedMsTotal: number;
 }
 
 export type SessionPhase = "VERDE" | "AMARELO" | "VERMELHO" | "EXCEDENTE";
@@ -34,6 +38,9 @@ export interface SessionTiming {
   /** Preço do plano + excedente, sem cupom/fidelidade. */
   liveTotalCents: number;
   phase: SessionPhase;
+  isPaused: boolean;
+  /** Há quanto tempo está pausada agora (0 se não estiver pausada). */
+  pausedForMs: number;
 }
 
 export interface QuoteLine {

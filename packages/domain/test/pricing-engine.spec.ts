@@ -21,6 +21,8 @@ function session(overrides: Partial<SessionForQuote> = {}): SessionForQuote {
     couponDiscountCents: 0,
     couponCode: null,
     freeFromLoyalty: false,
+    pausedAtMs: null,
+    pausedMsTotal: 0,
     ...overrides,
   };
 }

@@ -24,7 +24,7 @@ export interface StatusBadgeProps extends Omit<HTMLAttributes<HTMLSpanElement>, 
   phase: SessionPhase;
   /** Texto complementar (ex. "22:14" ou "+07:31"). Opcional. */
   detail?: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
 }
 
 /**
@@ -38,6 +38,37 @@ export interface StatusBadgeProps extends Omit<HTMLAttributes<HTMLSpanElement>, 
  * verificado e testado em test/status.spec.ts.
  */
 export function StatusBadge({ phase, detail, size = "md", style: styleProp, ...rest }: StatusBadgeProps) {
+  // "lg" é um layout à parte (bloco, com o tempo em destaque) em vez de
+  // só um `sm`/`md` maior — o Painel usa essa variante como o elemento
+  // visualmente dominante do card, porque o foco operacional #1 é o
+  // tempo de permanência (entrada → cobrança), não o rótulo da fase.
+  if (size === "lg") {
+    const style: CSSProperties = {
+      display: "flex",
+      flexDirection: "column",
+      gap: "2px",
+      padding: "8px 12px",
+      borderRadius: "var(--radius-badge)",
+      background: `var(--status-${phase.toLowerCase()}-bg)`,
+      color: `var(--status-${phase.toLowerCase()}-fg)`,
+      fontFamily: "var(--font-body)",
+      ...styleProp,
+    };
+    return (
+      <span style={style} role="status" {...rest}>
+        <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: "var(--weight-bold)" as unknown as number, textTransform: "uppercase", letterSpacing: "0.04em", opacity: 0.9 }}>
+          <span aria-hidden="true">{GLYPHS[phase]}</span>
+          <span>{LABELS[phase]}</span>
+        </span>
+        {detail && (
+          <span style={{ fontSize: "30px", fontWeight: "var(--weight-bold)" as unknown as number, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>
+            {detail}
+          </span>
+        )}
+      </span>
+    );
+  }
+
   const style: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",

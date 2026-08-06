@@ -17,10 +17,16 @@ export function planDurationMinutes(plan: Plan): number {
  */
 export function computeSessionTiming(
   plan: Plan,
-  session: Pick<SessionForQuote, "checkinAtMs">,
+  session: Pick<SessionForQuote, "checkinAtMs" | "pausedAtMs" | "pausedMsTotal">,
   nowMs: number,
 ): SessionTiming {
-  const elapsedMs = Math.max(0, nowMs - session.checkinAtMs);
+  const isPaused = session.pausedAtMs != null;
+  // Enquanto pausada, o relógio "congela" no instante da pausa: usar
+  // pausedAtMs no lugar de nowMs faz o elapsed parar de crescer sem
+  // precisar de um branch separado depois.
+  const clockMs = session.pausedAtMs ?? nowMs;
+  const elapsedMs = Math.max(0, clockMs - session.checkinAtMs - session.pausedMsTotal);
+  const pausedForMs = isPaused ? Math.max(0, nowMs - session.pausedAtMs!) : 0;
   const durationMs = planDurationMinutes(plan) * 60_000;
   const overMs = Math.max(0, elapsedMs - durationMs);
   const overMinutes = Math.ceil(overMs / 60_000);
@@ -32,5 +38,5 @@ export function computeSessionTiming(
   else if (elapsedMs < durationMs * 0.8) phase = "VERDE";
   else phase = "AMARELO";
 
-  return { elapsedMs, durationMs, overMinutes, overCents, liveTotalCents, phase };
+  return { elapsedMs, durationMs, overMinutes, overCents, liveTotalCents, phase, isPaused, pausedForMs };
 }

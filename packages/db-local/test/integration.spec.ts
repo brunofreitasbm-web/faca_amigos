@@ -86,6 +86,8 @@ describe("fluxo completo: check-in até fechamento de turno", () => {
       couponDiscountCents: session.coupon_discount_cents,
       couponCode: null,
       freeFromLoyalty: Boolean(session.free_from_loyalty),
+      pausedAtMs: null,
+      pausedMsTotal: 0,
     }, checkoutAtMs);
 
     expect(quote.totalCents).toBe(3300);

@@ -13,6 +13,17 @@ import { formatAge, formatElapsed, money } from "../format.js";
 import { EntradaScreen } from "./EntradaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
 
+const PAUSE_REASONS: Array<{ value: string; label: string }> = [
+  { value: "BANHEIRO", label: "Foi ao banheiro" },
+  { value: "SAIU_DO_ESPACO", label: "Saiu do espaço" },
+  { value: "OUTRO", label: "Outro motivo" },
+];
+
+// Sessão pausada e esquecida vira o mesmo problema que o painel existe
+// para evitar (criança some do controle de tempo) — por isso o card
+// pisca depois desse limite, igual ao alerta de excedente.
+const PAUSE_ALERT_MS = 10 * 60_000;
+
 /**
  * Painel do parque (seção 1.3/6 do plano): contagem ascendente,
  * cor por fase, seleção de mais de 1 card para famílias com mais de
@@ -30,6 +41,8 @@ export function PainelScreen() {
   const [planOptions, setPlanOptions] = useState<Plan[]>([]);
   const [changingPlanFor, setChangingPlanFor] = useState<string | null>(null);
   const [pendingPlanId, setPendingPlanId] = useState<string>("");
+  const [pausingFor, setPausingFor] = useState<string | null>(null);
+  const [pendingPauseReason, setPendingPauseReason] = useState<string>("");
   const [dailyGoalCents, setDailyGoalCents] = useState(0);
   const [todayRevenueCents, setTodayRevenueCents] = useState(0);
   const [entradaOpen, setEntradaOpen] = useState(false);
@@ -133,6 +146,41 @@ export function PainelScreen() {
     }
   }
 
+  async function confirmPauseSession(sessionId: string) {
+    if (!pendingPauseReason) return;
+    setActionBusy((prev) => new Set(prev).add(sessionId));
+    try {
+      await Api.pauseSession(sessionId, pendingPauseReason);
+      setPausingFor(null);
+      setPendingPauseReason("");
+      toast.success("Tempo pausado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível pausar o tempo.");
+    } finally {
+      setActionBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
+  }
+
+  async function resumeSession(sessionId: string) {
+    setActionBusy((prev) => new Set(prev).add(sessionId));
+    try {
+      await Api.resumeSession(sessionId);
+      toast.success("Tempo retomado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível retomar o tempo.");
+    } finally {
+      setActionBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
+  }
+
   function toggle(sessionId: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -169,7 +217,7 @@ export function PainelScreen() {
     <div style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", padding: "clamp(12px, 2.5vw, 24px)", gap: "clamp(10px, 2vw, 20px)" }}>
       <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 3vw, 28px)" }}>Painel — {unit.name}</h1>
+          <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 3vw, 28px)" }}>Painel</h1>
           <p style={{ margin: "4px 0 0 0", color: "var(--text-secondary)", fontSize: "14px" }}>
             Acompanhamento em tempo real das crianças no playground
           </p>
@@ -194,28 +242,33 @@ export function PainelScreen() {
           const { session, quote, plan, asset } = entry;
           const isSelected = selected.has(session.id);
           const isExceeded = quote.timing.phase === "EXCEDENTE" || quote.timing.phase === "VERMELHO";
+          const isPaused = quote.timing.isPaused;
+          const isPausedTooLong = isPaused && quote.timing.pausedForMs >= PAUSE_ALERT_MS;
           const overageLine = quote.lines.find((l) => l.label.startsWith("Excedente"));
           const wristbandCode = session.wristband_code || session.id.slice(0, 6).toUpperCase();
 
           return (
             <Card
               key={session.id}
-              onClick={() => toggle(session.id)}
-              className={isExceeded ? "blinking" : undefined}
+              onClick={() => !isPaused && toggle(session.id)}
+              className={(isExceeded && !isPaused) || isPausedTooLong ? "blinking" : undefined}
               style={{
-                cursor: "pointer",
+                cursor: isPaused ? "default" : "pointer",
                 padding: "16px",
                 display: "flex",
                 flexDirection: "column",
                 gap: "10px",
-                border: isSelected
+                border: isPaused
+                  ? "2px dashed var(--color-amber)"
+                  : isSelected
                   ? "2px solid var(--color-primary)"
                   : isExceeded
                   ? "2px solid var(--color-error)"
                   : "1px solid var(--border-subtle)",
                 borderLeft: `6px solid ${plan?.color ?? "var(--border-subtle)"}`,
                 borderRadius: "16px",
-                background: isSelected ? "rgba(240, 25, 107, 0.04)" : "var(--surface-card)",
+                background: isPaused ? "rgba(201, 144, 32, 0.06)" : isSelected ? "rgba(240, 25, 107, 0.04)" : "var(--surface-card)",
+                opacity: isPaused ? 0.85 : 1,
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -271,15 +324,28 @@ export function PainelScreen() {
                 </Button>
               </div>
 
-              <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-                <StatusBadge phase={quote.timing.phase} detail={formatElapsed(quote.timing.elapsedMs)} />
+              <StatusBadge
+                phase={quote.timing.phase}
+                detail={formatElapsed(quote.timing.elapsedMs)}
+                size="lg"
+                title={isPaused ? "Tempo congelado enquanto a sessão está pausada" : "Tempo de permanência desde a entrada — base para a cobrança"}
+                style={isPaused ? { opacity: 0.6 } : undefined}
+              />
 
-                {isExceeded && (
-                  <Badge variant="solid_pink" title="Tempo do plano já foi ultrapassado — minutos e valor extra somados em tempo real">
-                    🔴 +{quote.timing.overMinutes} min excedente{overageLine ? ` (+${money(overageLine.cents)})` : ""}
-                  </Badge>
-                )}
-              </div>
+              {isPaused && (
+                <Badge
+                  variant={isPausedTooLong ? "solid_pink" : "solid_amber"}
+                  title="Relógio parado — retome quando a criança voltar"
+                >
+                  ⏸ Pausada há {formatElapsed(quote.timing.pausedForMs)}
+                </Badge>
+              )}
+
+              {isExceeded && !isPaused && (
+                <Badge variant="solid_pink" title="Tempo do plano já foi ultrapassado — minutos e valor extra somados em tempo real">
+                  🔴 +{quote.timing.overMinutes} min excedente{overageLine ? ` (+${money(overageLine.cents)})` : ""}
+                </Badge>
+              )}
 
               {session.notes && (
                 <div style={{ fontSize: "12px", background: "rgba(201, 144, 32, 0.1)", padding: "6px 10px", borderRadius: "8px", color: "var(--color-dark)" }}>
@@ -305,18 +371,6 @@ export function PainelScreen() {
                   variant="ghost"
                   size="sm"
                   disabled={actionBusy.has(session.id)}
-                  title="Abrir WhatsApp com mensagem pronta para o responsável"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    notifyGuardian(entry, "WHATSAPP");
-                  }}
-                >
-                  💬 Notificar Responsável
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={actionBusy.has(session.id)}
                   title="Trocar o plano de permanência desta sessão"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -326,7 +380,66 @@ export function PainelScreen() {
                 >
                   🔄 Mudar Plano
                 </Button>
+                {isPaused ? (
+                  <Button
+                    variant="teal"
+                    size="sm"
+                    loading={actionBusy.has(session.id)}
+                    disabled={actionBusy.has(session.id)}
+                    title="Retomar a contagem do tempo desta sessão"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      resumeSession(session.id);
+                    }}
+                  >
+                    ▶ Retomar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={actionBusy.has(session.id)}
+                    title="Pausar a contagem do tempo — banheiro, saiu do espaço, etc."
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingPauseReason("");
+                      setPausingFor(pausingFor === session.id ? null : session.id);
+                    }}
+                  >
+                    ⏸ Pausar
+                  </Button>
+                )}
               </div>
+
+              {pausingFor === session.id && (
+                <div style={{ display: "flex", gap: "6px" }} onClick={(e) => e.stopPropagation()}>
+                  <select
+                    value={pendingPauseReason}
+                    title="Selecione o motivo da pausa"
+                    onChange={(e) => setPendingPauseReason(e.target.value)}
+                    style={{ flex: 1, padding: "8px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}
+                  >
+                    <option value="" disabled>
+                      Motivo da pausa...
+                    </option>
+                    {PAUSE_REASONS.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={actionBusy.has(session.id)}
+                    disabled={!pendingPauseReason || actionBusy.has(session.id)}
+                    title="Confirmar a pausa desta sessão"
+                    onClick={() => confirmPauseSession(session.id)}
+                  >
+                    Confirmar
+                  </Button>
+                </div>
+              )}
 
               {changingPlanFor === session.id && (
                 <div style={{ display: "flex", gap: "6px" }} onClick={(e) => e.stopPropagation()}>

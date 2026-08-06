@@ -1,4 +1,4 @@
-import { Badge, Input } from "@/components/design-system";
+import { Badge, DateInput, Input } from "@/components/design-system";
 import { createClient } from "@/lib/supabase/server";
 import { createEmployee } from "../actions";
 import { DataTable } from "@/components/DataTable";
@@ -82,7 +82,7 @@ export default async function FuncionariosPage() {
         <Input name="full_name" label="Nome completo" required />
         <Input name="cpf" label="CPF" />
         <Input name="email" type="email" label="E-mail" />
-        <Input name="birth_date" type="date" label="Nascimento" />
+        <DateInput name="birth_date" label="Nascimento" />
         <Input name="phone" label="Telefone" />
         <LabeledSelect label="Unidade" name="unit_id" required>
           {(units ?? []).map((u) => (

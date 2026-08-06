@@ -26,7 +26,7 @@ export function ConfiguracoesScreen() {
 
   return (
     <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações — {unit.name}</h1>
+      <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações</h1>
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "16px 0" }}>
         {tabs.map((t) => (
           <Button key={t.value} variant={tab === t.value ? "primary" : "ghost"} size="sm" onClick={() => setTab(t.value)} title={`Abrir aba ${t.label}`}>

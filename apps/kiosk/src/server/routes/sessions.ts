@@ -27,6 +27,8 @@ export function registerSessionRoutes(app: FastifyInstance, ctx: AppContext): vo
           couponDiscountCents: session.coupon_discount_cents,
           couponCode: null,
           freeFromLoyalty: Boolean(session.free_from_loyalty),
+          pausedAtMs: null,
+          pausedMsTotal: 0,
         },
         nowMs,
       );

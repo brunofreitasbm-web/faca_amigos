@@ -35,6 +35,36 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
   );
 }
 
+/**
+ * Rosca de planos vendidos. Usa a cor cadastrada de cada plano em vez da
+ * paleta genérica de gráficos: é a mesma cor que identifica o plano na
+ * borda esquerda dos cards do Painel, então o operador já a associa.
+ */
+export function PlansSoldChart({
+  title,
+  data,
+}: {
+  title: string;
+  data: { plan_name: string; plan_color: string; sessions_count: number }[];
+}) {
+  if (data.length === 0) return null;
+  return (
+    <ChartCard title={title}>
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie data={data} dataKey="sessions_count" nameKey="plan_name" innerRadius={55} outerRadius={85} paddingAngle={2}>
+            {data.map((d) => (
+              <Cell key={d.plan_name} fill={d.plan_color} />
+            ))}
+          </Pie>
+          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v} venda(s)`, ""]} />
+          <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
+        </PieChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  );
+}
+
 export function RevenueByDayChart({ data }: { data: { business_date: string; total_cents: number }[] }) {
   if (data.length === 0) return null;
   return (

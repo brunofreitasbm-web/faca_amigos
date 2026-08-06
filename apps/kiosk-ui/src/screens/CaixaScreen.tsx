@@ -120,7 +120,7 @@ export function CaixaScreen() {
   if (shift === null) {
     return (
       <div style={{ maxWidth: "420px", margin: "60px auto", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno — {unit.name}</h1>
+        <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno</h1>
         <Input label="Troco inicial (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
         {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
         <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
@@ -196,7 +196,7 @@ export function CaixaScreen() {
 
   return (
     <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>Caixa — {unit.name}</h1>
+      <h1 style={{ fontFamily: "var(--font-display)" }}>Caixa</h1>
 
       <Card style={{ padding: "16px" }}>
         <h2>Faturamento do turno</h2>

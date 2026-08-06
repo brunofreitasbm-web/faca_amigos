@@ -257,6 +257,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@facaamigos/domain':
+        specifier: workspace:*
+        version: link:../domain
       react:
         specifier: 'catalog:'
         version: 19.2.8

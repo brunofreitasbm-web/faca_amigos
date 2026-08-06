@@ -16,7 +16,7 @@ export function registerTickChannel(app: FastifyInstance, ctx: AppContext): void
       const nowMs = ctx.nowMs();
       const sessions = listActiveSessions(ctx.db, unitId).map((session) => {
         const plan = getPlan(ctx.db, session.plan_id)!;
-        const timing = computeSessionTiming(plan, { checkinAtMs: session.checkin_at_ms }, nowMs);
+        const timing = computeSessionTiming(plan, { checkinAtMs: session.checkin_at_ms, pausedAtMs: null, pausedMsTotal: 0 }, nowMs);
         return {
           id: session.id,
           remainingMs: timing.durationMs - timing.elapsedMs,
