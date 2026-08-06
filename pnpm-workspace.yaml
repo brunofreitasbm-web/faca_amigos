@@ -6,6 +6,8 @@ packages:
 allowBuilds:
   electron: true
   esbuild: true
+  sharp: true
+  unrs-resolver: true
 
 # Versão única de dependências-chave em todo o monorepo (D1 do plano:
 # uma só SPA, um só motor de domínio — não faz sentido ter React ou
