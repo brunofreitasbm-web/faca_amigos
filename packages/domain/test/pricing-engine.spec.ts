@@ -10,6 +10,7 @@ const plan: Plan = {
   durationValue: 15,
   durationUnit: "MINUTO",
   overageCentsPerMinute: 100,
+  color: "#2ECFB5",
 };
 
 function session(overrides: Partial<SessionForQuote> = {}): SessionForQuote {

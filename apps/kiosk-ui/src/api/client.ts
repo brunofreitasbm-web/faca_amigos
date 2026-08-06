@@ -3,11 +3,25 @@ export interface ApiError {
   message?: string;
 }
 
+/**
+ * Sinaliza indisponibilidade do backend local para o SystemStatusOverlay,
+ * sem interferir no tratamento de erro que cada tela já faz (o throw
+ * continua acontecendo normalmente — isto é só um aviso em paralelo).
+ */
+export const systemStatus = new EventTarget();
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...init?.headers },
+    });
+  } catch (err) {
+    systemStatus.dispatchEvent(new CustomEvent("backend-unreachable"));
+    throw err;
+  }
+  systemStatus.dispatchEvent(new CustomEvent("backend-reachable"));
   if (!res.ok) {
     const body = (await res.json().catch(() => ({ error: "UNKNOWN" }))) as ApiError;
     throw new Error(body.message ?? body.error);
@@ -20,6 +34,7 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
 };
 
 export interface Unit {
@@ -43,6 +58,7 @@ export interface Plan {
   durationValue: number;
   durationUnit: "MINUTO" | "HORA";
   overageCentsPerMinute: number;
+  color: string;
 }
 
 export interface Asset {
@@ -69,6 +85,8 @@ export interface ChildMatch {
   full_name: string;
   birth_date: string;
   phone_e164: string | null;
+  guardian_name: string | null;
+  cpf: string | null;
 }
 
 export type SessionPhase = "VERDE" | "AMARELO" | "VERMELHO" | "EXCEDENTE";
@@ -79,6 +97,7 @@ export interface QuoteLine {
 }
 
 export interface ActiveSessionEntry {
+  plan: { id: string; name: string; color: string };
   session: {
     id: string;
     child_name_snapshot: string;
@@ -109,6 +128,13 @@ export interface CashMovement {
   kind: "TROCO_INICIAL" | "SANGRIA" | "SUPRIMENTO" | "AJUSTE";
   amount_cents: number;
   reason: string | null;
+}
+
+export interface BonusRule {
+  id: string;
+  unitId: string;
+  description: string;
+  rewardValueCents: number;
 }
 
 export interface Coupon {
@@ -162,6 +188,14 @@ export interface BirthdayChild {
   full_name: string;
   birth_date: string;
 }
+export interface AssetUsage {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  sessions_count: number;
+  total_minutes: number;
+}
 export interface ShiftSummary {
   id: string;
   opened_at_ms: number;
@@ -185,13 +219,15 @@ export const Api = {
   assets: (unitId: string) => api.get<Asset[]>(`/api/assets?unitId=${unitId}`),
   products: (unitId: string) => api.get<Product[]>(`/api/products?unitId=${unitId}`),
   searchChildren: (q: string) => api.get<ChildMatch[]>(`/api/children/search?q=${encodeURIComponent(q)}`),
+  lastAssetForChild: (childId: string) => api.get<{ assetId: string | null }>(`/api/children/${childId}/last-asset`),
   activeSessions: (unitId: string) => api.get<ActiveSessionEntry[]>(`/api/sessions/active?unitId=${unitId}`),
   redeemableRewards: (childId: string) => api.get<RedeemableReward[]>(`/api/children/${childId}/redeemable-rewards`),
   currentShift: (unitId: string) => api.get<Shift | null>(`/api/shifts/current?unitId=${unitId}`),
 
   loginPin: (employeeId: string, pin: string) => api.post<{ employee: Employee }>("/api/auth/login-pin", { employeeId, pin }),
 
-  checkin: (body: unknown) => api.post<{ sessionId: string; wristbandCode: string; ticketCode: string }>("/api/checkins", body),
+  checkin: (body: unknown) =>
+    api.post<{ sessionId: string; childId: string; guardianId: string; wristbandCode: string; ticketCode: string }>("/api/checkins", body),
   checkout: (body: unknown) => api.post<{ orderId: string; totalCents: number }>("/api/checkout", body),
   pdvOrder: (body: unknown) => api.post<{ orderId: string; totalCents: number }>("/api/pdv/orders", body),
 
@@ -208,6 +244,17 @@ export const Api = {
   ponto: (body: unknown) => api.post<{ id: string; nsr: number; atMs: number }>("/api/ponto", body),
   pontoHistory: (employeeId: string, fromMs: number, toMs: number) =>
     api.get<PontoRecord[]>(`/api/ponto/${employeeId}?fromMs=${fromMs}&toMs=${toMs}`),
+
+  bonusRules: (unitId: string) => api.get<BonusRule[]>(`/api/bonus-rules?unitId=${unitId}`),
+  createBonusRule: (body: unknown) => api.post<{ id: string }>("/api/bonus-rules", body),
+  unitSetting: (unitId: string, key: "daily_goal_cents" | "terms_of_use" | "closing_time") =>
+    api.get<{ value: string | null }>(`/api/units/${unitId}/settings?key=${key}`),
+  setUnitSetting: (unitId: string, key: "daily_goal_cents" | "terms_of_use" | "closing_time", value: string) =>
+    api.put(`/api/units/${unitId}/settings`, { key, value }),
+  todayRevenue: (unitId: string) => api.get<{ totalCents: number }>(`/api/units/${unitId}/today-revenue`),
+  notifySession: (sessionId: string, body: { channel: "WHATSAPP" | "SMS"; message: string }) =>
+    api.post<{ ok: boolean; simulated: boolean }>(`/api/sessions/${sessionId}/notify`, body),
+  changeSessionPlan: (sessionId: string, planId: string) => api.patch(`/api/sessions/${sessionId}/plan`, { planId }),
 
   coupons: (unitId: string) => api.get<Coupon[]>(`/api/coupons?unitId=${unitId}`),
   createCoupon: (body: unknown) => api.post<{ id: string }>("/api/coupons", body),
@@ -227,5 +274,7 @@ export const Api = {
     api.get<DailyVisits[]>(`/api/reports/visits?unitId=${unitId}&from=${from}&to=${to}`),
   reportBirthdays: (month: number) => api.get<BirthdayChild[]>(`/api/reports/birthdays?month=${month}`),
   reportShifts: (unitId: string) => api.get<ShiftSummary[]>(`/api/reports/shifts?unitId=${unitId}`),
+  reportAssetUsage: (unitId: string, from: string, to: string) =>
+    api.get<AssetUsage[]>(`/api/reports/asset-usage?unitId=${unitId}&from=${from}&to=${to}`),
   reportPonto: (fromMs: number, toMs: number) => api.get<FolhaPontoRow[]>(`/api/reports/ponto?fromMs=${fromMs}&toMs=${toMs}`),
 };

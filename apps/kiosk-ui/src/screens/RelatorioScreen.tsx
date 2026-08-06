@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Button, Card } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, RevenueByMethod, ShiftSummary } from "../api/client.js";
+import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, RevenueByMethod, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
 
-type Tab = "VENDAS" | "VISITAS" | "ANIVERSARIANTES" | "TURNOS" | "PONTO";
+type Tab = "VENDAS" | "VISITAS" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -13,6 +13,7 @@ function isoDate(d: Date): string {
 
 export function RelatorioScreen() {
   const { unit } = useAppState();
+  const isQuiosque = unit?.kind === "QUIOSQUE";
   const [tab, setTab] = useState<Tab>("VENDAS");
 
   if (!unit) return null;
@@ -23,6 +24,7 @@ export function RelatorioScreen() {
     { value: "ANIVERSARIANTES", label: "Crianças (aniversário)" },
     { value: "TURNOS", label: "Movimentação de Caixa" },
     { value: "PONTO", label: "Folha de Ponto" },
+    ...(isQuiosque ? ([{ value: "FROTA", label: "Frota (mapa de calor)" }] as const) : []),
   ];
 
   return (
@@ -41,6 +43,7 @@ export function RelatorioScreen() {
       {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
       {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
       {tab === "PONTO" && <PontoTab />}
+      {tab === "FROTA" && isQuiosque && <FrotaHeatmapTab unitId={unit.id} />}
     </div>
   );
 }
@@ -221,6 +224,52 @@ function PontoTab() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function FrotaHeatmapTab({ unitId }: { unitId: string }) {
+  const { from, setFrom, to, setTo } = useDateRange();
+  const [usage, setUsage] = useState<AssetUsage[]>([]);
+
+  useEffect(() => {
+    Api.reportAssetUsage(unitId, from, to).then(setUsage);
+  }, [unitId, from, to]);
+
+  const maxSessions = Math.max(1, ...usage.map((u) => u.sessions_count));
+
+  return (
+    <div>
+      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} />
+      <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: "12px 0" }} title="Quanto mais escuro/intenso, mais o carrinho foi alocado no período — ajuda a identificar quais carrinhos se pagam mais rápido e quais ficam parados">
+        Intensidade da cor = frequência de uso no período selecionado.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px" }}>
+        {usage.map((u) => {
+          const intensity = u.sessions_count / maxSessions;
+          const idle = u.sessions_count === 0;
+          return (
+            <Card
+              key={u.id}
+              title={`${u.sessions_count} uso(s) — ${Math.round(u.total_minutes / 60)}h de uso no período`}
+              style={{
+                padding: "16px",
+                textAlign: "center",
+                opacity: idle ? 0.35 : 0.4 + intensity * 0.6,
+                background: idle ? "var(--surface-card)" : u.color,
+                color: idle ? "var(--text-primary)" : "#fff",
+              }}
+            >
+              <div style={{ fontSize: "28px" }}>{u.emoji}</div>
+              <strong>{u.name}</strong>
+              <div style={{ fontSize: "13px" }}>{u.sessions_count} usos</div>
+              <div style={{ fontSize: "12px" }}>{Math.round(u.total_minutes / 60)}h no período</div>
+              {idle && <div style={{ fontSize: "12px", fontWeight: "bold" }}>⏸️ parado</div>}
+            </Card>
+          );
+        })}
+        {usage.length === 0 && <p>Nenhum carrinho cadastrado para esta unidade.</p>}
+      </div>
     </div>
   );
 }

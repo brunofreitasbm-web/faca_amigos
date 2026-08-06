@@ -4,6 +4,7 @@ import { Api } from "../api/client.js";
 import type { Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
+import { CashPaymentPad } from "../components/CashPaymentPad.js";
 
 interface CartLine {
   product: Product;
@@ -110,7 +111,7 @@ export function PdvScreen() {
 
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "12px 0" }}>
           {METHODS.map((m) => (
-            <Button key={m} variant={method === m ? "primary" : "secondary"} size="sm" onClick={() => setMethod(m)}>
+            <Button key={m} variant={method === m ? "primary" : "secondary"} size="sm" onClick={() => setMethod(m)} title={`Pagar via ${m}`}>
               {m}
             </Button>
           ))}
@@ -125,9 +126,13 @@ export function PdvScreen() {
         {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
         {success && <p style={{ color: "var(--color-teal)" }}>{success}</p>}
 
-        <Button variant="primary" fullWidth disabled={busy || cart.length === 0 || hasOpenShift === false} onClick={confirm}>
-          Confirmar venda
-        </Button>
+        {method === "DINHEIRO" ? (
+          <CashPaymentPad totalCents={totalCents} busy={busy || cart.length === 0 || hasOpenShift === false} onConfirm={() => confirm()} />
+        ) : (
+          <Button variant="primary" fullWidth disabled={busy || cart.length === 0 || hasOpenShift === false} onClick={confirm} title="Confirmar a venda com o método selecionado">
+            Confirmar venda
+          </Button>
+        )}
       </Card>
     </div>
   );

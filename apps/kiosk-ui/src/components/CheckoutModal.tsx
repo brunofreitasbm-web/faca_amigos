@@ -4,6 +4,9 @@ import { Api } from "../api/client.js";
 import type { ActiveSessionEntry } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
+import { ReceiptPrintModal } from "./ReceiptPrintModal.js";
+import { CashPaymentPad } from "./CashPaymentPad.js";
+import type { ReceiptPrintPayload } from "@facaamigos/domain";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
@@ -16,15 +19,16 @@ export function CheckoutModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const { employee } = useAppState();
+  const { employee, unit } = useAppState();
   const [method, setMethod] = useState<(typeof METHODS)[number]>("PIX");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [receipts, setReceipts] = useState<ReceiptPrintPayload[]>([]);
 
   const totalCents = entries.reduce((sum, e) => sum + e.quote.totalCents, 0);
 
   async function confirm() {
-    if (!employee) return;
+    if (!employee || !unit) return;
     setBusy(true);
     setError(null);
     try {
@@ -33,12 +37,49 @@ export function CheckoutModal({
         employeeId: employee.id,
         payments: [{ method, amountCents: totalCents }],
       });
-      onDone();
+
+      // Um cupom não fiscal por criança, com entrada, saída, excedente e desconto aplicado.
+      const nowStr = new Date().toLocaleString("pt-BR");
+      setReceipts(
+        entries.map((e) => ({
+          title: "Comprovante de Saída",
+          unitName: unit.name,
+          employeeName: employee.full_name,
+          dateTime: nowStr,
+          items: e.quote.lines.map((l) => ({ description: l.label, amountCents: l.cents })),
+          totalCents: e.quote.totalCents,
+          payments: [{ method, amountCents: e.quote.totalCents }],
+          customerInfo: {
+            childName: e.session.child_name_snapshot,
+            guardianName: e.session.guardian_name_snapshot,
+            phone: e.session.guardian_phone_snapshot,
+          },
+          footerNote: `Entrada: ${new Date(e.session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} | Saída: ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} | Excedente: ${e.quote.timing.overMinutes} min`,
+        })),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao fechar");
     } finally {
       setBusy(false);
     }
+  }
+
+  if (receipts.length > 0) {
+    return (
+      <>
+        {receipts.map((r, i) => (
+          <ReceiptPrintModal
+            key={i}
+            data={r}
+            onClose={() => {
+              const rest = receipts.filter((_, idx) => idx !== i);
+              setReceipts(rest);
+              if (rest.length === 0) onDone();
+            }}
+          />
+        ))}
+      </>
+    );
   }
 
   return (
@@ -59,7 +100,7 @@ export function CheckoutModal({
 
         <div style={{ display: "flex", gap: "8px", margin: "16px 0", flexWrap: "wrap" }}>
           {METHODS.map((m) => (
-            <Button key={m} variant={method === m ? "primary" : "secondary"} size="sm" onClick={() => setMethod(m)}>
+            <Button key={m} variant={method === m ? "primary" : "secondary"} size="sm" onClick={() => setMethod(m)} title={`Pagar via ${m}`}>
               {m}
             </Button>
           ))}
@@ -67,14 +108,25 @@ export function CheckoutModal({
 
         {error && <p style={{ color: "var(--color-error)" }}>{error}</p>}
 
-        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button variant="primary" onClick={confirm} disabled={busy}>
-            Confirmar pagamento
-          </Button>
-        </div>
+        {method === "DINHEIRO" ? (
+          <>
+            <CashPaymentPad totalCents={totalCents} busy={busy} onConfirm={() => confirm()} />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
+              <Button variant="ghost" onClick={onClose} disabled={busy} title="Cancelar o fechamento sem cobrar">
+                Cancelar
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={onClose} disabled={busy} title="Cancelar o fechamento sem cobrar">
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={confirm} disabled={busy} title="Confirmar pagamento e imprimir cupom de saída">
+              Confirmar pagamento
+            </Button>
+          </div>
+        )}
       </Card>
     </div>
   );

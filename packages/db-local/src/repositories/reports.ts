@@ -59,6 +59,31 @@ export function visitsByDay(db: Db, unitId: string, fromDate: string, toDate: st
     .all(unitId, fromDate, toDate) as unknown as DailyVisits[];
 }
 
+export interface AssetUsage {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  sessions_count: number;
+  total_minutes: number;
+}
+
+/** Mapa de calor de uso: frequência e tempo de alocação por carrinho, para identificar quais se pagam mais rápido. */
+export function assetUsage(db: Db, unitId: string, fromDate: string, toDate: string): AssetUsage[] {
+  return db
+    .prepare(
+      `SELECT a.id AS id, a.name AS name, a.emoji AS emoji, a.color AS color,
+              COUNT(s.id) AS sessions_count,
+              COALESCE(SUM((COALESCE(s.checkout_at_ms, s.checkin_at_ms) - s.checkin_at_ms) / 60000), 0) AS total_minutes
+       FROM assets a
+       LEFT JOIN sessions s ON s.asset_id = a.id AND s.checkout_at_ms IS NOT NULL AND s.business_date BETWEEN ? AND ?
+       WHERE a.unit_id = ?
+       GROUP BY a.id
+       ORDER BY sessions_count DESC`,
+    )
+    .all(fromDate, toDate, unitId) as unknown as AssetUsage[];
+}
+
 export interface BirthdayChild {
   id: string;
   full_name: string;

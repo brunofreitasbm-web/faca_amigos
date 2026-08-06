@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizePhoneE164 } from "@facaamigos/domain";
+import { normalizePhoneE164, normalizeCpf, isValidCpf } from "@facaamigos/domain";
 
 
 /**
@@ -17,6 +17,7 @@ export const createPlanSchema = z.object({
   durationValue: z.number().int().positive(),
   durationUnit: z.enum(["MINUTO", "HORA"]),
   overageCentsPerMinute: z.number().int().nonnegative(),
+  color: z.string().min(1).default("#2ECFB5"),
 });
 
 export const createProductSchema = z.object({
@@ -43,6 +44,26 @@ export const createLoyaltyRuleSchema = z.object({
   triggerVisits: z.number().int().positive(),
   rewardKind: z.enum(["ENTRADA_GRATIS", "DESCONTO_PCT", "MINUTOS_EXTRA"]),
   rewardValue: z.number().int().positive(),
+});
+
+export const createBonusRuleSchema = z.object({
+  unitId: z.string().uuid(),
+  description: z.string().min(1),
+  rewardValueCents: z.number().int().nonnegative(),
+});
+
+export const setUnitSettingSchema = z.object({
+  key: z.enum(["daily_goal_cents", "terms_of_use", "closing_time"]),
+  value: z.string(),
+});
+
+export const notifySessionSchema = z.object({
+  channel: z.enum(["WHATSAPP", "SMS"]),
+  message: z.string().min(1),
+});
+
+export const changeSessionPlanSchema = z.object({
+  planId: z.string().uuid(),
 });
 
 export const createAssetSchema = z.object({
@@ -86,6 +107,10 @@ export const checkinBodySchema = z.object({
   guardian: z.object({
     id: z.string().uuid().optional(),
     fullName: z.string().min(2),
+    cpf: z
+      .string()
+      .transform(normalizeCpf)
+      .pipe(z.string().refine(isValidCpf, "CPF inválido")),
     phoneE164: z
       .string()
       .transform(normalizePhoneE164)

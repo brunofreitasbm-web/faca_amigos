@@ -48,6 +48,18 @@ export function listActiveSessions(db: Db, unitId: string): SessionRow[] {
     .all(unitId) as unknown as SessionRow[];
 }
 
+/** Favoritagem de equipamento: último carrinho que esta criança usou, para sugerir de novo no check-in. */
+export function getLastAssetIdForChild(db: Db, childId: string): string | null {
+  const row = db
+    .prepare(
+      `SELECT asset_id FROM sessions
+       WHERE child_id = ? AND activity = 'CARRINHO' AND asset_id IS NOT NULL
+       ORDER BY checkin_at_ms DESC LIMIT 1`,
+    )
+    .get(childId) as { asset_id: string } | undefined;
+  return row?.asset_id ?? null;
+}
+
 /**
  * Transição condicional (seção 5.2 do plano): só sai de ATIVA se ainda
  * estiver ATIVA no momento exato do UPDATE. `changes === 0` sinaliza
@@ -71,6 +83,12 @@ export function finalizeSession(db: Db, id: string, checkoutAtMs: number, orderI
 /** Reverte a sessão para ATIVA se o pagamento for cancelado no meio do fechamento. */
 export function revertToActive(db: Db, id: string): void {
   db.prepare("UPDATE sessions SET status = 'ATIVA' WHERE id = ? AND status = 'AGUARDANDO_PAGAMENTO'").run(id);
+}
+
+/** Troca o plano de uma sessão ainda ativa (ex: família decide estender/reduzir o tempo). */
+export function changeSessionPlan(db: Db, id: string, planId: string): boolean {
+  const result = db.prepare("UPDATE sessions SET plan_id = ? WHERE id = ? AND status = 'ATIVA'").run(planId, id);
+  return result.changes > 0;
 }
 
 export function insertSessionEvent(

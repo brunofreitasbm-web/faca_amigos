@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { Asset, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
+import type { Asset, BonusRule, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
 
-type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "FROTA" | "COLABORADORES";
+type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES";
 
 export function ConfiguracoesScreen() {
   const { unit } = useAppState();
@@ -19,6 +19,7 @@ export function ConfiguracoesScreen() {
     { value: "PRODUTOS", label: "Produtos" },
     { value: "CUPONS", label: "Cupons" },
     { value: "FIDELIDADE", label: "Fidelidade" },
+    { value: "META", label: "Meta" },
     ...(isQuiosque ? ([{ value: "FROTA", label: "Frota" }] as const) : []),
     { value: "COLABORADORES", label: "Colaboradores" },
   ];
@@ -28,7 +29,7 @@ export function ConfiguracoesScreen() {
       <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações — {unit.name}</h1>
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "16px 0" }}>
         {tabs.map((t) => (
-          <Button key={t.value} variant={tab === t.value ? "primary" : "ghost"} size="sm" onClick={() => setTab(t.value)}>
+          <Button key={t.value} variant={tab === t.value ? "primary" : "ghost"} size="sm" onClick={() => setTab(t.value)} title={`Abrir aba ${t.label}`}>
             {t.label}
           </Button>
         ))}
@@ -38,11 +39,161 @@ export function ConfiguracoesScreen() {
       {tab === "PRODUTOS" && <ProdutosTab unitId={unit.id} />}
       {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
       {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
+      {tab === "META" && <MetaTab unitId={unit.id} isQuiosque={isQuiosque} />}
       {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
       {tab === "COLABORADORES" && <ColaboradoresTab />}
     </div>
   );
 }
+
+function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }) {
+  const [goalReais, setGoalReais] = useState("0");
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [rules, setRules] = useState<BonusRule[]>([]);
+  const [ruleDescription, setRuleDescription] = useState("");
+  const [ruleValueReais, setRuleValueReais] = useState("0");
+  const [busyRule, setBusyRule] = useState(false);
+  const [termsOfUse, setTermsOfUse] = useState("");
+  const [savingTerms, setSavingTerms] = useState(false);
+  const [closingTime, setClosingTime] = useState("");
+  const [savingClosingTime, setSavingClosingTime] = useState(false);
+
+  function loadGoal() {
+    Api.unitSetting(unitId, "daily_goal_cents").then((r) => setGoalReais(((Number(r.value) || 0) / 100).toString()));
+  }
+  function loadRules() {
+    Api.bonusRules(unitId).then(setRules);
+  }
+  function loadTerms() {
+    if (isQuiosque) Api.unitSetting(unitId, "terms_of_use").then((r) => setTermsOfUse(r.value ?? ""));
+  }
+  function loadClosingTime() {
+    Api.unitSetting(unitId, "closing_time").then((r) => setClosingTime(r.value ?? ""));
+  }
+  useEffect(loadGoal, [unitId]);
+  useEffect(loadRules, [unitId]);
+  useEffect(loadTerms, [unitId, isQuiosque]);
+  useEffect(loadClosingTime, [unitId]);
+
+  async function saveGoal() {
+    setSavingGoal(true);
+    try {
+      await Api.setUnitSetting(unitId, "daily_goal_cents", String(Math.round(Number(goalReais) * 100)));
+    } finally {
+      setSavingGoal(false);
+    }
+  }
+
+  async function createRule() {
+    setBusyRule(true);
+    try {
+      await Api.createBonusRule({ unitId, description: ruleDescription, rewardValueCents: Math.round(Number(ruleValueReais) * 100) });
+      setRuleDescription("");
+      loadRules();
+    } finally {
+      setBusyRule(false);
+    }
+  }
+
+  async function saveTerms() {
+    setSavingTerms(true);
+    try {
+      await Api.setUnitSetting(unitId, "terms_of_use", termsOfUse);
+    } finally {
+      setSavingTerms(false);
+    }
+  }
+
+  async function saveClosingTime() {
+    setSavingClosingTime(true);
+    try {
+      await Api.setUnitSetting(unitId, "closing_time", closingTime);
+    } finally {
+      setSavingClosingTime(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 title="Meta de faturamento do dia, usada na barra de progresso do Painel">Meta diária de faturamento</h2>
+        <Input
+          label="Meta do dia (R$)"
+          type="number"
+          value={goalReais}
+          onChange={(e) => setGoalReais(e.target.value)}
+          title="Valor de faturamento que a unidade deve atingir hoje"
+        />
+        <Button variant="primary" disabled={savingGoal} onClick={saveGoal} title="Salvar a meta diária de faturamento">
+          Salvar meta
+        </Button>
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 title="Se faltar menos tempo até este horário do que a duração de um plano, a venda desse plano é bloqueada">
+          Encerramento Inteligente de Turno
+        </h2>
+        <label>Horário de fechamento do shopping</label>
+        <input
+          type="time"
+          value={closingTime}
+          onChange={(e) => setClosingTime(e.target.value)}
+          title="Planos que não caibam até este horário deixam de ser vendidos automaticamente"
+          style={{ padding: "10px", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}
+        />
+        <Button variant="primary" disabled={savingClosingTime} onClick={saveClosingTime} title="Salvar o horário de fechamento">
+          Salvar horário
+        </Button>
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 title="Recompensas para o colaborador quando a meta diária é batida">Regras de Bonificação</h2>
+        <Input
+          label="Descrição"
+          placeholder="Ex: Bônus para o turno ao bater a meta"
+          value={ruleDescription}
+          onChange={(e) => setRuleDescription(e.target.value)}
+          title="Descreva a regra de bonificação para o colaborador"
+        />
+        <Input
+          label="Valor (R$)"
+          type="number"
+          value={ruleValueReais}
+          onChange={(e) => setRuleValueReais(e.target.value)}
+          title="Valor da bonificação em reais"
+        />
+        <Button variant="primary" disabled={busyRule || !ruleDescription} onClick={createRule} title="Criar nova regra de bonificação">
+          Criar regra
+        </Button>
+        {rules.map((r) => (
+          <Card key={r.id} style={{ padding: "12px", display: "flex", justifyContent: "space-between" }}>
+            <span>{r.description}</span>
+            <strong>{money(r.rewardValueCents)}</strong>
+          </Card>
+        ))}
+      </Card>
+
+      {isQuiosque && (
+        <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <h2 title="Texto impresso no cupom não fiscal de entrada do módulo Circuito">Termos de Uso (Circuito)</h2>
+          <label>Texto dos Termos de Uso</label>
+          <textarea
+            value={termsOfUse}
+            onChange={(e) => setTermsOfUse(e.target.value)}
+            rows={6}
+            title="Texto que aparecerá impresso no cupom não fiscal de cada entrada do Circuito"
+            style={{ width: "100%", padding: "10px", borderRadius: "12px", border: "1px solid var(--border-subtle)", fontFamily: "inherit" }}
+          />
+          <Button variant="primary" disabled={savingTerms} onClick={saveTerms} title="Salvar os Termos de Uso">
+            Salvar Termos de Uso
+          </Button>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+const PLAN_COLOR_OPTIONS = ["#2ECFB5", "#F0196B", "#FFE234", "#FF7A00", "#A020EE", "#1A3F35"];
 
 function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND" | "CARRINHO" }) {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -51,6 +202,7 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
   const [durationValue, setDurationValue] = useState("15");
   const [durationUnit, setDurationUnit] = useState<"MINUTO" | "HORA">("MINUTO");
   const [overageReais, setOverageReais] = useState("1");
+  const [color, setColor] = useState(PLAN_COLOR_OPTIONS[0]!);
   const [busy, setBusy] = useState(false);
 
   function load() {
@@ -69,6 +221,7 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
         durationValue: Number(durationValue),
         durationUnit,
         overageCentsPerMinute: Math.round(Number(overageReais) * 100),
+        color,
       });
       setName("");
       load();
@@ -94,14 +247,27 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
           </div>
         </div>
         <Input label="Excedente por minuto (R$)" type="number" value={overageReais} onChange={(e) => setOverageReais(e.target.value)} />
+        <div>
+          <label>Cor no Painel</label>
+          <div style={{ display: "flex", gap: "4px" }}>
+            {PLAN_COLOR_OPTIONS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                style={{ width: "28px", height: "28px", borderRadius: "50%", background: c, border: color === c ? "3px solid black" : "1px solid var(--border-subtle)" }}
+              />
+            ))}
+          </div>
+        </div>
         <Button variant="primary" disabled={busy || !name} onClick={create}>
           Criar plano
         </Button>
       </Card>
 
       {plans.map((p) => (
-        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
-          <span>
+        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ width: "14px", height: "14px", borderRadius: "50%", background: p.color, display: "inline-block" }} />
             {p.name} — {p.durationValue} {p.durationUnit.toLowerCase()}
           </span>
           <span>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Card, Tag } from "@facaamigos/ui";
 import { generateGainschaGS2208DTSPL } from "@facaamigos/domain";
+import { systemStatus } from "../api/client.js";
 
 export interface WristbandData {
   wristbandCode: string;
@@ -36,9 +37,11 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
 
     const printWindow = window.open("", "_blank", "width=800,height=300");
     if (!printWindow) {
+      systemStatus.dispatchEvent(new CustomEvent("print-blocked"));
       setTimeout(() => window.print(), 50);
       return;
     }
+    systemStatus.dispatchEvent(new CustomEvent("print-ok"));
 
     printWindow.document.write(`
       <!DOCTYPE html>

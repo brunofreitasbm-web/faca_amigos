@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { evaluateLoyaltyRules, visitTier } from "@facaamigos/domain";
+import { evaluateLoyaltyRules, visitTier, planDurationMinutes, minutesUntilClosing } from "@facaamigos/domain";
 import {
   findGuardianByPhone,
+  findGuardianByCpf,
   insertGuardian,
   insertChild,
   linkChildGuardian,
@@ -15,6 +16,7 @@ import {
   listActiveLoyaltyRules,
   grantLoyaltyReward,
   getUnit,
+  getAppSetting,
   uuidv7,
   withTransaction,
 } from "@facaamigos/db-local";
@@ -35,6 +37,18 @@ export function registerCheckinRoutes(app: FastifyInstance, ctx: AppContext): vo
     const plan = getPlan(ctx.db, body.planId);
     if (!plan || plan.activity !== body.activity) throw new ValidationError("Plano inválido para a atividade selecionada");
 
+    const closingTime = getAppSetting(ctx.db, body.unitId, "closing_time");
+    if (closingTime) {
+      const remaining = minutesUntilClosing(nowMs, closingTime);
+      if (remaining !== null && planDurationMinutes(plan) > remaining) {
+        throw new ValidationError(
+          remaining > 0
+            ? `Este plano não cabe até o fechamento (faltam ${remaining} min)`
+            : "O shopping já está fechando — não é possível iniciar novos planos",
+        );
+      }
+    }
+
     if (body.activity === "CARRINHO") {
       if (!body.assetId) throw new ValidationError("assetId é obrigatório para CARRINHO");
       if (!tryAllocateAsset(ctx.db, body.assetId)) {
@@ -42,10 +56,17 @@ export function registerCheckinRoutes(app: FastifyInstance, ctx: AppContext): vo
       }
     }
 
-    let guardianId = body.guardian.id ?? findGuardianByPhone(ctx.db, body.guardian.phoneE164)?.id;
+    let guardianId =
+      body.guardian.id ??
+      findGuardianByCpf(ctx.db, body.guardian.cpf)?.id ??
+      findGuardianByPhone(ctx.db, body.guardian.phoneE164)?.id;
     if (!guardianId) {
       guardianId = uuidv7(nowMs);
-      insertGuardian(ctx.db, { id: guardianId, full_name: body.guardian.fullName, phone_e164: body.guardian.phoneE164 }, nowMs);
+      insertGuardian(
+        ctx.db,
+        { id: guardianId, full_name: body.guardian.fullName, phone_e164: body.guardian.phoneE164, cpf: body.guardian.cpf },
+        nowMs,
+      );
     }
 
     let childId = body.child.id;

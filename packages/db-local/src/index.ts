@@ -15,3 +15,4 @@ export * from "./repositories/coupons.js";
 export * from "./repositories/loyalty.js";
 export * from "./repositories/audit.js";
 export * from "./repositories/reports.js";
+export * from "./repositories/bonus-rules.js";

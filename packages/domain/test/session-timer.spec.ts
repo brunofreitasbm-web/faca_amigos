@@ -10,6 +10,7 @@ const plan: Plan = {
   durationValue: 15,
   durationUnit: "MINUTO",
   overageCentsPerMinute: 100,
+  color: "#2ECFB5",
 };
 
 const checkinAtMs = 0;
@@ -56,6 +57,7 @@ describe("computeSessionTiming", () => {
       durationValue: 5,
       durationUnit: "HORA",
       overageCentsPerMinute: 180,
+      color: "#A020EE",
     };
     const t = computeSessionTiming(dayUse, { checkinAtMs }, 5 * 60 * 60_000 + 10 * 60_000); // +10 min
     expect(t.overMinutes).toBe(10);

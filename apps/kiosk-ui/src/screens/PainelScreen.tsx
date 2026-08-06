@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Card, Button, StatusBadge, Badge } from "@facaamigos/ui";
+import { Card, Button, StatusBadge, Badge, Tag } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { ActiveSessionEntry } from "../api/client.js";
+import type { ActiveSessionEntry, Plan } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { CheckoutModal } from "../components/CheckoutModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
@@ -19,6 +19,11 @@ export function PainelScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [printData, setPrintData] = useState<WristbandData | null>(null);
+  const [planOptions, setPlanOptions] = useState<Plan[]>([]);
+  const [changingPlanFor, setChangingPlanFor] = useState<string | null>(null);
+  const [pendingPlanId, setPendingPlanId] = useState<string>("");
+  const [dailyGoalCents, setDailyGoalCents] = useState(0);
+  const [todayRevenueCents, setTodayRevenueCents] = useState(0);
 
   useEffect(() => {
     if (!unit) return;
@@ -34,6 +39,65 @@ export function PainelScreen() {
       clearInterval(interval);
     };
   }, [unit]);
+
+  useEffect(() => {
+    if (!unit) return;
+    const activity = unit.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
+    Api.plans(unit.id, activity).then(setPlanOptions);
+  }, [unit]);
+
+  // Faturamento muda bem mais devagar que a ocupação — repolla num intervalo mais espaçado.
+  useEffect(() => {
+    if (!unit) return;
+    let cancelled = false;
+    async function poll() {
+      try {
+        const [goal, revenue] = await Promise.all([Api.unitSetting(unit!.id, "daily_goal_cents"), Api.todayRevenue(unit!.id)]);
+        if (!cancelled) {
+          setDailyGoalCents(Number(goal.value) || 0);
+          setTodayRevenueCents(revenue.totalCents);
+        }
+      } catch {
+        // Meta é um extra informativo — se o backend ainda não tiver essas rotas (ex: servidor não reiniciado), o Painel segue funcionando sem o banner.
+      }
+    }
+    poll();
+    const interval = setInterval(poll, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [unit]);
+
+  async function notifyGuardian(entry: ActiveSessionEntry, channel: "WHATSAPP" | "SMS", customMessage?: string) {
+    const guardianName = entry.session.guardian_name_snapshot || "Responsável";
+    const message =
+      customMessage ??
+      `Olá ${guardianName}! ${entry.session.child_name_snapshot} está no plano ${entry.plan.name} — valor atual: ${money(entry.quote.totalCents)}.`;
+    if (channel === "WHATSAPP") {
+      const digits = (entry.session.guardian_phone_snapshot || "").replace(/\D/g, "");
+      if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, "_blank");
+    }
+    await Api.notifySession(entry.session.id, { channel, message });
+    if (channel === "SMS") alert("SMS simulado — nenhum provedor configurado ainda. Registrado no histórico da sessão.");
+  }
+
+  function callGuardianBack(entry: ActiveSessionEntry) {
+    const guardianName = entry.session.guardian_name_snapshot || "Responsável";
+    notifyGuardian(
+      entry,
+      "WHATSAPP",
+      `URGENTE: ${guardianName}, por favor compareça ao parque — ${entry.session.child_name_snapshot} precisa de você (banheiro / quer ir embora).`,
+    );
+  }
+
+  async function confirmChangePlan(sessionId: string) {
+    if (!pendingPlanId) return;
+    await Api.changeSessionPlan(sessionId, pendingPlanId);
+    setChangingPlanFor(null);
+    setPendingPlanId("");
+    if (unit) setEntries(await Api.activeSessions(unit.id));
+  }
 
   function toggle(sessionId: string) {
     setSelected((prev) => {
@@ -85,14 +149,11 @@ export function PainelScreen() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px", marginTop: "8px" }}>
-        {entries.map(({ session, quote }) => {
+        {entries.map((entry) => {
+          const { session, quote, plan } = entry;
           const isSelected = selected.has(session.id);
           const isExceeded = quote.timing.phase === "EXCEDENTE" || quote.timing.phase === "VERMELHO";
-          
-          // Cálculo de alerta de tempo restante
-          const remainingMs = quote.timing.durationMs - quote.timing.elapsedMs;
-          const remainingMinutes = Math.ceil(remainingMs / (1000 * 60));
-          const isWarningNearEnd = remainingMinutes > 0 && remainingMinutes <= 5 && (quote.timing.phase === "VERDE" || quote.timing.phase === "AMARELO");
+          const overageLine = quote.lines.find((l) => l.label.startsWith("Excedente"));
           const wristbandCode = session.wristband_code || session.id.slice(0, 6).toUpperCase();
 
           return (
@@ -111,6 +172,7 @@ export function PainelScreen() {
                   : isExceeded
                   ? "2px solid var(--color-error)"
                   : "1px solid var(--border-subtle)",
+                borderLeft: `6px solid ${plan?.color ?? "var(--border-subtle)"}`,
                 borderRadius: "16px",
                 background: isSelected ? "rgba(240, 25, 107, 0.04)" : "var(--surface-card)",
               }}
@@ -119,6 +181,9 @@ export function PainelScreen() {
                 <div>
                   <strong style={{ fontSize: "17px", display: "block" }}>{session.child_name_snapshot}</strong>
                   <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Pulseira: #{wristbandCode}</span>
+                  {plan && (
+                    <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>
+                  )}
                 </div>
                 <Button
                   variant="ghost"
@@ -143,13 +208,9 @@ export function PainelScreen() {
               <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
                 <StatusBadge phase={quote.timing.phase} detail={formatElapsed(quote.timing.elapsedMs)} />
 
-                {isWarningNearEnd && (
-                  <Badge variant="amber">⚠️ Restam {remainingMinutes} min</Badge>
-                )}
-
                 {isExceeded && (
-                  <Badge variant="solid_pink">
-                    🔴 EXCEDIDO (+{formatElapsed(Math.abs(remainingMs))})
+                  <Badge variant="solid_pink" title="Tempo do plano já foi ultrapassado — minutos e valor extra somados em tempo real">
+                    🔴 +{quote.timing.overMinutes} min excedente{overageLine ? ` (+${money(overageLine.cents)})` : ""}
                   </Badge>
                 )}
               </div>
@@ -157,6 +218,72 @@ export function PainelScreen() {
               {session.notes && (
                 <div style={{ fontSize: "12px", background: "rgba(201, 144, 32, 0.1)", padding: "6px 10px", borderRadius: "8px", color: "var(--color-dark)" }}>
                   💡 {session.notes}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  title="Chamado de retorno urgente — o responsável precisa vir buscar/atender a criança agora (banheiro, quer ir embora)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    callGuardianBack(entry);
+                  }}
+                >
+                  🚻 Chamado de Retorno
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Abrir WhatsApp com mensagem pronta para o responsável"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    notifyGuardian(entry, "WHATSAPP");
+                  }}
+                >
+                  💬 Notificar Responsável
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Trocar o plano de permanência desta sessão"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPendingPlanId("");
+                    setChangingPlanFor(changingPlanFor === session.id ? null : session.id);
+                  }}
+                >
+                  🔄 Mudar Plano
+                </Button>
+              </div>
+
+              {changingPlanFor === session.id && (
+                <div style={{ display: "flex", gap: "6px" }} onClick={(e) => e.stopPropagation()}>
+                  <select
+                    value={pendingPlanId}
+                    title="Selecione o novo plano para esta sessão"
+                    onChange={(e) => setPendingPlanId(e.target.value)}
+                    style={{ flex: 1, padding: "8px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}
+                  >
+                    <option value="" disabled>
+                      Escolher novo plano...
+                    </option>
+                    {planOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — {money(p.valueCents)}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!pendingPlanId}
+                    title="Confirmar a troca de plano desta sessão"
+                    onClick={() => confirmChangePlan(session.id)}
+                  >
+                    Confirmar
+                  </Button>
                 </div>
               )}
 
@@ -173,6 +300,28 @@ export function PainelScreen() {
           </div>
         )}
       </div>
+
+      {dailyGoalCents > 0 && (
+        <div
+          title="Progresso do faturamento de hoje em relação à meta diária configurada em Configurações → Meta"
+          style={{ minWidth: "280px" }}
+          className="capacity-container"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-muted)" }}>
+            <span>Meta do dia: {money(todayRevenueCents)} / {money(dailyGoalCents)}</span>
+            <span>{Math.min(100, Math.round((todayRevenueCents / dailyGoalCents) * 100))}%</span>
+          </div>
+          <div className="capacity-bar-track">
+            <div
+              className="capacity-bar-fill"
+              style={{
+                width: `${Math.min(100, Math.round((todayRevenueCents / dailyGoalCents) * 100))}%`,
+                backgroundColor: todayRevenueCents >= dailyGoalCents ? "var(--color-success)" : "var(--color-primary)",
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {selected.size > 0 && (
         <div style={{ position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 100 }}>

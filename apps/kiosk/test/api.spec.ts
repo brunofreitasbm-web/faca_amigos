@@ -51,7 +51,7 @@ describe("fluxo completo via HTTP", () => {
         planId: plan15min.id,
         employeeId: admin.id,
         child: { fullName: "Helena Souza", birthDate: "2019-04-12", inclusiveEligible: false },
-        guardian: { fullName: "Maria Souza", phoneE164: "+5591982501215" },
+        guardian: { fullName: "Maria Souza", cpf: "529.982.247-25", phoneE164: "+5591982501215" },
       },
     });
     expect(checkinRes.statusCode).toBe(201);

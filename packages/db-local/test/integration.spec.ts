@@ -48,7 +48,7 @@ describe("fluxo completo: check-in até fechamento de turno", () => {
     insertPlan(
       db,
       unitId,
-      { id: planId, activity: "CARRINHO", name: "15 minutos", valueCents: 3000, durationValue: 15, durationUnit: "MINUTO", overageCentsPerMinute: 100 },
+      { id: planId, activity: "CARRINHO", name: "15 minutos", valueCents: 3000, durationValue: 15, durationUnit: "MINUTO", overageCentsPerMinute: 100, color: "#2ECFB5" },
       NOW,
     );
 

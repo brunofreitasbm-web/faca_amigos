@@ -9,6 +9,8 @@ export interface Plan {
   durationUnit: DurationUnit;
   /** Preço do minuto excedente, cobrado após o teto do plano. */
   overageCentsPerMinute: number;
+  /** Cor usada para identificar o plano no Painel (hex). */
+  color: string;
 }
 
 export interface SessionForQuote {

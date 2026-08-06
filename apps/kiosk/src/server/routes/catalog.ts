@@ -11,24 +11,34 @@ import {
   insertCoupon,
   listActiveLoyaltyRules,
   insertLoyaltyRule,
+  listActiveBonusRules,
+  insertBonusRule,
   listEmployees,
   insertEmployee,
   upsertLocalCredentials,
   searchChildrenByNameOrPhone,
+  getLastAssetIdForChild,
   setAssetStatus,
   setEmployeeActive,
   setPlanActive,
+  getAppSetting,
+  setAppSetting,
+  getUnit,
+  salesByDay,
   uuidv7,
 } from "@facaamigos/db-local";
 import type { AppContext } from "../context.js";
+import { businessDateFor } from "../business-date.js";
 import {
   createAssetSchema,
+  createBonusRuleSchema,
   createCouponSchema,
   createEmployeeSchema,
   createLoyaltyRuleSchema,
   createPlanSchema,
   createProductSchema,
   setAssetStatusSchema,
+  setUnitSettingSchema,
 } from "../schemas.js";
 import { parseBody } from "../validate.js";
 import { hashPin } from "../security/pin.js";
@@ -100,6 +110,34 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
     return reply.code(201).send({ id });
   });
 
+  app.get<{ Querystring: { unitId: string } }>("/api/bonus-rules", async (req) => listActiveBonusRules(ctx.db, req.query.unitId));
+  app.post("/api/bonus-rules", async (req, reply) => {
+    const body = parseBody(createBonusRuleSchema, req.body);
+    const id = uuidv7(ctx.nowMs());
+    insertBonusRule(ctx.db, { id, unit_id: body.unitId, description: body.description, reward_value_cents: body.rewardValueCents }, ctx.nowMs());
+    return reply.code(201).send({ id });
+  });
+
+  // Meta diária e Termos de Uso vivem em app_settings (chave/valor por unidade) — não precisam de colunas dedicadas.
+  app.get<{ Params: { id: string }; Querystring: { key: "daily_goal_cents" | "terms_of_use" | "closing_time" } }>(
+    "/api/units/:id/settings",
+    async (req) => ({ value: getAppSetting(ctx.db, req.params.id, req.query.key) ?? null }),
+  );
+  app.put<{ Params: { id: string } }>("/api/units/:id/settings", async (req, reply) => {
+    const body = parseBody(setUnitSettingSchema, req.body);
+    setAppSetting(ctx.db, req.params.id, body.key, body.value, ctx.nowMs());
+    return reply.code(200).send({ ok: true });
+  });
+
+  // Faturamento de hoje para o banner de progresso da meta diária no Painel.
+  app.get<{ Params: { id: string } }>("/api/units/:id/today-revenue", async (req) => {
+    const unit = getUnit(ctx.db, req.params.id);
+    if (!unit) return { totalCents: 0 };
+    const today = businessDateFor(ctx.nowMs(), unit.business_day_cutoff_hour);
+    const [row] = salesByDay(ctx.db, req.params.id, today, today);
+    return { totalCents: row?.total_cents ?? 0 };
+  });
+
   app.get("/api/employees", async () => listEmployees(ctx.db, { activeOnly: true }));
   app.post("/api/employees", async (req, reply) => {
     const body = parseBody(createEmployeeSchema, req.body);
@@ -123,4 +161,9 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
     if (!req.query.q || req.query.q.length < 2) return [];
     return searchChildrenByNameOrPhone(ctx.db, req.query.q);
   });
+
+  // Favoritagem de equipamento: sugere o carrinho que a criança usou da última vez.
+  app.get<{ Params: { childId: string } }>("/api/children/:childId/last-asset", async (req) => ({
+    assetId: getLastAssetIdForChild(ctx.db, req.params.childId),
+  }));
 }

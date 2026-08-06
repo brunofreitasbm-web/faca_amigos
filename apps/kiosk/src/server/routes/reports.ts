@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { salesByDay, revenueByMethod, visitsByDay, childrenBirthdaysInMonth, shiftHistory, folhaPonto } from "@facaamigos/db-local";
+import { salesByDay, revenueByMethod, visitsByDay, assetUsage, childrenBirthdaysInMonth, shiftHistory, folhaPonto } from "@facaamigos/db-local";
 import type { AppContext } from "../context.js";
 
 export function registerReportRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -17,6 +17,10 @@ export function registerReportRoutes(app: FastifyInstance, ctx: AppContext): voi
   );
 
   app.get<{ Querystring: { unitId: string } }>("/api/reports/shifts", async (req) => shiftHistory(ctx.db, req.query.unitId));
+
+  app.get<{ Querystring: { unitId: string; from: string; to: string } }>("/api/reports/asset-usage", async (req) =>
+    assetUsage(ctx.db, req.query.unitId, req.query.from, req.query.to),
+  );
 
   app.get<{ Querystring: { fromMs: string; toMs: string } }>("/api/reports/ponto", async (req) =>
     folhaPonto(ctx.db, Number(req.query.fromMs), Number(req.query.toMs)),

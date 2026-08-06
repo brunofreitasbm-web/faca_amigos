@@ -10,6 +10,7 @@ interface PlanRow {
   duration_value: number;
   duration_unit: "MINUTO" | "HORA";
   overage_cents_per_minute: number;
+  color: string;
   active: 0 | 1;
   created_at_ms: number;
 }
@@ -23,13 +24,14 @@ function toDomain(row: PlanRow): Plan {
     durationValue: row.duration_value,
     durationUnit: row.duration_unit,
     overageCentsPerMinute: row.overage_cents_per_minute,
+    color: row.color,
   };
 }
 
 export function insertPlan(db: Db, unitId: string, plan: Plan, nowMs: number): void {
   db.prepare(
-    `INSERT INTO plans (id, unit_id, activity, name, value_cents, duration_value, duration_unit, overage_cents_per_minute, active, created_at_ms)
-     VALUES (@id, @unit_id, @activity, @name, @value_cents, @duration_value, @duration_unit, @overage_cents_per_minute, 1, @created_at_ms)`,
+    `INSERT INTO plans (id, unit_id, activity, name, value_cents, duration_value, duration_unit, overage_cents_per_minute, color, active, created_at_ms)
+     VALUES (@id, @unit_id, @activity, @name, @value_cents, @duration_value, @duration_unit, @overage_cents_per_minute, @color, 1, @created_at_ms)`,
   ).run({
     id: plan.id,
     unit_id: unitId,
@@ -39,6 +41,7 @@ export function insertPlan(db: Db, unitId: string, plan: Plan, nowMs: number): v
     duration_value: plan.durationValue,
     duration_unit: plan.durationUnit,
     overage_cents_per_minute: plan.overageCentsPerMinute,
+    color: plan.color,
     created_at_ms: nowMs,
   });
 }

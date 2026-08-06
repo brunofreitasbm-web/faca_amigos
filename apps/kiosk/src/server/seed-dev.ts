@@ -38,18 +38,18 @@ export function seedDevData(db: Db, nowMs: number): void {
   upsertLocalCredentials(db, adminId, hashPin("000000"), nowMs);
 
   // Planos - Playground (Parque Shopping)
-  insertPlan(db, playgroundId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "30 minutos", valueCents: 4000, durationValue: 30, durationUnit: "MINUTO", overageCentsPerMinute: 150 }, nowMs);
-  insertPlan(db, playgroundId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "1 hora", valueCents: 6000, durationValue: 1, durationUnit: "HORA", overageCentsPerMinute: 150 }, nowMs);
-  insertPlan(db, playgroundId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "Day Use (5h)", valueCents: 27000, durationValue: 5, durationUnit: "HORA", overageCentsPerMinute: 180 }, nowMs);
+  insertPlan(db, playgroundId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "30 minutos", valueCents: 4000, durationValue: 30, durationUnit: "MINUTO", overageCentsPerMinute: 150, color: "#2ECFB5" }, nowMs);
+  insertPlan(db, playgroundId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "1 hora", valueCents: 6000, durationValue: 1, durationUnit: "HORA", overageCentsPerMinute: 150, color: "#F0196B" }, nowMs);
+  insertPlan(db, playgroundId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "Day Use (5h)", valueCents: 27000, durationValue: 5, durationUnit: "HORA", overageCentsPerMinute: 180, color: "#A020EE" }, nowMs);
 
   // Planos - Circuito (Parque Shopping)
-  insertPlan(db, circuitoId, { id: uuidv7(nowMs), activity: "CARRINHO", name: "15 minutos", valueCents: 3000, durationValue: 15, durationUnit: "MINUTO", overageCentsPerMinute: 100 }, nowMs);
-  insertPlan(db, circuitoId, { id: uuidv7(nowMs), activity: "CARRINHO", name: "30 minutos", valueCents: 5500, durationValue: 30, durationUnit: "MINUTO", overageCentsPerMinute: 100 }, nowMs);
+  insertPlan(db, circuitoId, { id: uuidv7(nowMs), activity: "CARRINHO", name: "15 minutos", valueCents: 3000, durationValue: 15, durationUnit: "MINUTO", overageCentsPerMinute: 100, color: "#2ECFB5" }, nowMs);
+  insertPlan(db, circuitoId, { id: uuidv7(nowMs), activity: "CARRINHO", name: "30 minutos", valueCents: 5500, durationValue: 30, durationUnit: "MINUTO", overageCentsPerMinute: 100, color: "#FFE234" }, nowMs);
 
   // Planos - Grão-Pará (Bosque Grão-Pará)
-  insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "30 minutos", valueCents: 4000, durationValue: 30, durationUnit: "MINUTO", overageCentsPerMinute: 150 }, nowMs);
-  insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "1 hora", valueCents: 6000, durationValue: 1, durationUnit: "HORA", overageCentsPerMinute: 150 }, nowMs);
-  insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "Day Use (5h)", valueCents: 27000, durationValue: 5, durationUnit: "HORA", overageCentsPerMinute: 180 }, nowMs);
+  insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "30 minutos", valueCents: 4000, durationValue: 30, durationUnit: "MINUTO", overageCentsPerMinute: 150, color: "#2ECFB5" }, nowMs);
+  insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "1 hora", valueCents: 6000, durationValue: 1, durationUnit: "HORA", overageCentsPerMinute: 150, color: "#F0196B" }, nowMs);
+  insertPlan(db, graoParaId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "Day Use (5h)", valueCents: 27000, durationValue: 5, durationUnit: "HORA", overageCentsPerMinute: 180, color: "#A020EE" }, nowMs);
 
   // Produtos & Suprimentos
   insertProduct(db, { id: uuidv7(nowMs), unit_id: playgroundId, name: "Água mineral", description: "Garrafa 500ml", emoji: "💧", price_cents: 500, stock: 40 }, nowMs);
