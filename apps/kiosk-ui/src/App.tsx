@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
-import { Button, BrandLockup } from "@facaamigos/ui";
+import { Button, BrandLockup, AsyncState } from "@facaamigos/ui";
 import { unitBrandFor } from "./branding/unitBrand.js";
 import { useAppState } from "./state/AppState.js";
 import { useConfirm } from "./state/ConfirmContext.js";
@@ -37,7 +37,7 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
 };
 
 export function App() {
-  const { unit, setUnitId, employee } = useAppState();
+  const { unit, setUnitId, employee, employeeLoading } = useAppState();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
 
@@ -54,6 +54,16 @@ export function App() {
       cancelLabel: "Cancelar",
     });
     if (ok) setUnitId("");
+  }
+
+  // Enquanto o colaborador padrão ainda está sendo buscado, evita piscar a
+  // LoginScreen na tela (login está oculto a pedido do dono — ver AppState.tsx).
+  if (employeeLoading) {
+    return (
+      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <AsyncState kind="loading" title="Carregando…" />
+      </div>
+    );
   }
 
   if (!employee) return <LoginScreen />;
