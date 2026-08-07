@@ -38,7 +38,7 @@ export default async function CuponsPage() {
 
   return (
     <div>
-      <PageTitle>Cupons</PageTitle>
+      <PageTitle description="Códigos de desconto ou parceria que o operador pode aplicar na tela de Entrada do balcão.">Cupons</PageTitle>
 
       <DataTable<Coupon>
         columns={[
@@ -84,7 +84,12 @@ export default async function CuponsPage() {
         </LabeledSelect>
         <Input name="value" type="number" label="Valor" required />
         <Input name="partner_name" label="Parceiro (clínica, escola...)" />
-        <Input name="max_uses" type="number" label="Máx. usos (0 = ilimitado)" />
+        <Input
+          name="max_uses"
+          type="number"
+          label="Máx. usos (0 = ilimitado)"
+          title="Quantas vezes este cupom pode ser usado no total, somando todas as unidades"
+        />
         <Input name="description" label="Descrição" />
       </EntityForm>
     </div>

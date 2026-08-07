@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Button } from "@facaamigos/ui";
+import { Card, Button, HelpText } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import { PinPad } from "../components/PinPad.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
@@ -61,17 +61,18 @@ export function LoginScreen() {
   return (
     <div style={{ maxWidth: "480px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
       <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center" }}>Quem está operando?</h1>
+      <HelpText>Toque no seu nome para confirmar com o PIN deste terminal. Se ainda não apareceu na lista, entre com e-mail e senha uma vez.</HelpText>
       {terminalEmployees.map((emp) => (
         <Card key={emp.id} style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ cursor: "pointer" }} onClick={() => setMode({ kind: "PIN", employee: emp })}>
             <strong>{emp.full_name}</strong> — {emp.role}
           </span>
-          <Button variant="ghost" onClick={() => forgetEmployee(emp.id)}>
+          <Button variant="ghost" title="Esquecer este colaborador neste terminal (ele precisará entrar com e-mail e senha de novo)" onClick={() => forgetEmployee(emp.id)}>
             remover
           </Button>
         </Card>
       ))}
-      <Button variant="secondary" onClick={() => setMode({ kind: "NEW_LOGIN" })}>
+      <Button variant="secondary" title="Primeiro acesso deste colaborador neste terminal" onClick={() => setMode({ kind: "NEW_LOGIN" })}>
         entrar com e-mail e senha
       </Button>
     </div>
@@ -130,11 +131,16 @@ function NewEmployeeLogin({
   return (
     <div style={{ maxWidth: "360px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
       <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center" }}>Entrar</h1>
+      <HelpText>
+        Use o e-mail e senha da sua conta. O PIN que você escolher fica salvo só neste terminal, para trocar de
+        operador rapidamente nas próximas vezes, sem digitar e-mail e senha de novo.
+      </HelpText>
       {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
       <input placeholder="e-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input placeholder="senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
       <input
         placeholder="escolha um PIN de 6 dígitos para este terminal"
+        title="PIN de 6 dígitos para trocar de operador rapidamente neste terminal depois"
         value={pin}
         onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
       />

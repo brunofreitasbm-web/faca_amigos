@@ -123,17 +123,9 @@ export default async function RelatoriosPage() {
 
   return (
     <div>
-      <PageTitle>Relatórios</PageTitle>
-      <p
-        style={{
-          fontFamily: "var(--font-body)",
-          fontSize: "14px",
-          color: "var(--text-muted)",
-          marginTop: "-8px",
-        }}
-      >
-        Últimos 30 dias, todas as unidades.
-      </p>
+      <PageTitle description="Faturamento, check-ins e produtos mais vendidos dos últimos 30 dias, em todas as unidades, comparados com os 30 dias anteriores.">
+        Relatórios
+      </PageTitle>
       <div
         style={{
           display: "grid",

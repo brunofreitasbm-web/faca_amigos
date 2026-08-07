@@ -26,7 +26,7 @@ export default async function ProdutosPage() {
 
   return (
     <div>
-      <PageTitle>Produtos</PageTitle>
+      <PageTitle description="Itens vendidos avulsos (loja/lanchonete) no PDV do balcão, com o estoque disponível de cada um.">Produtos</PageTitle>
 
       <DataTable<Product>
         columns={[

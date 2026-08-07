@@ -22,7 +22,7 @@ export default async function UnidadesPage() {
 
   return (
     <div>
-      <PageTitle>Unidades</PageTitle>
+      <PageTitle description="Cadastro das unidades (lojas e quiosques) — cada uma aparece como um módulo separado no sistema do balcão.">Unidades</PageTitle>
 
       <DataTable<Unit>
         columns={[

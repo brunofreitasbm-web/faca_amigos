@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input } from "@facaamigos/ui";
+import { Button, Card, Input, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { CashMovement, RevenueByMethod, Shift, ShiftSale } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -126,6 +126,10 @@ export function CaixaScreen() {
     return (
       <div style={{ maxWidth: "420px", margin: "60px auto", display: "flex", flexDirection: "column", gap: "16px" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno</h1>
+        <HelpText>
+          É preciso abrir o turno de caixa antes de vender no PDV ou fechar atendimentos. Informe quanto dinheiro
+          (em espécie) já está na gaveta para começar — normalmente o troco combinado com a gerência.
+        </HelpText>
         <Input label="Troco inicial (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
@@ -139,6 +143,10 @@ export function CaixaScreen() {
     return (
       <div style={{ maxWidth: "480px", margin: "40px auto" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Turno fechado</h1>
+        <HelpText>
+          "Esperado" é o que o sistema calculou pelas vendas; "Declarado" é o que você contou. "✓ bateu" quer dizer
+          que os dois valores são iguais — qualquer diferença aparece com o valor da falta ou sobra.
+        </HelpText>
         {/* Cabeçalho e células precisam do MESMO alinhamento — antes o
             cabeçalho ficava centralizado (padrão do navegador) sobre
             valores em dinheiro sem textAlign nenhum (também padrão,
@@ -189,6 +197,11 @@ export function CaixaScreen() {
     return (
       <div style={{ maxWidth: "420px", margin: "40px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Fechar turno</h1>
+        <HelpText>
+          Conte o dinheiro e confira os comprovantes de cada forma de pagamento e digite o valor total que você
+          encontrou em cada um. O sistema mostra ao lado o que era esperado — se o valor contado for diferente, a
+          diferença aparece destacada depois de confirmar.
+        </HelpText>
         <p>Digite o que foi contado por método (o sistema já mostra o esperado ao lado — sem fechamento cego):</p>
         {METHODS.map((method) => (
           <div key={method} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -219,6 +232,10 @@ export function CaixaScreen() {
   return (
     <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Caixa</h1>
+      <HelpText>
+        Acompanhe o faturamento e as vendas deste turno, registre retiradas/reforços de dinheiro e feche o turno no
+        final do dia.
+      </HelpText>
 
       {refreshError && (
         <div
@@ -240,8 +257,9 @@ export function CaixaScreen() {
         ))}
       </Card>
 
-      <Card style={{ padding: "16px" }} title="Cada linha é uma venda paga neste turno — código único gerado no fechamento, para auditoria e rastreamento">
+      <Card style={{ padding: "16px" }}>
         <h2>Vendas do turno</h2>
+        <HelpText style={{ marginBottom: "8px" }}>Cada linha é uma venda paga neste turno (entrada ou produto do PDV).</HelpText>
         {sales.length === 0 && <p>Nenhuma venda registrada ainda.</p>}
         {sales.length > 0 && (
           <div style={{ overflowX: "auto" }}>
@@ -284,16 +302,30 @@ export function CaixaScreen() {
 
       <Card style={{ padding: "16px" }}>
         <h2>Sangria / Suprimento</h2>
+        <HelpText style={{ marginBottom: "8px" }}>
+          Use esta seção sempre que dinheiro sair ou entrar na gaveta fora de uma venda — por exemplo, retirar para
+          levar ao banco (Sangria) ou colocar troco extra (Suprimento).
+        </HelpText>
         <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-          <Button variant={movementKind === "SANGRIA" ? "primary" : "secondary"} size="sm" onClick={() => setMovementKind("SANGRIA")}>
-            Sangria
+          <Button
+            variant={movementKind === "SANGRIA" ? "primary" : "secondary"}
+            size="sm"
+            title="Retirar dinheiro da gaveta — ex.: levar ao banco, sobra de troco"
+            onClick={() => setMovementKind("SANGRIA")}
+          >
+            Sangria (retirar dinheiro)
           </Button>
-          <Button variant={movementKind === "SUPRIMENTO" ? "primary" : "secondary"} size="sm" onClick={() => setMovementKind("SUPRIMENTO")}>
-            Suprimento
+          <Button
+            variant={movementKind === "SUPRIMENTO" ? "primary" : "secondary"}
+            size="sm"
+            title="Colocar dinheiro extra na gaveta — ex.: reforço de troco"
+            onClick={() => setMovementKind("SUPRIMENTO")}
+          >
+            Suprimento (colocar dinheiro)
           </Button>
         </div>
         <Input label="Valor (R$)" type="number" value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} />
-        <Input label="Motivo" value={movementReason} onChange={(e) => setMovementReason(e.target.value)} />
+        <Input label="Motivo" placeholder="Ex: depósito no banco, troco insuficiente..." value={movementReason} onChange={(e) => setMovementReason(e.target.value)} />
         <Button variant="secondary" loading={busy} disabled={busy} onClick={addMovement} style={{ marginTop: "8px" }}>
           Registrar
         </Button>
@@ -309,7 +341,12 @@ export function CaixaScreen() {
 
       {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
 
-      <Button variant="primary" size="lg" onClick={() => setClosing(true)}>
+      <Button
+        variant="primary"
+        size="lg"
+        title="Encerrar o turno atual — conte o dinheiro da gaveta antes de tocar aqui"
+        onClick={() => setClosing(true)}
+      >
         Fechar turno
       </Button>
     </div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Modal, Tag } from "@facaamigos/ui";
+import { Button, Modal, Tag, HelpText } from "@facaamigos/ui";
 import { generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import { Api, systemStatus } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -193,23 +193,34 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
         {queueStatus === "queued" && <Tag color="var(--color-teal)">✓ Enviado para a impressora configurada</Tag>}
         {queueStatus === "error" && <Tag color="var(--color-amber)">⚠️ Fila de impressão indisponível — abrindo diálogo do navegador</Tag>}
 
+        <HelpText>
+          Use o botão rosa "Imprimir Pulseira" no dia a dia — ele manda direto para a impressora configurada.
+          "Imprimir pelo navegador" e "Ver Código TSPL" são alternativas técnicas, só para quando o suporte pedir
+          ou a impressora configurada não estiver funcionando.
+        </HelpText>
+
         <div style={{ display: "flex", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>
-          <Button variant="ghost" size="sm" onClick={() => setShowTspl(!showTspl)}>
+          <Button variant="ghost" size="sm" title="Mostrar o código técnico enviado à impressora (uso do suporte técnico)" onClick={() => setShowTspl(!showTspl)}>
             {showTspl ? "Ocultar TSPL" : "Ver Código TSPL"}
           </Button>
 
           {showTspl && (
-            <Button variant="secondary" size="sm" onClick={handleCopyTspl}>
+            <Button variant="secondary" size="sm" title="Copiar o código técnico para enviar ao suporte" onClick={handleCopyTspl}>
               {copied ? "Copiado! ✓" : "Copiar TSPL"}
             </Button>
           )}
 
           <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
-            <Button variant="ghost" onClick={handleBrowserPrint} title="Abrir o diálogo de impressão do navegador manualmente">
+            <Button variant="ghost" onClick={handleBrowserPrint} title="Alternativa: abrir o diálogo de impressão do navegador manualmente, se a impressão automática falhar">
               Imprimir pelo navegador
             </Button>
             {/* "Fechar" some — o ✕ do Modal já faz o mesmo, sem duplicar. */}
-            <Button variant="primary" loading={queueStatus === "queuing"} onClick={handleQueuePrint}>
+            <Button
+              variant="primary"
+              loading={queueStatus === "queuing"}
+              title="Enviar a pulseira para a impressora configurada nesta unidade"
+              onClick={handleQueuePrint}
+            >
               🖨️ Imprimir Pulseira (Gainscha)
             </Button>
           </div>

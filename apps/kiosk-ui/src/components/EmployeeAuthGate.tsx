@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Button } from "@facaamigos/ui";
+import { Card, Button, HelpText } from "@facaamigos/ui";
 import { PinPad } from "./PinPad.js";
 import { listTerminalEmployees, fullLogin, quickSwitch, forgetTerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
@@ -106,6 +106,7 @@ export function EmployeeAuthGate({ onAuthenticated, restrictToEmployeeId, requir
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <h2 style={{ fontFamily: "var(--font-display)", textAlign: "center", margin: 0 }}>Quem está confirmando?</h2>
+      <HelpText>Por segurança, esta ação exige confirmar sua identidade de novo com PIN ou e-mail e senha.</HelpText>
       {error && <p style={{ color: "var(--color-error-text)", textAlign: "center" }}>{error}</p>}
       {terminalEmployees.map((emp) => (
         <Card key={emp.id} style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

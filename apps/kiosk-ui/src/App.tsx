@@ -15,13 +15,13 @@ import { RelatorioScreen } from "./screens/RelatorioScreen.js";
 import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
 
 const SCREENS = [
-  { value: "ENTRADA", label: "Entrada" },
-  { value: "PAINEL", label: "Painel" },
-  { value: "PDV", label: "PDV" },
-  { value: "CAIXA", label: "Caixa" },
-  { value: "PONTO", label: "Ponto" },
-  { value: "RELATORIO", label: "Relatório" },
-  { value: "CONFIGURACOES", label: "Configurações" },
+  { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir o comprovante" },
+  { value: "PAINEL", label: "Painel", help: "Ver todas as crianças que estão no espaço agora, quanto tempo já ficaram e fechar o atendimento (cobrar) quando forem embora" },
+  { value: "PDV", label: "PDV", help: "Vender produtos avulsos (loja/lanchonete), sem estar ligado a uma entrada" },
+  { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento" },
+  { value: "PONTO", label: "Ponto", help: "Bater o ponto: registrar entrada, intervalo e saída do colaborador" },
+  { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa e folha de ponto de períodos anteriores" },
+  { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, metas, carrinhos, colaboradores e impressoras" },
 ] as const;
 
 type Screen = (typeof SCREENS)[number]["value"];
@@ -97,6 +97,7 @@ export function App() {
               key={s.value}
               variant={screen === s.value ? "teal" : "ghost"}
               size="sm"
+              title={s.help}
               onClick={() => setScreen(s.value)}
             >
               {s.label}
