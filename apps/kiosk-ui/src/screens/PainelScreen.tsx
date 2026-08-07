@@ -10,9 +10,11 @@ import { CheckoutModal } from "../components/CheckoutModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import type { WristbandData } from "../components/WristbandPrintModal.js";
 import { SessionTimelineModal } from "../components/SessionTimelineModal.js";
+import { getFriendlyWristbandCode } from "@facaamigos/domain";
 import { formatAge, formatElapsed, money } from "../format.js";
 import { EntradaScreen } from "./EntradaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
+import { WristbandQRCode } from "../components/WristbandQRCode.js";
 
 const PAUSE_REASONS: Array<{ value: string; label: string }> = [
   { value: "BANHEIRO", label: "Foi ao banheiro" },
@@ -49,6 +51,7 @@ export function PainelScreen() {
   const [todayRevenueCents, setTodayRevenueCents] = useState(0);
   const [entradaOpen, setEntradaOpen] = useState(false);
   const [pdvOpen, setPdvOpen] = useState(false);
+  const [qrModalSession, setQrModalSession] = useState<{ code: string; childName: string; guardianName?: string } | null>(null);
 
   useEffect(() => {
     if (!unit) return;
@@ -342,12 +345,36 @@ export function PainelScreen() {
                     {session.guardian_name_snapshot && (
                       <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Responsável: {session.guardian_name_snapshot}</span>
                     )}
-                    {/* wristband_code pode vir de fontes externas (ex.: leitor de código
-                        de barras) com formatos longos e sem espaços — sem overflowWrap
-                        esse token único força a linha inteira além da largura do card e,
-                        como o Card corta com overflow:hidden, empurra a coluna de botões
-                        (imprimir pulseira) pra fora da área visível. */}
-                    <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", overflowWrap: "anywhere" }}>Pulseira: #{wristbandCode}</span>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", margin: "2px 0" }}>
+                      <span>Pulseira: <strong>#{getFriendlyWristbandCode(wristbandCode)}</strong></span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQrModalSession({
+                            code: wristbandCode,
+                            childName: session.child_name_snapshot,
+                            guardianName: session.guardian_name_snapshot || "",
+                          });
+                        }}
+                        style={{
+                          background: "var(--color-primary-subtle, #fff0f5)",
+                          border: "1px solid var(--border-subtle, #f0c0d0)",
+                          borderRadius: "4px",
+                          padding: "1px 6px",
+                          fontSize: "11px",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          color: "var(--color-primary-hover, #F0196B)",
+                          fontWeight: 600,
+                        }}
+                        title="Clique para visualizar o QR Code da pulseira em tamanho grande"
+                      >
+                        <span>📱 QR Code</span>
+                      </button>
+                    </span>
                     {asset && <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Carrinho: {asset.name}</span>}
                     {plan && (
                       <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>
@@ -648,6 +675,32 @@ export function PainelScreen() {
       {pdvOpen && (
         <Modal onClose={() => setPdvOpen(false)} ariaLabel="PDV" maxWidth="1100px" padding="0" zIndex={150}>
           <PdvScreen />
+        </Modal>
+      )}
+
+      {qrModalSession && (
+        <Modal
+          title={`Pulseira de ${qrModalSession.childName}`}
+          onClose={() => setQrModalSession(null)}
+          maxWidth="380px"
+          zIndex={160}
+        >
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", padding: "12px 0", textAlign: "center" }}>
+            <WristbandQRCode value={qrModalSession.code} size={220} />
+            <div>
+              <div style={{ fontSize: "22px", fontWeight: "bold", letterSpacing: "1px", background: "#f0f0f0", color: "#141414", padding: "6px 16px", borderRadius: "8px", border: "1px solid #ccc", display: "inline-block" }}>
+                #{getFriendlyWristbandCode(qrModalSession.code)}
+              </div>
+              {qrModalSession.guardianName && (
+                <div style={{ marginTop: "8px", fontSize: "13px", color: "var(--text-muted)" }}>
+                  Responsável: {qrModalSession.guardianName}
+                </div>
+              )}
+            </div>
+            <Button variant="secondary" onClick={() => setQrModalSession(null)}>
+              Fechar
+            </Button>
+          </div>
         </Modal>
       )}
     </div>

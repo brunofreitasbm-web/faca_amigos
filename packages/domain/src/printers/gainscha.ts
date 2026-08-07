@@ -1,3 +1,5 @@
+import { getFriendlyWristbandCode } from "../utils/wristbandCode.js";
+
 export interface WristbandPrintPayload {
   wristbandCode: string;
   childName: string;
@@ -15,6 +17,7 @@ export interface WristbandPrintPayload {
 export function generateGainschaGS2208DTSPL(data: WristbandPrintPayload): string {
   const nowStr = data.entryTime || new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const cleanCode = data.wristbandCode.replace(/^#/, "");
+  const friendlyCode = getFriendlyWristbandCode(data.wristbandCode);
   const childUpper = data.childName.toUpperCase();
   const guardianUpper = data.guardianName.toUpperCase();
   const planUpper = (data.planName || "").toUpperCase();
@@ -28,9 +31,9 @@ export function generateGainschaGS2208DTSPL(data: WristbandPrintPayload): string
     // Seção 1: Marca do Parque
     'TEXT 30,30,"3",0,1,1,"FACA AMIGOS"',
     'TEXT 30,85,"2",0,1,1,"PLAYGROUND INCLUSIVO"',
-    // Seção 2: Código de Barras e Número
-    `BARCODE 420,20,"128",65,1,0,2,2,"${cleanCode}"`,
-    `TEXT 420,95,"2",0,1,1,"#${cleanCode}"`,
+    // Seção 2: QR Code imprimível e Número Amigável
+    `QRCODE 420,10,M,4,A,0,"${cleanCode}"`,
+    `TEXT 420,120,"2",0,1,1,"#${friendlyCode}"`,
     // Seção 3: Dados da Criança e Responsável
     `TEXT 900,25,"4",0,1,1,"CRIANCA: ${childUpper}"`,
     `TEXT 900,90,"2",0,1,1,"RESP: ${guardianUpper} (${data.phone})"`,

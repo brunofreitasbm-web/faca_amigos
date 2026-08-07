@@ -22,6 +22,9 @@ interface PrintJobRow {
   status: string;
 }
 
+import QRCode from "qrcode";
+import { getFriendlyWristbandCode } from "@facaamigos/domain";
+
 interface WristbandPayload {
   wristbandCode: string;
   childName: string;
@@ -32,8 +35,16 @@ interface WristbandPayload {
   entryTime?: string;
 }
 
-function wristbandHtml(p: WristbandPayload): string {
+async function wristbandHtml(p: WristbandPayload): Promise<string> {
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const friendlyCode = getFriendlyWristbandCode(p.wristbandCode);
+  let qrSvg = "";
+  try {
+    qrSvg = await QRCode.toString(p.wristbandCode, { type: "svg", margin: 1, errorCorrectionLevel: "M" });
+  } catch (err) {
+    console.error("[print-bridge] Erro ao gerar QR Code:", err);
+  }
+
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 270mm 20mm; margin: 0; }
@@ -41,13 +52,18 @@ function wristbandHtml(p: WristbandPayload): string {
       .wb { width: 270mm; height: 20mm; padding: 1mm 4mm; box-sizing: border-box; display: flex; flex-direction: row;
             align-items: center; justify-content: space-between; background: #fff; color: #000; }
       .cell { border-right: 2px solid #141414; padding-right: 12px; }
+      .qr-cell { border-right: 2px solid #141414; padding-right: 12px; display: flex; align-items: center; gap: 8px; }
+      .qr-cell svg { width: 16mm; height: 16mm; }
       .name { font-size: 16px; font-weight: bold; color: #F0196B; display: block; }
-      .code { font-size: 18px; font-weight: bold; letter-spacing: 1px; background: #f0f0f0; padding: 2px 8px; border-radius: 4px; }
+      .code { font-size: 15px; font-weight: bold; letter-spacing: 1px; background: #f0f0f0; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
       .notes { font-size: 10px; color: #d9534f; font-weight: bold; }
     </style></head><body>
     <div class="wb">
       <div class="cell"><span class="name">FaçaAmigos</span><span style="font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:1px">Playground Inclusivo</span></div>
-      <div class="cell" style="text-align:center"><div class="code">#${esc(p.wristbandCode)}</div></div>
+      <div class="qr-cell">
+        ${qrSvg}
+        <div style="text-align:center"><div class="code">#${esc(friendlyCode)}</div></div>
+      </div>
       <div class="cell">
         <div style="font-size:11px;color:#666">Criança:</div>
         <div style="font-size:15px;font-weight:800">${esc(p.childName)}</div>
@@ -123,7 +139,7 @@ export function startPrintBridge(): void {
         throw new Error(`Nenhuma impressora de ${job.kind === "WRISTBAND" ? "pulseira" : "cupom"} configurada (Configurações > Impressoras)`);
       }
       const html =
-        job.kind === "WRISTBAND" ? wristbandHtml(job.payload_json as unknown as WristbandPayload) : receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
+        job.kind === "WRISTBAND" ? await wristbandHtml(job.payload_json as unknown as WristbandPayload) : receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
       await printHtml(html, deviceName);
       await supabase.from("fa_kiosk_print_jobs").update({ status: "PRINTED", printed_at_ms: Date.now() }).eq("id", job.id);
       console.log(`[print-bridge] job ${job.id} (${job.kind}) impresso em "${deviceName}".`);
