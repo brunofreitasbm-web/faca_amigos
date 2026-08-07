@@ -55,8 +55,8 @@ export function LoginScreen() {
           setError(null);
           try {
             await switchEmployee(mode.employee.id, pin);
-          } catch {
-            setError("PIN incorreto");
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "PIN incorreto");
           } finally {
             setBusy(false);
           }

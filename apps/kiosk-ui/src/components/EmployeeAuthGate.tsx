@@ -54,8 +54,8 @@ export function EmployeeAuthGate({ onAuthenticated, restrictToEmployeeId, requir
       const employee = await pinLogin(employeeId, pin);
       setTerminalEmployees(listTerminalEmployees());
       checkAndAccept(employee);
-    } catch {
-      setError("PIN incorreto");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "PIN incorreto");
     } finally {
       setBusy(false);
     }
