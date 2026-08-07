@@ -30,7 +30,7 @@ export default async function FuncionariosPage() {
 
   return (
     <div>
-      <PageTitle>Funcionários</PageTitle>
+      <PageTitle description="Cadastro dos colaboradores e o papel de cada um (Operador, Gerente ou Admin) — define o que cada pessoa pode fazer no sistema do balcão.">Funcionários</PageTitle>
 
       <DataTable<Employee>
         columns={[
@@ -91,7 +91,13 @@ export default async function FuncionariosPage() {
             </option>
           ))}
         </LabeledSelect>
-        <LabeledSelect label="Função" name="role" required defaultValue="OPERADOR">
+        <LabeledSelect
+          label="Função"
+          name="role"
+          required
+          defaultValue="OPERADOR"
+          title="Operador atende no balcão; Gerente também acessa relatórios; Admin também cadastra colaboradores"
+        >
           <option value="OPERADOR">Operador</option>
           <option value="GERENTE">Gerente</option>
           <option value="ADMIN">Admin</option>

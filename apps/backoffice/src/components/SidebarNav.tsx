@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/dashboard", label: "Painel" },
-  { href: "/unidades", label: "Unidades" },
-  { href: "/planos", label: "Planos" },
-  { href: "/produtos", label: "Produtos" },
-  { href: "/cupons", label: "Cupons" },
-  { href: "/funcionarios", label: "Funcionários" },
-  { href: "/relatorios", label: "Relatórios" },
-  { href: "/configuracoes", label: "Configurações" },
+  { href: "/dashboard", label: "Painel", help: "Visão geral do negócio: faturamento e indicadores das unidades" },
+  { href: "/unidades", label: "Unidades", help: "Cadastro das unidades (lojas/quiosques) do FaçaAmigos" },
+  { href: "/planos", label: "Planos", help: "Planos de permanência vendidos nas unidades" },
+  { href: "/produtos", label: "Produtos", help: "Itens vendidos avulsos (loja/lanchonete) nas unidades" },
+  { href: "/cupons", label: "Cupons", help: "Códigos de desconto e parceria usados no check-in" },
+  { href: "/funcionarios", label: "Funcionários", help: "Cadastro e acesso dos colaboradores ao sistema" },
+  { href: "/relatorios", label: "Relatórios", help: "Vendas, visitas e demais números históricos" },
+  { href: "/configuracoes", label: "Configurações", help: "Ajustes gerais do sistema" },
 ];
 
 export function SidebarNav() {
@@ -25,6 +25,7 @@ export function SidebarNav() {
           <Link
             key={item.href}
             href={item.href}
+            title={item.help}
             style={{
               padding: "8px 12px",
               borderRadius: "var(--radius-sm)",

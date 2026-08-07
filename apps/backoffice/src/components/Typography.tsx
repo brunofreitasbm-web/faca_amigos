@@ -1,18 +1,23 @@
 import type { ReactNode } from "react";
+import { HelpText } from "./design-system";
 
-export function PageTitle({ children }: { children: ReactNode }) {
+export function PageTitle({ children, description }: { children: ReactNode; description?: ReactNode }) {
   return (
-    <h1
-      style={{
-        marginTop: 0,
-        fontFamily: "var(--font-body)",
-        fontWeight: "var(--weight-extrabold)" as unknown as number,
-        fontSize: "24px",
-        color: "var(--text-primary)",
-      }}
-    >
-      {children}
-    </h1>
+    <div style={{ marginBottom: description ? "var(--space-3)" : undefined }}>
+      <h1
+        style={{
+          marginTop: 0,
+          marginBottom: description ? "4px" : undefined,
+          fontFamily: "var(--font-body)",
+          fontWeight: "var(--weight-extrabold)" as unknown as number,
+          fontSize: "24px",
+          color: "var(--text-primary)",
+        }}
+      >
+        {children}
+      </h1>
+      {description && <HelpText>{description}</HelpText>}
+    </div>
   );
 }
 

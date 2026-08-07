@@ -235,18 +235,9 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <PageTitle>Relatórios & BI Executivo</PageTitle>
-      <p
-        style={{
-          fontFamily: "var(--font-body)",
-          fontSize: "14px",
-          color: "var(--text-secondary)",
-          marginTop: "-8px",
-          marginBottom: "16px",
-        }}
-      >
-        Análise gráfica detalhada das vendas, check-ins e operação do Faça Amigos.
-      </p>
+      <PageTitle description="Análise gráfica detalhada das vendas, check-ins e operação do Faça Amigos.">
+        Relatórios
+      </PageTitle>
 
       {/* Filtros de Período, Unidade e Exportação CSV */}
       <ReportFilters
@@ -255,8 +246,6 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
         currentUnitId={unitId}
         exportData={exportData}
       />
-
-      {/* KPI Cards */}
       <div
         style={{
           display: "grid",

@@ -30,17 +30,9 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div>
-      <PageTitle>Configurações</PageTitle>
-      <p
-        style={{
-          fontFamily: "var(--font-body)",
-          fontSize: "14px",
-          color: "var(--text-muted)",
-          marginTop: "-8px",
-        }}
-      >
-        Personalização do sistema por unidade.
-      </p>
+      <PageTitle description="Personalização do sistema por unidade: fuso horário, horário de corte do dia e ajustes gerais como meta diária e termos de uso.">
+        Configurações
+      </PageTitle>
 
       {(units ?? []).map((u) => {
         const unitSettings = ((settings ?? []) as AppSetting[]).filter(
@@ -68,6 +60,7 @@ export default async function ConfiguracoesPage() {
                   min={0}
                   max={23}
                   label="Hora de corte do dia"
+                  title="Hora (0-23) em que o dia operacional vira o próximo — usada nos relatórios e no fechamento de caixa, não precisa ser meia-noite"
                   defaultValue={u.business_day_cutoff_hour}
                 />
               </EntityForm>

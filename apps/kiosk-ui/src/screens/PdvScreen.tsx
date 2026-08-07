@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, MinusIcon } from "@facaamigos/ui";
+import { Button, Card, MinusIcon, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -81,6 +81,7 @@ export function PdvScreen() {
     <div style={{ display: "flex", gap: "24px", padding: "24px" }}>
       <div style={{ flex: 2 }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>PDV</h1>
+        <HelpText>Toque num produto para adicioná-lo ao carrinho, ao lado. Produtos sem estoque aparecem apagados.</HelpText>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px", marginTop: "16px" }}>
           {products.map((p) => (
             <Card key={p.id} onClick={() => p.stock > 0 && addToCart(p)} style={{ cursor: p.stock > 0 ? "pointer" : "not-allowed", opacity: p.stock > 0 ? 1 : 0.4, padding: "12px" }}>
@@ -115,6 +116,7 @@ export function PdvScreen() {
           <span>{money(totalCents)}</span>
         </div>
 
+        <HelpText style={{ margin: "8px 0 0" }}>Escolha como o cliente vai pagar:</HelpText>
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "12px 0" }}>
           {METHODS.map((m) => (
             <Button key={m} variant={method === m ? "primary" : "secondary"} size="sm" onClick={() => setMethod(m)} title={`Pagar via ${m}`}>

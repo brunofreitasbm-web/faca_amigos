@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Button } from "@facaamigos/ui";
+import { Card, Button, HelpText } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import { Api } from "../api/client.js";
 import { PinPad } from "../components/PinPad.js";
@@ -68,17 +68,18 @@ export function LoginScreen() {
   return (
     <div style={{ maxWidth: "480px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
       <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center" }}>Quem está operando?</h1>
+      <HelpText>Toque no seu nome para confirmar com o PIN deste terminal. Se ainda não apareceu na lista, toque em "outro colaborador".</HelpText>
       {terminalEmployees.map((emp) => (
         <Card key={emp.id} style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ cursor: "pointer" }} onClick={() => setMode({ kind: "PIN", employee: emp })}>
             <strong>{emp.full_name}</strong> — {emp.role}
           </span>
-          <Button variant="ghost" onClick={() => forgetEmployee(emp.id)}>
+          <Button variant="ghost" title="Esquecer este colaborador neste terminal (ele precisará ser selecionado de novo na lista completa)" onClick={() => forgetEmployee(emp.id)}>
             remover
           </Button>
         </Card>
       ))}
-      <Button variant="secondary" onClick={openAllEmployees}>
+      <Button variant="secondary" title="Ver a lista completa de colaboradores, caso o seu nome não apareça acima" onClick={openAllEmployees}>
         outro colaborador
       </Button>
     </div>
