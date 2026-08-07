@@ -1,19 +1,28 @@
-// Cria um colaborador com login real (auth.users + fa_kiosk_employees).
-// Só pode rodar aqui porque `auth.admin.createUser` exige a service role —
-// nunca disponível no cliente (anon key nem sessão de usuário bastam).
-// Confere que quem chama já é ADMIN autenticado antes de criar qualquer
-// coisa, usando o JWT repassado automaticamente pelo `supabase.functions.invoke`.
+// Cria um colaborador com login por PIN (auth.users + fa_kiosk_employees +
+// fa_kiosk_local_credentials). Só pode rodar aqui porque `auth.admin.
+// createUser` exige a service role — nunca disponível no cliente (anon
+// key nem sessão de usuário bastam). Confere que quem chama já é ADMIN
+// autenticado antes de criar qualquer coisa, usando o JWT repassado
+// automaticamente pelo `supabase.functions.invoke`.
+//
+// Não existe e-mail/senha visível em lugar nenhum deste fluxo: o
+// colaborador escolhe/recebe um PIN, ponto. A conta em auth.users criada
+// abaixo usa um e-mail SINTÉTICO (nunca mostrado, nunca digitado por
+// ninguém) só porque o GoTrue exige um identificador — quem autentica de
+// verdade é o PIN, verificado em login-pin.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import bcrypt from "npm:bcryptjs@2.4.3";
 
 const CONTRACT_TYPES = ["CLT", "ESTAGIO", "AUTONOMO"];
 const ROLES = ["OPERADOR", "GERENTE", "ADMIN"];
+const PIN_PATTERN = /^\d{6}$/;
 
 interface CreateEmployeeBody {
   fullName: string;
   role: string;
   cpf: string;
-  email: string;
+  pin: string;
   birthDate: string;
   admissionDate: string;
   position: string;
@@ -21,9 +30,9 @@ interface CreateEmployeeBody {
   weeklyHoursContracted: number;
 }
 
-function randomTemporaryPassword(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(12));
-  return btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, "").slice(0, 14) + "aA1!";
+function randomInternalPassword(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return btoa(String.fromCharCode(...bytes));
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -62,21 +71,22 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "corpo inválido" }, 400);
   }
 
-  if (!body.fullName || !body.email || !body.cpf || !body.birthDate || !body.admissionDate || !body.position) {
-    return jsonResponse({ error: "preencha nome, e-mail, CPF, data de nascimento, admissão e cargo" }, 400);
+  if (!body.fullName || !body.cpf || !body.birthDate || !body.admissionDate || !body.position) {
+    return jsonResponse({ error: "preencha nome, CPF, data de nascimento, admissão e cargo" }, 400);
   }
   if (!ROLES.includes(body.role)) return jsonResponse({ error: "papel inválido" }, 400);
   if (!CONTRACT_TYPES.includes(body.contractType)) return jsonResponse({ error: "tipo de contrato inválido" }, 400);
+  if (!PIN_PATTERN.test(body.pin ?? "")) return jsonResponse({ error: "o PIN precisa ter exatamente 6 dígitos" }, 400);
 
   // Client com service role — só a partir daqui, e só depois de confirmar
   // que o chamador é ADMIN, é que se toca auth.users/fa_kiosk_employees
   // ignorando RLS.
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-  const temporaryPassword = randomTemporaryPassword();
+  const syntheticEmail = `employee-${crypto.randomUUID()}@kiosk.internal`;
   const { data: createdUser, error: createUserError } = await adminClient.auth.admin.createUser({
-    email: body.email,
-    password: temporaryPassword,
+    email: syntheticEmail,
+    password: randomInternalPassword(),
     email_confirm: true,
   });
   if (createUserError || !createdUser.user) {
@@ -91,7 +101,6 @@ Deno.serve(async (req) => {
       role: body.role,
       cpf: body.cpf,
       cpf_last4: body.cpf.replace(/\D/g, "").slice(-4),
-      email: body.email,
       birth_date: body.birthDate,
       admission_date: body.admissionDate,
       position: body.position,
@@ -103,11 +112,20 @@ Deno.serve(async (req) => {
 
   if (insertError || !employeeRow) {
     // A conta de login já foi criada — sem o employee vinculado ela fica
-    // órfã (fullLogin/quickSwitch rejeitam "conta sem funcionário
-    // vinculado"), então desfaz para não deixar lixo em auth.users.
+    // órfã, então desfaz para não deixar lixo em auth.users.
     await adminClient.auth.admin.deleteUser(createdUser.user.id);
     return jsonResponse({ error: insertError?.message ?? "não foi possível salvar o colaborador" }, 400);
   }
 
-  return jsonResponse({ id: employeeRow.id, temporaryPassword });
+  const { error: credentialsError } = await adminClient.from("fa_kiosk_local_credentials").insert({
+    employee_id: employeeRow.id,
+    pin_hash: bcrypt.hashSync(body.pin, 10),
+  });
+  if (credentialsError) {
+    await adminClient.auth.admin.deleteUser(createdUser.user.id);
+    await adminClient.from("fa_kiosk_employees").delete().eq("id", employeeRow.id);
+    return jsonResponse({ error: "não foi possível salvar o PIN" }, 400);
+  }
+
+  return jsonResponse({ id: employeeRow.id });
 });

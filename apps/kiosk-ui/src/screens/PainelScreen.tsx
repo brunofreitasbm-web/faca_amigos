@@ -320,7 +320,7 @@ export function PainelScreen() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", minWidth: 0, flex: 1 }}>
                   {asset && (
                     asset.photo_url ? (
                       <img
@@ -346,38 +346,24 @@ export function PainelScreen() {
                     {session.guardian_name_snapshot && (
                       <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Responsável: {session.guardian_name_snapshot}</span>
                     )}
-                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Pulseira: #{wristbandCode}</span>
+                    {/* wristband_code pode vir de fontes externas (ex.: leitor de código
+                        de barras) com formatos longos e sem espaços — sem overflowWrap
+                        esse token único força a linha inteira além da largura do card e,
+                        como o Card corta com overflow:hidden, empurra a coluna de botões
+                        (imprimir pulseira) pra fora da área visível. */}
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", overflowWrap: "anywhere" }}>Pulseira: #{wristbandCode}</span>
                     {asset && <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Carrinho: {asset.name}</span>}
                     {plan && (
                       <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>
                     )}
                   </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px", flexShrink: 0 }}>
                   {isSelected && !isPaused && (
                     <Badge variant="solid_pink" title="Esta sessão entra no próximo fechamento">
                       ✓ Selecionada
                     </Badge>
                   )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Imprimir Pulseira Térmica"
-                  aria-label="Imprimir Pulseira Térmica"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPrintData({
-                      wristbandCode,
-                      childName: session.child_name_snapshot,
-                      guardianName: session.guardian_name_snapshot || "Responsável",
-                      phone: session.guardian_phone_snapshot || "",
-                      entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                      notes: session.notes,
-                    });
-                  }}
-                >
-                  <PrinterIcon />
-                </Button>
                 </div>
               </div>
 
@@ -448,6 +434,25 @@ export function PainelScreen() {
                   }}
                 >
                   🔄 Mudar Plano
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Imprimir Pulseira Térmica"
+                  aria-label="Imprimir Pulseira Térmica"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPrintData({
+                      wristbandCode,
+                      childName: session.child_name_snapshot,
+                      guardianName: session.guardian_name_snapshot || "Responsável",
+                      phone: session.guardian_phone_snapshot || "",
+                      entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                      notes: session.notes,
+                    });
+                  }}
+                >
+                  <PrinterIcon /> Pulseira
                 </Button>
                 {isPaused ? (
                   <Button

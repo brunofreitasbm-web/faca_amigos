@@ -62,9 +62,9 @@ export function StatusBadge({ phase, detail, size = "md", style: styleProp, ...r
     // não empurra sozinho a cada segundo.
     return (
       <span style={style} {...rest}>
-        <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: "var(--weight-bold)" as unknown as number, textTransform: "uppercase", letterSpacing: "0.04em", opacity: 0.9 }}>
-          <span aria-hidden="true">{GLYPHS[phase]}</span>
-          <span>{LABELS[phase]}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: "var(--weight-bold)" as unknown as number, textTransform: "uppercase", letterSpacing: "0.04em", opacity: 0.9, minWidth: 0 }}>
+          <span aria-hidden="true" style={{ flexShrink: 0 }}>{GLYPHS[phase]}</span>
+          <span style={{ overflowWrap: "anywhere" }}>{LABELS[phase]}</span>
         </span>
         {detail && (
           <span
