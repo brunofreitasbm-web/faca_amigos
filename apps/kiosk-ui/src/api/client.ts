@@ -66,7 +66,8 @@ export interface NewEmployeeInput {
   fullName: string;
   role: Employee["role"];
   cpf: string;
-  email: string;
+  /** PIN de 6 dígitos escolhido pelo ADMIN para o novo colaborador — não existe login por e-mail/senha. */
+  pin: string;
   birthDate: string;
   admissionDate: string;
   position: string;
@@ -890,10 +891,15 @@ export const Api = {
   // para ser feita com a chave anônima/de sessão do cliente, só com a
   // service role. A Edge Function `admin-create-employee` confere que
   // quem chama é ADMIN autenticado e faz o resto (auth.users + linha em
-  // fa_kiosk_employees) do lado do servidor.
+  // fa_kiosk_employees + PIN em fa_kiosk_local_credentials) do lado do
+  // servidor. Não existe e-mail/senha em nenhum passo — só o PIN.
   createEmployee: (body: NewEmployeeInput) =>
-    unwrap<{ id: string; temporaryPassword: string }>(supabase().functions.invoke("admin-create-employee", { body })),
+    unwrap<{ id: string }>(supabase().functions.invoke("admin-create-employee", { body })),
   setEmployeeActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_employees").update({ active }).eq("id", id).select().single()),
+  // Redefinição de PIN (ex.: colaborador esqueceu) — mesma exigência de
+  // chamador ADMIN autenticado, resolvida do lado do servidor.
+  setEmployeePin: (employeeId: string, pin: string) =>
+    unwrap<{ ok: boolean }>(supabase().functions.invoke("admin-set-employee-pin", { body: { employeeId, pin } })),
 
   // Os relatórios abaixo chamavam `/api/reports/...` (servidor Fastify
   // local, apps/kiosk) — removido na migração para Supabase (commit

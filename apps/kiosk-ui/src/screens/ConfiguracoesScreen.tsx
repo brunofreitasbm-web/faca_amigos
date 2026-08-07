@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input, Tabs } from "@facaamigos/ui";
+import { generateEscPosReceipt } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
 import type { Asset, BonusRule, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
+import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
 import { money } from "../format.js";
 
 type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES" | "IMPRESSORAS";
@@ -670,12 +672,11 @@ function ColaboradoresTab() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [admin, setAdmin] = useState<TerminalEmployee | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<Employee["role"]>("OPERADOR");
   const [cpf, setCpf] = useState("");
-  const [email, setEmail] = useState("");
+  const [pin, setPin] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [admissionDate, setAdmissionDate] = useState("");
   const [position, setPosition] = useState("");
@@ -683,6 +684,15 @@ function ColaboradoresTab() {
   const [weeklyHours, setWeeklyHours] = useState("44");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Redefinir PIN de um colaborador existente — exige o mesmo passo de
+  // ADMIN acima, mas fica separado porque age sobre um colaborador já
+  // escolhido (não sobre o formulário de cadastro).
+  const [resetPinTarget, setResetPinTarget] = useState<Employee | null>(null);
+  const [resetPinAdmin, setResetPinAdmin] = useState<TerminalEmployee | null>(null);
+  const [newPin, setNewPin] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   function load() {
     Api.allEmployees().then(setEmployees);
@@ -692,7 +702,7 @@ function ColaboradoresTab() {
   function resetForm() {
     setFullName("");
     setCpf("");
-    setEmail("");
+    setPin("");
     setBirthDate("");
     setAdmissionDate("");
     setPosition("");
@@ -705,20 +715,21 @@ function ColaboradoresTab() {
     setBusy(true);
     setError(null);
     try {
-      const res = await Api.createEmployee({
+      await Api.createEmployee({
         fullName,
         role,
         cpf,
-        email,
+        pin,
         birthDate,
         admissionDate,
         position,
         contractType,
         weeklyHoursContracted: Number(weeklyHours),
       });
-      setTemporaryPassword(res.temporaryPassword);
+      toast.success("Colaborador criado — já pode entrar com o PIN definido.");
       resetForm();
       setShowForm(false);
+      setAdmin(null);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar colaborador");
@@ -736,23 +747,32 @@ function ColaboradoresTab() {
     }
   }
 
-  const formValid = fullName && cpf && email && birthDate && admissionDate && position && Number(weeklyHours) > 0;
+  function closeResetPin() {
+    setResetPinTarget(null);
+    setResetPinAdmin(null);
+    setNewPin("");
+    setResetError(null);
+  }
+
+  async function confirmResetPin() {
+    if (!resetPinTarget) return;
+    setResetBusy(true);
+    setResetError(null);
+    try {
+      await Api.setEmployeePin(resetPinTarget.id, newPin);
+      toast.success(`PIN de ${resetPinTarget.full_name} redefinido.`);
+      closeResetPin();
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Não foi possível redefinir o PIN");
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
+  const formValid = fullName && cpf && pin.length === 6 && birthDate && admissionDate && position && Number(weeklyHours) > 0;
 
   return (
     <div>
-      {temporaryPassword && (
-        <Card style={{ padding: "16px", marginBottom: "16px", border: "2px solid var(--color-amber)" }}>
-          <strong>⚠️ Anote e entregue ao colaborador — esta senha só aparece uma vez:</strong>
-          <div style={{ fontFamily: "monospace", fontSize: "18px", margin: "8px 0" }}>{temporaryPassword}</div>
-          <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>
-            Ele deve entrar com e-mail e esta senha na tela de Ponto (ou Login) e escolher um PIN — a senha pode ser trocada depois.
-          </p>
-          <Button variant="ghost" size="sm" onClick={() => setTemporaryPassword(null)}>
-            ok, já anotei
-          </Button>
-        </Card>
-      )}
-
       {!showForm && !admin && (
         <Button variant="primary" onClick={() => setShowForm(true)} style={{ marginBottom: "16px" }}>
           + Novo colaborador
@@ -761,7 +781,7 @@ function ColaboradoresTab() {
 
       {showForm && !admin && (
         <Card style={{ padding: "16px", marginBottom: "16px" }}>
-          <p style={{ marginTop: 0, color: "var(--text-muted)" }}>Só um ADMIN pode cadastrar colaborador — confirme sua conta.</p>
+          <p style={{ marginTop: 0, color: "var(--text-muted)" }}>Só um ADMIN pode cadastrar colaborador — confirme com seu PIN.</p>
           <EmployeeAuthGate requireRole="ADMIN" onAuthenticated={setAdmin} onCancel={() => setShowForm(false)} />
         </Card>
       )}
@@ -771,7 +791,11 @@ function ColaboradoresTab() {
           <h2>Novo colaborador</h2>
           <Input label="Nome completo" value={fullName} onChange={(e) => setFullName(e.target.value)} />
           <Input label="CPF" value={cpf} onChange={(e) => setCpf(e.target.value)} />
-          <Input label="E-mail (vira a conta de login)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input
+            label="PIN de 6 dígitos (login deste colaborador)"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          />
           <Input label="Data de nascimento" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           <Input label="Data de admissão" type="date" value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
           <Input label="Cargo / função" value={position} onChange={(e) => setPosition(e.target.value)} />
@@ -804,6 +828,35 @@ function ColaboradoresTab() {
         </Card>
       )}
 
+      {resetPinTarget && (
+        <Card style={{ padding: "16px", marginBottom: "16px" }}>
+          <h2 style={{ marginTop: 0 }}>Redefinir PIN de {resetPinTarget.full_name}</h2>
+          {!resetPinAdmin ? (
+            <>
+              <p style={{ color: "var(--text-muted)" }}>Só um ADMIN pode redefinir o PIN de outro colaborador — confirme com seu PIN.</p>
+              <EmployeeAuthGate requireRole="ADMIN" onAuthenticated={setResetPinAdmin} onCancel={closeResetPin} />
+            </>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <Input
+                label="Novo PIN de 6 dígitos"
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+              {resetError && <p style={{ color: "var(--color-error-text)" }}>{resetError}</p>}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Button variant="primary" disabled={resetBusy || newPin.length !== 6} onClick={confirmResetPin}>
+                  Salvar novo PIN
+                </Button>
+                <Button variant="ghost" onClick={closeResetPin}>
+                  cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
       {employees.map((e) => (
         <Card key={e.id} style={{ padding: "12px", marginBottom: "8px", opacity: e.active === false ? 0.5 : 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -813,9 +866,14 @@ function ColaboradoresTab() {
               {e.contract_type && <span style={{ color: "var(--text-muted)" }}> · {CONTRACT_TYPE_LABEL[e.contract_type]}</span>}
               {e.admission_date && <span style={{ color: "var(--text-muted)" }}> · admitido em {new Date(e.admission_date).toLocaleDateString("pt-BR")}</span>}
             </div>
-            <Button variant="ghost" size="sm" onClick={() => toggleActive(e)}>
-              {e.active === false ? "reativar" : "desativar"}
-            </Button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Button variant="ghost" size="sm" onClick={() => { setResetError(null); setResetPinTarget(e); }}>
+                redefinir PIN
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => toggleActive(e)}>
+                {e.active === false ? "reativar" : "desativar"}
+              </Button>
+            </div>
           </div>
         </Card>
       ))}
@@ -830,6 +888,32 @@ function ColaboradoresTab() {
  * que o print bridge local (apps/kiosk) recebe para mandar o trabalho de
  * impressão direto pra fila do driver certo via Electron, sem diálogo.
  */
+// Dados fictícios só para a visualização rápida abaixo — não representam
+// nenhuma sessão ou venda real, existem só para o operador conferir o
+// layout que vai sair na impressora antes de precisar de um check-in de
+// verdade.
+const SAMPLE_WRISTBAND = {
+  wristbandCode: "A1B2C3",
+  childName: "Nome da Criança",
+  guardianName: "Nome do Responsável",
+  phone: "(11) 99999-9999",
+  planName: "Plano 2 horas",
+  notes: undefined as string | undefined,
+};
+
+const SAMPLE_RECEIPT = generateEscPosReceipt({
+  title: "Comprovante de Check-in",
+  unitName: "Unidade Exemplo",
+  employeeName: "Atendente Exemplo",
+  code: "PED-000123",
+  items: [
+    { description: "Plano 2 horas", quantity: 1, amountCents: 6000 },
+    { description: "Meia de antiderrapante", quantity: 1, amountCents: 1500 },
+  ],
+  totalCents: 7500,
+  payments: [{ method: "Cartão de Crédito", amountCents: 7500 }],
+});
+
 function ImpressorasTab({ unitId }: { unitId: string }) {
   const toast = useToast();
   const [wristbandPrinter, setWristbandPrinter] = useState("");
@@ -874,6 +958,51 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
           Salvar
         </Button>
       </Card>
+
+      <div>
+        <h2 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Visualização rápida</h2>
+        <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: "0 0 12px 0" }}>
+          Layout de exemplo — não imprime nada, só mostra como pulseira e cupom vão sair.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Pulseira (Gainscha GS-2208D — 20mm × 270mm)</h3>
+            <div
+              style={{
+                background: "#ffffff",
+                color: "#141414",
+                padding: "8px 16px",
+                borderRadius: "12px",
+                border: "2px dashed var(--border-subtle)",
+                fontFamily: "var(--font-body)",
+                overflowX: "auto",
+              }}
+            >
+              <WristbandLabelPreview data={SAMPLE_WRISTBAND} entryTime="14:32" />
+            </div>
+          </Card>
+          <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Cupom não fiscal (80mm)</h3>
+            <pre
+              style={{
+                background: "#ffffff",
+                color: "#141414",
+                padding: "12px",
+                borderRadius: "12px",
+                border: "2px dashed var(--border-subtle)",
+                fontFamily: "monospace",
+                fontSize: "10px",
+                whiteSpace: "pre-wrap",
+                maxHeight: "320px",
+                overflowY: "auto",
+                margin: 0,
+              }}
+            >
+              {SAMPLE_RECEIPT.text}
+            </pre>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

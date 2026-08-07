@@ -4,8 +4,7 @@ import { Api } from "../api/client.js";
 import type { Unit } from "../api/client.js";
 import {
   listTerminalEmployees,
-  fullLogin,
-  quickSwitch,
+  pinLogin,
   forgetTerminalEmployee,
   type TerminalEmployee,
 } from "../lib/supabase/terminalAuth.js";
@@ -16,7 +15,6 @@ interface AppStateValue {
   setUnitId: (id: string) => void;
   employee: TerminalEmployee | null;
   terminalEmployees: TerminalEmployee[];
-  loginWithPassword: (email: string, password: string, pin: string) => Promise<void>;
   switchEmployee: (employeeId: string, pin: string) => Promise<void>;
   forgetEmployee: (employeeId: string) => void;
   logout: () => void;
@@ -38,8 +36,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   // Login temporariamente oculto a pedido do dono (mesmo padrão já usado no
   // backoffice antes de haver contas reais) — entra direto com o primeiro
-  // colaborador cadastrado, sem exigir e-mail/senha/PIN. `loginWithPassword`/
-  // `switchEmployee` continuam existindo abaixo para quando o login voltar.
+  // colaborador cadastrado, sem exigir PIN. `switchEmployee` continua
+  // existindo abaixo para quando o login voltar.
   useEffect(() => {
     Api.employees().then((list) => {
       if (list.length > 0) setEmployee((current) => current ?? { id: list[0]!.id, full_name: list[0]!.full_name, role: list[0]!.role });
@@ -53,13 +51,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setUnitId,
       employee,
       terminalEmployees,
-      loginWithPassword: async (email, password, pin) => {
-        const emp = await fullLogin(email, password, pin);
-        setTerminalEmployees(listTerminalEmployees());
-        setEmployee(emp);
-      },
       switchEmployee: async (employeeId, pin) => {
-        const emp = await quickSwitch(employeeId, pin);
+        const emp = await pinLogin(employeeId, pin);
+        setTerminalEmployees(listTerminalEmployees());
         setEmployee(emp);
       },
       forgetEmployee: (employeeId) => {
