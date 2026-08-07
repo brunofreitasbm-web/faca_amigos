@@ -86,6 +86,17 @@ export function SignInIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+// Espelha o SignInIcon acima (mesmo peso visual), mas com a seta saindo do
+// retângulo em vez de entrando — é o par do botão de Entrada no Painel, e
+// precisa ser reconhecível como o oposto dele à distância de um balcão.
+export function SignOutIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <path d="M112,216a8,8,0,0,1-8,8H56a16,16,0,0,1-16-16V48A16,16,0,0,1,56,32h48a8,8,0,0,1,0,16H56V208h48A8,8,0,0,1,112,216Zm101.66-93.66-40-40a8,8,0,0,0-11.32,11.32L188.69,120H96a8,8,0,0,0,0,16h92.69l-26.35,26.34a8,8,0,0,0,11.32,11.32l40-40A8,8,0,0,0,213.66,122.34Z" />
+    </IconBase>
+  );
+}
+
 export function QrCodeIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconBase {...props}>

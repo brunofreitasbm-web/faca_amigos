@@ -264,13 +264,15 @@ export function SaidaScreen() {
           gap: "8px",
         }}
       >
-        <strong style={{ fontSize: "14px" }}>Câmera não leu? Digite o código</strong>
+        <strong style={{ fontSize: "14px" }}>Câmera não leu? Digite o PIN de saída</strong>
         <HelpText>
-          O código está impresso embaixo do QR, na pulseira e no recibo (ex.: {formatAccessCode("K7M2P9QX3B7")}).
+          O PIN de 4 dígitos está no recibo de guarda, ao lado do QR. Também aceita o código completo da pulseira (ex.:{" "}
+          {formatAccessCode("K7M2P9QX3B7")}), se for mais rápido ler ele.
         </HelpText>
         <div style={{ display: "flex", gap: "8px" }}>
           <Input
-            placeholder="K7M2-P9QX-3B7"
+            placeholder="0000"
+            inputMode="numeric"
             value={manualCode}
             autoCapitalize="characters"
             autoCorrect="off"

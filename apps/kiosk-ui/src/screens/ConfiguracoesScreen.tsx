@@ -605,7 +605,73 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
           Salvar regras
         </Button>
       </Card>
+
+      <QuickUpsellCard unitId={unitId} />
     </div>
+  );
+}
+
+/**
+ * Cross-sell rápido de item único (ex.: "Água") — diferente do motor de
+ * pacotes acima: sem script nem ancoragem, é só "oferecer X por R$Y" ao
+ * escolher um plano longo o bastante na Entrada. O produto ofertado é
+ * qualquer um já cadastrado em Produtos; sem produto escolhido aqui, o
+ * gatilho simplesmente não aparece no balcão.
+ */
+function QuickUpsellCard({ unitId }: { unitId: string }) {
+  const toast = useToast();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productId, setProductId] = useState("");
+  const [triggerMinutes, setTriggerMinutes] = useState("60");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    Api.products(unitId).then(setProducts).catch(() => {});
+    Api.unitSetting(unitId, "upsell_quick_product_id").then((r) => setProductId(r.value ?? "")).catch(() => {});
+    Api.unitSetting(unitId, "upsell_quick_trigger_minutes").then((r) => setTriggerMinutes(r.value ?? "60")).catch(() => {});
+  }, [unitId]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await Promise.all([
+        Api.setUnitSetting(unitId, "upsell_quick_product_id", productId),
+        Api.setUnitSetting(unitId, "upsell_quick_trigger_minutes", String(Math.max(1, Math.round(Number(triggerMinutes))))),
+      ]);
+      toast.success("Cross-sell rápido salvo.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+      <h2>Cross-sell rápido</h2>
+      <HelpText>
+        Ao escolher um plano com pelo menos os minutos configurados abaixo, a Entrada oferece este produto para
+        adicionar direto na comanda da criança — cobrado junto no fechamento.
+      </HelpText>
+      <Select label="Produto oferecido" value={productId} onChange={(e) => setProductId(e.target.value)}>
+        <option value="">Nenhum (gatilho desligado)</option>
+        {products.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name} — {money(p.price_cents)}
+          </option>
+        ))}
+      </Select>
+      <Input
+        label="A partir de quantos minutos de plano"
+        type="number"
+        value={triggerMinutes}
+        onChange={(e) => setTriggerMinutes(e.target.value)}
+        title="Planos com duração igual ou maior a este valor mostram o gatilho de oferta"
+      />
+      <Button variant="primary" disabled={saving} onClick={save}>
+        Salvar
+      </Button>
+    </Card>
   );
 }
 

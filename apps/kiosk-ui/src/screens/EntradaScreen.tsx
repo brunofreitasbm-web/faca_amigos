@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { Asset, ChildMatch, Coupon, Plan, UpsellOffer } from "../api/client.js";
+import type { Asset, ChildMatch, Coupon, Plan, Product, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { PhotoCapture } from "../components/PhotoCapture.js";
 import { useAppState } from "../state/AppState.js";
@@ -100,12 +100,20 @@ export function EntradaScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ sessionId: string; accessCode: string; childName: string } | null>(null);
+  const [done, setDone] = useState<{ sessionId: string; accessCode: string; exitPin: string; childName: string } | null>(null);
 
   // Oferta de upgrade da criança identificada. `null` cobre os dois casos
   // em que não há card: ainda não consultado e não elegível — a tela trata
   // os dois igual, então não vale um estado a mais para distingui-los.
   const [offer, setOffer] = useState<UpsellOffer | null>(null);
+
+  // Cross-sell rápido (produto único, ex.: "Água") — parametrizável em
+  // Configurações. Diferente da oferta de upgrade acima: não tem script
+  // nem ancoragem, é só "oferecer X por R$Y" quando o plano escolhido é
+  // longo o bastante para fazer sentido (padrão: 60 min).
+  const [quickProduct, setQuickProduct] = useState<Product | null>(null);
+  const [quickTriggerMinutes, setQuickTriggerMinutes] = useState(60);
+  const [quickUpsellAccepted, setQuickUpsellAccepted] = useState(false);
 
   const [lastGuardianId, setLastGuardianId] = useState<string | null>(null);
   const [closingTime, setClosingTime] = useState<string | undefined>(undefined);
@@ -117,6 +125,24 @@ export function EntradaScreen() {
     Api.unitSetting(unit.id, "closing_time")
       .then((r) => setClosingTime(r.value ?? undefined))
       .catch(() => {});
+  }, [unit]);
+
+  // Configuração do cross-sell rápido: qual produto oferecer e a partir de
+  // quantos minutos de plano. Sem produto configurado, o gatilho não
+  // aparece — não há "oferecer nada" na tela.
+  useEffect(() => {
+    if (!unit) return;
+    Api.unitSetting(unit.id, "upsell_quick_trigger_minutes")
+      .then((r) => setQuickTriggerMinutes(r.value ? Number(r.value) : 60))
+      .catch(() => {});
+    Api.unitSetting(unit.id, "upsell_quick_product_id")
+      .then((r) => {
+        if (!r.value) return setQuickProduct(null);
+        Api.products(unit.id)
+          .then((products) => setQuickProduct(products.find((p) => p.id === r.value) ?? null))
+          .catch(() => setQuickProduct(null));
+      })
+      .catch(() => setQuickProduct(null));
   }, [unit]);
 
   // Reavalia quais planos ainda cabem até o fechamento conforme o tempo passa.
@@ -234,6 +260,7 @@ export function EntradaScreen() {
     setCouponCode("");
     setShowExtras(false);
     setFavoriteAssetId(null);
+    setQuickUpsellAccepted(false);
     if (!keepGuardian) {
       setCpf("");
       setGuardianName("");
@@ -281,8 +308,17 @@ export function EntradaScreen() {
         sensoryTags: selectedSensoryTags,
       });
 
-      setDone({ sessionId: res.sessionId, accessCode: res.accessCode, childName: childName.trim() });
+      setDone({ sessionId: res.sessionId, accessCode: res.accessCode, exitPin: res.exitPin, childName: childName.trim() });
       setLastGuardianId(res.guardianId);
+
+      if (quickUpsellAccepted && quickProduct) {
+        // Fora do try do check-in de propósito, mesma lógica da foto: a
+        // entrada já foi gravada, e o item extra é um adicional na comanda,
+        // não algo que pode reverter um check-in já concluído.
+        Api.addSessionExtra(res.sessionId, quickProduct.id, employee.id).catch(() =>
+          toast.error(`Entrada registrada, mas não foi possível adicionar "${quickProduct.name}" à comanda. Adicione manualmente no fechamento.`),
+        );
+      }
 
       if (childPhoto) {
         // Fora do try do check-in de propósito: a entrada já foi gravada, e a
@@ -369,6 +405,8 @@ export function EntradaScreen() {
               <strong style={{ fontFamily: "var(--font-display)", letterSpacing: "1px" }}>
                 {formatAccessCode(done.accessCode)}
               </strong>
+              {" · "}PIN de saída:{" "}
+              <strong style={{ fontFamily: "var(--font-display)", letterSpacing: "3px" }}>{done.exitPin}</strong>
             </span>
           </div>
           <Button variant="ghost" size="sm" onClick={reprint} title="Reenviar as duas vias para a impressora">
@@ -574,6 +612,38 @@ export function EntradaScreen() {
             );
           })}
         </div>
+
+        {/* Cross-sell rápido: só aparece com plano longo o bastante e
+            produto configurado. Um toque liga/desliga — o item só entra
+            na comanda de fato depois do check-in confirmado. */}
+        {selectedPlan && quickProduct && planDurationMinutes(selectedPlan) >= quickTriggerMinutes && (
+          <div
+            style={{
+              marginTop: "10px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "12px 14px",
+              borderRadius: "14px",
+              border: quickUpsellAccepted ? "2px solid var(--color-primary)" : "1px dashed var(--border-subtle)",
+              background: quickUpsellAccepted ? "rgba(240, 25, 107, 0.06)" : "transparent",
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: "20px" }}>{quickProduct.emoji ?? "🛒"}</span>
+            <span style={{ flex: 1, minWidth: "180px", fontSize: "14px" }}>
+              Oferecer <strong>{quickProduct.name}</strong> por {money(quickProduct.price_cents)}?
+            </span>
+            <Button
+              type="button"
+              variant={quickUpsellAccepted ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setQuickUpsellAccepted((v) => !v)}
+            >
+              {quickUpsellAccepted ? "✓ Vai na comanda" : "Adicionar"}
+            </Button>
+          </div>
+        )}
       </section>
 
       {activity === "CARRINHO" && (

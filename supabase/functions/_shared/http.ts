@@ -8,7 +8,11 @@
 // localhost — falha fechado, e o erro aparece em homologação, não em
 // produção com a porta aberta.
 
-const FALLBACK_ORIGINS = ["http://localhost:5173", "http://localhost:4173"];
+const FALLBACK_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:4173",
+  "https://kiosk-ui.vercel.app",
+];
 
 function allowedOrigins(): string[] {
   const raw = Deno.env.get("FUNCTIONS_ALLOWED_ORIGINS");

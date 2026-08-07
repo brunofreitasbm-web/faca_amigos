@@ -282,7 +282,12 @@ export type UnitSettingKey =
   // Calibragem do motor de cross-selling (ver migration 20260807000008).
   | "upsell_vip_visits"
   | "upsell_vip_window_days"
-  | "upsell_cooldown_days";
+  | "upsell_cooldown_days"
+  // Cross-sell rápido (produto único, ex.: "Água") oferecido ao selecionar
+  // um plano de permanência a partir de N minutos. Ver migration
+  // fa_kiosk_session_extra_items_upsell.
+  | "upsell_quick_product_id"
+  | "upsell_quick_trigger_minutes";
 
 export interface VipFlag {
   child_id: string;
@@ -800,6 +805,21 @@ export const Api = {
       p_payments: body.payments,
       p_employee_id: body.employeeId,
     }),
+  /**
+   * Cross-sell rápido: adiciona um produto único (ex.: "Água") à comanda
+   * da sessão, cobrado junto no fechamento (fa_checkout). Diferente do
+   * upgrade de pacote (upsellVenderPacote) — aqui não há cobrança
+   * imediata nem ancoragem, é só um item extra que entra na conta.
+   */
+  addSessionExtra: (sessionId: string, productId: string, employeeId: string, quantity = 1) =>
+    unwrap<void>(
+      supabase().rpc("fa_kiosk_add_session_extra", {
+        p_session_id: sessionId,
+        p_product_id: productId,
+        p_quantity: quantity,
+        p_employee_id: employeeId,
+      }),
+    ),
   /** Selo VIP de várias crianças numa consulta só (cards do Painel). */
   vipFlags: async (unitId: string, childIds: string[]) => {
     if (childIds.length === 0) return new Map<string, VipFlag>();
@@ -880,6 +900,8 @@ export const Api = {
       childId: string;
       guardianId: string;
       accessCode: string;
+      /** PIN numérico de 4 dígitos para digitação rápida na Saída (único do dia). */
+      exitPin: string;
       wristbandCode: string;
       ticketCode: string;
     }>(

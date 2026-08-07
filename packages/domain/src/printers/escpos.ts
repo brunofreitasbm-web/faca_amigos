@@ -26,6 +26,8 @@ export interface ReceiptPrintPayload {
   // --- Recibo de guarda (via dos pais, impressa no check-in) -------------
   /** Código de acesso da criança. A presença deste campo é o que transforma o cupom em recibo de guarda. */
   accessCode?: string;
+  /** PIN numérico de 4 dígitos para digitação rápida na Saída — alternativa ao QR/código longo. */
+  exitPin?: string;
   /** Conteúdo do QR Code. Igual ao accessCode; separado porque só o caminho HTML do print bridge sabe desenhar imagem. */
   qrValue?: string;
   entryTime?: string;
@@ -116,6 +118,11 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
     lines.push("");
     lines.push(centerText("CÓDIGO DE SAÍDA"));
     lines.push(centerText(formatAccessCode(payload.accessCode)));
+    if (payload.exitPin) {
+      lines.push("");
+      lines.push(centerText("PIN RÁPIDO (digite na Saída)"));
+      lines.push(centerText(payload.exitPin));
+    }
     lines.push("");
     lines.push(centerText("Apresente este recibo na saída"));
     lines.push(subDivider);
