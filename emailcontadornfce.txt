@@ -1,0 +1,43 @@
+Assunto: FaçaAmigos — preciso de informações para começar a emitir nota fiscal dos produtos (NFC-e)
+
+Olá, [nome do contador],
+
+Estou implementando no sistema do FaçaAmigos a emissão automática de nota fiscal (NFC-e) para os
+produtos vendidos no balcão — lanche, bebida, brinquedo etc. Por enquanto vou emitir nota só dos
+produtos; as sessões de brincar (serviço) ficam para uma etapa futura.
+
+Para começar, preciso da sua ajuda em alguns pontos. Pode ser por e-mail mesmo, ou se preferir
+marcamos uma ligação de uns 30-40 minutos.
+
+1. Minha empresa tem Inscrição Estadual ativa no Pará? Qual é o número? Se não tiver, quanto tempo
+   leva para conseguir?
+
+2. Os CNAEs da empresa cobrem a venda de mercadoria (lanche, bebida, brinquedo)? Precisa alterar o
+   contrato social para isso?
+
+3. Preciso do NCM de cada produto que vendemos. Vou te mandar a lista com foto de cada item
+   (água, suco, salgadinho, meia antiderrapante, brinquedo de pelúcia etc.) — pode me passar o NCM
+   de cada um?
+
+4. Sendo Simples Nacional, posso confirmar que uso CSOSN 102, origem 0 (nacional) e CFOP 5102 nas
+   vendas? Algum desses produtos entra em substituição tributária (precisaria de CEST)?
+
+5. Qual CST de PIS/COFINS devo usar nessas vendas?
+
+6. Como você prefere receber os XMLs das notas todo mês — ZIP por e-mail, pasta compartilhada, ou
+   outra forma?
+
+7. Se eu precisar cancelar uma nota depois dos 30 minutos que a lei permite, qual é o procedimento
+   correto?
+
+Em paralelo, também vou:
+- confirmar/solicitar a Inscrição Estadual;
+- me credenciar como emissor de NFC-e no portal da SEFA-PA e gerar o CSC (código de segurança do
+  contribuinte);
+- confirmar a validade do meu certificado digital A1.
+
+Qualquer coisa que eu esteja esquecendo de perguntar, me avise. Obrigado desde já!
+
+[seu nome]
+FaçaAmigos — Parque Shopping Belém
+[telefone]

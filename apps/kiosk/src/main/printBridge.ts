@@ -1,18 +1,9 @@
 import { BrowserWindow } from "electron";
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
-import { generateEscPosReceipt } from "@facaamigos/domain";
-import type { ReceiptPrintPayload } from "@facaamigos/domain";
-
-/**
- * Fase 6 do plano, finalmente implementada: assina fa_kiosk_print_jobs
- * (Supabase Realtime) e manda o trabalho direto pra impressora do
- * sistema operacional via `webContents.print({ silent: true })` — sem
- * diálogo nenhum na tela do quiosque. `fa_kiosk_print_jobs` só aceita
- * UPDATE de `service_role` (RLS, migration 20260806000009), então este
- * processo precisa da service role key — configurada só aqui, neste
- * terminal, nunca no kiosk-ui (que roda com a anon key no navegador).
- */
+import { generateEscPosReceipt, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
+import type { ReceiptPrintPayload, WristbandPrintPayload } from "@facaamigos/domain";
+import { printRawWindows } from "./rawPrint.js";
 
 interface PrintJobRow {
   id: string;
@@ -21,6 +12,9 @@ interface PrintJobRow {
   payload_json: Record<string, unknown>;
   status: string;
 }
+
+import QRCode from "qrcode";
+import { getFriendlyWristbandCode } from "@facaamigos/domain";
 
 interface WristbandPayload {
   wristbandCode: string;
@@ -32,8 +26,16 @@ interface WristbandPayload {
   entryTime?: string;
 }
 
-function wristbandHtml(p: WristbandPayload): string {
+async function wristbandHtml(p: WristbandPayload): Promise<string> {
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const friendlyCode = getFriendlyWristbandCode(p.wristbandCode);
+  let qrSvg = "";
+  try {
+    qrSvg = await QRCode.toString(p.wristbandCode, { type: "svg", margin: 1, errorCorrectionLevel: "M" });
+  } catch (err) {
+    console.error("[print-bridge] Erro ao gerar QR Code:", err);
+  }
+
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 270mm 20mm; margin: 0; }
@@ -41,13 +43,18 @@ function wristbandHtml(p: WristbandPayload): string {
       .wb { width: 270mm; height: 20mm; padding: 1mm 4mm; box-sizing: border-box; display: flex; flex-direction: row;
             align-items: center; justify-content: space-between; background: #fff; color: #000; }
       .cell { border-right: 2px solid #141414; padding-right: 12px; }
+      .qr-cell { border-right: 2px solid #141414; padding-right: 12px; display: flex; align-items: center; gap: 8px; }
+      .qr-cell svg { width: 16mm; height: 16mm; }
       .name { font-size: 16px; font-weight: bold; color: #F0196B; display: block; }
-      .code { font-size: 18px; font-weight: bold; letter-spacing: 1px; background: #f0f0f0; padding: 2px 8px; border-radius: 4px; }
+      .code { font-size: 15px; font-weight: bold; letter-spacing: 1px; background: #f0f0f0; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
       .notes { font-size: 10px; color: #d9534f; font-weight: bold; }
     </style></head><body>
     <div class="wb">
       <div class="cell"><span class="name">FaçaAmigos</span><span style="font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:1px">Playground Inclusivo</span></div>
-      <div class="cell" style="text-align:center"><div class="code">#${esc(p.wristbandCode)}</div></div>
+      <div class="qr-cell">
+        ${qrSvg}
+        <div style="text-align:center"><div class="code">#${esc(friendlyCode)}</div></div>
+      </div>
       <div class="cell">
         <div style="font-size:11px;color:#666">Criança:</div>
         <div style="font-size:15px;font-weight:800">${esc(p.childName)}</div>
@@ -67,8 +74,8 @@ function receiptHtml(payload: ReceiptPrintPayload): string {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 80mm auto; margin: 0; }
-      html, body { margin: 0; padding: 4mm; background: #fff; }
-      pre { font-family: "Courier New", monospace; font-size: 11px; white-space: pre-wrap; margin: 0; }
+      html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
+      pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
     </style></head><body><pre>${esc}</pre></body></html>`;
 }
 
@@ -78,11 +85,14 @@ function printHtml(html: string, deviceName: string): Promise<void> {
     win
       .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
       .then(() => {
-        win.webContents.print({ silent: true, deviceName, printBackground: true }, (success, failureReason) => {
-          win.destroy();
-          if (success) resolve();
-          else reject(new Error(failureReason || "falha desconhecida ao imprimir"));
-        });
+        win.webContents.print(
+          { silent: true, deviceName, printBackground: true, margins: { marginType: "none" } },
+          (success, failureReason) => {
+            win.destroy();
+            if (success) resolve();
+            else reject(new Error(failureReason || "falha desconhecida ao imprimir"));
+          },
+        );
       })
       .catch((err) => {
         win.destroy();
@@ -119,9 +129,19 @@ export function startPrintBridge(): void {
       if (!deviceName) {
         throw new Error(`Nenhuma impressora de ${job.kind === "WRISTBAND" ? "pulseira" : "cupom"} configurada (Configurações > Impressoras)`);
       }
-      const html =
-        job.kind === "WRISTBAND" ? wristbandHtml(job.payload_json as unknown as WristbandPayload) : receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
-      await printHtml(html, deviceName);
+
+      if (job.kind === "WRISTBAND") {
+        const tspl = generateGainschaGS2208DTSPL(job.payload_json as unknown as WristbandPrintPayload);
+        const printedRaw = await printRawWindows(tspl, deviceName);
+        if (!printedRaw) {
+          const html = await wristbandHtml(job.payload_json as unknown as WristbandPayload);
+          await printHtml(html, deviceName);
+        }
+      } else {
+        const html = receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
+        await printHtml(html, deviceName);
+      }
+
       await supabase.from("fa_kiosk_print_jobs").update({ status: "PRINTED", printed_at_ms: Date.now() }).eq("id", job.id);
       console.log(`[print-bridge] job ${job.id} (${job.kind}) impresso em "${deviceName}".`);
     } catch (err) {

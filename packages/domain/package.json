@@ -13,7 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@facaamigos/contracts": "workspace:*"
+    "@facaamigos/contracts": "workspace:*",
+    "@types/qrcode": "^1.5.6",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@facaamigos/config": "workspace:*",

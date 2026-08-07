@@ -79,7 +79,8 @@ export function Badge({ variant = "pink", children, style: styleProp, ...rest }:
     fontSize: "12px",
     lineHeight: 1,
     letterSpacing: "0.02em",
-    whiteSpace: "nowrap",
+    whiteSpace: "normal",
+    overflowWrap: "anywhere",
     ...variants[variant],
     ...styleProp,
   };

@@ -3,7 +3,7 @@
 -- Mesmo padrão de fa_kiosk_print_jobs (migration 07): fila por tabela +
 -- Realtime + RLS onde só service_role escreve. A diferença crítica é que o
 -- consumidor desta fila usa `for update skip locked` (ver fa_fiscal_claim_next
--- na migration 32) — o print bridge atual não tem essa trava e dois bridges
+-- na migration 33) — o print bridge atual não tem essa trava e dois bridges
 -- ligados imprimem duas vezes. Nota fiscal duplicada não é aceitável, então o
 -- worker fiscal não pode copiar aquele padrão.
 --
@@ -105,7 +105,7 @@ create table if not exists fa_kiosk_fiscal_doc_events (
   cstat text,
   xmotivo text,
   -- Pode conter CPF do consumidor: RLS restringe a leitura a GERENTE+ e há
-  -- expurgo aos 90 dias (migration 32). A guarda legal de 5 anos é sobre o
+  -- expurgo aos 90 dias (migration 33). A guarda legal de 5 anos é sobre o
   -- XML, não sobre o log de depuração.
   detail_json jsonb,
   at_ms bigint not null default (extract(epoch from now()) * 1000)::bigint

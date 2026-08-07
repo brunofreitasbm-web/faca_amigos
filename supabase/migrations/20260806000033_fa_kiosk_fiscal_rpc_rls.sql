@@ -1,7 +1,7 @@
 -- Fase 2/3 do plano fiscal: RPCs da fila e RLS.
 
 -- fa_fiscal_enqueue_for_order: chamada de DENTRO de fa_create_pdv_order, na
--- mesma transação da venda (migration 33). Ou a venda existe com documento
+-- mesma transação da venda (migration 34). Ou a venda existe com documento
 -- enfileirado, ou nenhuma das duas coisas existe.
 --
 -- Três regras invioláveis, e é por elas que esta função é tão curta:

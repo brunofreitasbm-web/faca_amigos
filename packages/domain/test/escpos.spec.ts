@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { generateEscPosReceipt } from "../src/printers/escpos.js";
 
 describe("generateEscPosReceipt", () => {
-  it("gera cupom não fiscal formatado para impressoras de 80mm (Elgin i8/i9, Bematech 4200TH)", () => {
+  it("gera cupom não fiscal formatado em 42 colunas para impressoras de 80mm (Apptech T271U, Elgin i8/i9, Bematech 4200TH)", () => {
     const receipt = generateEscPosReceipt({
       title: "Recibo de Caixa",
       unitName: "Playground Parque Shopping",
@@ -21,12 +21,19 @@ describe("generateEscPosReceipt", () => {
     expect(receipt.text).toContain("*** RECIBO DE CAIXA ***");
     expect(receipt.text).toContain("Criança: Helena Souza");
     expect(receipt.text).toContain("Plano 30 minutos");
-    expect(receipt.text).toContain("TOTAL:                                 R$      50,00");
+    expect(receipt.text).toContain("TOTAL:                       R$       50,00");
     expect(receipt.text).toContain("Não possui valor fiscal");
 
-    // Verifica que o hex gerado possui o cabeçalho ESC @ e o comando de corte de papel
+    // Verifica que cada linha de divisor tem exatamente 42 caracteres
+    const lines = receipt.text.split("\n");
+    const dividerLines = lines.filter((l) => l.startsWith("==="));
+    expect(dividerLines.length).toBeGreaterThan(0);
+    expect(dividerLines[0]!.length).toBe(42);
+
+    // Verifica que o hex gerado possui o cabeçalho ESC @, avanço de 3 linhas (1b6403) e comando de corte de papel (1d564200)
     expect(receipt.commandsHex).toBeDefined();
     expect(receipt.commandsHex.startsWith("1b401b6101")).toBe(true);
-    expect(receipt.commandsHex.endsWith("1d564200")).toBe(true);
+    expect(receipt.commandsHex.endsWith("1b64031d564200")).toBe(true);
   });
 });
+

@@ -3,6 +3,7 @@ import { Button, Modal, Tag } from "@facaamigos/ui";
 import { generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import { Api, systemStatus } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { WristbandLabelPreview } from "./WristbandLabelPreview.js";
 
 export interface WristbandData {
   wristbandCode: string;
@@ -47,31 +48,40 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
   }
 
   function handleBrowserPrint() {
+    let iframe = document.getElementById("fa-wristband-print-iframe") as HTMLIFrameElement | null;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "fa-wristband-print-iframe";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.visibility = "hidden";
+      document.body.appendChild(iframe);
+    }
+
     const printableElement = document.querySelector(".wristband-printable");
     if (!printableElement) {
-      setTimeout(() => window.print(), 50);
+      window.print();
       return;
     }
 
-    const printWindow = window.open("", "_blank", "width=800,height=300");
-    if (!printWindow) {
-      systemStatus.dispatchEvent(new CustomEvent("print-blocked"));
-      setTimeout(() => window.print(), 50);
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
       return;
     }
-    systemStatus.dispatchEvent(new CustomEvent("print-ok"));
 
-    printWindow.document.write(`
+    doc.open();
+    doc.write(`
       <!DOCTYPE html>
       <html lang="pt-BR">
         <head>
           <meta charset="UTF-8">
           <title>Impressão de Pulseira — FaçaAmigos</title>
           <style>
-            /* Sem a palavra "landscape" aqui: combinada com um tamanho
-               explícito width×height ela é redundante (270mm > 20mm já
-               define a orientação) e faz o Chrome travar no "Carregando
-               visualização..." da caixa de impressão indefinidamente. */
             @page {
               size: 270mm 20mm;
               margin: 0;
@@ -96,22 +106,31 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
               background: #ffffff;
               color: #000000;
             }
+            .wristband-printable svg {
+              max-height: 18mm;
+              width: auto;
+            }
           </style>
         </head>
         <body>
           <div class="wristband-printable">
             ${printableElement.innerHTML}
           </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
       </html>
     `);
-    printWindow.document.close();
+    doc.close();
+
+    systemStatus.dispatchEvent(new CustomEvent("print-ok"));
+
+    setTimeout(() => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Erro ao disparar impressão do iframe:", err);
+      }
+    }, 150);
   }
 
   function handleCopyTspl() {
@@ -145,41 +164,7 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
             overflowX: "auto",
           }}
         >
-          <div className="wristband-printable" style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: "16px", minWidth: "680px" }}>
-            <div style={{ borderRight: "2px solid #141414", paddingRight: "12px" }}>
-              <strong style={{ fontFamily: "Fredoka, sans-serif", fontSize: "16px", color: "#F0196B", display: "block" }}>
-                FaçaAmigos
-              </strong>
-              <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>
-                Playground Inclusivo
-              </span>
-            </div>
-
-            <div style={{ textAlign: "center", borderRight: "2px solid #141414", paddingRight: "12px" }}>
-              <div style={{ fontSize: "18px", fontWeight: "bold", letterSpacing: "1px", background: "#f0f0f0", padding: "2px 8px", borderRadius: "4px" }}>
-                #{data.wristbandCode}
-              </div>
-            </div>
-
-            <div style={{ borderRight: "2px solid #141414", paddingRight: "12px" }}>
-              <div style={{ fontSize: "11px", color: "#666" }}>Criança:</div>
-              <div style={{ fontSize: "15px", fontWeight: "800" }}>{data.childName}</div>
-              <div style={{ fontSize: "11px", fontWeight: "600", color: "#444" }}>
-                Resp: {data.guardianName} ({data.phone})
-              </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: "11px" }}>
-                <strong>Entrada:</strong> {nowStr} {data.planName ? `| ${data.planName}` : ""}
-              </div>
-              {data.notes && (
-                <div style={{ fontSize: "10px", color: "#d9534f", fontWeight: "bold" }}>
-                  ⚠️ OBS: {data.notes}
-                </div>
-              )}
-            </div>
-          </div>
+          <WristbandLabelPreview data={data} entryTime={nowStr} />
         </div>
 
         {showTspl && (

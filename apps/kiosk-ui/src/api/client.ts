@@ -66,7 +66,8 @@ export interface NewEmployeeInput {
   fullName: string;
   role: Employee["role"];
   cpf: string;
-  email: string;
+  /** PIN de 6 dígitos escolhido pelo ADMIN para o novo colaborador — não existe login por e-mail/senha. */
+  pin: string;
   birthDate: string;
   admissionDate: string;
   position: string;
@@ -710,21 +711,35 @@ export const Api = {
         .single(),
     ),
   unitSetting: async (unitId: string, key: "daily_goal_cents" | "terms_of_use" | "closing_time" | "printer_wristband" | "printer_receipt") => {
-    const row = await unwrap<{ value: string } | null>(
-      supabase().from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId).eq("key", key).maybeSingle(),
-    );
-    return { value: row?.value ?? null };
+    try {
+      const row = await unwrap<{ value: string } | null>(
+        supabase().from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId).eq("key", key).maybeSingle(),
+      );
+      if (row?.value) return { value: row.value };
+    } catch (err) {
+      console.warn("Falha ao ler fa_kiosk_app_settings do Supabase, buscando no localStorage:", err);
+    }
+    const localVal = typeof localStorage !== "undefined" ? localStorage.getItem(`fa_setting_${unitId}_${key}`) : null;
+    return { value: localVal };
   },
-  setUnitSetting: (
+  setUnitSetting: async (
     unitId: string,
     key: "daily_goal_cents" | "terms_of_use" | "closing_time" | "printer_wristband" | "printer_receipt",
     value: string,
-  ) =>
-    unwrap(
-      supabase()
-        .from("fa_kiosk_app_settings")
-        .upsert({ unit_id: unitId, key, value, updated_at_ms: Date.now() }, { onConflict: "unit_id,key" }),
-    ),
+  ) => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(`fa_setting_${unitId}_${key}`, value);
+    }
+    try {
+      await unwrap(
+        supabase()
+          .from("fa_kiosk_app_settings")
+          .upsert({ unit_id: unitId, key, value, updated_at_ms: Date.now() }, { onConflict: "unit_id,key" }),
+      );
+    } catch (err) {
+      console.warn("Supabase RLS impediu gravação remota em fa_kiosk_app_settings (salvo localmente no quiosque):", err);
+    }
+  },
   /**
    * Enfileira um pedido de impressão para o print bridge (processo local
    * em cada terminal, ver apps/kiosk) em vez de abrir o diálogo nativo do
@@ -890,10 +905,15 @@ export const Api = {
   // para ser feita com a chave anônima/de sessão do cliente, só com a
   // service role. A Edge Function `admin-create-employee` confere que
   // quem chama é ADMIN autenticado e faz o resto (auth.users + linha em
-  // fa_kiosk_employees) do lado do servidor.
+  // fa_kiosk_employees + PIN em fa_kiosk_local_credentials) do lado do
+  // servidor. Não existe e-mail/senha em nenhum passo — só o PIN.
   createEmployee: (body: NewEmployeeInput) =>
-    unwrap<{ id: string; temporaryPassword: string }>(supabase().functions.invoke("admin-create-employee", { body })),
+    unwrap<{ id: string }>(supabase().functions.invoke("admin-create-employee", { body })),
   setEmployeeActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_employees").update({ active }).eq("id", id).select().single()),
+  // Redefinição de PIN (ex.: colaborador esqueceu) — mesma exigência de
+  // chamador ADMIN autenticado, resolvida do lado do servidor.
+  setEmployeePin: (employeeId: string, pin: string) =>
+    unwrap<{ ok: boolean }>(supabase().functions.invoke("admin-set-employee-pin", { body: { employeeId, pin } })),
 
   // Os relatórios abaixo chamavam `/api/reports/...` (servidor Fastify
   // local, apps/kiosk) — removido na migração para Supabase (commit
