@@ -9,6 +9,7 @@ import { useConfirm } from "../state/ConfirmContext.js";
 import { CheckoutModal } from "../components/CheckoutModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import type { WristbandData } from "../components/WristbandPrintModal.js";
+import { SessionTimelineModal } from "../components/SessionTimelineModal.js";
 import { formatAge, formatElapsed, money } from "../format.js";
 import { EntradaScreen } from "./EntradaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
@@ -38,6 +39,7 @@ export function PainelScreen() {
   const [actionBusy, setActionBusy] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [printData, setPrintData] = useState<WristbandData | null>(null);
+  const [timelineFor, setTimelineFor] = useState<ActiveSessionEntry | null>(null);
   const [planOptions, setPlanOptions] = useState<Plan[]>([]);
   const [changingPlanFor, setChangingPlanFor] = useState<string | null>(null);
   const [pendingPlanId, setPendingPlanId] = useState<string>("");
@@ -407,6 +409,17 @@ export function PainelScreen() {
 
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                 <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Ver linha do tempo completa desta sessão: chegada, plano, pausas e retomadas"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTimelineFor(entry);
+                  }}
+                >
+                  📋 Sessão
+                </Button>
+                <Button
                   variant="primary"
                   size="sm"
                   loading={actionBusy.has(session.id)}
@@ -594,6 +607,8 @@ export function PainelScreen() {
           onClose={() => setPrintData(null)}
         />
       )}
+
+      {timelineFor && <SessionTimelineModal entry={timelineFor} onClose={() => setTimelineFor(null)} />}
 
       {/* Botões flutuantes: Painel é a tela principal — Entrada e PDV abrem por cima, sem sair dele */}
       <div style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 90, display: "flex", flexDirection: "column", gap: "14px", alignItems: "flex-end" }}>

@@ -129,6 +129,7 @@ export interface ActiveSessionEntry {
     child_name_snapshot: string;
     activity: "PLAYGROUND" | "CARRINHO";
     checkin_at_ms: number;
+    checkin_by_employee_id?: string | null;
     asset_id: string | null;
     wristband_code?: string;
     guardian_name_snapshot?: string;
@@ -202,6 +203,14 @@ export interface RedeemableReward {
   id: string;
   rule_id: string;
   earned_at_ms: number;
+}
+
+export interface SessionEvent {
+  id: string;
+  kind: string;
+  at_ms: number;
+  employee_name: string | null;
+  payload: Record<string, unknown> | null;
 }
 
 export interface PontoRecord {
@@ -391,6 +400,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         child_name_snapshot: row.child_name_snapshot as string,
         activity: row.activity as "PLAYGROUND" | "CARRINHO",
         checkin_at_ms: row.checkin_at_ms as number,
+        checkin_by_employee_id: (row.checkin_by_employee_id as string | null) ?? null,
         asset_id: row.asset_id as string | null,
         wristband_code: row.wristband_code as string,
         guardian_name_snapshot: (guardian?.full_name as string) ?? undefined,
@@ -660,6 +670,23 @@ export const Api = {
       p_kind: body.kind,
       p_registered_by_employee_id: body.registeredByEmployeeId,
     }),
+  /** Linha do tempo de uma sessão (pausas, retomadas, troca de plano, notificações) — botão "Sessão" no Painel. */
+  sessionEvents: async (sessionId: string) => {
+    const rows = await unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_session_events")
+        .select("id, kind, at_ms, payload_json, fa_kiosk_employees(full_name)")
+        .eq("session_id", sessionId)
+        .order("at_ms", { ascending: true }),
+    );
+    return rows.map((r) => ({
+      id: r.id as string,
+      kind: r.kind as string,
+      at_ms: r.at_ms as number,
+      employee_name: (r.fa_kiosk_employees as unknown as { full_name: string } | null)?.full_name ?? null,
+      payload: (r.payload_json as Record<string, unknown> | null) ?? null,
+    })) as SessionEvent[];
+  },
   pontoHistory: (employeeId: string, fromMs: number, toMs: number) =>
     unwrap<PontoRecord[]>(
       supabase()
