@@ -145,12 +145,18 @@ export function ConfiguracoesScreen() {
 
 function MetaTab({ unitId }: { unitId: string }) {
   const toast = useToast();
+  const { employee } = useAppState();
+  const isOwner = employee?.role === "ADMIN";
+
   const [goalReais, setGoalReais] = useState("0");
   const [savingGoal, setSavingGoal] = useState(false);
+  
   const [rules, setRules] = useState<BonusRule[]>([]);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [ruleDescription, setRuleDescription] = useState("");
   const [ruleValueReais, setRuleValueReais] = useState("0");
   const [busyRule, setBusyRule] = useState(false);
+  
   const [closingTime, setClosingTime] = useState("");
   const [savingClosingTime, setSavingClosingTime] = useState(false);
 
@@ -185,17 +191,50 @@ function MetaTab({ unitId }: { unitId: string }) {
     }
   }
 
-  async function createRule() {
+  function startEditRule(r: BonusRule) {
+    setEditingRuleId(r.id);
+    setRuleDescription(r.description);
+    setRuleValueReais((r.rewardValueCents / 100).toFixed(2));
+  }
+
+  function cancelEditRule() {
+    setEditingRuleId(null);
+    setRuleDescription("");
+    setRuleValueReais("0");
+  }
+
+  async function saveRule() {
     setBusyRule(true);
     try {
-      await Api.createBonusRule({ unitId, description: ruleDescription, rewardValueCents: Math.round(Number(ruleValueReais) * 100) });
-      setRuleDescription("");
+      const payload = {
+        description: ruleDescription,
+        rewardValueCents: Math.round(Number(ruleValueReais) * 100),
+      };
+
+      if (editingRuleId) {
+        await Api.updateBonusRule(editingRuleId, payload);
+        toast.success("Regra de bonificação atualizada.");
+      } else {
+        await Api.createBonusRule({ unitId, ...payload });
+        toast.success("Regra de bonificação criada.");
+      }
+      cancelEditRule();
       loadRules();
-      toast.success("Regra de bonificação criada.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível criar a regra.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a regra.");
     } finally {
       setBusyRule(false);
+    }
+  }
+
+  async function handleToggleActiveRule(r: BonusRule) {
+    if (!window.confirm(`Deseja realmente ${r.active ? "inativar/excluir" : "reativar"} a regra "${r.description}"?`)) return;
+    try {
+      await Api.setBonusRuleActive(r.id, !r.active);
+      toast.success(r.active ? "Regra removida com sucesso." : "Regra reativada.");
+      loadRules();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível alterar a regra.");
     }
   }
 
@@ -245,7 +284,16 @@ function MetaTab({ unitId }: { unitId: string }) {
       </Card>
 
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 title="Recompensas para o colaborador quando a meta diária é batida">Regras de Bonificação</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 title="Recompensas para o colaborador quando a meta diária é batida">
+            {editingRuleId ? "Editar Regra de Bonificação" : "Regras de Bonificação"}
+          </h2>
+          {editingRuleId && (
+            <Button variant="secondary" onClick={cancelEditRule} disabled={busyRule}>
+              Cancelar Edição
+            </Button>
+          )}
+        </div>
         <Input
           label="Descrição"
           placeholder="Ex: Bônus para o turno ao bater a meta"
@@ -260,13 +308,27 @@ function MetaTab({ unitId }: { unitId: string }) {
           onChange={(e) => setRuleValueReais(e.target.value)}
           title="Valor da bonificação em reais"
         />
-        <Button variant="primary" disabled={busyRule || !ruleDescription} onClick={createRule} title="Criar nova regra de bonificação">
-          Criar regra
+        <Button variant="primary" disabled={busyRule || !ruleDescription} onClick={saveRule} title={editingRuleId ? "Salvar regra" : "Criar nova regra"}>
+          {editingRuleId ? "Salvar regra" : "Criar regra"}
         </Button>
         {rules.map((r) => (
-          <Card key={r.id} style={{ padding: "12px", display: "flex", justifyContent: "space-between" }}>
+          <Card key={r.id} style={{ padding: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: r.active ? 1 : 0.5 }}>
             <span>{r.description}</span>
-            <strong>{money(r.rewardValueCents)}</strong>
+            <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <strong>{money(r.rewardValueCents)}</strong>
+              <Button variant="secondary" onClick={() => startEditRule(r)} disabled={busyRule}>
+                Editar
+              </Button>
+              {r.active ? (
+                <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActiveRule(r)} disabled={busyRule}>
+                  {isOwner ? "Excluir" : "Inativar"}
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={() => handleToggleActiveRule(r)} disabled={busyRule}>
+                  Reativar
+                </Button>
+              )}
+            </span>
           </Card>
         ))}
       </Card>
@@ -299,7 +361,12 @@ const PLAN_COLOR_OPTIONS = ["#2ECFB5", "#F0196B", "#FFE234", "#FF7A00", "#A020EE
 
 function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND" | "CARRINHO" }) {
   const toast = useToast();
+  const { employee } = useAppState();
+  const isOwner = employee?.role === "ADMIN";
+  
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  
   const [name, setName] = useState("");
   const [valueReais, setValueReais] = useState("0");
   const [durationValue, setDurationValue] = useState("15");
@@ -309,28 +376,67 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
   const [busy, setBusy] = useState(false);
 
   function load() {
-    Api.plans(unitId, activity).then(setPlans);
+    Api.plans(unitId, activity, false).then(setPlans);
   }
   useEffect(load, [unitId, activity]);
 
-  async function create() {
+  function startEdit(p: Plan) {
+    setEditingId(p.id);
+    setName(p.name);
+    setValueReais((p.valueCents / 100).toFixed(2));
+    setDurationValue(String(p.durationValue));
+    setDurationUnit(p.durationUnit);
+    setOverageReais((p.overageCentsPerMinute / 100).toFixed(2));
+    setColor(p.color);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setName("");
+    setValueReais("0");
+    setDurationValue("15");
+    setDurationUnit("MINUTO");
+    setOverageReais("1");
+    setColor(PLAN_COLOR_OPTIONS[0]!);
+  }
+
+  async function save() {
     setBusy(true);
     try {
-      await Api.createPlan({
-        unitId,
-        activity,
+      const payload = {
         name,
         valueCents: Math.round(Number(valueReais) * 100),
         durationValue: Number(durationValue),
         durationUnit,
         overageCentsPerMinute: Math.round(Number(overageReais) * 100),
         color,
-      });
-      setName("");
+      };
+
+      if (editingId) {
+        await Api.updatePlan(editingId, payload);
+        toast.success("Plano atualizado.");
+      } else {
+        await Api.createPlan({ unitId, activity, ...payload });
+        toast.success("Plano criado.");
+      }
+      cancelEdit();
       load();
-      toast.success("Plano criado.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível criar o plano.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o plano.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleActive(p: Plan) {
+    if (!window.confirm(`Deseja realmente ${p.active ? "inativar/excluir" : "reativar"} o plano "${p.name}"?`)) return;
+    setBusy(true);
+    try {
+      await Api.setPlanActive(p.id, !p.active);
+      toast.success(p.active ? "Plano removido com sucesso." : "Plano reativado.");
+      load();
+    } catch (err) {
+      toast.error("Erro ao alterar o plano.");
     } finally {
       setBusy(false);
     }
@@ -339,7 +445,16 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo plano</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>
+            {editingId ? "Editar plano" : "Novo plano"}
+          </h2>
+          {editingId && (
+            <Button variant="secondary" onClick={cancelEdit} disabled={busy}>
+              Cancelar Edição
+            </Button>
+          )}
+        </div>
         <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
         <Input label="Valor (R$)" type="number" value={valueReais} onChange={(e) => setValueReais(e.target.value)} />
         <div style={{ display: "flex", gap: "8px" }}>
@@ -372,19 +487,33 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
             ))}
           </div>
         </div>
-        <Button variant="primary" disabled={busy || !name} onClick={create}>
-          Criar plano
+        <Button variant="primary" disabled={busy || !name} onClick={save}>
+          {editingId ? "Salvar plano" : "Criar plano"}
         </Button>
       </Card>
 
       {plans.map((p) => (
-        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: p.active ? 1 : 0.5 }}>
           <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ width: "14px", height: "14px", borderRadius: "50%", background: p.color, display: "inline-block" }} />
             {p.name} — {p.durationValue} {p.durationUnit.toLowerCase()}
           </span>
-          <span>
-            {money(p.valueCents)} + {money(p.overageCentsPerMinute)}/min excedente
+          <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span>
+              {money(p.valueCents)} + {money(p.overageCentsPerMinute)}/min excedente
+            </span>
+            <Button variant="secondary" onClick={() => startEdit(p)} disabled={busy}>
+              Editar
+            </Button>
+            {p.active ? (
+              <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActive(p)} disabled={busy}>
+                {isOwner ? "Excluir" : "Inativar"}
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={() => handleToggleActive(p)} disabled={busy}>
+                Reativar
+              </Button>
+            )}
           </span>
         </Card>
       ))}
@@ -403,7 +532,12 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
  */
 function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND" | "CARRINHO" }) {
   const toast = useToast();
+  const { employee } = useAppState();
+  const isOwner = employee?.role === "ADMIN";
+
   const [packages, setPackages] = useState<Package[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const [name, setName] = useState("");
   const [priceReais, setPriceReais] = useState("0");
   const [includedHours, setIncludedHours] = useState("10");
@@ -436,33 +570,59 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
   // cadastrado, some da tela e ninguém entende o porquê.
   const hourlyCents = includedMinutes > 0 ? Math.round((priceCents * 60) / includedMinutes) : 0;
 
-  async function create() {
+  function startEdit(p: Package) {
+    setEditingId(p.id);
+    setName(p.name);
+    setPriceReais((p.priceCents / 100).toFixed(2));
+    setIncludedHours(String(p.includedMinutes / 60));
+    setValidityDays(String(p.validityDays));
+    setBenefitText(p.benefitText);
+    setColor(p.color);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setName("");
+    setPriceReais("0");
+    setIncludedHours("10");
+    setValidityDays("30");
+    setBenefitText("");
+    setColor("#FF7A00");
+  }
+
+  async function save() {
     setBusy(true);
     try {
-      await Api.createPackage({
-        unitId,
-        activity,
+      const payload = {
         name,
         priceCents,
         includedMinutes,
         validityDays: Math.max(1, Math.round(Number(validityDays))),
         benefitText: benefitText.trim(),
         color,
-      });
-      setName("");
-      setBenefitText("");
+      };
+
+      if (editingId) {
+        await Api.updatePackage(editingId, payload);
+        toast.success("Pacote atualizado.");
+      } else {
+        await Api.createPackage({ unitId, activity, ...payload });
+        toast.success("Pacote criado.");
+      }
+      cancelEdit();
       load();
-      toast.success("Pacote criado.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível criar o pacote.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o pacote.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function toggle(pkg: Package) {
+  async function handleToggleActive(pkg: Package) {
+    if (!window.confirm(`Deseja realmente ${pkg.active ? "inativar/excluir" : "reativar"} o pacote "${pkg.name}"?`)) return;
     try {
       await Api.setPackageActive(pkg.id, !pkg.active);
+      toast.success(pkg.active ? "Pacote removido com sucesso." : "Pacote reativado.");
       load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível alterar o pacote.");
@@ -490,7 +650,14 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-        <h2>Novo pacote</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2>{editingId ? "Editar pacote" : "Novo pacote"}</h2>
+          {editingId && (
+            <Button variant="secondary" onClick={cancelEdit} disabled={busy}>
+              Cancelar Edição
+            </Button>
+          )}
+        </div>
         <HelpText>
           O valor cheio é a âncora: o cliente paga só a diferença entre ele e o que já gastou no mês. O benefício é lido
           em voz alta pelo operador, então escreva a frase exata — ex.: “2 horas extras e um lanche”.
@@ -546,8 +713,8 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
             mais do que isso por hora.
           </div>
         )}
-        <Button variant="primary" disabled={busy || !canCreate} onClick={create}>
-          Criar pacote
+        <Button variant="primary" disabled={busy || !canCreate} onClick={save}>
+          {editingId ? "Salvar pacote" : "Criar pacote"}
         </Button>
       </Card>
 
@@ -575,9 +742,18 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
                 <br />
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{money(hourly)}/h</span>
               </span>
-              <Button variant="ghost" size="sm" onClick={() => toggle(p)} title={p.active ? "Parar de oferecer este pacote" : "Voltar a oferecer este pacote"}>
-                {p.active ? "Desativar" : "Ativar"}
+              <Button variant="secondary" onClick={() => startEdit(p)} disabled={busy}>
+                Editar
               </Button>
+              {p.active ? (
+                <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActive(p)} disabled={busy}>
+                  {isOwner ? "Excluir" : "Inativar"}
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={() => handleToggleActive(p)} disabled={busy}>
+                  Reativar
+                </Button>
+              )}
             </span>
           </Card>
         );
@@ -686,7 +862,12 @@ function QuickUpsellCard({ unitId }: { unitId: string }) {
 
 function ProdutosTab({ unitId }: { unitId: string }) {
   const toast = useToast();
+  const { employee } = useAppState();
+  const isOwner = employee?.role === "ADMIN";
+
   const [products, setProducts] = useState<Product[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const [name, setName] = useState("");
   const [priceReais, setPriceReais] = useState("0");
   const [stock, setStock] = useState("0");
@@ -694,43 +875,105 @@ function ProdutosTab({ unitId }: { unitId: string }) {
   const [busy, setBusy] = useState(false);
 
   function load() {
-    Api.products(unitId).then(setProducts);
+    Api.products(unitId, false).then(setProducts);
   }
   useEffect(load, [unitId]);
 
-  async function create() {
+  function startEdit(p: Product) {
+    setEditingId(p.id);
+    setName(p.name);
+    setPriceReais((p.price_cents / 100).toFixed(2));
+    setStock(String(p.stock));
+    setEmoji(p.emoji ?? "🛍️");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setName("");
+    setPriceReais("0");
+    setStock("0");
+    setEmoji("🛍️");
+  }
+
+  async function save() {
     setBusy(true);
     try {
-      await Api.createProduct({ unitId, name, emoji, priceCents: Math.round(Number(priceReais) * 100), stock: Number(stock) });
-      setName("");
+      const payload = {
+        name,
+        emoji,
+        priceCents: Math.round(Number(priceReais) * 100),
+        stock: Number(stock),
+      };
+      
+      if (editingId) {
+        await Api.updateProduct(editingId, payload);
+        toast.success("Produto atualizado.");
+      } else {
+        await Api.createProduct({ unitId, ...payload });
+        toast.success("Produto criado.");
+      }
+      cancelEdit();
       load();
-      toast.success("Produto criado.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível criar o produto.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o produto.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleToggleActive(p: Product) {
+    if (!window.confirm(`Deseja realmente ${p.active ? "inativar/excluir" : "reativar"} o produto "${p.name}"?`)) return;
+    try {
+      await Api.setProductActive(p.id, !p.active);
+      toast.success(p.active ? "Produto removido com sucesso." : "Produto reativado.");
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível alterar o produto.");
     }
   }
 
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo produto</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>
+            {editingId ? "Editar produto" : "Novo produto"}
+          </h2>
+          {editingId && (
+            <Button variant="secondary" onClick={cancelEdit} disabled={busy}>
+              Cancelar Edição
+            </Button>
+          )}
+        </div>
         <Input label="Emoji" value={emoji} onChange={(e) => setEmoji(e.target.value)} />
         <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
         <Input label="Preço (R$)" type="number" value={priceReais} onChange={(e) => setPriceReais(e.target.value)} />
         <Input label="Estoque" type="number" value={stock} onChange={(e) => setStock(e.target.value)} />
-        <Button variant="primary" disabled={busy || !name} onClick={create}>
-          Criar produto
+        <Button variant="primary" disabled={busy || !name} onClick={save}>
+          {editingId ? "Salvar produto" : "Criar produto"}
         </Button>
       </Card>
       {products.map((p) => (
-        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
+        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: p.active ? 1 : 0.5 }}>
           <span>
             {p.emoji} {p.name}
           </span>
-          <span>
-            {money(p.price_cents)} — {p.stock} un.
+          <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span>
+              {money(p.price_cents)} — {p.stock} un.
+            </span>
+            <Button variant="secondary" onClick={() => startEdit(p)} disabled={busy}>
+              Editar
+            </Button>
+            {p.active ? (
+              <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActive(p)} disabled={busy}>
+                {isOwner ? "Excluir" : "Inativar"}
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={() => handleToggleActive(p)} disabled={busy}>
+                Reativar
+              </Button>
+            )}
           </span>
         </Card>
       ))}
@@ -740,7 +983,12 @@ function ProdutosTab({ unitId }: { unitId: string }) {
 
 function CuponsTab({ unitId }: { unitId: string }) {
   const toast = useToast();
+  const { employee } = useAppState();
+  const isOwner = employee?.role === "ADMIN";
+
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const [code, setCode] = useState("");
   const [kind, setKind] = useState<Coupon["kind"]>("MINUTOS_EXTRA");
   const [value, setValue] = useState("10");
@@ -752,24 +1000,72 @@ function CuponsTab({ unitId }: { unitId: string }) {
   }
   useEffect(load, [unitId]);
 
-  async function create() {
+  function startEdit(c: Coupon) {
+    setEditingId(c.id);
+    setCode(c.code);
+    setKind(c.kind);
+    setValue(String(c.value));
+    setDescription(c.description ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setCode("");
+    setKind("MINUTOS_EXTRA");
+    setValue("10");
+    setDescription("");
+  }
+
+  async function save() {
     setBusy(true);
     try {
-      await Api.createCoupon({ unitId, code, kind, value: Number(value), description: description || undefined });
-      setCode("");
+      const payload = {
+        code,
+        kind,
+        value: Number(value),
+        description: description || undefined,
+      };
+
+      if (editingId) {
+        await Api.updateCoupon(editingId, payload);
+        toast.success("Cupom atualizado.");
+      } else {
+        await Api.createCoupon({ unitId, ...payload });
+        toast.success("Cupom criado.");
+      }
+      cancelEdit();
       load();
-      toast.success("Cupom criado.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível criar o cupom.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o cupom.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleToggleActive(c: Coupon) {
+    if (!window.confirm(`Deseja realmente ${c.active ? "inativar/excluir" : "reativar"} o cupom "${c.code}"?`)) return;
+    try {
+      await Api.setCouponActive(c.id, !c.active);
+      toast.success(c.active ? "Cupom removido com sucesso." : "Cupom reativado.");
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível alterar o cupom.");
     }
   }
 
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo cupom</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>
+            {editingId ? "Editar cupom" : "Novo cupom"}
+          </h2>
+          {editingId && (
+            <Button variant="secondary" onClick={cancelEdit} disabled={busy}>
+              Cancelar Edição
+            </Button>
+          )}
+        </div>
         <Input label="Código" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
         <Select label="Tipo" value={kind} onChange={(e) => setKind(e.target.value as Coupon["kind"])}>
           <option value="MINUTOS_EXTRA">Minutos extras</option>
@@ -778,13 +1074,29 @@ function CuponsTab({ unitId }: { unitId: string }) {
         </Select>
         <Input label="Valor" type="number" value={value} onChange={(e) => setValue(e.target.value)} />
         <Input label="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} />
-        <Button variant="primary" disabled={busy || !code} onClick={create}>
-          Criar cupom
+        <Button variant="primary" disabled={busy || !code} onClick={save}>
+          {editingId ? "Salvar cupom" : "Criar cupom"}
         </Button>
       </Card>
       {coupons.map((c) => (
-        <Card key={c.id} style={{ padding: "12px", marginBottom: "8px" }}>
-          <strong>{c.code}</strong> — {c.kind} ({c.value}) — usado {c.used_count}× {c.description ? `— ${c.description}` : ""}
+        <Card key={c.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: c.active ? 1 : 0.5 }}>
+          <span>
+            <strong>{c.code}</strong> — {c.kind} ({c.value}) — usado {c.used_count}× {c.description ? `— ${c.description}` : ""}
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <Button variant="secondary" onClick={() => startEdit(c)} disabled={busy}>
+              Editar
+            </Button>
+            {c.active ? (
+              <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActive(c)} disabled={busy}>
+                {isOwner ? "Excluir" : "Inativar"}
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={() => handleToggleActive(c)} disabled={busy}>
+                Reativar
+              </Button>
+            )}
+          </span>
         </Card>
       ))}
     </div>

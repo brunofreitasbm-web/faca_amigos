@@ -744,14 +744,14 @@ export const Api = {
         .select("id, unit_id, name, emoji, color, status, odometer_minutes, photo_url")
         .eq("unit_id", unitId),
     ),
-  products: (unitId: string) =>
-    unwrap<Product[]>(
-      supabase()
-        .from("fa_kiosk_products")
-        .select("id, name, description, emoji, price_cents, stock")
-        .eq("unit_id", unitId)
-        .eq("active", true),
-    ),
+  products: (unitId: string, onlyActive = true) => {
+    let query = supabase()
+      .from("fa_kiosk_products")
+      .select("id, name, description, emoji, price_cents, stock, active")
+      .eq("unit_id", unitId);
+    if (onlyActive) query = query.eq("active", true);
+    return unwrap<Product[]>(query);
+  },
   // `unitId` é opcional só porque o limiar do selo VIP tem padrão global;
   // passando-o, a busca respeita o limiar configurado para a unidade.
   searchChildren: async (q: string, unitId?: string) => {

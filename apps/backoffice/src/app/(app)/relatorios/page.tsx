@@ -106,7 +106,6 @@ function DeltaBadge({ pct }: { pct: number | null }) {
 interface PageProps {
   searchParams: Promise<{
     period?: string;
-    origin?: string;
     unitId?: string;
     from?: string;
     to?: string;
@@ -116,7 +115,6 @@ interface PageProps {
 export default async function RelatoriosPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const period = params.period ?? "30d";
-  const origin = params.origin ?? "ALL";
   const unitId = params.unitId ?? "all";
   const from = params.from ?? "";
   const to = params.to ?? "";
@@ -175,16 +173,6 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
     itemsQuery = itemsQuery.eq("fa_kiosk_orders.unit_id", unitId);
     prevOrdersQuery = prevOrdersQuery.eq("unit_id", unitId);
     prevSessionsQuery = prevSessionsQuery.eq("unit_id", unitId);
-  }
-
-  // Aplicar filtro de Origem (Local vs Safoplay)
-  if (origin !== "ALL") {
-    ordersQuery = ordersQuery.eq("origin", origin);
-    sessionsQuery = sessionsQuery.eq("origin", origin);
-    itemsQuery = itemsQuery.eq("fa_kiosk_orders.origin", origin);
-    prevOrdersQuery = prevOrdersQuery.eq("origin", origin);
-    prevSessionsQuery = prevSessionsQuery.eq("origin", origin);
-    paymentsQuery = paymentsQuery.eq("origin", origin);
   }
 
   const [ordersRes, sessionsRes, paymentsRes, itemsRes, previousOrdersRes, previousSessionsRes] =
@@ -312,11 +300,10 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
         Relatórios
       </PageTitle>
 
-      {/* Filtros de Período, Origem, Unidade e Exportação CSV */}
+      {/* Filtros de Período, Unidade e Exportação CSV */}
       <ReportFilters
         units={units}
         currentPeriod={period}
-        currentOrigin={origin}
         currentUnitId={unitId}
         currentFrom={from}
         currentTo={to}

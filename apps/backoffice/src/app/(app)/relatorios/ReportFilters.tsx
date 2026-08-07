@@ -11,7 +11,6 @@ interface UnitOption {
 interface ReportFiltersProps {
   units: UnitOption[];
   currentPeriod: string;
-  currentOrigin: string;
   currentUnitId: string;
   currentFrom?: string;
   currentTo?: string;
@@ -26,7 +25,6 @@ interface ReportFiltersProps {
 export function ReportFilters({
   units,
   currentPeriod,
-  currentOrigin,
   currentUnitId,
   currentFrom = "",
   currentTo = "",
@@ -61,10 +59,6 @@ export function ReportFilters({
     }
   };
 
-  const handleOriginChange = (origin: string) => {
-    updateParam({ origin });
-  };
-
   const handleUnitChange = (unitId: string) => {
     updateParam({ unitId });
   };
@@ -74,17 +68,9 @@ export function ReportFilters({
   };
 
   const handleExportCSV = () => {
-    const originLabel =
-      currentOrigin === "SAFOPLAY"
-        ? "Somente Safoplay (Importado)"
-        : currentOrigin === "LOCAL"
-        ? "Somente Sistema Local"
-        : "Todos os Dados (Local + Safoplay)";
-
     const rows = [
       ["--- CABEÇALHO DO RELATÓRIO ---"],
       ["Período", currentPeriod],
-      ["Origem dos Dados", originLabel],
       ["Unidade", currentUnitId === "all" ? "Todas as Unidades" : currentUnitId],
       [],
       ["--- RESUMO EXECUTIVO ---"],
@@ -108,7 +94,7 @@ export function ReportFilters({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `relatorio_facaamigos_${currentPeriod}_${currentOrigin.toLowerCase()}.csv`);
+    link.setAttribute("download", `relatorio_facaamigos_${currentPeriod}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -175,20 +161,6 @@ export function ReportFilters({
               <option value="this_year">Este Ano</option>
               <option value="last_year">Ano Anterior</option>
               <option value="custom">Período Personalizado</option>
-            </select>
-          </div>
-
-          {/* Seletor de Origem dos Dados (Local vs Safoplay) */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: 500 }}>Origem:</span>
-            <select
-              value={currentOrigin}
-              onChange={(e) => handleOriginChange(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="ALL">Todas as Origens (Local + Safoplay)</option>
-              <option value="LOCAL">Somente Sistema Local</option>
-              <option value="SAFOPLAY">Somente Safoplay (Importado)</option>
             </select>
           </div>
 
