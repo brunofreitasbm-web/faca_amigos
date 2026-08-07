@@ -20,9 +20,27 @@ const ERROR_MESSAGES: Record<string, string> = {
   SESSAO_PAUSADA: "A sessão está pausada. Clique em 'Retomar' no card antes de fechar o atendimento.",
 };
 
-function friendlyError(message: string): string {
-  const code = message.split(":")[0]?.trim() ?? message;
-  return ERROR_MESSAGES[code] ?? message;
+function getRawErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null) {
+    if ("message" in err && typeof (err as { message: unknown }).message === "string") {
+      return (err as { message: string }).message;
+    }
+    if ("error" in err && typeof (err as { error: unknown }).error === "string") {
+      return (err as { error: string }).error;
+    }
+    return JSON.stringify(err);
+  }
+  if (typeof err === "string") return err;
+  return "Erro ao fechar atendimento";
+}
+
+function friendlyError(err: unknown): string {
+  const rawMessage = getRawErrorMessage(err);
+  for (const [code, userMsg] of Object.entries(ERROR_MESSAGES)) {
+    if (rawMessage.includes(code)) return userMsg;
+  }
+  return rawMessage;
 }
 
 /**
@@ -50,11 +68,6 @@ export function CheckoutModal({
 }) {
   const { employee, unit } = useAppState();
   const [method, setMethod] = useState<PaymentMethod>("PIX");
-  // Segunda forma de pagamento (divisão do total em até 2 formas) — null
-  // quando o atendimento é pago numa forma só (caso comum, layout igual ao
-  // de sempre). `splitCents` é quanto da conta vai para a PRIMEIRA forma;
-  // a segunda sempre recebe o restante, nunca digitado diretamente, pra
-  // nunca deixar a soma divergir do total (fa_checkout exige soma exata).
   const [secondMethod, setSecondMethod] = useState<PaymentMethod | null>(null);
   const [splitTyped, setSplitTyped] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,6 +84,7 @@ export function CheckoutModal({
   const isSplit = secondMethod !== null;
   const splitCents = isSplit ? Math.min(totalCents, Math.max(0, Math.round(Number(splitTyped.replace(",", ".")) * 100) || 0)) : totalCents;
   const secondCents = totalCents - splitCents;
+  const hasPausedSession = entries.some((e) => e.session.paused_at_ms !== null);
 
   function startSplit() {
     const other = METHODS.find((m) => m !== method) ?? "DINHEIRO";
@@ -100,7 +114,6 @@ export function CheckoutModal({
         payments,
       });
 
-      // Um cupom não fiscal por criança, com entrada, saída, excedente e desconto aplicado.
       const nowStr = new Date().toLocaleString("pt-BR");
       setReceipts(
         entries.map((e) => ({
@@ -111,7 +124,6 @@ export function CheckoutModal({
           code: result.orderCode,
           items: e.quote.lines.map((l) => ({ description: l.label, amountCents: l.cents })),
           totalCents: e.quote.totalCents,
-          // Cupom por criança rateia a mesma divisão de pagamento proporcionalmente ao total dela.
           payments: isSplit
             ? [
                 { method, amountCents: Math.round((e.quote.totalCents * splitCents) / totalCents) },
@@ -127,13 +139,13 @@ export function CheckoutModal({
         })),
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : "";
+      const message = getRawErrorMessage(err);
       const expected = !isRetry && !isSplit ? extractExpectedCents(message) : null;
       if (expected !== null) {
         await confirm(expected, true);
         return;
       }
-      setError(err instanceof Error ? friendlyError(err.message) : "Erro ao fechar");
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
@@ -158,10 +170,6 @@ export function CheckoutModal({
   }
 
   return (
-    // closeOnBackdrop={false}: era assim antes (o fundo escurecido não
-    // fechava o diálogo) — um clique perdido no meio de um pagamento não
-    // pode descartar a tela sem querer. O "Cancelar" explícito continua
-    // sendo o único jeito de sair sem cobrar.
     <Modal title="Fechar atendimento" onClose={onClose} closeOnBackdrop={false} maxWidth="420px" zIndex={100}>
       <>
         {entries.map((e) => (
@@ -231,11 +239,17 @@ export function CheckoutModal({
           </div>
         )}
 
-        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
+        {hasPausedSession && (
+          <div style={{ background: "#FEF3C7", color: "#92400E", padding: "12px 16px", borderRadius: "8px", border: "1px solid #F59E0B", marginBottom: "12px", fontSize: "14px" }}>
+            ⏸️ <strong>Sessão pausada:</strong> Uma das crianças está com o tempo pausado. Clique em <strong>Retomar</strong> no card no Painel antes de fechar.
+          </div>
+        )}
+
+        {error && <p style={{ color: "var(--color-error-text)", fontWeight: 600 }}>{error}</p>}
 
         {method === "DINHEIRO" && !isSplit ? (
           <>
-            <CashPaymentPad totalCents={totalCents} busy={busy || hasOpenShift === false} onConfirm={() => confirm()} />
+            <CashPaymentPad totalCents={totalCents} busy={busy || hasOpenShift === false || hasPausedSession} onConfirm={() => confirm()} />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
               <Button variant="ghost" onClick={onClose} disabled={busy} title="Cancelar o fechamento sem cobrar">
                 Cancelar
@@ -251,8 +265,14 @@ export function CheckoutModal({
               variant="primary"
               onClick={() => confirm()}
               loading={busy}
-              disabled={busy || hasOpenShift === false || (isSplit && (secondCents < 0 || splitCents <= 0))}
-              title={hasOpenShift === false ? "Abra o turno na tela Caixa antes de fechar o atendimento" : "Confirmar pagamento e imprimir cupom de saída"}
+              disabled={busy || hasOpenShift === false || hasPausedSession || (isSplit && (secondCents < 0 || splitCents <= 0))}
+              title={
+                hasOpenShift === false
+                  ? "Abra o turno na tela Caixa antes de fechar o atendimento"
+                  : hasPausedSession
+                  ? "Retome a contagem da sessão no Painel antes de fechar"
+                  : "Confirmar pagamento e imprimir cupom de saída"
+              }
             >
               Confirmar pagamento
             </Button>
