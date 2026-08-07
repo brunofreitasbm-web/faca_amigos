@@ -40,8 +40,8 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
           <title>Cupom Não Fiscal — FaçaAmigos</title>
           <style>
             @page { size: 80mm auto; margin: 0; }
-            html, body { margin: 0 !important; padding: 4mm !important; background: #fff !important; }
-            pre { font-family: "Courier New", monospace; font-size: 11px; white-space: pre-wrap; margin: 0; }
+            html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
+            pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
           </style>
         </head>
         <body>
@@ -78,7 +78,7 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
       title={
         <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontFamily: "var(--font-display)", color: "var(--color-primary-hover)" }}>Cupom Não Fiscal</span>
-          <Tag color="var(--color-teal)">80mm</Tag>
+          <Tag color="var(--color-teal)">80mm / Apptech T271U</Tag>
         </span>
       }
       onClose={onClose}
@@ -96,10 +96,13 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
             padding: "12px",
             borderRadius: "12px",
             border: "2px dashed var(--border-subtle)",
-            fontFamily: "monospace",
-            fontSize: "10px",
-            whiteSpace: "pre-wrap",
+            fontFamily: '"Consolas", "Courier New", monospace',
+            fontSize: "11px",
+            lineHeight: "1.25",
+            fontWeight: 600,
+            whiteSpace: "pre",
             maxHeight: "320px",
+            overflowX: "auto",
             overflowY: "auto",
           }}
         >

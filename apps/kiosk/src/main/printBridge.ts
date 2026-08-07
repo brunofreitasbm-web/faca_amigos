@@ -67,8 +67,8 @@ function receiptHtml(payload: ReceiptPrintPayload): string {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 80mm auto; margin: 0; }
-      html, body { margin: 0; padding: 4mm; background: #fff; }
-      pre { font-family: "Courier New", monospace; font-size: 11px; white-space: pre-wrap; margin: 0; }
+      html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
+      pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
     </style></head><body><pre>${esc}</pre></body></html>`;
 }
 
@@ -78,11 +78,14 @@ function printHtml(html: string, deviceName: string): Promise<void> {
     win
       .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
       .then(() => {
-        win.webContents.print({ silent: true, deviceName, printBackground: true }, (success, failureReason) => {
-          win.destroy();
-          if (success) resolve();
-          else reject(new Error(failureReason || "falha desconhecida ao imprimir"));
-        });
+        win.webContents.print(
+          { silent: true, deviceName, printBackground: true, margins: { marginType: "none" } },
+          (success, failureReason) => {
+            win.destroy();
+            if (success) resolve();
+            else reject(new Error(failureReason || "falha desconhecida ao imprimir"));
+          },
+        );
       })
       .catch((err) => {
         win.destroy();

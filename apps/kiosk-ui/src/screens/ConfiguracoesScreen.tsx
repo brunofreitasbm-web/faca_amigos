@@ -919,6 +919,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   const [wristbandPrinter, setWristbandPrinter] = useState("");
   const [receiptPrinter, setReceiptPrinter] = useState("");
   const [saving, setSaving] = useState<"WRISTBAND" | "RECEIPT" | null>(null);
+  const [testingReceipt, setTestingReceipt] = useState(false);
 
   useEffect(() => {
     Api.unitSetting(unitId, "printer_wristband").then((r) => setWristbandPrinter(r.value ?? ""));
@@ -930,7 +931,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     try {
       const key = kind === "WRISTBAND" ? "printer_wristband" : "printer_receipt";
       await Api.setUnitSetting(unitId, key, kind === "WRISTBAND" ? wristbandPrinter : receiptPrinter);
-      toast.success("Impressora salva.");
+      toast.success("Impressora salva com sucesso.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível salvar a impressora.");
     } finally {
@@ -938,10 +939,35 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     }
   }
 
+  async function testReceiptPrint() {
+    setTestingReceipt(true);
+    try {
+      await Api.queuePrintJob(unitId, "RECEIPT", {
+        title: "Teste de Impressão",
+        unitName: "Unidade FaçaAmigos",
+        employeeName: "Operador Kiosk",
+        code: "TESTE-T271U",
+        items: [
+          { description: "Cupom de Teste Apptech T271U", quantity: 1, amountCents: 0 },
+          { description: "Verificação de Enquadramento", quantity: 1, amountCents: 0 },
+        ],
+        totalCents: 0,
+        payments: [{ method: "Teste do Sistema", amountCents: 0 }],
+        customerInfo: { childName: "Criança Teste", guardianName: "Responsável Teste" },
+        footerNote: "Teste de enquadramento 80mm OK!",
+      });
+      toast.success("Cupom de teste enviado para a fila de impressão!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar cupom de teste.");
+    } finally {
+      setTestingReceipt(false);
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
-        Digite o nome exato da impressora como ela aparece instalada no Windows deste terminal. O print bridge local usa esse nome para
+        Digite o nome exato da impressora como ela aparece instalada no Windows deste terminal (Painel de Controle &gt; Dispositivos e Impressoras). O print bridge local usa esse nome para
         imprimir direto, sem abrir diálogo nenhum na tela.
       </p>
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -951,18 +977,37 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
           Salvar
         </Button>
       </Card>
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Cupons</h2>
-        <Input placeholder="Ex: Elgin i9" value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} />
-        <Button variant="primary" size="sm" loading={saving === "RECEIPT"} onClick={() => save("RECEIPT")} style={{ alignSelf: "flex-start" }}>
-          Salvar
-        </Button>
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Cupons Não Fiscais (80mm)</h2>
+        <Input placeholder="Ex: Apptech T271U, Elgin i9, POS-80" value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} />
+        
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Modelos comuns:</span>
+          <Button variant="ghost" size="sm" onClick={() => setReceiptPrinter("Apptech T271U")}>
+            + Usar Apptech T271U
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setReceiptPrinter("Elgin i9")}>
+            + Usar Elgin i9
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setReceiptPrinter("POS-80")}>
+            + Usar POS-80
+          </Button>
+        </div>
+
+        <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+          <Button variant="primary" size="sm" loading={saving === "RECEIPT"} onClick={() => save("RECEIPT")}>
+            Salvar Impressora
+          </Button>
+          <Button variant="secondary" size="sm" loading={testingReceipt} onClick={testReceiptPrint}>
+            🖨️ Enviar Cupom de Teste
+          </Button>
+        </div>
       </Card>
 
       <div>
-        <h2 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Visualização rápida</h2>
+        <h2 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Visualização rápida de impressão</h2>
         <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: "0 0 12px 0" }}>
-          Layout de exemplo — não imprime nada, só mostra como pulseira e cupom vão sair.
+          Layout em tempo real — mostra o enquadramento exato de 42 colunas como sairá na impressora Apptech T271U.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -982,7 +1027,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
             </div>
           </Card>
           <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Cupom não fiscal (80mm)</h3>
+            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Cupom não fiscal (Apptech T271U / 80mm - 42 Colunas)</h3>
             <pre
               style={{
                 background: "#ffffff",
@@ -990,10 +1035,13 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
                 padding: "12px",
                 borderRadius: "12px",
                 border: "2px dashed var(--border-subtle)",
-                fontFamily: "monospace",
-                fontSize: "10px",
-                whiteSpace: "pre-wrap",
-                maxHeight: "320px",
+                fontFamily: '"Consolas", "Courier New", monospace',
+                fontSize: "11px",
+                lineHeight: "1.25",
+                fontWeight: 600,
+                whiteSpace: "pre",
+                maxHeight: "340px",
+                overflowX: "auto",
                 overflowY: "auto",
                 margin: 0,
               }}
