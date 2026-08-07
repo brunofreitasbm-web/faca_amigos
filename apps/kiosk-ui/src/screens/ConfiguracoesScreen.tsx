@@ -286,7 +286,7 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2>Novo plano</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo plano</h2>
         <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
         <Input label="Valor (R$)" type="number" value={valueReais} onChange={(e) => setValueReais(e.target.value)} />
         <div style={{ display: "flex", gap: "8px" }}>
@@ -370,7 +370,7 @@ function ProdutosTab({ unitId }: { unitId: string }) {
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2>Novo produto</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo produto</h2>
         <Input label="Emoji" value={emoji} onChange={(e) => setEmoji(e.target.value)} />
         <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
         <Input label="Preço (R$)" type="number" value={priceReais} onChange={(e) => setPriceReais(e.target.value)} />
@@ -424,7 +424,7 @@ function CuponsTab({ unitId }: { unitId: string }) {
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2>Novo cupom</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo cupom</h2>
         <Input label="Código" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
         <Select label="Tipo" value={kind} onChange={(e) => setKind(e.target.value as Coupon["kind"])}>
           <option value="MINUTOS_EXTRA">Minutos extras</option>
@@ -481,7 +481,7 @@ function FidelidadeTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boo
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2>Nova regra</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Nova regra</h2>
         <Input label="A cada X visitas" type="number" value={triggerVisits} onChange={(e) => setTriggerVisits(e.target.value)} />
         <Select label="Recompensa" value={rewardKind} onChange={(e) => setRewardKind(e.target.value as LoyaltyRule["rewardKind"])}>
           <option value="ENTRADA_GRATIS">Entrada grátis</option>
@@ -581,7 +581,7 @@ function FrotaTab({ unitId }: { unitId: string }) {
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2>Novo carrinho</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo carrinho</h2>
         <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
         <div>
           <label>Emoji</label>
@@ -799,7 +799,7 @@ function ColaboradoresTab() {
 
       {showForm && admin && (
         <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          <h2>Novo colaborador</h2>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo colaborador</h2>
           <Input label="Nome completo" value={fullName} onChange={(e) => setFullName(e.target.value)} />
           <Input label="CPF" value={cpf} onChange={(e) => setCpf(e.target.value)} />
           <Input
