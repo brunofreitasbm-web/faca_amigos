@@ -1024,7 +1024,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
 
       {/* IMPRESSORA DE PULSEIRAS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-        <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Pulseiras</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Impressora de Pulseiras</h2>
         <Input placeholder="Ex: Gainscha GS-2208D, Zebra ZD220" value={wristbandPrinter} onChange={(e) => setWristbandPrinter(e.target.value)} />
         
         <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
@@ -1063,7 +1063,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
 
       {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-        <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Cupons Não Fiscais (80mm / Apptech T271U)</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Impressora de Cupons Não Fiscais (80mm / Apptech T271U)</h2>
         <Input placeholder="Ex: Apptech T271U, Elgin i9, POS-80" value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} />
         
         <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
