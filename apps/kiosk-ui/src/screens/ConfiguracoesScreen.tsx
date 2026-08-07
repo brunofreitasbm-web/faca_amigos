@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input, Select, Tabs, HelpText } from "@facaamigos/ui";
+import { Button, Card, Input, Select, Tabs, HelpText, Modal, Tag } from "@facaamigos/ui";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
 import type {
@@ -1378,8 +1378,8 @@ function ColaboradoresTab() {
   const toast = useToast();
   const { can } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [admin, setAdmin] = useState<TerminalEmployee | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [espelhoTarget, setEspelhoTarget] = useState<Employee | null>(null);
 
   const [fullName, setFullName] = useState("");
@@ -1397,11 +1397,7 @@ function ColaboradoresTab() {
 
   const selectedFunction = FUNCTION_OPTIONS.find((f) => f.value === functionKey) ?? FUNCTION_OPTIONS[0]!;
 
-  // Redefinir PIN de um colaborador existente — exige o mesmo passo de
-  // ADMIN acima, mas fica separado porque age sobre um colaborador já
-  // escolhido (não sobre o formulário de cadastro).
   const [resetPinTarget, setResetPinTarget] = useState<Employee | null>(null);
-  const [resetPinAdmin, setResetPinAdmin] = useState<TerminalEmployee | null>(null);
   const [newPin, setNewPin] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
@@ -1422,6 +1418,7 @@ function ColaboradoresTab() {
     setFunctionKey(FUNCTION_OPTIONS[0]!.value);
     setContractType("CLT");
     setWeeklyHours("44");
+    setShowOptionalFields(false);
   }
 
   async function create() {
@@ -1429,22 +1426,21 @@ function ColaboradoresTab() {
     setError(null);
     try {
       await Api.createEmployee({
-        fullName,
+        fullName: fullName.trim(),
         role: selectedFunction.role,
-        cpf,
-        email,
-        phone,
+        cpf: cpfDigits ? cpfDigits : undefined,
+        email: email.trim() ? email.trim() : undefined,
+        phone: phoneDigits ? phoneDigits : undefined,
         pin,
-        birthDate,
-        admissionDate,
+        birthDate: birthDate || undefined,
+        admissionDate: admissionDate || undefined,
         position: selectedFunction.label,
         contractType,
-        weeklyHoursContracted: Number(weeklyHours),
+        weeklyHoursContracted: Number(weeklyHours) || 44,
       });
       toast.success("Colaborador criado — já pode entrar com o PIN definido.");
       resetForm();
       setShowForm(false);
-      setAdmin(null);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar colaborador");
@@ -1456,11 +1452,9 @@ function ColaboradoresTab() {
   async function toggleActive(emp: Employee) {
     try {
       await Api.setEmployeeActive(emp.id, !emp.active);
+      toast.success(`${emp.full_name} foi ${emp.active ? "desativado(a)" : "reativado(a)"}.`);
       load();
     } catch (err) {
-      // O erro pode vir do guard do último proprietário (migration
-      // 20260807000003), e nesse caso a mensagem do banco já explica o que
-      // fazer — mostrar ela crua é melhor que um genérico.
       toast.error(err instanceof Error ? err.message : "Não foi possível atualizar o colaborador");
     }
   }
@@ -1473,14 +1467,12 @@ function ColaboradoresTab() {
       load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível alterar o nível de acesso");
-      // Recarrega para o select voltar ao valor real caso o servidor recuse.
       load();
     }
   }
 
   function closeResetPin() {
     setResetPinTarget(null);
-    setResetPinAdmin(null);
     setNewPin("");
     setResetError(null);
   }
@@ -1502,176 +1494,296 @@ function ColaboradoresTab() {
 
   const cpfDigits = cpf.replace(/\D/g, "");
   const phoneDigits = phone.replace(/\D/g, "");
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const emailValid = !email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const cpfValid = !cpf || cpfDigits.length === 11;
+  const phoneValid = !phone || phoneDigits.length === 10 || phoneDigits.length === 11;
+
   const formValid = Boolean(
-    fullName &&
-      cpfDigits.length === 11 &&
-      emailValid &&
-      (phoneDigits.length === 10 || phoneDigits.length === 11) &&
+    fullName.trim().length >= 2 &&
       pin.length === 6 &&
-      birthDate &&
-      admissionDate &&
-      Number(weeklyHours) > 0,
+      cpfValid &&
+      emailValid &&
+      phoneValid
   );
 
   return (
     <div>
-      {!showForm && !admin && (
-        <Button variant="primary" onClick={() => setShowForm(true)} style={{ marginBottom: "16px" }}>
-          + Novo colaborador
-        </Button>
+      {!showForm && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+          <div>
+            <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>Equipe e Colaboradores</h2>
+            <HelpText>{employees.length} colaboradores cadastrados na unidade.</HelpText>
+          </div>
+          <Button variant="primary" onClick={() => setShowForm(true)} style={{ borderRadius: "9999px" }}>
+            ⚡ + Novo colaborador rápido
+          </Button>
+        </div>
       )}
 
-      {showForm && !admin && (
-        <Card style={{ padding: "16px", marginBottom: "16px" }}>
-          <p style={{ marginTop: 0, color: "var(--text-muted)" }}>Só o proprietário pode cadastrar colaborador — confirme com seu PIN.</p>
-          <EmployeeAuthGate
-            requireCapability="config.employees.write"
-            onAuthenticated={setAdmin}
-            onCancel={() => setShowForm(false)}
-          />
-        </Card>
-      )}
-
-      {showForm && admin && (
-        <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo colaborador</h2>
-          <Input label="Nome completo" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <Input
-            label="CPF"
-            value={cpf}
-            onChange={(e) => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))}
-            error={cpf && cpfDigits.length !== 11 ? "CPF precisa ter 11 dígitos" : undefined}
-          />
-          <Input
-            label="E-mail"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={email && !emailValid ? "E-mail inválido" : undefined}
-          />
-          <Input
-            label="Telefone (com DDD)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
-            error={phone && phoneDigits.length !== 10 && phoneDigits.length !== 11 ? "Telefone precisa ter 10 ou 11 dígitos" : undefined}
-          />
-          <Input
-            label="PIN de 6 dígitos (login deste colaborador)"
-            type="password"
-            inputMode="numeric"
-            autoComplete="new-password"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          />
-          <Input label="Data de nascimento" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-          <Input label="Data de admissão" type="date" value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
-          <Select label="Tipo de contrato" value={contractType} onChange={(e) => setContractType(e.target.value as typeof contractType)}>
-            <option value="CLT">CLT</option>
-            <option value="ESTAGIO">Estágio</option>
-            <option value="AUTONOMO">Autônomo</option>
-          </Select>
-          <Input label="Jornada semanal contratada (horas)" type="number" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} />
-          <Select
-            label="Função"
-            title={ROLE_DESCRIPTION[selectedFunction.role]}
-            value={functionKey}
-            onChange={(e) => setFunctionKey(e.target.value)}
-          >
-            {FUNCTION_OPTIONS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </Select>
-          <HelpText>
-            Nível de acesso: <strong>{ROLE_LABEL[selectedFunction.role]}</strong> — {ROLE_DESCRIPTION[selectedFunction.role]}
-          </HelpText>
-          {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
-          <div style={{ display: "flex", gap: "8px" }}>
-            <Button variant="primary" disabled={busy || !formValid} onClick={create}>
-              Criar colaborador
-            </Button>
-            <Button variant="ghost" onClick={() => { setShowForm(false); setAdmin(null); }}>
-              cancelar
+      {showForm && (
+        <Card style={{ padding: "20px", marginBottom: "20px", borderRadius: "18px", border: "2px solid var(--color-primary, #f0196b)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <div>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>⚡ Cadastro Rápido de Colaborador</h2>
+              <HelpText style={{ margin: 0 }}>Apenas Nome, Função e PIN são obrigatórios para cadastro imediato.</HelpText>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => { setShowForm(false); resetForm(); }}>
+              ✕ Fechar
             </Button>
           </div>
-        </Card>
-      )}
 
-      {resetPinTarget && (
-        <Card style={{ padding: "16px", marginBottom: "16px" }}>
-          <h2 style={{ marginTop: 0 }}>Redefinir PIN de {resetPinTarget.full_name}</h2>
-          {!resetPinAdmin ? (
-            <>
-              <p style={{ color: "var(--text-muted)" }}>Só o proprietário pode redefinir o PIN de outro colaborador — confirme com seu PIN.</p>
-              <EmployeeAuthGate
-                requireCapability="config.employees.write"
-                onAuthenticated={setResetPinAdmin}
-                onCancel={closeResetPin}
-              />
-            </>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
               <Input
-                label="Novo PIN de 6 dígitos"
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                value={newPin}
-                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                label="Nome completo *"
+                placeholder="Ex: Maria Silva"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
               />
-              {resetError && <p style={{ color: "var(--color-error-text)" }}>{resetError}</p>}
-              <div style={{ display: "flex", gap: "8px" }}>
-                <Button variant="primary" disabled={resetBusy || newPin.length !== 6} onClick={confirmResetPin}>
-                  Salvar novo PIN
-                </Button>
-                <Button variant="ghost" onClick={closeResetPin}>
-                  cancelar
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
 
-      {employees.map((e) => (
-        <Card key={e.id} style={{ padding: "12px", marginBottom: "8px", opacity: e.active === false ? 0.5 : 1 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <div>
-              <strong>{e.full_name}</strong> — {ROLE_LABEL[e.role]}
-              {e.position && <span style={{ color: "var(--text-muted)" }}> · {e.position}</span>}
-              {e.contract_type && <span style={{ color: "var(--text-muted)" }}> · {CONTRACT_TYPE_LABEL[e.contract_type]}</span>}
-              {e.admission_date && <span style={{ color: "var(--text-muted)" }}> · admitido em {new Date(e.admission_date).toLocaleDateString("pt-BR")}</span>}
-            </div>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <Select
-                aria-label={`Nível de acesso de ${e.full_name}`}
-                title={ROLE_DESCRIPTION[e.role]}
-                value={e.role}
-                onChange={(ev) => void changeRole(e, ev.target.value as Employee["role"])}
+                label="Função e Permissão *"
+                title={ROLE_DESCRIPTION[selectedFunction.role]}
+                value={functionKey}
+                onChange={(e) => setFunctionKey(e.target.value)}
               >
-                {(["OPERADOR", "GERENTE", "ADMIN"] as const).map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_LABEL[r]}
+                {FUNCTION_OPTIONS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label} ({ROLE_LABEL[f.role]})
                   </option>
                 ))}
               </Select>
-              <Button variant="ghost" size="sm" onClick={() => { setResetError(null); setResetPinTarget(e); }}>
-                redefinir PIN
+
+              <Input
+                label="PIN de Acesso (6 dígitos) *"
+                placeholder="Ex: 123456"
+                type="password"
+                inputMode="numeric"
+                autoComplete="new-password"
+                maxLength={6}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                error={pin && pin.length !== 6 ? "PIN deve ter 6 dígitos" : undefined}
+              />
+            </div>
+
+            <HelpText style={{ margin: 0 }}>
+              Permissão concedida: <strong>{ROLE_LABEL[selectedFunction.role]}</strong> — {ROLE_DESCRIPTION[selectedFunction.role]}
+            </HelpText>
+
+            {/* Seção opcional de dados complementares */}
+            <div style={{ marginTop: "4px" }}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowOptionalFields((v) => !v)}
+                style={{ color: "var(--color-primary-hover)", fontWeight: "bold" }}
+              >
+                {showOptionalFields ? "− Ocultar dados complementares" : "＋ Adicionar dados complementares (CPF, E-mail, Telefone, Admissão — Opcional)"}
               </Button>
-              {can("relatorio.ponto") && (
-                <Button variant="ghost" size="sm" onClick={() => setEspelhoTarget(e)} title="Gerar e imprimir o espelho de ponto mensal deste colaborador">
-                  📄 espelho de ponto
-                </Button>
+
+              {showOptionalFields && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginTop: "12px", padding: "14px", background: "var(--surface-sunken)", borderRadius: "14px" }}>
+                  <Input
+                    label="CPF (Opcional)"
+                    placeholder="000.000.000-00"
+                    value={cpf}
+                    onChange={(e) => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                    error={cpf && !cpfValid ? "CPF precisa ter 11 dígitos" : undefined}
+                  />
+                  <Input
+                    label="E-mail (Opcional)"
+                    type="email"
+                    placeholder="colaborador@empresa.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    error={email && !emailValid ? "E-mail inválido" : undefined}
+                  />
+                  <Input
+                    label="Telefone com DDD (Opcional)"
+                    placeholder="(91) 99999-9999"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                    error={phone && !phoneValid ? "Telefone precisa ter 10 ou 11 dígitos" : undefined}
+                  />
+                  <Input label="Data de nascimento (Opcional)" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+                  <Input label="Data de admissão (Opcional)" type="date" value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
+                  <Select label="Tipo de contrato" value={contractType} onChange={(e) => setContractType(e.target.value as typeof contractType)}>
+                    <option value="CLT">CLT</option>
+                    <option value="ESTAGIO">Estágio</option>
+                    <option value="AUTONOMO">Autônomo</option>
+                  </Select>
+                  <Input label="Jornada semanal (horas)" type="number" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} />
+                </div>
               )}
-              <Button variant="ghost" size="sm" onClick={() => toggleActive(e)}>
-                {e.active === false ? "reativar" : "desativar"}
+            </div>
+
+            {error && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{error}</p>}
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+              <Button variant="primary" disabled={busy || !formValid} onClick={create} style={{ borderRadius: "9999px" }}>
+                ✓ Cadastrar Colaborador
+              </Button>
+              <Button variant="ghost" onClick={() => { setShowForm(false); resetForm(); }}>
+                Cancelar
               </Button>
             </div>
           </div>
         </Card>
-      ))}
+      )}
+
+      {/* Modal simples de Redefinição de PIN */}
+      {resetPinTarget && (
+        <Modal onClose={closeResetPin} title={`🔑 Redefinir PIN de ${resetPinTarget.full_name}`}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
+              Informe o novo PIN numérico de 6 dígitos que o colaborador usará para login no sistema.
+            </p>
+            <Input
+              label="Novo PIN (6 dígitos)"
+              type="password"
+              inputMode="numeric"
+              autoComplete="new-password"
+              maxLength={6}
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              error={newPin && newPin.length !== 6 ? "PIN deve ter exatamente 6 dígitos" : undefined}
+            />
+            {resetError && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{resetError}</p>}
+            <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+              <Button variant="primary" disabled={resetBusy || newPin.length !== 6} onClick={confirmResetPin} style={{ borderRadius: "9999px", flex: 1 }}>
+                Salvar Novo PIN
+              </Button>
+              <Button variant="ghost" onClick={closeResetPin}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Lista visual da equipe */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {employees.map((e) => {
+          const roleBadgeStyle =
+            e.role === "ADMIN"
+              ? { bg: "rgba(124, 58, 237, 0.12)", color: "#6d28d9", label: "👑 Admin" }
+              : e.role === "GERENTE"
+              ? { bg: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", label: "⭐ Gerente" }
+              : { bg: "rgba(13, 148, 136, 0.12)", color: "#0f766e", label: "👤 Operador" };
+
+          return (
+            <Card
+              key={e.id}
+              style={{
+                padding: "16px",
+                borderRadius: "16px",
+                opacity: e.active === false ? 0.6 : 1,
+                border: e.active === false ? "1px dashed var(--border-subtle)" : "1px solid var(--border-subtle)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      width: "42px",
+                      height: "42px",
+                      borderRadius: "50%",
+                      background: roleBadgeStyle.bg,
+                      color: roleBadgeStyle.color,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: "bold",
+                      fontSize: "18px",
+                      fontFamily: "var(--font-display)",
+                    }}
+                  >
+                    {e.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <strong style={{ fontSize: "16px" }}>{e.full_name}</strong>
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          padding: "2px 8px",
+                          borderRadius: "9999px",
+                          background: roleBadgeStyle.bg,
+                          color: roleBadgeStyle.color,
+                        }}
+                      >
+                        {roleBadgeStyle.label}
+                      </span>
+                      {e.active === false ? (
+                        <Tag color="var(--text-muted)">Inativo</Tag>
+                      ) : (
+                        <Tag color="var(--color-teal, #1d9b84)">Ativo</Tag>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>
+                      {e.position || ROLE_LABEL[e.role]}
+                      {e.cpf ? ` · CPF: ${e.cpf}` : ""}
+                      {e.phone ? ` · Tel: ${e.phone}` : ""}
+                      {e.admission_date ? ` · Admitido: ${new Date(e.admission_date).toLocaleDateString("pt-BR")}` : ""}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <Select
+                    aria-label={`Nível de acesso de ${e.full_name}`}
+                    title={ROLE_DESCRIPTION[e.role]}
+                    value={e.role}
+                    onChange={(ev) => void changeRole(e, ev.target.value as Employee["role"])}
+                    style={{ minWidth: "120px", fontSize: "13px" }}
+                  >
+                    {(["OPERADOR", "GERENTE", "ADMIN"] as const).map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABEL[r]}
+                      </option>
+                    ))}
+                  </Select>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setResetError(null);
+                      setResetPinTarget(e);
+                    }}
+                    title="Redefinir PIN de login"
+                  >
+                    🔑 PIN
+                  </Button>
+
+                  {can("relatorio.ponto") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEspelhoTarget(e)}
+                      title="Gerar e imprimir o espelho de ponto mensal deste colaborador"
+                    >
+                      📄 Ponto
+                    </Button>
+                  )}
+
+                  <Button
+                    variant={e.active === false ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => toggleActive(e)}
+                    title={e.active === false ? "Ativar acesso do colaborador" : "Desativar acesso do colaborador"}
+                  >
+                    {e.active === false ? "Reativar" : "Desativar"}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
 
       {espelhoTarget && <EspelhoPontoModal employee={espelhoTarget} onClose={() => setEspelhoTarget(null)} />}
     </div>

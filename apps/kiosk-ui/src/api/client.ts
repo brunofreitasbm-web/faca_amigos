@@ -69,16 +69,16 @@ export interface Employee {
 export interface NewEmployeeInput {
   fullName: string;
   role: Employee["role"];
-  cpf: string;
-  email: string;
-  phone: string;
+  cpf?: string;
+  email?: string;
+  phone?: string;
   /** PIN de 6 dígitos escolhido pelo ADMIN para o novo colaborador — não existe login por e-mail/senha. */
   pin: string;
-  birthDate: string;
-  admissionDate: string;
-  position: string;
-  contractType: NonNullable<Employee["contract_type"]>;
-  weeklyHoursContracted: number;
+  birthDate?: string;
+  admissionDate?: string;
+  position?: string;
+  contractType?: NonNullable<Employee["contract_type"]>;
+  weeklyHoursContracted?: number;
 }
 
 export interface EspelhoPontoRecord {

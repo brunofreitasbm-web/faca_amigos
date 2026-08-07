@@ -54,6 +54,14 @@ export function Modal({
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+  // `onClose` costuma chegar como arrow function inline (ex.: os overlays
+  // flutuantes de Entrada/PDV do Painel), recriada a cada render do pai —
+  // no caso do Painel, a cada atualização realtime da lista de sessões.
+  // Guardar a versão mais recente numa ref (sem entrar nas deps do efeito
+  // abaixo) evita que esse reender externo dispare de novo o foco inicial
+  // do diálogo, que rouba o foco de quem está digitando dentro do modal.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     previousFocus.current = document.activeElement as HTMLElement | null;
@@ -65,7 +73,7 @@ export function Modal({
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab" || !dialogRef.current) return;
@@ -92,7 +100,10 @@ export function Modal({
       // onde estava toda vez que fecha um modal.
       previousFocus.current?.focus?.();
     };
-  }, [onClose]);
+    // Só no mount/unmount do diálogo — não a cada troca de identidade de
+    // `onClose` vinda de um reender externo ao modal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
