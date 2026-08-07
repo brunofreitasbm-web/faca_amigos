@@ -32,8 +32,8 @@ export function generateGainschaGS2208DTSPL(data: WristbandPrintPayload): string
     'TEXT 30,30,"3",0,1,1,"FACA AMIGOS"',
     'TEXT 30,85,"2",0,1,1,"PLAYGROUND INCLUSIVO"',
     // Seção 2: QR Code imprimível e Número Amigável
-    `QRCODE 420,10,M,4,A,0,"${cleanCode}"`,
-    `TEXT 420,120,"2",0,1,1,"#${friendlyCode}"`,
+    `QRCODE 420,5,M,3,A,0,"${cleanCode}"`,
+    `TEXT 420,115,"2",0,1,1,"#${friendlyCode}"`,
     // Seção 3: Dados da Criança e Responsável
     `TEXT 900,25,"4",0,1,1,"CRIANCA: ${childUpper}"`,
     `TEXT 900,90,"2",0,1,1,"RESP: ${guardianUpper} (${data.phone})"`,

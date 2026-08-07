@@ -8,6 +8,7 @@ import { useToast } from "../state/ToastContext.js";
 import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
+import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import { money } from "../format.js";
 
 type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES" | "IMPRESSORAS";
@@ -940,6 +941,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   const [saving, setSaving] = useState<"WRISTBAND" | "RECEIPT" | null>(null);
   const [testingReceipt, setTestingReceipt] = useState(false);
   const [testingWristband, setTestingWristband] = useState(false);
+  const [showWristbandTestModal, setShowWristbandTestModal] = useState(false);
 
   useEffect(() => {
     Api.unitSetting(unitId, "printer_wristband").then((r) => setWristbandPrinter(r.value ?? ""));
@@ -1030,14 +1032,24 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+        <div style={{ display: "flex", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
           <Button variant="primary" size="sm" loading={saving === "WRISTBAND"} onClick={() => save("WRISTBAND")}>
             Salvar Impressora
           </Button>
-          <Button variant="secondary" size="sm" loading={testingWristband} onClick={testWristbandPrint}>
-            🖨️ Enviar Pulseira de Teste
+          <Button variant="secondary" size="sm" onClick={() => setShowWristbandTestModal(true)}>
+            🖨️ Abrir Diálogo / Imprimir Pulseira de Teste
+          </Button>
+          <Button variant="ghost" size="sm" loading={testingWristband} onClick={testWristbandPrint} title="Enviar job diretamente para a fila de impressão do Electron (print bridge)">
+            ⚡ Enviar para Fila de Impressão
           </Button>
         </div>
+
+        {showWristbandTestModal && (
+          <WristbandPrintModal
+            data={SAMPLE_WRISTBAND}
+            onClose={() => setShowWristbandTestModal(false)}
+          />
+        )}
       </Card>
 
       {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
