@@ -1132,3 +1132,29 @@ create policy fa_kiosk_print_jobs_insert on fa_kiosk_print_jobs for insert with 
 drop policy if exists fa_kiosk_print_jobs_update on fa_kiosk_print_jobs;
 create policy fa_kiosk_print_jobs_update on fa_kiosk_print_jobs for update using (true) with check (true);
 
+-- Migração para suporte a dados importados do Safoplay e filtragem por origem
+alter table fa_kiosk_orders add column if not exists origin text check (origin in ('LOCAL', 'SAFOPLAY')) default 'LOCAL';
+update fa_kiosk_orders set origin = 'LOCAL' where origin is null;
+create index if not exists idx_fa_kiosk_orders_origin_date on fa_kiosk_orders (origin, business_date);
+
+alter table fa_kiosk_sessions add column if not exists origin text check (origin in ('LOCAL', 'SAFOPLAY')) default 'LOCAL';
+update fa_kiosk_sessions set origin = 'LOCAL' where origin is null;
+create index if not exists idx_fa_kiosk_sessions_origin_date on fa_kiosk_sessions (origin, business_date);
+
+alter table fa_kiosk_visit_log add column if not exists origin text check (origin in ('LOCAL', 'SAFOPLAY')) default 'LOCAL';
+update fa_kiosk_visit_log set origin = 'LOCAL' where origin is null;
+create index if not exists idx_fa_kiosk_visit_log_origin on fa_kiosk_visit_log (origin);
+
+alter table fa_kiosk_guardians add column if not exists origin text check (origin in ('LOCAL', 'SAFOPLAY')) default 'LOCAL';
+update fa_kiosk_guardians set origin = 'LOCAL' where origin is null;
+create index if not exists idx_fa_kiosk_guardians_origin on fa_kiosk_guardians (origin);
+
+alter table fa_kiosk_children add column if not exists origin text check (origin in ('LOCAL', 'SAFOPLAY')) default 'LOCAL';
+update fa_kiosk_children set origin = 'LOCAL' where origin is null;
+create index if not exists idx_fa_kiosk_children_origin on fa_kiosk_children (origin);
+
+alter table fa_kiosk_payments add column if not exists origin text check (origin in ('LOCAL', 'SAFOPLAY')) default 'LOCAL';
+update fa_kiosk_payments set origin = 'LOCAL' where origin is null;
+create index if not exists idx_fa_kiosk_payments_origin on fa_kiosk_payments (origin);
+
+

@@ -5,8 +5,12 @@ import type { CashMovement, RevenueByMethod, Shift, ShiftSale } from "../api/cli
 import { useAppState } from "../state/AppState.js";
 import { useConfirm } from "../state/ConfirmContext.js";
 import { money } from "../format.js";
+import { OFFLINE_FLUSH_EVENT, OfflineQueuedError } from "../lib/supabase/offlineQueue.js";
+import type { OfflineFlushDetail } from "../lib/supabase/offlineQueue.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
+
+type CloseResult = { expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number> };
 
 export function CaixaScreen() {
   const { unit, employee } = useAppState();
@@ -27,6 +31,10 @@ export function CaixaScreen() {
   const [declared, setDeclared] = useState<Record<string, string>>({ DINHEIRO: "0", PIX: "0", CREDITO: "0", DEBITO: "0" });
   const [closeResult, setCloseResult] = useState<{ expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number> } | null>(null);
   const [refreshError, setRefreshError] = useState(false);
+  // Enquanto isso está preenchido, o fechamento foi enviado mas ficou na fila
+  // offline (sem rede no momento) — ainda NÃO aconteceu de fato. O
+  // OFFLINE_FLUSH_EVENT abaixo resolve isso quando a fila reenviar sozinha.
+  const [pendingCloseKey, setPendingCloseKey] = useState<string | null>(null);
 
   async function refresh() {
     if (!unit) return;
@@ -54,6 +62,25 @@ export function CaixaScreen() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unit]);
+
+  useEffect(() => {
+    if (!pendingCloseKey) return;
+    function onFlush(event: Event) {
+      const detail = (event as CustomEvent<OfflineFlushDetail>).detail;
+      if (detail.idempotencyKey !== pendingCloseKey) return;
+      setPendingCloseKey(null);
+      if (detail.success) {
+        setCloseResult(detail.data as typeof closeResult extends infer T ? NonNullable<T> : never);
+      } else {
+        // A fila desistiu (erro de regra de negócio no reenvio, ex.: turno já
+        // fechado por outra via) — o fechamento não vai acontecer sozinho.
+        setError("Não foi possível concluir o fechamento enviado anteriormente. Tente fechar o turno novamente.");
+      }
+      refresh();
+    }
+    window.addEventListener(OFFLINE_FLUSH_EVENT, onFlush);
+    return () => window.removeEventListener(OFFLINE_FLUSH_EVENT, onFlush);
+  }, [pendingCloseKey]);
 
   async function openShift() {
     if (!unit || !employee) return;

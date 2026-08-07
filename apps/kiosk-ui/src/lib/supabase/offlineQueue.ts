@@ -15,6 +15,16 @@ import { supabase } from "./client.js";
 
 const QUEUE_KEY = "fa_kiosk_offline_queue";
 
+/** Evento disparado quando uma chamada da fila é processada (com sucesso ou erro de regra de negócio). */
+export const OFFLINE_FLUSH_EVENT = "fa-offline-flush";
+
+export interface OfflineFlushDetail {
+  idempotencyKey: string;
+  rpcName: string;
+  success: boolean;
+  data?: unknown;
+}
+
 interface PendingCall {
   idempotencyKey: string;
   rpcName: string;
@@ -80,16 +90,23 @@ export async function flushOfflineQueue(): Promise<void> {
   const remaining: PendingCall[] = [];
   for (const call of queue) {
     try {
-      const { error } = await supabase().rpc(call.rpcName, { p_idempotency_key: call.idempotencyKey, ...call.args });
+      const { data, error } = await supabase().rpc(call.rpcName, { p_idempotency_key: call.idempotencyKey, ...call.args });
       if (error) throw error;
+      dispatchFlushResult({ idempotencyKey: call.idempotencyKey, rpcName: call.rpcName, success: true, data });
     } catch (err) {
       if (isNetworkError(err)) {
         remaining.push(call);
         continue;
       }
       // Erro de regra de negócio (ex.: cupom esgotado nesse meio tempo) —
-      // não adianta reenviar, mas também não trava a fila inteira.
+      // não adianta reenviar, mas também não trava a fila inteira. A tela
+      // que originou a chamada precisa saber que ela NÃO vai mais acontecer.
+      dispatchFlushResult({ idempotencyKey: call.idempotencyKey, rpcName: call.rpcName, success: false });
     }
   }
   writeQueue(remaining);
+}
+
+function dispatchFlushResult(detail: OfflineFlushDetail) {
+  window.dispatchEvent(new CustomEvent<OfflineFlushDetail>(OFFLINE_FLUSH_EVENT, { detail }));
 }

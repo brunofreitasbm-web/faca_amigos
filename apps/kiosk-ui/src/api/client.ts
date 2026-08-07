@@ -793,19 +793,32 @@ export const Api = {
     return { totalCents };
   },
   /** Quantidade de sessões vendidas por tipo de plano no intervalo de dias operacionais. */
-  reportPlansSold: async (unitId: string, from: string, to: string) => {
-    const rows = await unwrap<Record<string, unknown>[]>(
-      supabase().rpc("fa_kiosk_plans_sold", { p_unit_id: unitId, p_from: from, p_to: to }),
-    );
-    return rows.map((r) => ({
-      plan_id: r.plan_id as string,
-      plan_name: r.plan_name as string,
-      plan_color: r.plan_color as string,
-      activity: r.activity as PlanSold["activity"],
-      // count() do Postgres volta como bigint, que o supabase-js entrega
-      // string quando passa de 2^53 — Number() aqui evita "3" + 1 = "31".
-      sessions_count: Number(r.sessions_count),
-    })) as PlanSold[];
+  reportPlansSold: async (unitId: string, from: string, to: string, origin?: string) => {
+    let query = supabase()
+      .from("fa_kiosk_sessions")
+      .select("plan_id, fa_kiosk_plans(name, color, activity)")
+      .eq("unit_id", unitId)
+      .gte("business_date", from)
+      .lte("business_date", to);
+    if (origin && origin !== "ALL") {
+      query = query.eq("origin", origin);
+    }
+    const rows = await unwrap<Record<string, unknown>[]>(query);
+    const map = new Map<string, { plan_id: string; plan_name: string; plan_color: string; activity: PlanSold["activity"]; sessions_count: number }>();
+    for (const r of rows) {
+      const planId = r.plan_id as string;
+      const plan = r.fa_kiosk_plans as unknown as { name: string; color: string; activity: PlanSold["activity"] } | null;
+      const cur = map.get(planId) ?? {
+        plan_id: planId,
+        plan_name: plan?.name ?? "Plano",
+        plan_color: plan?.color ?? "#2ECFB5",
+        activity: plan?.activity ?? "PLAYGROUND",
+        sessions_count: 0,
+      };
+      cur.sessions_count += 1;
+      map.set(planId, cur);
+    }
+    return [...map.values()] as PlanSold[];
   },
   notifySession: async (sessionId: string, body: { channel: "WHATSAPP" | "SMS"; message: string }) => {
     await unwrap(
@@ -954,16 +967,18 @@ export const Api = {
   // cafbda6), então todo relatório voltava 404. Reescritos como consultas
   // diretas ao Supabase, agregadas no cliente (mesmo padrão de
   // apps/backoffice/.../relatorios/page.tsx).
-  reportSales: async (unitId: string, from: string, to: string) => {
-    const orders = await unwrap<Record<string, unknown>[]>(
-      supabase()
-        .from("fa_kiosk_orders")
-        .select("id, business_date, total_cents")
-        .eq("unit_id", unitId)
-        .eq("status", "PAGA")
-        .gte("business_date", from)
-        .lte("business_date", to),
-    );
+  reportSales: async (unitId: string, from: string, to: string, origin?: string) => {
+    let ordersQuery = supabase()
+      .from("fa_kiosk_orders")
+      .select("id, business_date, total_cents")
+      .eq("unit_id", unitId)
+      .eq("status", "PAGA")
+      .gte("business_date", from)
+      .lte("business_date", to);
+    if (origin && origin !== "ALL") {
+      ordersQuery = ordersQuery.eq("origin", origin);
+    }
+    const orders = await unwrap<Record<string, unknown>[]>(ordersQuery);
     const byDayMap = new Map<string, { orders_count: number; total_cents: number }>();
     for (const o of orders) {
       const d = o.business_date as string;
@@ -979,9 +994,11 @@ export const Api = {
     const orderIds = orders.map((o) => o.id as string);
     let byMethod: RevenueByMethod[] = [];
     if (orderIds.length > 0) {
-      const payments = await unwrap<Record<string, unknown>[]>(
-        supabase().from("fa_kiosk_payments").select("method, amount_cents").in("order_id", orderIds),
-      );
+      let paymentsQuery = supabase().from("fa_kiosk_payments").select("method, amount_cents").in("order_id", orderIds);
+      if (origin && origin !== "ALL") {
+        paymentsQuery = paymentsQuery.eq("origin", origin);
+      }
+      const payments = await unwrap<Record<string, unknown>[]>(paymentsQuery);
       const methodMap = new Map<string, number>();
       for (const p of payments) {
         const m = p.method as string;
@@ -991,10 +1008,12 @@ export const Api = {
     }
     return { byDay, byMethod };
   },
-  reportVisits: async (unitId: string, from: string, to: string) => {
-    const sessions = await unwrap<Record<string, unknown>[]>(
-      supabase().from("fa_kiosk_sessions").select("business_date").eq("unit_id", unitId).gte("business_date", from).lte("business_date", to),
-    );
+  reportVisits: async (unitId: string, from: string, to: string, origin?: string) => {
+    let query = supabase().from("fa_kiosk_sessions").select("business_date").eq("unit_id", unitId).gte("business_date", from).lte("business_date", to);
+    if (origin && origin !== "ALL") {
+      query = query.eq("origin", origin);
+    }
+    const sessions = await unwrap<Record<string, unknown>[]>(query);
     const map = new Map<string, number>();
     for (const s of sessions) {
       const d = s.business_date as string;
@@ -1002,10 +1021,14 @@ export const Api = {
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([business_date, sessions_count]) => ({ business_date, sessions_count }));
   },
-  reportBirthdays: async (month: number) => {
-    const children = await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_children").select("id, full_name, birth_date"));
+  reportBirthdays: async (month: number, origin?: string) => {
+    let query = supabase().from("fa_kiosk_children").select("id, full_name, birth_date");
+    if (origin && origin !== "ALL") {
+      query = query.eq("origin", origin);
+    }
+    const children = await unwrap<Record<string, unknown>[]>(query);
     return children
-      .filter((c) => new Date(c.birth_date as string).getUTCMonth() + 1 === month)
+      .filter((c) => c.birth_date && new Date(c.birth_date as string).getUTCMonth() + 1 === month)
       .map((c) => ({ id: c.id as string, full_name: c.full_name as string, birth_date: c.birth_date as string }));
   },
   reportShifts: (unitId: string) =>
@@ -1016,19 +1039,21 @@ export const Api = {
         .eq("unit_id", unitId)
         .order("opened_at_ms", { ascending: false }),
     ),
-  reportAssetUsage: async (unitId: string, from: string, to: string) => {
+  reportAssetUsage: async (unitId: string, from: string, to: string, origin?: string) => {
+    let sessionsQuery = supabase()
+      .from("fa_kiosk_sessions")
+      .select("asset_id, checkin_at_ms, checkout_at_ms")
+      .eq("unit_id", unitId)
+      .eq("activity", "CARRINHO")
+      .not("asset_id", "is", null)
+      .gte("business_date", from)
+      .lte("business_date", to);
+    if (origin && origin !== "ALL") {
+      sessionsQuery = sessionsQuery.eq("origin", origin);
+    }
     const [assets, sessions] = await Promise.all([
       unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_assets").select("id, name, emoji, color").eq("unit_id", unitId)),
-      unwrap<Record<string, unknown>[]>(
-        supabase()
-          .from("fa_kiosk_sessions")
-          .select("asset_id, checkin_at_ms, checkout_at_ms")
-          .eq("unit_id", unitId)
-          .eq("activity", "CARRINHO")
-          .not("asset_id", "is", null)
-          .gte("business_date", from)
-          .lte("business_date", to),
-      ),
+      unwrap<Record<string, unknown>[]>(sessionsQuery),
     ]);
     const usageByAsset = new Map<string, { sessions_count: number; total_minutes: number }>();
     const nowMs = Date.now();

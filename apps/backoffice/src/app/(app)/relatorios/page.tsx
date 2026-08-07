@@ -11,27 +11,75 @@ import {
   TopProductsChart,
 } from "./ReportCharts";
 
-function getPeriodDates(period: string) {
+function getPeriodDates(period: string, customFrom?: string, customTo?: string) {
   const now = new Date();
-  let days = 30;
+  const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
-  if (period === "7d") days = 7;
-  else if (period === "90d") days = 90;
-  else if (period === "this_month") {
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const diffTime = Math.abs(now.getTime() - firstDay.getTime());
-    days = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  let sinceDate = new Date();
+  let untilDate = new Date();
+  let prevSinceDate = new Date();
+  let prevUntilDate = new Date();
+
+  if (period === "today") {
+    sinceDate = new Date(now);
+    untilDate = new Date(now);
+    prevSinceDate = new Date(now);
+    prevSinceDate.setDate(now.getDate() - 1);
+    prevUntilDate = new Date(prevSinceDate);
+  } else if (period === "yesterday") {
+    sinceDate = new Date(now);
+    sinceDate.setDate(now.getDate() - 1);
+    untilDate = new Date(sinceDate);
+    prevSinceDate = new Date(now);
+    prevSinceDate.setDate(now.getDate() - 2);
+    prevUntilDate = new Date(prevSinceDate);
+  } else if (period === "7d") {
+    sinceDate.setDate(now.getDate() - 7);
+    prevSinceDate.setDate(now.getDate() - 14);
+    prevUntilDate.setDate(now.getDate() - 7);
+  } else if (period === "90d") {
+    sinceDate.setDate(now.getDate() - 90);
+    prevSinceDate.setDate(now.getDate() - 180);
+    prevUntilDate.setDate(now.getDate() - 90);
+  } else if (period === "this_month") {
+    sinceDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    prevSinceDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    prevUntilDate = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if (period === "last_month") {
+    sinceDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    untilDate = new Date(now.getFullYear(), now.getMonth(), 0);
+    prevSinceDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    prevUntilDate = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+  } else if (period === "this_year") {
+    sinceDate = new Date(now.getFullYear(), 0, 1);
+    prevSinceDate = new Date(now.getFullYear() - 1, 0, 1);
+    prevUntilDate = new Date(now.getFullYear() - 1, 11, 31);
+  } else if (period === "last_year") {
+    sinceDate = new Date(now.getFullYear() - 1, 0, 1);
+    untilDate = new Date(now.getFullYear() - 1, 11, 31);
+    prevSinceDate = new Date(now.getFullYear() - 2, 0, 1);
+    prevUntilDate = new Date(now.getFullYear() - 2, 11, 31);
+  } else if (period === "custom" && customFrom && customTo) {
+    sinceDate = new Date(customFrom);
+    untilDate = new Date(customTo);
+    const diffTime = Math.abs(untilDate.getTime() - sinceDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+    prevSinceDate = new Date(sinceDate);
+    prevSinceDate.setDate(sinceDate.getDate() - diffDays);
+    prevUntilDate = new Date(sinceDate);
+  } else {
+    // 30d por padrão
+    sinceDate.setDate(now.getDate() - 30);
+    prevSinceDate.setDate(now.getDate() - 60);
+    prevUntilDate.setDate(now.getDate() - 30);
   }
 
-  const sinceDate = new Date();
-  sinceDate.setDate(now.getDate() - days);
-  const since = sinceDate.toISOString().slice(0, 10);
-
-  const prevSinceDate = new Date();
-  prevSinceDate.setDate(now.getDate() - days * 2);
-  const previousSince = prevSinceDate.toISOString().slice(0, 10);
-
-  return { days, since, previousSince };
+  return {
+    since: isoDate(sinceDate),
+    until: isoDate(untilDate),
+    previousSince: isoDate(prevSinceDate),
+    previousUntil: isoDate(prevUntilDate),
+  };
 }
 
 function pctDelta(current: number, previous: number): number | null {
@@ -56,16 +104,25 @@ function DeltaBadge({ pct }: { pct: number | null }) {
 }
 
 interface PageProps {
-  searchParams: Promise<{ period?: string; unitId?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    origin?: string;
+    unitId?: string;
+    from?: string;
+    to?: string;
+  }>;
 }
 
 export default async function RelatoriosPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const period = params.period ?? "30d";
+  const origin = params.origin ?? "ALL";
   const unitId = params.unitId ?? "all";
+  const from = params.from ?? "";
+  const to = params.to ?? "";
 
   const supabase = await createClient();
-  const { days, since, previousSince } = getPeriodDates(period);
+  const { since, until, previousSince, previousUntil } = getPeriodDates(period, from, to);
 
   // Busca lista de unidades para o filtro
   const unitsRes = await supabase.from("fa_kiosk_units").select("id, name").order("name");
@@ -76,43 +133,58 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
     .from("fa_kiosk_orders")
     .select("business_date, total_cents, unit_id, created_at, fa_kiosk_units(name)")
     .eq("status", "PAGA")
-    .gte("business_date", since);
+    .gte("business_date", since)
+    .lte("business_date", until);
 
   let sessionsQuery = supabase
     .from("fa_kiosk_sessions")
     .select("business_date, created_at_ms, unit_id")
-    .gte("business_date", since);
+    .gte("business_date", since)
+    .lte("business_date", until);
 
   let paymentsQuery = supabase
     .from("fa_kiosk_payments")
     .select("method, amount_cents, created_at")
-    .gte("created_at", `${since}T00:00:00Z`);
+    .gte("created_at", `${since}T00:00:00Z`)
+    .lte("created_at", `${until}T23:59:59Z`);
 
   let itemsQuery = supabase
     .from("fa_kiosk_order_items")
     .select("description, total_cents, fa_kiosk_orders!inner(status, business_date, unit_id)")
     .eq("fa_kiosk_orders.status", "PAGA")
-    .gte("fa_kiosk_orders.business_date", since);
+    .gte("fa_kiosk_orders.business_date", since)
+    .lte("fa_kiosk_orders.business_date", until);
 
   let prevOrdersQuery = supabase
     .from("fa_kiosk_orders")
     .select("total_cents")
     .eq("status", "PAGA")
     .gte("business_date", previousSince)
-    .lt("business_date", since);
+    .lte("business_date", previousUntil);
 
   let prevSessionsQuery = supabase
     .from("fa_kiosk_sessions")
     .select("id", { count: "exact", head: true })
     .gte("business_date", previousSince)
-    .lt("business_date", since);
+    .lte("business_date", previousUntil);
 
+  // Aplicar filtro de Unidade
   if (unitId !== "all") {
     ordersQuery = ordersQuery.eq("unit_id", unitId);
     sessionsQuery = sessionsQuery.eq("unit_id", unitId);
     itemsQuery = itemsQuery.eq("fa_kiosk_orders.unit_id", unitId);
     prevOrdersQuery = prevOrdersQuery.eq("unit_id", unitId);
     prevSessionsQuery = prevSessionsQuery.eq("unit_id", unitId);
+  }
+
+  // Aplicar filtro de Origem (Local vs Safoplay)
+  if (origin !== "ALL") {
+    ordersQuery = ordersQuery.eq("origin", origin);
+    sessionsQuery = sessionsQuery.eq("origin", origin);
+    itemsQuery = itemsQuery.eq("fa_kiosk_orders.origin", origin);
+    prevOrdersQuery = prevOrdersQuery.eq("origin", origin);
+    prevSessionsQuery = prevSessionsQuery.eq("origin", origin);
+    paymentsQuery = paymentsQuery.eq("origin", origin);
   }
 
   const [ordersRes, sessionsRes, paymentsRes, itemsRes, previousOrdersRes, previousSessionsRes] =
@@ -170,9 +242,10 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
 
   // Descobrir o horário de pico máximo
   const peakHourEntry = [...hourlyMap.entries()].sort(([, a], [, b]) => b - a)[0];
-  const peakHourText = peakHourEntry && peakHourEntry[1] > 0
-    ? `${String(peakHourEntry[0]).padStart(2, "0")}:00 - ${String(peakHourEntry[0] + 1).padStart(2, "0")}:00`
-    : "Sem dados suficientes";
+  const peakHourText =
+    peakHourEntry && peakHourEntry[1] > 0
+      ? `${String(peakHourEntry[0]).padStart(2, "0")}:00 - ${String(peakHourEntry[0] + 1).padStart(2, "0")}:00`
+      : "Sem dados suficientes";
 
   // Formas de Pagamento
   const METHOD_LABEL: Record<string, string> = {
@@ -235,17 +308,21 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <PageTitle description="Análise gráfica detalhada das vendas, check-ins e operação do Faça Amigos.">
+      <PageTitle description="Análise gráfica detalhada das vendas, check-ins e operação do Faça Amigos (incluindo dados importados do Safoplay).">
         Relatórios
       </PageTitle>
 
-      {/* Filtros de Período, Unidade e Exportação CSV */}
+      {/* Filtros de Período, Origem, Unidade e Exportação CSV */}
       <ReportFilters
         units={units}
         currentPeriod={period}
+        currentOrigin={origin}
         currentUnitId={unitId}
+        currentFrom={from}
+        currentTo={to}
         exportData={exportData}
       />
+
       <div
         style={{
           display: "grid",
