@@ -23,7 +23,15 @@ export class ConflictError extends Error {
 export function parseBody<S extends ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
   const result = schema.safeParse(body);
   if (!result.success) {
-    throw new ValidationError(result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    throw new ValidationError(
+      result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+    );
   }
   return result.data;
 }
+
+/**
+ * Mesma validação, nome honesto para querystring — que chega sempre
+ * como string e por isso costuma precisar de coerção no schema.
+ */
+export const parseQuery = parseBody;

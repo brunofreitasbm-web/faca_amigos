@@ -12,6 +12,7 @@ import { registerShiftRoutes } from "./routes/shifts.js";
 import { registerPontoRoutes } from "./routes/ponto.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerReportRoutes } from "./routes/reports.js";
+import { registerFaturamentoRoutes } from "./routes/faturamento.js";
 import { registerTickChannel } from "./ws-tick.js";
 import { ValidationError, ConflictError } from "./validate.js";
 import type { TlsMaterial } from "./tls.js";
@@ -33,7 +34,9 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
   // options (overloads incompatíveis para HTTP vs HTTPS) — unificar aqui
   // para o resto do arquivo não precisar carregar essa união.
   const app: FastifyInstance = (
-    opts.tls ? Fastify({ logger: true, https: { key: opts.tls.key, cert: opts.tls.cert } }) : Fastify({ logger: true })
+    opts.tls
+      ? Fastify({ logger: true, https: { key: opts.tls.key, cert: opts.tls.cert } })
+      : Fastify({ logger: true })
   ) as FastifyInstance;
 
   await app.register(cors, { origin: true });
@@ -44,7 +47,9 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
       return reply.code(err.statusCode).send({ error: "VALIDATION_ERROR", message: err.message });
     }
     if (err instanceof ConflictError) {
-      return reply.code(err.statusCode).send({ error: "CONFLICT", message: err.message, ...err.details });
+      return reply
+        .code(err.statusCode)
+        .send({ error: "CONFLICT", message: err.message, ...err.details });
     }
     app.log.error(err);
     return reply.code(500).send({ error: "INTERNAL_ERROR" });
@@ -61,6 +66,7 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
   registerPontoRoutes(app, ctx);
   registerAuthRoutes(app, ctx);
   registerReportRoutes(app, ctx);
+  registerFaturamentoRoutes(app, ctx);
   registerTickChannel(app, ctx);
 
   return app;

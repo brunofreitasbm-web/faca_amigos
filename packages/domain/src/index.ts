@@ -9,8 +9,6 @@ export * from "./rbac/permissions.js";
 export * from "./phone.js";
 export * from "./cpf.js";
 export * from "./date.js";
+export * from "./faturamento/faturamento-shopping.js";
 export * from "./printers/gainscha.js";
 export * from "./printers/escpos.js";
-
-
-

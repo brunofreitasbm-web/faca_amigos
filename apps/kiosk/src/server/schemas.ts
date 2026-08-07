@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { normalizePhoneE164, normalizeCpf, isValidCpf } from "@facaamigos/domain";
 
-
 /**
  * DTOs específicos de Configurações/gestão que ainda não vivem em
  * packages/contracts. Ficam aqui enquanto só o kiosk local os usa; o
@@ -107,14 +106,13 @@ export const checkinBodySchema = z.object({
   guardian: z.object({
     id: z.string().uuid().optional(),
     fullName: z.string().min(2),
-    cpf: z
-      .string()
-      .transform(normalizeCpf)
-      .pipe(z.string().refine(isValidCpf, "CPF inválido")),
+    cpf: z.string().transform(normalizeCpf).pipe(z.string().refine(isValidCpf, "CPF inválido")),
     phoneE164: z
       .string()
       .transform(normalizePhoneE164)
-      .pipe(z.string().regex(/^\+55\d{10,11}$/, "Telefone deve conter DDD + número (ex: 91999999999)")),
+      .pipe(
+        z.string().regex(/^\+55\d{10,11}$/, "Telefone deve conter DDD + número (ex: 91999999999)"),
+      ),
   }),
   couponCode: z.string().optional(),
 });
@@ -138,7 +136,9 @@ export const checkoutBodySchema = z.object({
 export const pdvOrderBodySchema = z.object({
   unitId: z.string().uuid(),
   employeeId: z.string().uuid(),
-  items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().int().positive() })).min(1),
+  items: z
+    .array(z.object({ productId: z.string().uuid(), quantity: z.number().int().positive() }))
+    .min(1),
   payments: z
     .array(
       z.object({
@@ -172,4 +172,48 @@ export const pontoBodySchema = z.object({
   employeeId: z.string().uuid(),
   kind: z.enum(["ENTRADA", "SAIDA", "INTERVALO_INICIO", "INTERVALO_FIM"]),
   registeredByEmployeeId: z.string().uuid().optional(),
+});
+
+// --- Integração de faturamento com o shopping (ver routes/faturamento.ts) ---
+
+const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "use o formato AAAA-MM-DD");
+
+/**
+ * Período consultável. O teto de 366 dias não é capricho: a
+ * declaração é mensal, e um intervalo aberto vindo de fora seria um
+ * jeito fácil de derrubar o kiosk no meio do expediente.
+ */
+export const periodoFaturamentoSchema = z
+  .object({
+    unitId: z.string().uuid(),
+    de: dataIso,
+    ate: dataIso,
+  })
+  .refine((v) => v.de <= v.ate, { message: "'de' não pode ser posterior a 'ate'", path: ["de"] })
+  .refine(
+    (v) => (Date.parse(`${v.ate}T00:00:00Z`) - Date.parse(`${v.de}T00:00:00Z`)) / 86_400_000 <= 366,
+    {
+      message: "período máximo de 366 dias por consulta",
+      path: ["ate"],
+    },
+  );
+
+/** CNPJ guardado só com dígitos; a máscara é assunto da tela. */
+export const identificacaoFiscalSchema = z.object({
+  cnpj: z
+    .string()
+    .transform((s) => s.replace(/\D/g, ""))
+    .refine((s) => s.length === 14, "CNPJ deve ter 14 dígitos")
+    .optional(),
+  razaoSocial: z.string().min(1).optional(),
+  shoppingLuc: z.string().min(1).optional(),
+  shoppingStoreCode: z.string().min(1).optional(),
+});
+
+export const criarChaveIntegracaoSchema = z.object({
+  employeeId: z.string().uuid(),
+  /** Nome legível de quem recebeu a chave — "Parque Shopping — portal do lojista". */
+  nome: z.string().min(1),
+  /** Quando presente, a chave só enxerga essa unidade. */
+  unitId: z.string().uuid().optional(),
 });
