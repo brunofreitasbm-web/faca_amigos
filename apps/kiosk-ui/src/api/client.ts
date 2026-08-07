@@ -887,6 +887,15 @@ export const Api = {
     ),
   setPackageActive: (id: string, active: boolean) =>
     unwrap(supabase().from("fa_kiosk_packages").update({ active }).eq("id", id)),
+  updatePackage: (id: string, body: { name: string; priceCents: number; includedMinutes: number; validityDays: number; benefitText: string; color: string }) =>
+    unwrap(supabase().from("fa_kiosk_packages").update({
+      name: body.name,
+      price_cents: body.priceCents,
+      included_minutes: body.includedMinutes,
+      validity_days: body.validityDays,
+      benefit_text: body.benefitText,
+      color: body.color,
+    }).eq("id", id)),
   redeemableRewards: (childId: string) =>
     unwrap<RedeemableReward[]>(
       supabase()
@@ -1154,6 +1163,9 @@ export const Api = {
         .select("id")
         .single(),
     ),
+  setBonusRuleActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_bonus_rules").update({ active }).eq("id", id)),
+  updateBonusRule: (id: string, body: { description: string; rewardValueCents: number }) =>
+    unwrap(supabase().from("fa_kiosk_bonus_rules").update({ description: body.description, reward_value_cents: body.rewardValueCents }).eq("id", id)),
   unitSetting: async (unitId: string, key: UnitSettingKey) => {
     try {
       const row = await unwrap<{ value: string } | null>(
@@ -1247,16 +1259,13 @@ export const Api = {
     return { totalCents };
   },
   /** Quantidade de sessões vendidas por tipo de plano no intervalo de dias operacionais. */
-  reportPlansSold: async (unitId: string, from: string, to: string, origin?: string) => {
+  reportPlansSold: async (unitId: string, from: string, to: string) => {
     let query = supabase()
       .from("fa_kiosk_sessions")
       .select("plan_id, fa_kiosk_plans(name, color, activity)")
       .eq("unit_id", unitId)
       .gte("business_date", from)
       .lte("business_date", to);
-    if (origin && origin !== "ALL") {
-      query = query.eq("origin", origin);
-    }
     const rows = await unwrap<Record<string, unknown>[]>(query);
     const map = new Map<string, { plan_id: string; plan_name: string; plan_color: string; activity: PlanSold["activity"]; sessions_count: number }>();
     for (const r of rows) {
@@ -1304,6 +1313,9 @@ export const Api = {
         .select("id")
         .single(),
     ),
+  setCouponActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_coupons").update({ active }).eq("id", id)),
+  updateCoupon: (id: string, body: { code: string; kind: Coupon["kind"]; value: number; description?: string }) =>
+    unwrap(supabase().from("fa_kiosk_coupons").update({ code: body.code, kind: body.kind, value: body.value, description: body.description ?? null }).eq("id", id)),
   loyaltyRules: (unitId: string) =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_loyalty_rules").select("*").eq("unit_id", unitId)).then((rows) =>
       rows.map(loyaltyRuleFromRow),
@@ -1355,6 +1367,15 @@ export const Api = {
         .single(),
     ),
   setPlanActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_plans").update({ active }).eq("id", id)),
+  updatePlan: (id: string, body: { name: string; valueCents: number; durationValue: number; durationUnit: Plan["durationUnit"]; overageCentsPerMinute: number; color: string }) =>
+    unwrap(supabase().from("fa_kiosk_plans").update({
+      name: body.name,
+      value_cents: body.valueCents,
+      duration_value: body.durationValue,
+      duration_unit: body.durationUnit,
+      overage_cents_per_minute: body.overageCentsPerMinute,
+      color: body.color,
+    }).eq("id", id)),
   createProduct: (body: { unitId: string; name: string; emoji?: string; priceCents: number; stock: number }) =>
     unwrap<{ id: string }>(
       supabase()
@@ -1363,6 +1384,9 @@ export const Api = {
         .select("id")
         .single(),
     ),
+  setProductActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_products").update({ active }).eq("id", id)),
+  updateProduct: (id: string, body: { name: string; emoji?: string; priceCents: number; stock: number }) =>
+    unwrap(supabase().from("fa_kiosk_products").update({ name: body.name, emoji: body.emoji ?? null, price_cents: body.priceCents, stock: body.stock }).eq("id", id)),
   createAsset: (body: {
     unitId: string;
     name: string;
@@ -1540,7 +1564,7 @@ export const Api = {
   // cafbda6), então todo relatório voltava 404. Reescritos como consultas
   // diretas ao Supabase, agregadas no cliente (mesmo padrão de
   // apps/backoffice/.../relatorios/page.tsx).
-  reportSales: async (unitId: string, from: string, to: string, origin?: string) => {
+  reportSales: async (unitId: string, from: string, to: string) => {
     let ordersQuery = supabase()
       .from("fa_kiosk_orders")
       .select("id, business_date, total_cents")
@@ -1548,9 +1572,6 @@ export const Api = {
       .eq("status", "PAGA")
       .gte("business_date", from)
       .lte("business_date", to);
-    if (origin && origin !== "ALL") {
-      ordersQuery = ordersQuery.eq("origin", origin);
-    }
     const orders = await unwrap<Record<string, unknown>[]>(ordersQuery);
     const byDayMap = new Map<string, { orders_count: number; total_cents: number }>();
     for (const o of orders) {
@@ -1566,11 +1587,8 @@ export const Api = {
 
     const orderIds = orders.map((o) => o.id as string);
     let byMethod: RevenueByMethod[] = [];
-    if (orderIds.length > 0) {
+      if (orderIds.length > 0) {
       let paymentsQuery = supabase().from("fa_kiosk_payments").select("method, amount_cents").in("order_id", orderIds);
-      if (origin && origin !== "ALL") {
-        paymentsQuery = paymentsQuery.eq("origin", origin);
-      }
       const payments = await unwrap<Record<string, unknown>[]>(paymentsQuery);
       const methodMap = new Map<string, number>();
       for (const p of payments) {
@@ -1581,11 +1599,8 @@ export const Api = {
     }
     return { byDay, byMethod };
   },
-  reportVisits: async (unitId: string, from: string, to: string, origin?: string) => {
+  reportVisits: async (unitId: string, from: string, to: string) => {
     let query = supabase().from("fa_kiosk_sessions").select("business_date").eq("unit_id", unitId).gte("business_date", from).lte("business_date", to);
-    if (origin && origin !== "ALL") {
-      query = query.eq("origin", origin);
-    }
     const sessions = await unwrap<Record<string, unknown>[]>(query);
     const map = new Map<string, number>();
     for (const s of sessions) {
@@ -1594,11 +1609,8 @@ export const Api = {
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([business_date, sessions_count]) => ({ business_date, sessions_count }));
   },
-  reportBirthdays: async (month: number, origin?: string) => {
+  reportBirthdays: async (month: number) => {
     let query = supabase().from("fa_kiosk_children").select("id, full_name, birth_date");
-    if (origin && origin !== "ALL") {
-      query = query.eq("origin", origin);
-    }
     const children = await unwrap<Record<string, unknown>[]>(query);
     return children
       .filter((c) => c.birth_date && new Date(c.birth_date as string).getUTCMonth() + 1 === month)
@@ -1612,7 +1624,7 @@ export const Api = {
         .eq("unit_id", unitId)
         .order("opened_at_ms", { ascending: false }),
     ),
-  reportAssetUsage: async (unitId: string, from: string, to: string, origin?: string) => {
+  reportAssetUsage: async (unitId: string, from: string, to: string) => {
     let sessionsQuery = supabase()
       .from("fa_kiosk_sessions")
       .select("asset_id, checkin_at_ms, checkout_at_ms")
@@ -1621,9 +1633,6 @@ export const Api = {
       .not("asset_id", "is", null)
       .gte("business_date", from)
       .lte("business_date", to);
-    if (origin && origin !== "ALL") {
-      sessionsQuery = sessionsQuery.eq("origin", origin);
-    }
     const [assets, sessions] = await Promise.all([
       unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_assets").select("id, name, emoji, color").eq("unit_id", unitId)),
       unwrap<Record<string, unknown>[]>(sessionsQuery),

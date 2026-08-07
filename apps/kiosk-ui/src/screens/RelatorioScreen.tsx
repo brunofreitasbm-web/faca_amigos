@@ -8,7 +8,6 @@ import { AssetUsageChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChar
 
 type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
-type OriginFilter = "ALL" | "LOCAL" | "SAFOPLAY";
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -69,7 +68,6 @@ export function RelatorioScreen() {
   const [tab, setTab] = useState<Tab>("VENDAS");
 
   const [period, setPeriod] = useState<PeriodPreset>("30d");
-  const [origin, setOrigin] = useState<OriginFilter>("ALL");
   const [customFrom, setCustomFrom] = useState(() => isoDate(new Date(Date.now() - 30 * 86_400_000)));
   const [customTo, setCustomTo] = useState(() => isoDate(new Date()));
 
@@ -132,14 +130,6 @@ export function RelatorioScreen() {
           </Select>
         </div>
 
-        <div style={{ width: "260px" }}>
-          <Select label="Origem dos Dados" value={origin} onChange={(e) => setOrigin(e.target.value as OriginFilter)}>
-            <option value="ALL">Todas as Origens (Local + Safoplay)</option>
-            <option value="LOCAL">Somente Sistema Local</option>
-            <option value="SAFOPLAY">Somente Safoplay (Importado)</option>
-          </Select>
-        </div>
-
         {period === "custom" && (
           <div style={{ display: "flex", gap: "12px", alignItems: "flex-end" }}>
             <div style={{ width: "150px" }}>
@@ -156,28 +146,28 @@ export function RelatorioScreen() {
       <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
 
       <div role="tabpanel">
-        {tab === "VENDAS" && <VendasTab unitId={unit.id} from={from} to={to} origin={origin} />}
-        {tab === "PLANOS" && <PlanosTab unitId={unit.id} from={from} to={to} origin={origin} />}
-        {tab === "VISITAS" && <VisitasTab unitId={unit.id} from={from} to={to} origin={origin} />}
-        {tab === "ANIVERSARIANTES" && <AniversariantesTab origin={origin} />}
+        {tab === "VENDAS" && <VendasTab unitId={unit.id} from={from} to={to} />}
+        {tab === "PLANOS" && <PlanosTab unitId={unit.id} from={from} to={to} />}
+        {tab === "VISITAS" && <VisitasTab unitId={unit.id} from={from} to={to} />}
+        {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
         {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
         {tab === "PONTO" && <PontoTab from={from} to={to} />}
-        {tab === "FROTA" && isQuiosque && <FrotaHeatmapTab unitId={unit.id} from={from} to={to} origin={origin} />}
+        {tab === "FROTA" && isQuiosque && <FrotaHeatmapTab unitId={unit.id} from={from} to={to} />}
       </div>
     </div>
   );
 }
 
-function VendasTab({ unitId, from, to, origin }: { unitId: string; from: string; to: string; origin: OriginFilter }) {
+function VendasTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
   const [byDay, setByDay] = useState<DailySales[]>([]);
   const [byMethod, setByMethod] = useState<RevenueByMethod[]>([]);
 
   useEffect(() => {
-    Api.reportSales(unitId, from, to, origin).then((r) => {
+    Api.reportSales(unitId, from, to).then((r) => {
       setByDay(r.byDay);
       setByMethod(r.byMethod);
     });
-  }, [unitId, from, to, origin]);
+  }, [unitId, from, to]);
 
   const total = byMethod.reduce((sum, r) => sum + r.total_cents, 0);
 
@@ -227,12 +217,12 @@ function VendasTab({ unitId, from, to, origin }: { unitId: string; from: string;
   );
 }
 
-function PlanosTab({ unitId, from, to, origin }: { unitId: string; from: string; to: string; origin: OriginFilter }) {
+function PlanosTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
   const [plansSold, setPlansSold] = useState<PlanSold[]>([]);
 
   useEffect(() => {
-    Api.reportPlansSold(unitId, from, to, origin).then(setPlansSold);
-  }, [unitId, from, to, origin]);
+    Api.reportPlansSold(unitId, from, to).then(setPlansSold);
+  }, [unitId, from, to]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px", marginTop: "16px" }}>
@@ -307,12 +297,12 @@ function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
   );
 }
 
-function VisitasTab({ unitId, from, to, origin }: { unitId: string; from: string; to: string; origin: OriginFilter }) {
+function VisitasTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
   const [visits, setVisits] = useState<DailyVisits[]>([]);
 
   useEffect(() => {
-    Api.reportVisits(unitId, from, to, origin).then(setVisits);
-  }, [unitId, from, to, origin]);
+    Api.reportVisits(unitId, from, to).then(setVisits);
+  }, [unitId, from, to]);
 
   return (
     <div>
@@ -348,13 +338,13 @@ function VisitasTab({ unitId, from, to, origin }: { unitId: string; from: string
   );
 }
 
-function AniversariantesTab({ origin }: { origin: OriginFilter }) {
+function AniversariantesTab() {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [children, setChildren] = useState<BirthdayChild[]>([]);
 
   useEffect(() => {
-    Api.reportBirthdays(month, origin).then(setChildren);
-  }, [month, origin]);
+    Api.reportBirthdays(month).then(setChildren);
+  }, [month]);
 
   const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -564,12 +554,12 @@ function PontoTab({ from, to }: { from: string; to: string }) {
   );
 }
 
-function FrotaHeatmapTab({ unitId, from, to, origin }: { unitId: string; from: string; to: string; origin: OriginFilter }) {
+function FrotaHeatmapTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
   const [usage, setUsage] = useState<AssetUsage[]>([]);
 
   useEffect(() => {
-    Api.reportAssetUsage(unitId, from, to, origin).then(setUsage);
-  }, [unitId, from, to, origin]);
+    Api.reportAssetUsage(unitId, from, to).then(setUsage);
+  }, [unitId, from, to]);
 
   const maxSessions = Math.max(1, ...usage.map((u) => u.sessions_count));
 
