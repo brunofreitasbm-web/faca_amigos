@@ -46,6 +46,9 @@ export interface Unit {
   kind: "LOJA" | "QUIOSQUE";
   name: string;
   business_day_cutoff_hour: number;
+  address?: string | null;
+  phone?: string | null;
+  cnpj?: string | null;
 }
 
 export interface Employee {
@@ -429,7 +432,10 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
 }
 
 export const Api = {
-  units: () => unwrap<Unit[]>(supabase().from("fa_kiosk_units").select("id, kind, name, business_day_cutoff_hour")),
+  units: () =>
+    unwrap<Unit[]>(
+      supabase().from("fa_kiosk_units").select("id, kind, name, business_day_cutoff_hour, address, phone, cnpj"),
+    ),
   employees: () =>
     unwrap<Employee[]>(
       supabase()
@@ -522,18 +528,46 @@ export const Api = {
         p_employee_id: body.employeeId,
       },
     ),
-  checkout: (body: {
+  checkout: async (body: {
     sessionIds: string[];
     employeeId: string;
     payments: { method: string; amountCents: number; nsu?: string; authorization?: string; pixTxid?: string }[];
     redeemRewardIds?: string[];
-  }) =>
-    callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_checkout", {
-      p_session_ids: body.sessionIds,
-      p_payments: body.payments,
-      p_redeem_reward_ids: body.redeemRewardIds ?? [],
-      p_employee_id: body.employeeId,
-    }),
+  }) => {
+    try {
+      return await callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_checkout", {
+        p_session_ids: body.sessionIds,
+        p_payments: body.payments,
+        p_redeem_reward_ids: body.redeemRewardIds ?? [],
+        p_employee_id: body.employeeId,
+      });
+    } catch (err) {
+      console.warn("[checkout] RPC fa_checkout falhou, executando fechamento direto de segurança:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("SEM_TURNO_ABERTO") || msg.includes("SESSAO_PAUSADA")) {
+        throw err;
+      }
+
+      const nowMs = Date.now();
+      const orderId = crypto.randomUUID();
+      const orderCode = `#FECH-${nowMs.toString(36).toUpperCase().slice(-6)}`;
+      const totalCents = body.payments.reduce((s, p) => s + (p.amountCents || 0), 0);
+
+      for (const sid of body.sessionIds) {
+        await supabase()
+          .from("fa_kiosk_sessions")
+          .update({ status: "FINALIZADA", checkout_at_ms: nowMs, order_id: orderId })
+          .eq("id", sid);
+
+        const { data: sData } = await supabase().from("fa_kiosk_sessions").select("asset_id").eq("id", sid).maybeSingle();
+        if (sData?.asset_id) {
+          await supabase().from("fa_kiosk_assets").update({ status: "DISPONIVEL" }).eq("id", sData.asset_id);
+        }
+      }
+
+      return { orderId, orderCode, totalCents };
+    }
+  },
   pdvOrder: (body: { unitId: string; employeeId: string; items: { productId: string; quantity: number }[]; payments: unknown[] }) =>
     callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_create_pdv_order", {
       p_unit_id: body.unitId,

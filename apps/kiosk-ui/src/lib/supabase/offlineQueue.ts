@@ -53,7 +53,11 @@ export async function callResilient<T>(rpcName: string, args: Record<string, unk
   const fullArgs = { p_idempotency_key: idempotencyKey, ...args };
   try {
     const { data, error } = await supabase().rpc(rpcName, fullArgs);
-    if (error) throw error;
+    if (error) {
+      console.warn(`[RPC ${rpcName} Error]`, error);
+      const msg = error.message || error.details || "Erro no servidor (RPC)";
+      throw new Error(msg);
+    }
     return data as T;
   } catch (err) {
     if (isNetworkError(err)) {

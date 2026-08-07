@@ -170,6 +170,9 @@ export function EntradaScreen() {
       setReceiptData({
         title: "Comprovante de Check-in",
         unitName: unit.name,
+        unitAddress: unit.address ?? undefined,
+        unitPhone: unit.phone ?? undefined,
+        unitCnpj: unit.cnpj ?? undefined,
         employeeName: employee.full_name,
         dateTime: new Date().toLocaleString("pt-BR"),
         items: [{ description: selectedPlan?.name ?? "Plano", amountCents: selectedPlan?.valueCents ?? 0 }],

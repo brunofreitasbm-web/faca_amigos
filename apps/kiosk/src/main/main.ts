@@ -5,6 +5,7 @@ import { buildApp } from "../server/app.js";
 import { seedDevData } from "../server/seed-dev.js";
 import { loadOrCreateTls } from "../server/tls.js";
 import { startPrintBridge } from "./printBridge.js";
+import { startFiscalWorker } from "../fiscal/index.js";
 
 /**
  * D1/D2 do plano: o Electron não fala com o banco diretamente — ele
@@ -64,6 +65,20 @@ app.whenReady().then(async () => {
 
   createWindow(protocol);
   startPrintBridge();
+
+  // Emissão fiscal (Fase 3 do plano): try/catch explícito e captura de
+  // rejeições não tratadas — um erro aqui NUNCA pode derrubar a impressão
+  // de pulseira/cupom, que é o que trava o balcão na hora. O print bridge
+  // acima não tem essa proteção porque foi escrito antes; o worker fiscal
+  // não repete essa lacuna.
+  try {
+    startFiscalWorker(app.getPath("userData"));
+  } catch (err) {
+    console.error("[fiscal] falha ao iniciar o worker fiscal — emissão de NFC-e desligada neste terminal:", err);
+  }
+  process.on("unhandledRejection", (reason) => {
+    console.error("[fiscal] rejeição não tratada no worker fiscal:", reason);
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow(protocol);

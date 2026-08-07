@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
-import { Button, BrandLockup } from "@facaamigos/ui";
+import { Button, BrandLockup, Modal } from "@facaamigos/ui";
 import { unitBrandFor } from "./branding/unitBrand.js";
 import { useAppState } from "./state/AppState.js";
 import { useConfirm } from "./state/ConfirmContext.js";
+import { EmployeeAuthGate } from "./components/EmployeeAuthGate.js";
 import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
@@ -26,6 +27,8 @@ const SCREENS = [
 
 type Screen = (typeof SCREENS)[number]["value"];
 
+const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL as string | undefined;
+
 const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
   ENTRADA: EntradaScreen,
   PAINEL: PainelScreen,
@@ -40,6 +43,7 @@ export function App() {
   const { unit, setUnitId, employee } = useAppState();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
+  const [showBackofficeGate, setShowBackofficeGate] = useState(false);
 
   // Cada módulo/unidade selecionado sempre abre direto no Painel (tela principal do sistema).
   useEffect(() => {
@@ -117,8 +121,34 @@ export function App() {
           >
             🔄 Trocar Módulo
           </Button>
+
+          {BACKOFFICE_URL && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowBackofficeGate(true)}
+              title="Acessar o backoffice (requer PIN de administrador)"
+              aria-label="Acessar o backoffice"
+              style={{ fontSize: "12px", opacity: 0.5, padding: "4px 6px" }}
+            >
+              ⚙️
+            </Button>
+          )}
         </div>
       </header>
+
+      {showBackofficeGate && (
+        <Modal title="Acesso ao backoffice" onClose={() => setShowBackofficeGate(false)} maxWidth="360px">
+          <EmployeeAuthGate
+            requireRole="ADMIN"
+            onAuthenticated={() => {
+              setShowBackofficeGate(false);
+              window.open(BACKOFFICE_URL, "_blank", "noopener,noreferrer");
+            }}
+            onCancel={() => setShowBackofficeGate(false)}
+          />
+        </Modal>
+      )}
 
       {/* flex:1 + minHeight:0 é o que faz o filho poder ser 100% de altura
           sem estourar o pai — sem minHeight:0 um flex item nunca encolhe
