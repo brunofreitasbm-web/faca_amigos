@@ -39,10 +39,16 @@ const REASON_MESSAGE: Record<ResolvedAccessCode["reason"], string> = {
   JA_FINALIZADA: "Esta criança já saiu — o atendimento dela foi fechado.",
 };
 
-export function SaidaScreen() {
+export interface SaidaScreenProps {
+  entriesOverride?: ActiveSessionEntry[];
+}
+
+export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
   const { unit, employee } = useAppState();
   const toast = useToast();
-  const { entries, status: sessionsStatus } = useActiveSessions(unit?.id ?? null);
+  const activeSessionsRes = useActiveSessions(entriesOverride ? null : (unit?.id ?? null));
+  const entries = entriesOverride ?? activeSessionsRes.entries;
+  const sessionsStatus = entriesOverride ? "ready" : activeSessionsRes.status;
 
   const [resolved, setResolved] = useState<ResolvedAccessCode | null>(null);
   const [problem, setProblem] = useState<string | null>(null);

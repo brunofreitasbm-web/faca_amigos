@@ -798,7 +798,7 @@ export function PainelScreen() {
 
       {saidaOpen && (
         <Modal onClose={() => setSaidaOpen(false)} ariaLabel="Saída" maxWidth="600px" padding="0" zIndex={150}>
-          <SaidaScreen />
+          <SaidaScreen entriesOverride={entries} />
         </Modal>
       )}
 

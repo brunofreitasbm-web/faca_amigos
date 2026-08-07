@@ -71,14 +71,34 @@ export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
     }
     refetch();
 
-    const channel = supabase()
-      .channel(`fa_kiosk_sessions:unit:${unitId}:${Math.random().toString(36).substring(7)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "fa_kiosk_sessions", filter: `unit_id=eq.${unitId}` }, refetch)
-      .subscribe();
+    let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
+    try {
+      const existingChannels = supabase().getChannels();
+      for (const ch of existingChannels) {
+        if (ch.topic.includes("fa_kiosk_sessions")) {
+          try {
+            supabase().removeChannel(ch);
+          } catch (_) {}
+        }
+      }
+
+      const channelName = `fa_kiosk_sessions_unit_${unitId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      channel = supabase()
+        .channel(channelName)
+        .on("postgres_changes", { event: "*", schema: "public", table: "fa_kiosk_sessions", filter: `unit_id=eq.${unitId}` }, refetch);
+
+      channel.subscribe();
+    } catch (err) {
+      console.warn("Failed to subscribe to Realtime fa_kiosk_sessions:", err);
+    }
 
     return () => {
       cancelled = true;
-      supabase().removeChannel(channel);
+      if (channel) {
+        try {
+          supabase().removeChannel(channel);
+        } catch (_) {}
+      }
     };
   }, [unitId]);
 
