@@ -12,8 +12,23 @@ with
   grao_para as (
     insert into fa_kiosk_units (kind, name) values ('LOJA', 'Playground (Bosque Grão-Pará)') returning id
   ),
+  admin_user as (
+    insert into auth.users (
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at
+    ) values (
+      '00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
+      'admin-dev@kiosk.internal', crypt('000000', gen_salt('bf')), now(),
+      '{"provider":"email","providers":["email"]}', '{}', false, now(), now()
+    ) returning id
+  ),
   admin_emp as (
-    insert into fa_kiosk_employees (full_name, role, active) values ('Admin Dev', 'ADMIN', true) returning id
+    insert into fa_kiosk_employees (auth_user_id, full_name, role, active)
+    select id, 'Admin Dev', 'ADMIN', true from admin_user returning id
+  ),
+  admin_cred as (
+    insert into fa_kiosk_local_credentials (employee_id, pin_hash)
+    select id, crypt('000000', gen_salt('bf')) from admin_emp returning employee_id
   ),
   plans_playground as (
     insert into fa_kiosk_plans (unit_id, activity, name, value_cents, duration_value, duration_unit, overage_cents_per_minute, color)

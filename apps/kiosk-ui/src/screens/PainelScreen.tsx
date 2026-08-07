@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, HelpText } from "@facaamigos/ui";
+import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
@@ -240,8 +240,8 @@ export function PainelScreen() {
         </div>
 
         {/* Gauge de Ocupação do Parque */}
-        <div style={{ minWidth: "280px" }} className="capacity-container">
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: "bold" }}>
+        <div style={{ minWidth: "280px", flex: "0 1 340px" }} className="capacity-container">
+          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "13px", fontWeight: "bold" }}>
             <span>Ocupação: {currentOccupancy} / {maxCapacity} crianças</span>
             <span style={{ color: capacityTextColor }}>{occupancyPercent}% ({capacityLabel})</span>
           </div>
@@ -362,17 +362,17 @@ export function PainelScreen() {
                           });
                         }}
                         style={{
-                          background: "var(--color-primary-subtle, #fff0f5)",
-                          border: "1px solid var(--border-subtle, #f0c0d0)",
-                          borderRadius: "4px",
-                          padding: "1px 6px",
+                          background: "rgba(240,25,107,0.08)",
+                          border: "1px solid rgba(240,25,107,0.25)",
+                          borderRadius: "var(--radius-full)",
+                          padding: "2px 8px",
                           fontSize: "11px",
                           cursor: "pointer",
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "4px",
-                          color: "var(--color-primary-hover, #F0196B)",
-                          fontWeight: 600,
+                          color: "var(--color-primary-hover)",
+                          fontWeight: "var(--weight-bold)" as unknown as number,
                         }}
                         title="Clique para visualizar o QR Code da pulseira em tamanho grande"
                       >
@@ -514,11 +514,11 @@ export function PainelScreen() {
 
               {pausingFor === session.id && (
                 <div style={{ display: "flex", gap: "6px" }} onClick={(e) => e.stopPropagation()}>
-                  <select
+                  <Select
                     value={pendingPauseReason}
                     title="Selecione o motivo da pausa"
                     onChange={(e) => setPendingPauseReason(e.target.value)}
-                    style={{ flex: 1, padding: "8px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}
+                    style={{ height: "40px", fontSize: "14px" }}
                   >
                     <option value="" disabled>
                       Motivo da pausa...
@@ -528,7 +528,7 @@ export function PainelScreen() {
                         {r.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <Button
                     variant="primary"
                     size="sm"
@@ -544,11 +544,11 @@ export function PainelScreen() {
 
               {changingPlanFor === session.id && (
                 <div style={{ display: "flex", gap: "6px" }} onClick={(e) => e.stopPropagation()}>
-                  <select
+                  <Select
                     value={pendingPlanId}
                     title="Selecione o novo plano para esta sessão"
                     onChange={(e) => setPendingPlanId(e.target.value)}
-                    style={{ flex: 1, padding: "8px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}
+                    style={{ height: "40px", fontSize: "14px" }}
                   >
                     <option value="" disabled>
                       Escolher novo plano...
@@ -558,7 +558,7 @@ export function PainelScreen() {
                         {p.name} — {money(p.valueCents)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <Button
                     variant="primary"
                     size="sm"
@@ -599,10 +599,10 @@ export function PainelScreen() {
       {dailyGoalCents > 0 && (
         <div
           title="Progresso do faturamento de hoje em relação à meta diária configurada em Configurações → Meta"
-          style={{ flexShrink: 0, minWidth: "280px" }}
+          style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
           className="capacity-container"
         >
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-muted)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "var(--text-muted)" }}>
             <span>Meta do dia: {money(todayRevenueCents)} / {money(dailyGoalCents)}</span>
             <span>{Math.min(100, Math.round((todayRevenueCents / dailyGoalCents) * 100))}%</span>
           </div>
@@ -692,7 +692,7 @@ export function PainelScreen() {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", padding: "12px 0", textAlign: "center" }}>
             <WristbandQRCode value={qrModalSession.code} size={220} />
             <div>
-              <div style={{ fontSize: "22px", fontWeight: "bold", letterSpacing: "1px", background: "#f0f0f0", color: "#141414", padding: "6px 16px", borderRadius: "8px", border: "1px solid #ccc", display: "inline-block" }}>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: "22px", letterSpacing: "1px", background: "var(--surface-sunken)", color: "var(--text-primary)", padding: "8px 20px", borderRadius: "var(--radius-full)", border: "1px solid var(--border-subtle)", display: "inline-block" }}>
                 #{getFriendlyWristbandCode(qrModalSession.code)}
               </div>
               {qrModalSession.guardianName && (

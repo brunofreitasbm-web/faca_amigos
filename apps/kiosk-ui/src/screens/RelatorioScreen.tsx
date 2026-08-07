@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, DateInput, Tabs, contrastRatio, HelpText } from "@facaamigos/ui";
+import { Card, DateInput, Select, Tabs, contrastRatio, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -97,20 +97,9 @@ export function RelatorioScreen() {
     FROTA: "Quais carrinhos foram mais e menos usados no período — ajuda a decidir manutenção e reposição.",
   };
 
-  const selectStyle = {
-    padding: "8px 12px",
-    borderRadius: "8px",
-    border: "1px solid var(--border-subtle, #e5e7eb)",
-    background: "var(--surface-card, #fff)",
-    color: "var(--text-primary, #111827)",
-    fontSize: "14px",
-    fontWeight: 500,
-    outline: "none",
-  };
-
   return (
     <div style={{ padding: "24px", maxWidth: "950px", margin: "0 auto" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>Relatórios Gerais</h1>
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: "28px", margin: "0 0 4px" }}>Relatórios Gerais</h1>
       <HelpText>Consulte o histórico de vendas, visitas, planos e movimentações — selecione o período e a origem dos dados (Local/Safoplay).</HelpText>
 
       {/* Barra Global de Filtros (Período e Origem) */}
@@ -118,19 +107,18 @@ export function RelatorioScreen() {
         style={{
           display: "flex",
           flexWrap: "wrap",
-          alignItems: "center",
+          alignItems: "flex-end",
           gap: "16px",
           padding: "16px",
           margin: "16px 0",
-          borderRadius: "12px",
-          background: "var(--surface-card, #fff)",
-          border: "1px solid var(--border-subtle, #e5e7eb)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+          borderRadius: "var(--radius-lg)",
+          background: "var(--surface-card)",
+          border: "1px solid var(--border-subtle)",
+          boxShadow: "var(--shadow-sm)",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary, #6b7280)" }}>Período</label>
-          <select value={period} onChange={(e) => setPeriod(e.target.value as PeriodPreset)} style={selectStyle}>
+        <div style={{ width: "220px" }}>
+          <Select label="Período" value={period} onChange={(e) => setPeriod(e.target.value as PeriodPreset)}>
             <option value="today">Hoje (Dia)</option>
             <option value="yesterday">Ontem (Dia)</option>
             <option value="7d">Últimos 7 dias</option>
@@ -141,16 +129,15 @@ export function RelatorioScreen() {
             <option value="this_year">Este Ano</option>
             <option value="last_year">Ano Anterior</option>
             <option value="custom">Período Personalizado</option>
-          </select>
+          </Select>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary, #6b7280)" }}>Origem dos Dados</label>
-          <select value={origin} onChange={(e) => setOrigin(e.target.value as OriginFilter)} style={selectStyle}>
+        <div style={{ width: "260px" }}>
+          <Select label="Origem dos Dados" value={origin} onChange={(e) => setOrigin(e.target.value as OriginFilter)}>
             <option value="ALL">Todas as Origens (Local + Safoplay)</option>
             <option value="LOCAL">Somente Sistema Local</option>
             <option value="SAFOPLAY">Somente Safoplay (Importado)</option>
-          </select>
+          </Select>
         </div>
 
         {period === "custom" && (
@@ -197,11 +184,11 @@ function VendasTab({ unitId, from, to, origin }: { unitId: string; from: string;
   return (
     <div>
       <Card style={{ padding: "16px", margin: "16px 0" }}>
-        <h2>Total do período: {money(total)}</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px" }}>Total do período: {money(total)}</h2>
         {byMethod.map((r) => (
-          <div key={r.method} style={{ display: "flex", justifyContent: "space-between", margin: "4px 0" }}>
-            <span>{r.method}</span>
-            <span>{money(r.total_cents)}</span>
+          <div key={r.method} style={{ display: "flex", justifyContent: "space-between", margin: "4px 0", fontSize: "14px" }}>
+            <span style={{ color: "var(--text-secondary)" }}>{r.method}</span>
+            <strong>{money(r.total_cents)}</strong>
           </div>
         ))}
       </Card>
@@ -209,31 +196,33 @@ function VendasTab({ unitId, from, to, origin }: { unitId: string; from: string;
         <RevenueByDayChart data={byDay} />
         <RevenueByMethodChart data={byMethod} />
       </div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left" }}>Dia</th>
-            <th>Pedidos</th>
-            <th>Faturamento</th>
-          </tr>
-        </thead>
-        <tbody>
-          {byDay.map((d) => (
-            <tr key={d.business_date}>
-              <td>{d.business_date}</td>
-              <td style={{ textAlign: "center" }}>{d.orders_count}</td>
-              <td style={{ textAlign: "right" }}>{money(d.total_cents)}</td>
-            </tr>
-          ))}
-          {byDay.length === 0 && (
+      <Card style={{ padding: "8px", overflowX: "auto" }}>
+        <table className="report-table">
+          <thead>
             <tr>
-              <td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "16px" }}>
-                Nenhuma venda encontrada para os filtros selecionados.
-              </td>
+              <th>Dia</th>
+              <th>Pedidos</th>
+              <th>Faturamento</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {byDay.map((d) => (
+              <tr key={d.business_date}>
+                <td>{d.business_date}</td>
+                <td style={{ textAlign: "center" }}>{d.orders_count}</td>
+                <td style={{ textAlign: "right" }}>{money(d.total_cents)}</td>
+              </tr>
+            ))}
+            {byDay.length === 0 && (
+              <tr>
+                <td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                  Nenhuma venda encontrada para os filtros selecionados.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }
@@ -269,11 +258,11 @@ function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: "16px" }}>
           <PlansSoldChart title={`Participação — ${title}`} data={data} />
 
-          <Card style={{ padding: "16px" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <Card style={{ padding: "8px", overflowX: "auto" }}>
+            <table className="report-table">
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left" }}>Plano</th>
+                  <th>Plano</th>
                   <th style={{ textAlign: "right" }}>Qtd.</th>
                   <th style={{ textAlign: "right" }}>%</th>
                 </tr>
@@ -283,7 +272,7 @@ function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
                   const pct = (p.sessions_count / total) * 100;
                   return (
                     <tr key={p.plan_id}>
-                      <td style={{ padding: "6px 0" }}>
+                      <td>
                         <span
                           aria-hidden="true"
                           style={{
@@ -304,10 +293,10 @@ function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
                 })}
               </tbody>
               <tfoot>
-                <tr style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                  <td style={{ paddingTop: "8px", color: "var(--text-secondary)" }}>Total</td>
-                  <td style={{ textAlign: "right", paddingTop: "8px", fontWeight: "bold" }}>{total}</td>
-                  <td style={{ textAlign: "right", paddingTop: "8px", color: "var(--text-secondary)" }}>100%</td>
+                <tr>
+                  <td style={{ color: "var(--text-secondary)", fontWeight: "var(--weight-bold)" as unknown as number }}>Total</td>
+                  <td style={{ textAlign: "right", fontWeight: "bold" }}>{total}</td>
+                  <td style={{ textAlign: "right", color: "var(--text-secondary)" }}>100%</td>
                 </tr>
               </tfoot>
             </table>
@@ -330,29 +319,31 @@ function VisitasTab({ unitId, from, to, origin }: { unitId: string; from: string
       <div style={{ margin: "16px 0" }}>
         <VisitsByDayChart data={visits} />
       </div>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "16px" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left" }}>Dia</th>
-            <th>Visitas</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visits.map((v) => (
-            <tr key={v.business_date}>
-              <td>{v.business_date}</td>
-              <td style={{ textAlign: "center" }}>{v.sessions_count}</td>
-            </tr>
-          ))}
-          {visits.length === 0 && (
+      <Card style={{ padding: "8px", overflowX: "auto" }}>
+        <table className="report-table">
+          <thead>
             <tr>
-              <td colSpan={2} style={{ textAlign: "center", color: "var(--text-muted)", padding: "16px" }}>
-                Nenhuma visita encontrada no período e origem selecionados.
-              </td>
+              <th>Dia</th>
+              <th>Visitas</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {visits.map((v) => (
+              <tr key={v.business_date}>
+                <td>{v.business_date}</td>
+                <td style={{ textAlign: "center" }}>{v.sessions_count}</td>
+              </tr>
+            ))}
+            {visits.length === 0 && (
+              <tr>
+                <td colSpan={2} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                  Nenhuma visita encontrada no período e origem selecionados.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }
@@ -369,47 +360,27 @@ function AniversariantesTab({ origin }: { origin: OriginFilter }) {
 
   return (
     <div style={{ marginTop: "16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-        <span style={{ fontSize: "14px", fontWeight: 600 }}>Mês:</span>
-        <select
-          value={month}
-          onChange={(e) => setMonth(Number(e.target.value))}
-          style={{
-            padding: "8px 12px",
-            borderRadius: "8px",
-            border: "1px solid var(--border-subtle, #e5e7eb)",
-            background: "var(--surface-card, #fff)",
-            fontSize: "14px",
-          }}
-        >
+      <div style={{ width: "220px", marginBottom: "16px" }}>
+        <Select label="Mês" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
           {MONTHS.map((m, i) => (
             <option key={m} value={i + 1}>
               {m}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      <ul style={{ listStyle: "none", padding: 0 }}>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
         {children.map((c) => (
-          <li
-            key={c.id}
-            style={{
-              padding: "10px 14px",
-              marginBottom: "8px",
-              background: "var(--surface-card, #fff)",
-              borderRadius: "8px",
-              border: "1px solid var(--border-subtle, #e5e7eb)",
-              display: "flex",
-              justifyContent: "space-between",
-            }}
-          >
-            <strong>{c.full_name}</strong>
-            <span style={{ color: "var(--text-secondary)" }}>{c.birth_date}</span>
-          </li>
+          <Card key={c.id} style={{ padding: "12px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <strong>{c.full_name}</strong>
+              <span style={{ color: "var(--text-secondary)", fontSize: "14px" }}>{c.birth_date}</span>
+            </div>
+          </Card>
         ))}
         {children.length === 0 && (
-          <li style={{ color: "var(--text-muted)", textAlign: "center", padding: "16px" }}>
+          <li style={{ color: "var(--text-muted)", textAlign: "center", padding: "24px" }}>
             Nenhum aniversariante encontrado neste mês.
           </li>
         )}
@@ -426,31 +397,33 @@ function TurnosTab({ unitId }: { unitId: string }) {
   }, [unitId]);
 
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "16px" }}>
-      <thead>
-        <tr>
-          <th style={{ textAlign: "left" }}>Abertura</th>
-          <th>Fechamento</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {shifts.map((s) => (
-          <tr key={s.id}>
-            <td>{new Date(s.opened_at_ms).toLocaleString("pt-BR")}</td>
-            <td>{s.closed_at_ms ? new Date(s.closed_at_ms).toLocaleString("pt-BR") : "—"}</td>
-            <td>{s.status}</td>
-          </tr>
-        ))}
-        {shifts.length === 0 && (
+    <Card style={{ padding: "8px", marginTop: "16px", overflowX: "auto" }}>
+      <table className="report-table">
+        <thead>
           <tr>
-            <td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "16px" }}>
-              Nenhum turno registrado.
-            </td>
+            <th>Abertura</th>
+            <th>Fechamento</th>
+            <th>Status</th>
           </tr>
-        )}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {shifts.map((s) => (
+            <tr key={s.id}>
+              <td>{new Date(s.opened_at_ms).toLocaleString("pt-BR")}</td>
+              <td>{s.closed_at_ms ? new Date(s.closed_at_ms).toLocaleString("pt-BR") : "—"}</td>
+              <td>{s.status}</td>
+            </tr>
+          ))}
+          {shifts.length === 0 && (
+            <tr>
+              <td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                Nenhum turno registrado.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </Card>
   );
 }
 
@@ -520,68 +493,73 @@ function PontoTab({ from, to }: { from: string; to: string }) {
 
   return (
     <div>
-      <h3 style={{ marginTop: "20px" }}>Resumo de horas por colaborador/dia</h3>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "24px" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left" }}>Colaborador</th>
-            <th>Dia</th>
-            <th>Horas trabalhadas</th>
-            <th>Jornada contratada (dia)</th>
-            <th>Diferença</th>
-          </tr>
-        </thead>
-        <tbody>
-          {dailySummaries.map((s) => {
-            const diffMs = s.targetMs !== null ? s.workedMs - s.targetMs : null;
-            return (
-              <tr key={`${s.employeeId}|${s.dateLabel}`}>
-                <td>{s.fullName}</td>
-                <td style={{ textAlign: "center" }}>{s.dateLabel}</td>
-                <td style={{ textAlign: "center" }}>{formatDurationMs(s.workedMs)}</td>
-                <td style={{ textAlign: "center" }}>{s.targetMs !== null ? formatDurationMs(s.targetMs) : "—"}</td>
-                <td
-                  style={{
-                    textAlign: "center",
-                    color: diffMs === null ? undefined : diffMs < -15 * 60_000 ? "var(--color-error-text)" : diffMs > 15 * 60_000 ? "var(--color-amber)" : "var(--color-teal-text)",
-                  }}
-                >
-                  {diffMs === null ? "—" : `${diffMs >= 0 ? "+" : "-"}${formatDurationMs(Math.abs(diffMs))}`}
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px", marginTop: "24px" }}>Resumo de horas por colaborador/dia</h3>
+      <Card style={{ padding: "8px", marginBottom: "24px", overflowX: "auto" }}>
+        <table className="report-table">
+          <thead>
+            <tr>
+              <th>Colaborador</th>
+              <th>Dia</th>
+              <th>Horas trabalhadas</th>
+              <th>Jornada contratada (dia)</th>
+              <th>Diferença</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dailySummaries.map((s) => {
+              const diffMs = s.targetMs !== null ? s.workedMs - s.targetMs : null;
+              return (
+                <tr key={`${s.employeeId}|${s.dateLabel}`}>
+                  <td>{s.fullName}</td>
+                  <td style={{ textAlign: "center" }}>{s.dateLabel}</td>
+                  <td style={{ textAlign: "center" }}>{formatDurationMs(s.workedMs)}</td>
+                  <td style={{ textAlign: "center" }}>{s.targetMs !== null ? formatDurationMs(s.targetMs) : "—"}</td>
+                  <td
+                    style={{
+                      textAlign: "center",
+                      fontWeight: "var(--weight-bold)" as unknown as number,
+                      color: diffMs === null ? undefined : diffMs < -15 * 60_000 ? "var(--color-error-text)" : diffMs > 15 * 60_000 ? "var(--color-amber-text)" : "var(--color-teal-text)",
+                    }}
+                  >
+                    {diffMs === null ? "—" : `${diffMs >= 0 ? "+" : "-"}${formatDurationMs(Math.abs(diffMs))}`}
+                  </td>
+                </tr>
+              );
+            })}
+            {dailySummaries.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                  Nenhuma marcação no período.
                 </td>
               </tr>
-            );
-          })}
-          {dailySummaries.length === 0 && (
-            <tr>
-              <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)" }}>
-                Nenhuma marcação no período.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </Card>
 
-      <h3>Marcações (registro de auditoria)</h3>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "16px" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left" }}>Colaborador</th>
-            <th>Tipo</th>
-            <th>Horário</th>
-            <th>NSR</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              <td>{r.full_name}</td>
-              <td>{r.kind}</td>
-              <td>{new Date(r.at_ms).toLocaleString("pt-BR")}</td>
-              <td style={{ textAlign: "center" }}>{r.nsr}</td>
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Marcações (registro de auditoria)</h3>
+      <Card style={{ padding: "8px", marginTop: "16px", overflowX: "auto" }}>
+        <table className="report-table">
+          <thead>
+            <tr>
+              <th>Colaborador</th>
+              <th>Tipo</th>
+              <th>Horário</th>
+              <th>NSR</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td>{r.full_name}</td>
+                <td>{r.kind}</td>
+                <td>{new Date(r.at_ms).toLocaleString("pt-BR")}</td>
+                <td style={{ textAlign: "center" }}>{r.nsr}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }

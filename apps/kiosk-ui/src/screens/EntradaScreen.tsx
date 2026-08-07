@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Input, DateInput, Tag, HelpText } from "@facaamigos/ui";
+import { Card, Button, Input, Select, DateInput, Tag, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -401,16 +401,15 @@ export function EntradaScreen() {
       </section>
 
       <section>
-        <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "var(--text-muted)" }}>Cupom de Desconto / Parceria (opcional)</label>
         <HelpText style={{ marginBottom: "4px" }}>Só selecione se o responsável apresentar um cupom válido — o desconto é aplicado automaticamente no fechamento.</HelpText>
-        <select value={couponCode} onChange={(e) => setCouponCode(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
+        <Select label="Cupom de Desconto / Parceria (opcional)" value={couponCode} onChange={(e) => setCouponCode(e.target.value)}>
           <option value="">Nenhum</option>
           {coupons.map((c) => (
             <option key={c.id} value={c.code}>
               {c.code}{c.description ? ` — ${c.description}` : ""}
             </option>
           ))}
-        </select>
+        </Select>
       </section>
 
       {error && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{error}</p>}

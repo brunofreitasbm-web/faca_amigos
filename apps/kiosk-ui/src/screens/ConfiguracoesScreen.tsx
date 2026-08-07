@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input, Tabs, HelpText } from "@facaamigos/ui";
+import { Button, Card, Input, Select, Tabs, HelpText } from "@facaamigos/ui";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
 import type { Asset, BonusRule, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
@@ -291,13 +291,10 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
         <Input label="Valor (R$)" type="number" value={valueReais} onChange={(e) => setValueReais(e.target.value)} />
         <div style={{ display: "flex", gap: "8px" }}>
           <Input label="Duração" type="number" value={durationValue} onChange={(e) => setDurationValue(e.target.value)} />
-          <div>
-            <label>Unidade</label>
-            <select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value as "MINUTO" | "HORA")}>
-              <option value="MINUTO">minuto(s)</option>
-              <option value="HORA">hora(s)</option>
-            </select>
-          </div>
+          <Select label="Unidade" value={durationUnit} onChange={(e) => setDurationUnit(e.target.value as "MINUTO" | "HORA")}>
+            <option value="MINUTO">minuto(s)</option>
+            <option value="HORA">hora(s)</option>
+          </Select>
         </div>
         <Input
           label="Excedente por minuto (R$)"
@@ -429,14 +426,11 @@ function CuponsTab({ unitId }: { unitId: string }) {
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <h2>Novo cupom</h2>
         <Input label="Código" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
-        <div>
-          <label>Tipo</label>
-          <select value={kind} onChange={(e) => setKind(e.target.value as Coupon["kind"])}>
-            <option value="MINUTOS_EXTRA">Minutos extras</option>
-            <option value="DESCONTO_PCT">Desconto %</option>
-            <option value="DESCONTO_VALOR">Desconto em R$</option>
-          </select>
-        </div>
+        <Select label="Tipo" value={kind} onChange={(e) => setKind(e.target.value as Coupon["kind"])}>
+          <option value="MINUTOS_EXTRA">Minutos extras</option>
+          <option value="DESCONTO_PCT">Desconto %</option>
+          <option value="DESCONTO_VALOR">Desconto em R$</option>
+        </Select>
         <Input label="Valor" type="number" value={value} onChange={(e) => setValue(e.target.value)} />
         <Input label="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} />
         <Button variant="primary" disabled={busy || !code} onClick={create}>
@@ -489,14 +483,11 @@ function FidelidadeTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boo
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <h2>Nova regra</h2>
         <Input label="A cada X visitas" type="number" value={triggerVisits} onChange={(e) => setTriggerVisits(e.target.value)} />
-        <div>
-          <label>Recompensa</label>
-          <select value={rewardKind} onChange={(e) => setRewardKind(e.target.value as LoyaltyRule["rewardKind"])}>
-            <option value="ENTRADA_GRATIS">Entrada grátis</option>
-            <option value="DESCONTO_PCT">Desconto %</option>
-            <option value="MINUTOS_EXTRA">Minutos extras</option>
-          </select>
-        </div>
+        <Select label="Recompensa" value={rewardKind} onChange={(e) => setRewardKind(e.target.value as LoyaltyRule["rewardKind"])}>
+          <option value="ENTRADA_GRATIS">Entrada grátis</option>
+          <option value="DESCONTO_PCT">Desconto %</option>
+          <option value="MINUTOS_EXTRA">Minutos extras</option>
+        </Select>
         <Input label="Valor" type="number" value={rewardValue} onChange={(e) => setRewardValue(e.target.value)} />
         <Button variant="primary" disabled={busy} onClick={create}>
           Criar regra
@@ -819,23 +810,22 @@ function ColaboradoresTab() {
           <Input label="Data de nascimento" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           <Input label="Data de admissão" type="date" value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
           <Input label="Cargo / função" value={position} onChange={(e) => setPosition(e.target.value)} />
-          <div>
-            <label>Tipo de contrato</label>
-            <select value={contractType} onChange={(e) => setContractType(e.target.value as typeof contractType)}>
-              <option value="CLT">CLT</option>
-              <option value="ESTAGIO">Estágio</option>
-              <option value="AUTONOMO">Autônomo</option>
-            </select>
-          </div>
+          <Select label="Tipo de contrato" value={contractType} onChange={(e) => setContractType(e.target.value as typeof contractType)}>
+            <option value="CLT">CLT</option>
+            <option value="ESTAGIO">Estágio</option>
+            <option value="AUTONOMO">Autônomo</option>
+          </Select>
           <Input label="Jornada semanal contratada (horas)" type="number" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} />
-          <div>
-            <label title="Define o que a pessoa pode fazer no sistema: Operador atende no balcão; Gerente também acessa relatórios; Admin também cadastra colaboradores">Papel</label>
-            <select value={role} onChange={(e) => setRole(e.target.value as Employee["role"])}>
-              <option value="OPERADOR">Operador</option>
-              <option value="GERENTE">Gerente</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-          </div>
+          <Select
+            label="Papel"
+            title="Define o que a pessoa pode fazer no sistema: Operador atende no balcão; Gerente também acessa relatórios; Admin também cadastra colaboradores"
+            value={role}
+            onChange={(e) => setRole(e.target.value as Employee["role"])}
+          >
+            <option value="OPERADOR">Operador</option>
+            <option value="GERENTE">Gerente</option>
+            <option value="ADMIN">Admin</option>
+          </Select>
           {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
           <div style={{ display: "flex", gap: "8px" }}>
             <Button variant="primary" disabled={busy || !formValid} onClick={create}>

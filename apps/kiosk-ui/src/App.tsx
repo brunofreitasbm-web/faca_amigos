@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
-import type { ReactElement } from "react";
-import { Button, BrandLockup, Modal } from "@facaamigos/ui";
+import type { ReactElement, ReactNode } from "react";
+import {
+  Button,
+  BrandLockup,
+  Modal,
+  SignInIcon,
+  GridIcon,
+  ShoppingCartIcon,
+  WalletIcon,
+  ClockIcon,
+  ChartBarIcon,
+  GearIcon,
+  ArrowClockwiseIcon,
+} from "@facaamigos/ui";
 import { unitBrandFor } from "./branding/unitBrand.js";
 import { useAppState } from "./state/AppState.js";
 import { useConfirm } from "./state/ConfirmContext.js";
@@ -15,17 +27,17 @@ import { PontoScreen } from "./screens/PontoScreen.js";
 import { RelatorioScreen } from "./screens/RelatorioScreen.js";
 import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
 
-const SCREENS = [
-  { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir o comprovante" },
-  { value: "PAINEL", label: "Painel", help: "Ver todas as crianças que estão no espaço agora, quanto tempo já ficaram e fechar o atendimento (cobrar) quando forem embora" },
-  { value: "PDV", label: "PDV", help: "Vender produtos avulsos (loja/lanchonete), sem estar ligado a uma entrada" },
-  { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento" },
-  { value: "PONTO", label: "Ponto", help: "Bater o ponto: registrar entrada, intervalo e saída do colaborador" },
-  { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa e folha de ponto de períodos anteriores" },
-  { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, metas, carrinhos, colaboradores e impressoras" },
-] as const;
+type Screen = "ENTRADA" | "PAINEL" | "PDV" | "CAIXA" | "PONTO" | "RELATORIO" | "CONFIGURACOES";
 
-type Screen = (typeof SCREENS)[number]["value"];
+const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
+  { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir o comprovante", icon: <SignInIcon /> },
+  { value: "PAINEL", label: "Painel", help: "Ver todas as crianças que estão no espaço agora, quanto tempo já ficaram e fechar o atendimento (cobrar) quando forem embora", icon: <GridIcon /> },
+  { value: "PDV", label: "PDV", help: "Vender produtos avulsos (loja/lanchonete), sem estar ligado a uma entrada", icon: <ShoppingCartIcon /> },
+  { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento", icon: <WalletIcon /> },
+  { value: "PONTO", label: "Ponto", help: "Bater o ponto: registrar entrada, intervalo e saída do colaborador", icon: <ClockIcon /> },
+  { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa e folha de ponto de períodos anteriores", icon: <ChartBarIcon /> },
+  { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, metas, carrinhos, colaboradores e impressoras", icon: <GearIcon /> },
+];
 
 const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL as string | undefined;
 
@@ -104,13 +116,13 @@ export function App() {
               title={s.help}
               onClick={() => setScreen(s.value)}
             >
-              {s.label}
+              {s.icon} {s.label}
             </Button>
           ))}
         </nav>
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{employee.full_name}</span>
+          <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: "var(--weight-semibold)" as unknown as number }}>{employee.full_name}</span>
 
           <Button
             variant="ghost"
@@ -119,7 +131,7 @@ export function App() {
             title="Alternar para a tela inicial de seleção de módulos"
             style={{ fontSize: "12px", border: "1px solid var(--border-subtle)" }}
           >
-            🔄 Trocar Módulo
+            <ArrowClockwiseIcon /> Trocar Módulo
           </Button>
 
           {BACKOFFICE_URL && (
@@ -129,9 +141,9 @@ export function App() {
               onClick={() => setShowBackofficeGate(true)}
               title="Acessar o backoffice (requer PIN de administrador)"
               aria-label="Acessar o backoffice"
-              style={{ fontSize: "12px", opacity: 0.5, padding: "4px 6px" }}
+              style={{ fontSize: "16px", opacity: 0.5, padding: "4px 8px" }}
             >
-              ⚙️
+              <GearIcon />
             </Button>
           )}
         </div>
@@ -154,7 +166,7 @@ export function App() {
           sem estourar o pai — sem minHeight:0 um flex item nunca encolhe
           abaixo do seu conteúdo, e a rolagem "vaza" pra página inteira. */}
       <main style={{ flex: 1, minHeight: 0 }}>
-        <ScreenComponent />
+        {ScreenComponent && <ScreenComponent />}
       </main>
     </div>
   );

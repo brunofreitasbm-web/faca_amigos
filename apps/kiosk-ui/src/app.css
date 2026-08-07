@@ -83,3 +83,51 @@ body {
     line-height: 32px;
   }
 }
+
+/* ---------- Relatório: tabelas ----------
+
+   As tabelas do Relatório eram HTML cru (<table style="border-collapse">)
+   sem nenhuma classe — herdavam só o estilo padrão do navegador: cabeçalho
+   sem destaque, linhas sem separação, nada de raio/marca. Uma classe só
+   para não repetir a mesma receita em 5 tabelas (Vendas, Planos, Visitas,
+   Turnos, Ponto×2). */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.report-table thead th {
+  text-align: left;
+  font-family: var(--font-body);
+  font-weight: var(--weight-bold);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
+.report-table thead th:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.report-table thead th:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.report-table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.report-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.report-table tbody tr:hover td {
+  background: var(--surface-sunken);
+}

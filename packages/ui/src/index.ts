@@ -4,6 +4,7 @@ export * from "./components/Badge.js";
 export * from "./components/StatusBadge.js";
 export * from "./components/Tag.js";
 export * from "./components/Input.js";
+export * from "./components/Select.js";
 export * from "./components/DateInput.js";
 export * from "./components/BrandLockup.js";
 export * from "./components/AsyncState.js";
