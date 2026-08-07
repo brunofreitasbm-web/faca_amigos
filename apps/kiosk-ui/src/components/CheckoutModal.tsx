@@ -17,6 +17,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   SEM_TURNO_ABERTO: "Não há caixa aberto nesta unidade. Abra o turno na tela Caixa antes de fechar o atendimento.",
   SESSAO_JA_FECHADA: "Uma dessas sessões já foi fechada em outro dispositivo. Feche esta janela e atualize o Painel.",
   SESSAO_NAO_ENCONTRADA: "Uma dessas sessões não foi encontrada. Feche esta janela e atualize o Painel.",
+  SESSAO_PAUSADA: "A sessão está pausada. Clique em 'Retomar' no card antes de fechar o atendimento.",
 };
 
 function friendlyError(message: string): string {
