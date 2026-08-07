@@ -355,25 +355,6 @@ export function PainelScreen() {
                       ✓ Selecionada
                     </Badge>
                   )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Imprimir Pulseira Térmica"
-                  aria-label="Imprimir Pulseira Térmica"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPrintData({
-                      wristbandCode,
-                      childName: session.child_name_snapshot,
-                      guardianName: session.guardian_name_snapshot || "Responsável",
-                      phone: session.guardian_phone_snapshot || "",
-                      entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                      notes: session.notes,
-                    });
-                  }}
-                >
-                  <PrinterIcon />
-                </Button>
                 </div>
               </div>
 
@@ -444,6 +425,25 @@ export function PainelScreen() {
                   }}
                 >
                   🔄 Mudar Plano
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Imprimir Pulseira Térmica"
+                  aria-label="Imprimir Pulseira Térmica"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPrintData({
+                      wristbandCode,
+                      childName: session.child_name_snapshot,
+                      guardianName: session.guardian_name_snapshot || "Responsável",
+                      phone: session.guardian_phone_snapshot || "",
+                      entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                      notes: session.notes,
+                    });
+                  }}
+                >
+                  <PrinterIcon /> Pulseira
                 </Button>
                 {isPaused ? (
                   <Button
