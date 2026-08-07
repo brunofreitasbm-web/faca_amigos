@@ -32,7 +32,7 @@ export default async function FolhaPagamentoPage({ searchParams }: PageProps) {
     return (
       <div>
         <PageTitle>Folha de Pagamento</PageTitle>
-        <p style={{ color: "var(--text-muted)" }}>Cadastre uma unidade em "Unidades" antes de gerar a folha de pagamento.</p>
+        <p style={{ color: "var(--text-muted)" }}>Cadastre uma unidade em &quot;Unidades&quot; antes de gerar a folha de pagamento.</p>
       </div>
     );
   }
