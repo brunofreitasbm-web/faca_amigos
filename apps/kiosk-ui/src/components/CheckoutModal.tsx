@@ -119,6 +119,9 @@ export function CheckoutModal({
         entries.map((e) => ({
           title: "Comprovante de Saída",
           unitName: unit.name,
+          unitAddress: unit.address ?? undefined,
+          unitPhone: unit.phone ?? undefined,
+          unitCnpj: unit.cnpj ?? undefined,
           employeeName: employee.full_name,
           dateTime: nowStr,
           code: result.orderCode,

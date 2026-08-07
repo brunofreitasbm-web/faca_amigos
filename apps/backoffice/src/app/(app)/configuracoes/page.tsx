@@ -1,6 +1,6 @@
 import { Card, Input } from "@/components/design-system";
 import { createClient } from "@/lib/supabase/server";
-import { upsertAppSetting, updateUnitSettings } from "../actions";
+import { upsertAppSetting, updateUnitSettings, updateUnitReceiptInfo } from "../actions";
 import { DataTable } from "@/components/DataTable";
 import { EntityForm } from "@/components/EntityForm";
 import { LabeledSelect } from "@/components/LabeledSelect";
@@ -23,7 +23,7 @@ export default async function ConfiguracoesPage() {
   const [{ data: units }, { data: settings }] = await Promise.all([
     supabase
       .from("fa_kiosk_units")
-      .select("id, name, timezone, business_day_cutoff_hour")
+      .select("id, name, timezone, business_day_cutoff_hour, address, phone, cnpj")
       .order("name"),
     supabase.from("fa_kiosk_app_settings").select("unit_id, key, value"),
   ]);
@@ -70,6 +70,25 @@ export default async function ConfiguracoesPage() {
                   label="Hora de corte do dia"
                   defaultValue={u.business_day_cutoff_hour}
                 />
+              </EntityForm>
+            </div>
+
+            <h3
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "13px",
+                fontWeight: "var(--weight-semibold)" as unknown as number,
+                color: "var(--text-secondary)",
+              }}
+            >
+              Dados para o cupom não fiscal (timbre)
+            </h3>
+            <div style={{ marginBottom: "var(--space-4)" }}>
+              <EntityForm action={updateUnitReceiptInfo} submitLabel="Salvar">
+                <input type="hidden" name="unit_id" value={u.id} />
+                <Input name="address" label="Endereço" defaultValue={u.address ?? ""} />
+                <Input name="phone" label="Telefone" defaultValue={u.phone ?? ""} />
+                <Input name="cnpj" label="CNPJ" defaultValue={u.cnpj ?? ""} />
               </EntityForm>
             </div>
 
