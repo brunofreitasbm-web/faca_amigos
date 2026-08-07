@@ -4,6 +4,7 @@ import { openDatabase, migrate } from "@facaamigos/db-local";
 import { buildApp } from "../server/app.js";
 import { seedDevData } from "../server/seed-dev.js";
 import { loadOrCreateTls } from "../server/tls.js";
+import { startPrintBridge } from "./printBridge.js";
 
 /**
  * D1/D2 do plano: o Electron não fala com o banco diretamente — ele
@@ -62,6 +63,7 @@ app.whenReady().then(async () => {
   }
 
   createWindow(protocol);
+  startPrintBridge();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow(protocol);

@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button, Modal, Tag } from "@facaamigos/ui";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
-import { systemStatus } from "../api/client.js";
+import { Api, systemStatus } from "../api/client.js";
+import { useAppState } from "../state/AppState.js";
 
 interface ReceiptPrintModalProps {
   data: ReceiptPrintPayload;
@@ -10,14 +11,20 @@ interface ReceiptPrintModalProps {
 }
 
 /**
- * Cupom não fiscal (80mm): dispara a impressão sozinho ao abrir (via
- * useEffect), sem exigir clique do operador — se o pop-up for
- * bloqueado pelo navegador, o botão "Reimprimir" cobre o caso.
+ * Cupom não fiscal (80mm): enfileira o pedido em fa_kiosk_print_jobs ao
+ * abrir, sem exigir clique do operador nem abrir o diálogo nativo do
+ * navegador — o print bridge local (apps/kiosk) assina essa fila e manda
+ * direto para a impressora configurada em Configurações > Impressoras. Se
+ * a fila falhar (ex.: sem unidade selecionada), cai no caminho antigo
+ * (janela + window.print()) como último recurso — melhor um diálogo
+ * aparecendo do que nenhum cupom saindo.
  */
 export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
+  const { unit } = useAppState();
   const { text } = generateEscPosReceipt(data);
+  const [status, setStatus] = useState<"queuing" | "queued" | "fallback">("queuing");
 
-  function handlePrint() {
+  function handleBrowserPrint() {
     const printWindow = window.open("", "_blank", "width=420,height=600");
     if (!printWindow) {
       systemStatus.dispatchEvent(new CustomEvent("print-blocked"));
@@ -52,7 +59,17 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
   }
 
   useEffect(() => {
-    handlePrint();
+    if (!unit) {
+      setStatus("fallback");
+      handleBrowserPrint();
+      return;
+    }
+    Api.queuePrintJob(unit.id, "RECEIPT", data)
+      .then(() => setStatus("queued"))
+      .catch(() => {
+        setStatus("fallback");
+        handleBrowserPrint();
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -61,7 +78,7 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
       title={
         <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontFamily: "var(--font-display)", color: "var(--color-primary-hover)" }}>Cupom Não Fiscal</span>
-          <Tag color="var(--color-teal)" title="Impressão disparada automaticamente ao abrir esta janela">80mm</Tag>
+          <Tag color="var(--color-teal)">80mm</Tag>
         </span>
       }
       onClose={onClose}
@@ -69,6 +86,9 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
       zIndex={9999}
       bodyStyle={{ display: "flex", flexDirection: "column", gap: "16px" }}
     >
+        {status === "queued" && <Tag color="var(--color-teal)">✓ Enviado para a impressora configurada</Tag>}
+        {status === "fallback" && <Tag color="var(--color-amber)">⚠️ Fila de impressão indisponível — abrindo diálogo do navegador</Tag>}
+
         <pre
           style={{
             background: "#ffffff",
@@ -87,9 +107,8 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
         </pre>
 
         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-          {/* "Fechar" some — o ✕ do Modal já faz o mesmo, sem duplicar. */}
-          <Button variant="primary" onClick={handlePrint} title="Reimprimir caso o pop-up de impressão tenha sido bloqueado">
-            🖨️ Reimprimir
+          <Button variant="ghost" onClick={handleBrowserPrint} title="Abrir o diálogo de impressão do navegador manualmente">
+            🖨️ Imprimir pelo navegador
           </Button>
         </div>
     </Modal>

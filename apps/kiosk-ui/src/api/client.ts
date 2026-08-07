@@ -682,17 +682,33 @@ export const Api = {
         .select("id")
         .single(),
     ),
-  unitSetting: async (unitId: string, key: "daily_goal_cents" | "terms_of_use" | "closing_time") => {
+  unitSetting: async (unitId: string, key: "daily_goal_cents" | "terms_of_use" | "closing_time" | "printer_wristband" | "printer_receipt") => {
     const row = await unwrap<{ value: string } | null>(
       supabase().from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId).eq("key", key).maybeSingle(),
     );
     return { value: row?.value ?? null };
   },
-  setUnitSetting: (unitId: string, key: "daily_goal_cents" | "terms_of_use" | "closing_time", value: string) =>
+  setUnitSetting: (
+    unitId: string,
+    key: "daily_goal_cents" | "terms_of_use" | "closing_time" | "printer_wristband" | "printer_receipt",
+    value: string,
+  ) =>
     unwrap(
       supabase()
         .from("fa_kiosk_app_settings")
         .upsert({ unit_id: unitId, key, value, updated_at_ms: Date.now() }, { onConflict: "unit_id,key" }),
+    ),
+  /**
+   * Enfileira um pedido de impressão para o print bridge (processo local
+   * em cada terminal, ver apps/kiosk) em vez de abrir o diálogo nativo do
+   * navegador — só assim dá pra imprimir sem clique nenhum do operador,
+   * direto na impressora escolhida em Configurações > Impressoras.
+   */
+  queuePrintJob: (unitId: string, kind: "WRISTBAND" | "RECEIPT", payload: unknown) =>
+    unwrap(
+      supabase()
+        .from("fa_kiosk_print_jobs")
+        .insert({ unit_id: unitId, kind, payload_json: payload, status: "PENDING", created_at_ms: Date.now() }),
     ),
   todayRevenue: async (unitId: string, cutoffHour: number) => {
     const totalCents = await unwrap<number>(

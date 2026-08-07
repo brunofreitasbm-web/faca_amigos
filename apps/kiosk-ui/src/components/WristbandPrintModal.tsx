@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button, Modal, Tag } from "@facaamigos/ui";
 import { generateGainschaGS2208DTSPL } from "@facaamigos/domain";
-import { systemStatus } from "../api/client.js";
+import { Api, systemStatus } from "../api/client.js";
+import { useAppState } from "../state/AppState.js";
 
 export interface WristbandData {
   wristbandCode: string;
@@ -19,16 +20,33 @@ interface WristbandPrintModalProps {
 }
 
 export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps) {
+  const { unit } = useAppState();
   const nowStr = data.entryTime || new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const [showTspl, setShowTspl] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [queueStatus, setQueueStatus] = useState<"idle" | "queuing" | "queued" | "error">("idle");
 
   const tsplCommands = generateGainschaGS2208DTSPL({
     ...data,
     entryTime: nowStr,
   });
 
-  function handlePrint() {
+  async function handleQueuePrint() {
+    if (!unit) {
+      handleBrowserPrint();
+      return;
+    }
+    setQueueStatus("queuing");
+    try {
+      await Api.queuePrintJob(unit.id, "WRISTBAND", { ...data, entryTime: nowStr });
+      setQueueStatus("queued");
+    } catch {
+      setQueueStatus("error");
+      handleBrowserPrint();
+    }
+  }
+
+  function handleBrowserPrint() {
     const printableElement = document.querySelector(".wristband-printable");
     if (!printableElement) {
       setTimeout(() => window.print(), 50);
@@ -172,6 +190,9 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
           </div>
         )}
 
+        {queueStatus === "queued" && <Tag color="var(--color-teal)">✓ Enviado para a impressora configurada</Tag>}
+        {queueStatus === "error" && <Tag color="var(--color-amber)">⚠️ Fila de impressão indisponível — abrindo diálogo do navegador</Tag>}
+
         <div style={{ display: "flex", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>
           <Button variant="ghost" size="sm" onClick={() => setShowTspl(!showTspl)}>
             {showTspl ? "Ocultar TSPL" : "Ver Código TSPL"}
@@ -184,8 +205,11 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
           )}
 
           <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
+            <Button variant="ghost" onClick={handleBrowserPrint} title="Abrir o diálogo de impressão do navegador manualmente">
+              Imprimir pelo navegador
+            </Button>
             {/* "Fechar" some — o ✕ do Modal já faz o mesmo, sem duplicar. */}
-            <Button variant="primary" onClick={handlePrint}>
+            <Button variant="primary" loading={queueStatus === "queuing"} onClick={handleQueuePrint}>
               🖨️ Imprimir Pulseira (Gainscha)
             </Button>
           </div>

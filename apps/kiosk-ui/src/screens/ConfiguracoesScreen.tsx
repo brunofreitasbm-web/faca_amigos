@@ -8,7 +8,7 @@ import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { money } from "../format.js";
 
-type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES";
+type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES" | "IMPRESSORAS";
 
 export function ConfiguracoesScreen() {
   const { unit } = useAppState();
@@ -25,6 +25,7 @@ export function ConfiguracoesScreen() {
     { value: "META", label: "Meta" },
     ...(isQuiosque ? ([{ value: "FROTA", label: "Frota" }] as const) : []),
     { value: "COLABORADORES", label: "Colaboradores" },
+    { value: "IMPRESSORAS", label: "Impressoras" },
   ];
 
   return (
@@ -40,6 +41,7 @@ export function ConfiguracoesScreen() {
         {tab === "META" && <MetaTab unitId={unit.id} isQuiosque={isQuiosque} />}
         {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
         {tab === "COLABORADORES" && <ColaboradoresTab />}
+        {tab === "IMPRESSORAS" && <ImpressorasTab unitId={unit.id} />}
       </div>
     </div>
   );
@@ -817,6 +819,61 @@ function ColaboradoresTab() {
           </div>
         </Card>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Nome exato da impressora tal como aparece no Windows (Painel de
+ * Controle > Dispositivos e Impressoras) — não é uma lista buscada do
+ * sistema operacional (o navegador não expõe isso a uma página web), é o
+ * que o print bridge local (apps/kiosk) recebe para mandar o trabalho de
+ * impressão direto pra fila do driver certo via Electron, sem diálogo.
+ */
+function ImpressorasTab({ unitId }: { unitId: string }) {
+  const toast = useToast();
+  const [wristbandPrinter, setWristbandPrinter] = useState("");
+  const [receiptPrinter, setReceiptPrinter] = useState("");
+  const [saving, setSaving] = useState<"WRISTBAND" | "RECEIPT" | null>(null);
+
+  useEffect(() => {
+    Api.unitSetting(unitId, "printer_wristband").then((r) => setWristbandPrinter(r.value ?? ""));
+    Api.unitSetting(unitId, "printer_receipt").then((r) => setReceiptPrinter(r.value ?? ""));
+  }, [unitId]);
+
+  async function save(kind: "WRISTBAND" | "RECEIPT") {
+    setSaving(kind);
+    try {
+      const key = kind === "WRISTBAND" ? "printer_wristband" : "printer_receipt";
+      await Api.setUnitSetting(unitId, key, kind === "WRISTBAND" ? wristbandPrinter : receiptPrinter);
+      toast.success("Impressora salva.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a impressora.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
+        Digite o nome exato da impressora como ela aparece instalada no Windows deste terminal. O print bridge local usa esse nome para
+        imprimir direto, sem abrir diálogo nenhum na tela.
+      </p>
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Pulseiras</h2>
+        <Input placeholder="Ex: Gainscha GS-2208D" value={wristbandPrinter} onChange={(e) => setWristbandPrinter(e.target.value)} />
+        <Button variant="primary" size="sm" loading={saving === "WRISTBAND"} onClick={() => save("WRISTBAND")} style={{ alignSelf: "flex-start" }}>
+          Salvar
+        </Button>
+      </Card>
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Cupons</h2>
+        <Input placeholder="Ex: Elgin i9" value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} />
+        <Button variant="primary" size="sm" loading={saving === "RECEIPT"} onClick={() => save("RECEIPT")} style={{ alignSelf: "flex-start" }}>
+          Salvar
+        </Button>
+      </Card>
     </div>
   );
 }
