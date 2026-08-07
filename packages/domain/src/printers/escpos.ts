@@ -1,6 +1,10 @@
 export interface ReceiptPrintPayload {
   title: string; // Ex: "COMPROVANTE DE CHECK-IN", "RECIBO DE CAIXA", "COMPROVANTE PDV"
   unitName: string;
+  /** Dados cadastrais da unidade (endereço/telefone/CNPJ), geridos no backoffice. Opcionais — nem toda unidade tem tudo preenchido. */
+  unitAddress?: string;
+  unitPhone?: string;
+  unitCnpj?: string;
   employeeName?: string;
   dateTime?: string;
   /** Código único da venda (fa_kiosk_orders.order_code), para auditoria/rastreamento. */
@@ -35,6 +39,9 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   lines.push(centerText("FAÇA AMIGOS", 42));
   lines.push(centerText("PLAYGROUND INCLUSIVO", 42));
   lines.push(centerText(payload.unitName.toUpperCase(), 42));
+  if (payload.unitAddress) lines.push(centerText(payload.unitAddress, 42));
+  if (payload.unitPhone) lines.push(centerText(payload.unitPhone, 42));
+  if (payload.unitCnpj) lines.push(centerText(`CNPJ: ${payload.unitCnpj}`, 42));
   lines.push(divider);
   lines.push(centerText(`*** ${payload.title.toUpperCase()} ***`, 42));
   if (payload.code) lines.push(`Código: ${payload.code}`);
