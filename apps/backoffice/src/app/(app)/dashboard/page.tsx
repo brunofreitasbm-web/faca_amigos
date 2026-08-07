@@ -1,7 +1,7 @@
 import { Card } from "@/components/design-system";
 import { createClient } from "@/lib/supabase/server";
 import { PageTitle } from "@/components/Typography";
-import { KpiCard } from "./DashboardCharts";
+import { KpiCard, OverviewTrendChart } from "./DashboardCharts";
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -50,6 +50,12 @@ export default async function DashboardPage() {
   const revenueSeries = [...revenueByDayMap.entries()].map(([date, revenue]) => ({ date, revenue }));
   const checkinsSeries = [...checkinsByDayMap.entries()].map(([date, checkins]) => ({ date, checkins }));
 
+  const overviewData = [...revenueByDayMap.keys()].map((date) => ({
+    date,
+    revenue: revenueByDayMap.get(date) ?? 0,
+    checkins: checkinsByDayMap.get(date) ?? 0,
+  }));
+
   const revenueToday = revenueByDayMap.get(todayStr.slice(5)) ?? 0;
   const revenueYesterday = revenueByDayMap.get(yesterdayStr.slice(5)) ?? 0;
   const checkinsToday = checkinsByDayMap.get(todayStr.slice(5)) ?? 0;
@@ -57,7 +63,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <PageTitle>Painel</PageTitle>
+      <PageTitle>Painel Principal</PageTitle>
       <div
         style={{
           display: "grid",
@@ -69,7 +75,7 @@ export default async function DashboardPage() {
           <div
             style={{
               fontFamily: "var(--font-body)",
-              fontWeight: "var(--weight-extrabold)" as unknown as number,
+              fontWeight: 800,
               fontSize: "28px",
               color: "var(--text-primary)",
             }}
@@ -83,7 +89,7 @@ export default async function DashboardPage() {
           deltaPct={pctDelta(checkinsToday, checkinsYesterday)}
           data={checkinsSeries}
           dataKey="checkins"
-          color="var(--chart-3)"
+          color="var(--chart-3, #6366F1)"
           valueFormatter={(v) => `${v} check-ins`}
         />
         <KpiCard
@@ -92,10 +98,13 @@ export default async function DashboardPage() {
           deltaPct={pctDelta(revenueToday, revenueYesterday)}
           data={revenueSeries}
           dataKey="revenue"
-          color="var(--chart-1)"
+          color="var(--chart-1, #2ECFB5)"
           valueFormatter={(v) => `R$ ${(v / 100).toFixed(2)}`}
         />
       </div>
+
+      {/* Visão Geral Gráfica Recharts */}
+      <OverviewTrendChart data={overviewData} />
     </div>
   );
 }
