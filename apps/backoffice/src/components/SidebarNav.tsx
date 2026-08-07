@@ -10,6 +10,7 @@ const NAV = [
   { href: "/produtos", label: "Produtos", help: "Itens vendidos avulsos (loja/lanchonete) nas unidades" },
   { href: "/cupons", label: "Cupons", help: "Códigos de desconto e parceria usados no check-in" },
   { href: "/funcionarios", label: "Funcionários", help: "Cadastro e acesso dos colaboradores ao sistema" },
+  { href: "/folha-pagamento", label: "Folha de Pagamento", help: "Extrato mensal de salários e dados bancários para fechamento e pagamento dos colaboradores" },
   { href: "/relatorios", label: "Relatórios", help: "Vendas, visitas e demais números históricos" },
   { href: "/configuracoes", label: "Configurações", help: "Ajustes gerais do sistema" },
 ];
