@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText } from "@facaamigos/ui";
+import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan, Product, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
@@ -114,6 +114,7 @@ export function EntradaScreen() {
   const [quickProduct, setQuickProduct] = useState<Product | null>(null);
   const [quickTriggerMinutes, setQuickTriggerMinutes] = useState(60);
   const [quickUpsellAccepted, setQuickUpsellAccepted] = useState(false);
+  const [crossSellModalOpen, setCrossSellModalOpen] = useState(false);
 
   const [lastGuardianId, setLastGuardianId] = useState<string | null>(null);
   const [closingTime, setClosingTime] = useState<string | undefined>(undefined);
@@ -128,8 +129,7 @@ export function EntradaScreen() {
   }, [unit]);
 
   // Configuração do cross-sell rápido: qual produto oferecer e a partir de
-  // quantos minutos de plano. Sem produto configurado, o gatilho não
-  // aparece — não há "oferecer nada" na tela.
+  // quantos minutos de plano. Se não houver id configurado, tenta localizar "Água".
   useEffect(() => {
     if (!unit) return;
     Api.unitSetting(unit.id, "upsell_quick_trigger_minutes")
@@ -137,10 +137,17 @@ export function EntradaScreen() {
       .catch(() => {});
     Api.unitSetting(unit.id, "upsell_quick_product_id")
       .then((r) => {
-        if (!r.value) return setQuickProduct(null);
-        Api.products(unit.id)
-          .then((products) => setQuickProduct(products.find((p) => p.id === r.value) ?? null))
-          .catch(() => setQuickProduct(null));
+        return Api.products(unit.id).then((products) => {
+          if (r.value) {
+            const found = products.find((p) => p.id === r.value);
+            if (found) return setQuickProduct(found);
+          }
+          const agua = products.find((p) => p.name.toLowerCase().includes("água") || p.name.toLowerCase().includes("agua"));
+          if (agua) return setQuickProduct(agua);
+          const fallback = products[0];
+          if (fallback) return setQuickProduct(fallback);
+          setQuickProduct(null);
+        });
       })
       .catch(() => setQuickProduct(null));
   }, [unit]);
@@ -588,10 +595,17 @@ export function EntradaScreen() {
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           {plans.map((plan) => {
             const fits = remainingMinutes === null || planDurationMinutes(plan) <= remainingMinutes;
+            const minutes = planDurationMinutes(plan);
             return (
               <Card
                 key={plan.id}
-                onClick={() => fits && setPlanId(plan.id)}
+                onClick={() => {
+                  if (!fits) return;
+                  setPlanId(plan.id);
+                  if (minutes >= quickTriggerMinutes) {
+                    setCrossSellModalOpen(true);
+                  }
+                }}
                 title={fits ? undefined : `Não cabe até o fechamento — faltam ${Math.max(0, remainingMinutes ?? 0)} min`}
                 style={{
                   cursor: fits ? "pointer" : "not-allowed",
@@ -782,9 +796,107 @@ export function EntradaScreen() {
           style={{ borderRadius: "9999px", padding: "16px" }}
           title="Registrar a entrada e imprimir a pulseira e o recibo de guarda"
         >
-          Confirmar entrada{selectedPlan ? ` — ${money(selectedPlan.valueCents)}` : ""}
+          Confirmar entrada{selectedPlan ? ` — ${money(selectedPlan.valueCents + (quickUpsellAccepted && quickProduct ? quickProduct.price_cents : 0))}` : ""}
         </Button>
       </div>
+
+      {/* Modal de Cross-Selling Automático para pacotes >= 1h */}
+      {crossSellModalOpen && (
+        <Modal onClose={() => setCrossSellModalOpen(false)} title="🥤 Oportunidade de Venda (Cross-Selling)">
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "4px" }}>
+            <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
+              O cliente selecionou um pacote de{" "}
+              <strong>
+                {selectedPlan
+                  ? planDurationMinutes(selectedPlan) >= 60 && planDurationMinutes(selectedPlan) % 60 === 0
+                    ? `${planDurationMinutes(selectedPlan) / 60}h`
+                    : `${planDurationMinutes(selectedPlan)} min`
+                  : "1h"}
+              </strong>
+              . Ofereça o produto adicional utilizando o script abaixo:
+            </p>
+
+            {/* Script destacado para o operador ler */}
+            <div
+              style={{
+                border: "2px solid var(--color-orange, #ff7a00)",
+                background: "rgba(255, 122, 0, 0.08)",
+                borderRadius: "14px",
+                padding: "16px 18px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  color: "var(--color-orange-text, #d96300)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Script de Abordagem
+              </div>
+              <blockquote
+                style={{
+                  margin: 0,
+                  fontSize: "18px",
+                  lineHeight: 1.5,
+                  fontWeight: "600",
+                  color: "var(--text-primary)",
+                  borderLeft: "4px solid var(--color-orange, #ff7a00)",
+                  paddingLeft: "12px",
+                }}
+              >
+                “Por mais {money(quickProduct ? quickProduct.price_cents : 500)}, você quer adicionar uma água para ele?{" "}
+                {selectedPlan
+                  ? planDurationMinutes(selectedPlan) >= 60 && planDurationMinutes(selectedPlan) % 60 === 0
+                    ? `${planDurationMinutes(selectedPlan) / 60} ${planDurationMinutes(selectedPlan) === 60 ? "hora" : "horas"}`
+                    : `${planDurationMinutes(selectedPlan)} minutos`
+                  : "1 hora"}{" "}
+                vai dar bem sede!”
+              </blockquote>
+            </div>
+
+            {/* Botões de Ação */}
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "8px" }}>
+              <Button
+                type="button"
+                variant="primary"
+                size="lg"
+                onClick={() => {
+                  setQuickUpsellAccepted(true);
+                  setCrossSellModalOpen(false);
+                  toast.success(`${quickProduct?.name ?? "Água"} adicionada ao pedido!`);
+                }}
+                style={{
+                  flex: 1,
+                  minWidth: "220px",
+                  borderRadius: "9999px",
+                  background: "var(--color-orange, #ff7a00)",
+                  borderColor: "var(--color-orange, #ff7a00)",
+                }}
+              >
+                ✓ Sim, adicionar água (+ {money(quickProduct ? quickProduct.price_cents : 500)})
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                onClick={() => {
+                  setQuickUpsellAccepted(false);
+                  setCrossSellModalOpen(false);
+                }}
+                style={{ flex: 1, minWidth: "180px", borderRadius: "9999px" }}
+              >
+                ✕ Não, apenas o pacote
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
