@@ -10,6 +10,14 @@ const PAUSE_REASON_LABEL: Record<string, string> = {
   OUTRO: "Outro motivo",
 };
 
+const DOCUMENT_LABEL: Record<string, string> = {
+  RG: "RG",
+  CNH: "CNH",
+  PASSAPORTE: "Passaporte",
+  CTPS_DIGITAL: "Documento digital (gov.br / CTPS)",
+  OUTRO: "Outro documento com foto",
+};
+
 interface TimelineStep {
   atMs: number;
   label: string;
@@ -41,6 +49,43 @@ function stepFor(event: SessionEvent): TimelineStep {
         color: "var(--color-teal)",
         employeeName: event.employee_name,
         detail: event.payload?.message as string | undefined,
+      };
+    case "SAIDA_QR_ESCANEADA":
+      return {
+        atMs: event.at_ms,
+        label: "📷 Pulseira lida na saída",
+        color: "var(--color-teal)",
+        employeeName: event.employee_name,
+      };
+    // Esta é a linha que dá valor probatório à saída de contingência: sem os
+    // detalhes do documento visíveis aqui, o registro existiria no banco e
+    // ninguém conseguiria consultá-lo quando precisasse.
+    case "SAIDA_MANUAL_AUTORIZADA": {
+      const p = event.payload ?? {};
+      const documento = DOCUMENT_LABEL[p.documentKind as string] ?? (p.documentKind as string) ?? "documento";
+      const quem = (p.guardianName as string | undefined) ?? "pessoa não cadastrada";
+      const autorizado = p.authorizedPickup === true;
+      return {
+        atMs: event.at_ms,
+        label: `🪪 Saída manual autorizada — retirada por ${quem}`,
+        color: autorizado ? "var(--color-primary)" : "var(--color-amber)",
+        employeeName: event.employee_name,
+        detail: [
+          `Documento conferido: ${documento}`,
+          p.documentNote ? `(${p.documentNote as string})` : null,
+          autorizado ? "Responsável cadastrado." : "⚠️ EXCEÇÃO — não consta no cadastro.",
+          p.reason ? `Justificativa: ${p.reason as string}` : null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      };
+    }
+    case "REIMPRESSAO_ENTRADA":
+      return {
+        atMs: event.at_ms,
+        label: "🖨️ Pulseira e recibo reimpressos",
+        color: "var(--border-subtle)",
+        employeeName: event.employee_name,
       };
     default:
       return { atMs: event.at_ms, label: event.kind, color: "var(--border-subtle)", employeeName: event.employee_name };

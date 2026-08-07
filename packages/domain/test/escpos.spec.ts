@@ -21,7 +21,8 @@ describe("generateEscPosReceipt", () => {
     expect(receipt.text).toContain("*** RECIBO DE CAIXA ***");
     expect(receipt.text).toContain("Criança: Helena Souza");
     expect(receipt.text).toContain("Plano 30 minutos");
-    expect(receipt.text).toContain("TOTAL:                       R$       50,00");
+    // 42 colunas exatas: rótulo à esquerda, valor encostado na borda da bobina.
+    expect(receipt.text).toContain("TOTAL:                      R$       50,00");
     expect(receipt.text).toContain("Não possui valor fiscal");
 
     // Verifica que cada linha de divisor tem exatamente 42 caracteres

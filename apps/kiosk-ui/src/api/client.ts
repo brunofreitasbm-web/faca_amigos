@@ -109,6 +109,76 @@ export interface Product {
   stock: number;
 }
 
+/**
+ * Dados fiscais do emitente. NFC-e (modelo 65, mercadoria, autorizada pela
+ * SVRS desde que a SEFA-PA desativou os webservices próprios) e o CADASTRO
+ * de NFS-e (serviço, ISS, Prefeitura de Belém) — a emissão de NFS-e está
+ * fora de escopo, ver migration 20260807000004.
+ *
+ * Nenhum segredo trafega aqui: `nfce_csc_id` é só o identificador do CSC
+ * (ex. '000001'), que não é secreto. O TOKEN do CSC e o certificado A1
+ * (.pfx) vivem exclusivamente no cofre local do PC do balcão.
+ */
+export interface UnitFiscal {
+  id: string;
+  name: string;
+  cnpj: string | null;
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  inscricao_estadual: string | null;
+  inscricao_municipal: string | null;
+  cnae_principal: string | null;
+  crt: number | null;
+  end_logradouro: string | null;
+  end_numero: string | null;
+  end_complemento: string | null;
+  end_bairro: string | null;
+  end_municipio_ibge: string | null;
+  end_uf: string | null;
+  end_cep: string | null;
+  fone: string | null;
+  fiscal_ambiente: string | null;
+  fiscal_enabled: boolean | null;
+  nfce_serie: number | null;
+  nfce_csc_id: string | null;
+  nfce_qrcode_url_consulta: string | null;
+  nfse_item_lista_servico: string | null;
+  nfse_codigo_tributacao_municipio: string | null;
+  nfse_aliquota_iss_bp: number | null;
+  nfse_iss_retido: boolean | null;
+  nfse_regime_especial: number | null;
+  nfse_serie_rps: string | null;
+  nfse_ambiente: string | null;
+  nfse_enabled: boolean | null;
+}
+
+/** Tributação por item — sem NCM/CFOP/CSOSN a NFC-e é rejeitada. */
+export interface ProductFiscal {
+  id: string;
+  name: string;
+  ncm: string | null;
+  cest: string | null;
+  cfop: string | null;
+  csosn: string | null;
+  origem: number | null;
+  unidade_comercial: string | null;
+  gtin: string | null;
+  pis_cst: string | null;
+  cofins_cst: string | null;
+}
+
+export interface FiscalTerminalStatus {
+  unit_id: string;
+  terminal_id: string;
+  worker_version: string | null;
+  cert_subject_cn: string | null;
+  cert_not_after_ms: number | null;
+  csc_configured: boolean;
+  environment: string | null;
+  last_heartbeat_ms: number;
+  last_error: string | null;
+}
+
 export interface ChildMatch {
   id: string;
   full_name: string;
@@ -116,6 +186,38 @@ export interface ChildMatch {
   phone_e164: string | null;
   guardian_name: string | null;
   cpf: string | null;
+}
+
+/**
+ * Resposta de `fa_resolve_access_code`. Cada `reason` é uma situação real de
+ * balcão, não um erro genérico:
+ *
+ *   OK             sessão ativa encontrada, pode seguir para o pagamento
+ *   PAUSADA        criança está com o tempo pausado — retomar antes de fechar
+ *   CODIGO_INVALIDO leu outra coisa, ou o dígito verificador não bate
+ *   NAO_ENCONTRADO código válido, mas nenhuma sessão com ele
+ *   OUTRA_UNIDADE  pulseira de outra operação/módulo
+ *   JA_FINALIZADA  essa criança já saiu (leitura duplicada da mesma pulseira)
+ */
+export interface ResolvedAccessCode {
+  reason: "OK" | "PAUSADA" | "CODIGO_INVALIDO" | "NAO_ENCONTRADO" | "OUTRA_UNIDADE" | "JA_FINALIZADA";
+  code?: string;
+  sessionId?: string;
+  childName?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  checkinAtMs?: number;
+  checkoutAtMs?: number;
+  notes?: string | null;
+  sensoryTags?: string[];
+}
+
+export interface AuthorizedGuardian {
+  guardianId: string;
+  fullName: string;
+  cpf: string | null;
+  phone: string | null;
+  isPrimary: boolean;
 }
 
 export type SessionPhase = "VERDE" | "AMARELO" | "VERMELHO" | "EXCEDENTE";
@@ -136,10 +238,13 @@ export interface ActiveSessionEntry {
     checkin_by_employee_id?: string | null;
     asset_id: string | null;
     wristband_code?: string;
+    /** Código curto impresso na pulseira e no recibo de guarda (11 caracteres). */
+    access_code?: string | null;
     guardian_name_snapshot?: string;
     guardian_phone_snapshot?: string;
     child_birth_date?: string;
     notes?: string;
+    sensory_tags?: string[];
     paused_at_ms: number | null;
     paused_ms_total: number;
   };
@@ -407,9 +512,16 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         checkin_by_employee_id: (row.checkin_by_employee_id as string | null) ?? null,
         asset_id: row.asset_id as string | null,
         wristband_code: row.wristband_code as string,
+        access_code: (row.access_code as string | null) ?? null,
         guardian_name_snapshot: (guardian?.full_name as string) ?? undefined,
         guardian_phone_snapshot: (guardian?.phone_e164 as string) ?? undefined,
         child_birth_date: (childRow?.birth_date as string) ?? undefined,
+        // Estes dois chegavam do banco no select("*") e eram descartados
+        // aqui — por isso o alerta de cuidados no card do Painel e o "OBS"
+        // da etiqueta nunca apareciam, mesmo com a tela de Entrada tendo um
+        // seletor de tags sensoriais desde o começo.
+        notes: (row.notes as string | null) ?? undefined,
+        sensory_tags: (row.sensory_tags as string[] | null) ?? undefined,
         paused_at_ms: (row.paused_at_ms as number | null) ?? null,
         paused_ms_total: (row.paused_ms_total as number) ?? 0,
       },
@@ -476,6 +588,26 @@ export const Api = {
     if (!q || q.length < 2) return [];
     return unwrap<ChildMatch[]>(supabase().rpc("fa_kiosk_search_children", { p_query: q }));
   },
+  /**
+   * Cuidados inclusivos registrados na última visita da criança.
+   *
+   * Necessidade sensorial não muda de uma visita para a outra: obrigar o
+   * operador a remarcar "usa abafador" toda vez é o tipo de recadastro que
+   * na prática deixa de ser feito na correria — e aí o monitor não recebe a
+   * informação. Vem preenchido e pode ser alterado.
+   */
+  lastCareForChild: async (childId: string) => {
+    const row = await unwrap<{ notes: string | null; sensory_tags: string[] | null } | null>(
+      supabase()
+        .from("fa_kiosk_sessions")
+        .select("notes, sensory_tags")
+        .eq("child_id", childId)
+        .order("checkin_at_ms", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    );
+    return { notes: row?.notes ?? "", sensoryTags: row?.sensory_tags ?? [] };
+  },
   lastAssetForChild: async (childId: string) => {
     const assetId = await unwrap<string | null>(supabase().rpc("fa_kiosk_last_asset_for_child", { p_child_id: childId }));
     return { assetId };
@@ -508,8 +640,20 @@ export const Api = {
     child: { id?: string; fullName: string; birthDate: string; inclusiveEligible: boolean; inclusiveProofType?: string };
     guardian: { id?: string; fullName: string; cpf: string; phoneE164: string };
     couponCode?: string;
+    notes?: string;
+    sensoryTags?: string[];
   }) =>
-    callResilient<{ sessionId: string; childId: string; guardianId: string; wristbandCode: string; ticketCode: string }>(
+    // fa_checkin também enfileira, na mesma transação, a pulseira e o recibo
+    // de guarda. Nenhuma tela precisa disparar impressão no check-in: se a
+    // RPC voltou, as duas vias já estão na fila do print bridge.
+    callResilient<{
+      sessionId: string;
+      childId: string;
+      guardianId: string;
+      accessCode: string;
+      wristbandCode: string;
+      ticketCode: string;
+    }>(
       "fa_checkin",
       {
         p_unit_id: body.unitId,
@@ -526,48 +670,38 @@ export const Api = {
         },
         p_coupon_code: body.couponCode ?? null,
         p_employee_id: body.employeeId,
+        p_notes: body.notes ?? null,
+        p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
       },
     ),
-  checkout: async (body: {
+  /**
+   * Fechamento do atendimento.
+   *
+   * Havia aqui um "fechamento direto de segurança": quando fa_checkout
+   * falhava por qualquer motivo, o navegador marcava as sessões como
+   * FINALIZADA por conta própria e devolvia um código inventado. A criança
+   * saía, mas nenhum pedido, item ou pagamento era gravado — o dinheiro
+   * entrava no caixa físico e sumia do sistema, e o turno fechava com
+   * divergência sem rastro de onde. Removido: erro de fechamento agora
+   * chega à tela para o operador resolver (abrir o caixa, retomar a
+   * sessão, tentar de novo), que é a única saída que não perde a venda.
+   *
+   * Queda de rede continua coberta, e sem esse risco: callResilient guarda
+   * a chamada na fila offline com a mesma chave de idempotência e reenvia
+   * quando a conexão volta.
+   */
+  checkout: (body: {
     sessionIds: string[];
     employeeId: string;
     payments: { method: string; amountCents: number; nsu?: string; authorization?: string; pixTxid?: string }[];
     redeemRewardIds?: string[];
-  }) => {
-    try {
-      return await callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_checkout", {
-        p_session_ids: body.sessionIds,
-        p_payments: body.payments,
-        p_redeem_reward_ids: body.redeemRewardIds ?? [],
-        p_employee_id: body.employeeId,
-      });
-    } catch (err) {
-      console.warn("[checkout] RPC fa_checkout falhou, executando fechamento direto de segurança:", err);
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("SEM_TURNO_ABERTO") || msg.includes("SESSAO_PAUSADA")) {
-        throw err;
-      }
-
-      const nowMs = Date.now();
-      const orderId = crypto.randomUUID();
-      const orderCode = `#FECH-${nowMs.toString(36).toUpperCase().slice(-6)}`;
-      const totalCents = body.payments.reduce((s, p) => s + (p.amountCents || 0), 0);
-
-      for (const sid of body.sessionIds) {
-        await supabase()
-          .from("fa_kiosk_sessions")
-          .update({ status: "FINALIZADA", checkout_at_ms: nowMs, order_id: orderId })
-          .eq("id", sid);
-
-        const { data: sData } = await supabase().from("fa_kiosk_sessions").select("asset_id").eq("id", sid).maybeSingle();
-        if (sData?.asset_id) {
-          await supabase().from("fa_kiosk_assets").update({ status: "DISPONIVEL" }).eq("id", sData.asset_id);
-        }
-      }
-
-      return { orderId, orderCode, totalCents };
-    }
-  },
+  }) =>
+    callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_checkout", {
+      p_session_ids: body.sessionIds,
+      p_payments: body.payments,
+      p_redeem_reward_ids: body.redeemRewardIds ?? [],
+      p_employee_id: body.employeeId,
+    }),
   pdvOrder: (body: { unitId: string; employeeId: string; items: { productId: string; quantity: number }[]; payments: unknown[] }) =>
     callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_create_pdv_order", {
       p_unit_id: body.unitId,
@@ -780,6 +914,50 @@ export const Api = {
    * navegador — só assim dá pra imprimir sem clique nenhum do operador,
    * direto na impressora escolhida em Configurações > Impressoras.
    */
+  /**
+   * Traduz o que a câmera leu (ou o que o operador digitou) numa sessão.
+   *
+   * Nunca lança para código errado: na porta de saída, apontar a câmera para
+   * a etiqueta errada é rotina, não falha de sistema. O motivo vem em
+   * `reason` para a tela reagir sem tratar tudo como erro vermelho.
+   */
+  resolveAccessCode: (unitId: string, code: string, employeeId?: string) =>
+    unwrap<ResolvedAccessCode>(
+      supabase().rpc("fa_resolve_access_code", {
+        p_unit_id: unitId,
+        p_code: code,
+        p_employee_id: employeeId ?? null,
+      }),
+    ),
+  /** Responsáveis autorizados a retirar a criança desta sessão, para conferência do documento. */
+  saidaResponsaveis: async (sessionId: string) =>
+    (await unwrap<AuthorizedGuardian[] | null>(
+      supabase().rpc("fa_saida_responsaveis", { p_session_id: sessionId }),
+    )) ?? [],
+  /** Registra a liberação de contingência (recibo perdido / etiqueta danificada) antes de cobrar. */
+  saidaManualAuthorize: (body: {
+    sessionId: string;
+    guardianId: string | null;
+    documentKind: string;
+    documentNote?: string;
+    reason?: string;
+    employeeId: string;
+  }) =>
+    unwrap<{ authorizedPickup: boolean; guardianName: string | null }>(
+      supabase().rpc("fa_saida_manual_authorize", {
+        p_session_id: body.sessionId,
+        p_guardian_id: body.guardianId,
+        p_document_kind: body.documentKind,
+        p_document_note: body.documentNote ?? null,
+        p_reason: body.reason ?? null,
+        p_employee_id: body.employeeId,
+      }),
+    ),
+  /** Reimprime pulseira + recibo de guarda da mesma sessão, sem gerar código novo. */
+  reimprimirEntrada: (sessionId: string, employeeId?: string) =>
+    unwrap<{ accessCode: string }>(
+      supabase().rpc("fa_reimprimir_entrada", { p_session_id: sessionId, p_employee_id: employeeId ?? null }),
+    ),
   queuePrintJob: (unitId: string, kind: "WRISTBAND" | "RECEIPT", payload: unknown) =>
     unwrap(
       supabase()
@@ -956,11 +1134,108 @@ export const Api = {
   // servidor. Não existe e-mail/senha em nenhum passo — só o PIN.
   createEmployee: (body: NewEmployeeInput) =>
     unwrap<{ id: string }>(supabase().functions.invoke("admin-create-employee", { body })),
-  setEmployeeActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_employees").update({ active }).eq("id", id).select().single()),
+  // Ativar/desativar e trocar papel passam por RPC (e não por UPDATE direto)
+  // para a alteração ficar na trilha de auditoria na mesma transação e para
+  // o guard do último Owner disparar. Ver migration 20260807000005.
+  setEmployeeActive: (id: string, active: boolean) =>
+    unwrap(supabase().rpc("fa_config_set_employee_active", { p_employee_id: id, p_active: active })),
+  setEmployeeRole: (id: string, role: Employee["role"]) =>
+    unwrap(supabase().rpc("fa_config_set_employee_role", { p_employee_id: id, p_role: role })),
   // Redefinição de PIN (ex.: colaborador esqueceu) — mesma exigência de
   // chamador ADMIN autenticado, resolvida do lado do servidor.
   setEmployeePin: (employeeId: string, pin: string) =>
     unwrap<{ ok: boolean }>(supabase().functions.invoke("admin-set-employee-pin", { body: { employeeId, pin } })),
+
+  /**
+   * Colaborador correspondente à sessão do Supabase Auth atual. É daqui
+   * que o app descobre "quem está operando" ao restaurar uma sessão salva —
+   * nunca do que o cliente afirma ser.
+   */
+  currentEmployee: async (): Promise<{ id: string; full_name: string; role: Employee["role"] }> => {
+    const { data: userData } = await supabase().auth.getUser();
+    const authUserId = userData.user?.id;
+    if (!authUserId) throw new Error("sem sessão");
+    return unwrap<{ id: string; full_name: string; role: Employee["role"] }>(
+      supabase()
+        .from("fa_kiosk_employees")
+        .select("id, full_name, role")
+        .eq("auth_user_id", authUserId)
+        .eq("active", true)
+        .single(),
+    );
+  },
+
+  /**
+   * Lista usada na TELA DE LOGIN, antes de existir sessão. Vai por Edge
+   * Function porque fa_kiosk_employees só é legível por `authenticated`
+   * (e deve continuar assim: tem CPF, PIS e cargo). Devolve só id + nome —
+   * sem o papel, para um ataque de força bruta não saber qual nome é o
+   * Owner. Ver supabase/functions/list-employees.
+   */
+  employeesForLogin: async (): Promise<{ id: string; full_name: string }[]> => {
+    const { data, error } = await supabase().functions.invoke<{
+      employees: { id: string; full_name: string }[];
+    }>("list-employees", { body: {} });
+    if (error || !data) throw new Error("Não foi possível carregar a lista de colaboradores");
+    return data.employees;
+  },
+
+  /** Capacidades do colaborador logado (view fa_kiosk_my_capabilities). */
+  myCapabilities: () =>
+    unwrap<{ capability: string }[]>(supabase().from("fa_kiosk_my_capabilities").select("capability")),
+
+  // --- Configurações: unidade, fiscal e termos de uso -----------------------
+  // Todas passam por RPC `fa_config_*`, que checa fa_kiosk_can() no servidor
+  // ANTES de tocar em qualquer linha e registra a alteração na trilha de
+  // auditoria. Esconder a aba no menu é UX; isto é o que de fato protege.
+  createUnit: (body: { name: string; kind: Unit["kind"]; timezone?: string; businessDayCutoffHour?: number }) =>
+    unwrap<string>(supabase().rpc("fa_config_create_unit", { p_payload: body })),
+  updateUnit: (
+    unitId: string,
+    body: {
+      name?: string;
+      timezone?: string;
+      businessDayCutoffHour?: number;
+      address?: string | null;
+      phone?: string | null;
+    },
+  ) => unwrap(supabase().rpc("fa_config_update_unit", { p_unit_id: unitId, p_payload: body })),
+  unitFiscal: (unitId: string) =>
+    unwrap<UnitFiscal>(
+      supabase()
+        .from("fa_kiosk_units")
+        .select(
+          "id, name, cnpj, razao_social, nome_fantasia, inscricao_estadual, inscricao_municipal, cnae_principal, crt, " +
+            "end_logradouro, end_numero, end_complemento, end_bairro, end_municipio_ibge, end_uf, end_cep, fone, " +
+            "fiscal_ambiente, fiscal_enabled, nfce_serie, nfce_csc_id, nfce_qrcode_url_consulta, " +
+            "nfse_item_lista_servico, nfse_codigo_tributacao_municipio, nfse_aliquota_iss_bp, nfse_iss_retido, " +
+            "nfse_regime_especial, nfse_serie_rps, nfse_ambiente, nfse_enabled",
+        )
+        .eq("id", unitId)
+        .single(),
+    ),
+  updateUnitFiscal: (unitId: string, payload: Record<string, unknown>) =>
+    unwrap(supabase().rpc("fa_config_update_unit_fiscal", { p_unit_id: unitId, p_payload: payload })),
+  productsFiscal: (unitId: string) =>
+    unwrap<ProductFiscal[]>(
+      supabase()
+        .from("fa_kiosk_products")
+        .select("id, name, ncm, cest, cfop, csosn, origem, unidade_comercial, gtin, pis_cst, cofins_cst")
+        .eq("unit_id", unitId)
+        .eq("active", true)
+        .order("name"),
+    ),
+  updateProductFiscal: (productId: string, payload: Record<string, unknown>) =>
+    unwrap(supabase().rpc("fa_config_update_product_fiscal", { p_product_id: productId, p_payload: payload })),
+  fiscalTerminalStatus: (unitId: string) =>
+    unwrap<FiscalTerminalStatus[]>(
+      supabase()
+        .from("fa_kiosk_fiscal_terminal_status")
+        .select("unit_id, terminal_id, worker_version, cert_subject_cn, cert_not_after_ms, csc_configured, environment, last_heartbeat_ms, last_error")
+        .eq("unit_id", unitId),
+    ),
+  setTerms: (unitId: string, terms: string) =>
+    unwrap(supabase().rpc("fa_config_set_terms", { p_unit_id: unitId, p_terms: terms })),
 
   // Os relatórios abaixo chamavam `/api/reports/...` (servidor Fastify
   // local, apps/kiosk) — removido na migração para Supabase (commit

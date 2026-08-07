@@ -4,6 +4,7 @@ import "@facaamigos/ui/styles.css";
 import "./app.css";
 import { App } from "./App.js";
 import { AppStateProvider } from "./state/AppState.js";
+import { AuthProvider } from "./auth/AuthContext.js";
 import { ToastProvider } from "./state/ToastContext.js";
 import { ConfirmProvider } from "./state/ConfirmContext.js";
 import { SystemStatusOverlay } from "./components/SystemStatusOverlay.js";
@@ -20,9 +21,11 @@ createRoot(container).render(
   <StrictMode>
     <ToastProvider>
       <ConfirmProvider>
-        <AppStateProvider>
-          <App />
-        </AppStateProvider>
+        <AuthProvider>
+          <AppStateProvider>
+            <App />
+          </AppStateProvider>
+        </AuthProvider>
         <SystemStatusOverlay />
       </ConfirmProvider>
     </ToastProvider>

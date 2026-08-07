@@ -4,6 +4,7 @@ import { Api } from "../api/client.js";
 import type { CashMovement, RevenueByMethod, Shift, ShiftSale } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useConfirm } from "../state/ConfirmContext.js";
+import { IfCan } from "../auth/RequireCapability.js";
 import { money } from "../format.js";
 import { OFFLINE_FLUSH_EVENT, OfflineQueuedError } from "../lib/supabase/offlineQueue.js";
 import type { OfflineFlushDetail } from "../lib/supabase/offlineQueue.js";
@@ -340,6 +341,12 @@ export function CaixaScreen() {
         )}
       </Card>
 
+      {/* Sangria/suprimento tira e põe dinheiro na gaveta fora de uma venda —
+          é a operação em que a diferença entre Operador e Líder tem
+          consequência financeira. Esconder aqui é só cortesia: quem barra de
+          verdade é o trigger fa_kiosk_guard_cash_movement (migration
+          20260807000006), que recusa a inserção no banco. */}
+      <IfCan capability="caixa.sangria">
       <Card style={{ padding: "16px" }}>
         <h2>Sangria / Suprimento</h2>
         <HelpText style={{ marginBottom: "8px" }}>
@@ -378,6 +385,7 @@ export function CaixaScreen() {
           ))}
         </ul>
       </Card>
+      </IfCan>
 
       {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
 

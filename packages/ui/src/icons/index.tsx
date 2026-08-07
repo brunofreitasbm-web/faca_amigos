@@ -86,6 +86,14 @@ export function SignInIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function QrCodeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <path d="M104,48H56a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V56A8,8,0,0,0,104,48ZM96,96H64V64H96ZM200,48H152a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V56A8,8,0,0,0,200,48Zm-8,48H160V64h32ZM104,144H56a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V152A8,8,0,0,0,104,144Zm-8,48H64V160H96Zm88-48H152a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0v-8h24a8,8,0,0,0,0-16Zm16,32a8,8,0,0,0-8,8v24H176a8,8,0,0,0,0,16h24a8,8,0,0,0,8-8V184A8,8,0,0,0,200,176Zm-56,16a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-8A8,8,0,0,0,144,192Z" />
+    </IconBase>
+  );
+}
+
 export function GridIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconBase {...props}>

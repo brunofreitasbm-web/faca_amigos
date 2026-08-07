@@ -6,7 +6,9 @@ import { useActiveSessions } from "../api/useTick.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useConfirm } from "../state/ConfirmContext.js";
+import { IfCan } from "../auth/RequireCapability.js";
 import { CheckoutModal } from "../components/CheckoutModal.js";
+import { SaidaManualModal } from "../components/SaidaManualModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import type { WristbandData } from "../components/WristbandPrintModal.js";
 import { SessionTimelineModal } from "../components/SessionTimelineModal.js";
@@ -52,6 +54,9 @@ export function PainelScreen() {
   const [entradaOpen, setEntradaOpen] = useState(false);
   const [pdvOpen, setPdvOpen] = useState(false);
   const [qrModalSession, setQrModalSession] = useState<{ code: string; childName: string; guardianName?: string } | null>(null);
+  // Contingência: recibo perdido E etiqueta ilegível. Passa pela conferência
+  // do documento antes de cair no mesmo fechamento financeiro de sempre.
+  const [manualExitFor, setManualExitFor] = useState<ActiveSessionEntry | null>(null);
 
   useEffect(() => {
     if (!unit) return;
@@ -274,7 +279,11 @@ export function PainelScreen() {
           const isPaused = quote.timing.isPaused;
           const isPausedTooLong = isPaused && quote.timing.pausedForMs >= PAUSE_ALERT_MS;
           const overageLine = quote.lines.find((l) => l.label.startsWith("Excedente"));
-          const wristbandCode = session.wristband_code || session.id.slice(0, 6).toUpperCase();
+          // access_code é o código curto novo; wristband_code cobre as
+          // pulseiras impressas antes da migração 20260807000007, que ainda
+          // circulam no pulso de quem entrou naquele dia.
+          const wristbandCode = session.access_code || session.wristband_code || session.id.slice(0, 6).toUpperCase();
+          const careSummary = [...(session.sensory_tags ?? []), session.notes].filter(Boolean).join(" · ");
 
           return (
             <Card
@@ -418,9 +427,9 @@ export function PainelScreen() {
                 </Badge>
               )}
 
-              {session.notes && (
+              {careSummary && (
                 <div style={{ fontSize: "12px", background: "rgba(201, 144, 32, 0.1)", padding: "6px 10px", borderRadius: "8px", color: "var(--color-dark)" }}>
-                  💡 {session.notes}
+                  💡 {careSummary}
                 </div>
               )}
 
@@ -449,19 +458,25 @@ export function PainelScreen() {
                 >
                   🚻 Chamado de Retorno
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={actionBusy.has(session.id)}
-                  title="Trocar o plano de permanência desta sessão"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPendingPlanId("");
-                    setChangingPlanFor(changingPlanFor === session.id ? null : session.id);
-                  }}
-                >
-                  🔄 Mudar Plano
-                </Button>
+                {/* Trocar o plano de uma sessão já vendida é exceção de
+                    atendimento, não rotina. Quem barra de verdade é o trigger
+                    fa_kiosk_guard_session_exception (migration 20260807000006);
+                    isto só evita mostrar ao Operador um botão que vai falhar. */}
+                <IfCan capability="sessao.change_plan">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={actionBusy.has(session.id)}
+                    title="Trocar o plano de permanência desta sessão"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingPlanId("");
+                      setChangingPlanFor(changingPlanFor === session.id ? null : session.id);
+                    }}
+                  >
+                    🔄 Mudar Plano
+                  </Button>
+                </IfCan>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -475,11 +490,30 @@ export function PainelScreen() {
                       guardianName: session.guardian_name_snapshot || "Responsável",
                       phone: session.guardian_phone_snapshot || "",
                       entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                      notes: session.notes,
+                      notes: careSummary || undefined,
                     });
                   }}
                 >
                   <PrinterIcon /> Pulseira
+                </Button>
+                {/* Contingência de saída. Fica no card, e não escondido num
+                    menu, porque é usado justamente quando algo já deu errado
+                    e o operador está sob pressão com a família na frente. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isPaused || actionBusy.has(session.id)}
+                  title={
+                    isPaused
+                      ? "Retome a contagem antes de liberar a criança"
+                      : "Recibo perdido ou etiqueta danificada: liberar conferindo o documento do responsável"
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setManualExitFor(entry);
+                  }}
+                >
+                  🪪 Saída manual
                 </Button>
                 {isPaused ? (
                   <Button
@@ -633,6 +667,22 @@ export function PainelScreen() {
           onDone={() => {
             setCheckoutOpen(false);
             setSelected(new Set());
+          }}
+        />
+      )}
+
+      {manualExitFor && (
+        <SaidaManualModal
+          entry={manualExitFor}
+          onClose={() => setManualExitFor(null)}
+          onAuthorized={() => {
+            // Conferência registrada — a cobrança segue pelo mesmo caminho
+            // do fechamento normal, para não existir uma segunda forma de
+            // fechar venda no sistema.
+            setSelected(new Set([manualExitFor.session.id]));
+            setManualExitFor(null);
+            setCheckoutOpen(true);
+            toast.success("Conferência registrada. Finalize o pagamento.");
           }}
         />
       )}

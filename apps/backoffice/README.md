@@ -1,34 +1,43 @@
-# @facaamigos/backoffice
+# @facaamigos/backoffice — DESATIVADO
 
-Back-office web (Fase 2 do plano) — administração em nuvem de unidades, planos, produtos e
-funcionários. Next.js (App Router) + Supabase, feito para deploy no Vercel.
+> ⚠️ **Este app está sendo desligado.** Toda a administração foi consolidada em
+> **Configurações**, dentro do `apps/kiosk-ui`, com controle de acesso de 3 níveis
+> (Operador / Líder / Owner) validado no servidor. Nada novo deve ser adicionado aqui.
 
-O quiosque (`apps/kiosk` + `apps/kiosk-ui`) continua offline-first e não depende deste app; este
-back-office é uma superfície de gestão separada, hoje sem sincronização automática com o SQLite
-local do quiosque.
+## Por que ele ainda existe no repositório
 
-## Banco de dados
+Só como referência das telas migradas, até o deployment ser removido do Vercel. O código
+continua funcional, mas nenhuma tela dele é a fonte da verdade da operação.
 
-Usa o projeto Supabase existente `ivjvpdzsfjdpyabbzzuj` (compartilhado com outro app da mesma
-organização). Todas as tabelas deste app usam o prefixo `fa_kiosk_` para não colidir com as
-tabelas do outro sistema. RLS habilitada em todas — apenas usuários autenticados (Supabase Auth)
-leem/escrevem.
+## O que PRECISA ser feito para desativar de verdade
 
-Para dar acesso a alguém: crie o usuário em Authentication → Users no painel do Supabase (ou via
-`supabase.auth.admin.createUser`). Não há cadastro público nesta versão.
+Remover o link do kiosk-ui não desativa nada — o deployment é alcançável por URL direta.
+Enquanto ele existir, é um bypass completo do RBAC do kiosk-ui: as telas deste app escrevem
+direto nas tabelas, sem passar pelas RPCs `fa_config_*`.
 
-## Rodando localmente
+1. **Remover o projeto do Vercel** (`vercel remove`, ou deletar pelo painel).
+   Até lá, o guard de autenticação em `src/lib/supabase/middleware.ts` está **ativo** de novo —
+   ele estava comentado, o que deixava o painel administrativo público na internet.
+2. **Rotacionar a publishable key** do Supabase depois de aplicar a migration
+   `20260807000003_fa_security_hardening.sql`. A chave atual circulou em bundle público
+   enquanto as policies `to anon` estavam abertas.
+3. **Auditar policies residuais** criadas direto no dashboard, fora do repositório:
+   ```sql
+   select schemaname, tablename, policyname, roles, cmd
+     from pg_policies where schemaname = 'public' order by tablename;
+   ```
+   O que não estiver declarado em `supabase/migrations/` é porta dos fundos invisível no código.
+4. Remover `apps/backoffice` do `pnpm-workspace.yaml` e apagar o diretório.
 
-```bash
-cp .env.example .env.local
-pnpm --filter @facaamigos/backoffice dev
-```
+## Onde cada tela foi parar
 
-## Deploy no Vercel
-
-1. Import o repositório no Vercel.
-2. Root Directory: `apps/backoffice`.
-3. Framework preset: Next.js (detectado automaticamente).
-4. Environment Variables: copie os valores de `.env.example`
-   (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`).
-5. Deploy.
+| Backoffice | kiosk-ui |
+|---|---|
+| `/unidades` | Configurações › Unidade |
+| `/planos` | Configurações › Planos de Preços |
+| `/produtos` | Configurações › Produtos (fiscal em › Dados Fiscais) |
+| `/cupons` | Configurações › Cupons |
+| `/funcionarios` | Configurações › Colaboradores |
+| `/fiscal` | Configurações › Dados Fiscais |
+| `/configuracoes` | Configurações › Meta / Unidade / Termos de Uso |
+| `/relatorios`, `/dashboard` | Relatório (visível a partir de Líder) |

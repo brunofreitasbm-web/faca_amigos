@@ -2,34 +2,87 @@ import { useEffect, useState } from "react";
 import { Button, Card, Input, Select, Tabs, HelpText } from "@facaamigos/ui";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
-import type { Asset, BonusRule, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
+import type {
+  Asset,
+  BonusRule,
+  Coupon,
+  Employee,
+  LoyaltyRule,
+  Plan,
+  Product,
+  ProductFiscal,
+  FiscalTerminalStatus,
+  UnitFiscal,
+} from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
+import { useAuth } from "../auth/AuthContext.js";
+import { RequireCapability } from "../auth/RequireCapability.js";
+import { ROLE_LABEL, ROLE_DESCRIPTION, type Capability } from "../auth/capabilities.js";
 import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import { money } from "../format.js";
 
-type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES" | "IMPRESSORAS";
+type Tab =
+  | "PLANOS"
+  | "PRODUTOS"
+  | "CUPONS"
+  | "FIDELIDADE"
+  | "META"
+  | "FROTA"
+  | "COLABORADORES"
+  | "UNIDADE"
+  | "FISCAL"
+  | "TERMOS"
+  | "IMPRESSORAS";
+
+/**
+ * Capacidade exigida por aba. Assim como em auth/screens.ts, o
+ * `Record<Tab, Capability>` faz o build quebrar se uma aba nova nascer sem
+ * declarar o que exige — o modo de falha natural seria ela nascer aberta.
+ *
+ * Todas exigem no mínimo `config.write` (Owner); as três de baixo têm
+ * capacidade própria porque o dano de errar nelas é de outra natureza:
+ * papel de colaborador, dado fiscal e o texto que o responsável aceita.
+ */
+const TAB_CAPABILITY: Record<Tab, Capability> = {
+  PLANOS: "config.write",
+  PRODUTOS: "config.write",
+  CUPONS: "config.write",
+  FIDELIDADE: "config.write",
+  META: "config.write",
+  FROTA: "config.write",
+  IMPRESSORAS: "config.write",
+  COLABORADORES: "config.employees.write",
+  UNIDADE: "config.unit.write",
+  FISCAL: "config.fiscal.write",
+  TERMOS: "config.terms.write",
+};
 
 export function ConfiguracoesScreen() {
   const { unit } = useAppState();
+  const { can } = useAuth();
   const isQuiosque = unit?.kind === "QUIOSQUE";
   const [tab, setTab] = useState<Tab>("PLANOS");
 
   if (!unit) return null;
 
-  const tabs: { value: Tab; label: string }[] = [
+  const allTabs: { value: Tab; label: string }[] = [
     { value: "PLANOS", label: "Planos de Preços" },
     { value: "PRODUTOS", label: "Produtos" },
     { value: "CUPONS", label: "Cupons" },
     { value: "FIDELIDADE", label: "Fidelidade" },
     { value: "META", label: "Meta" },
-    ...(isQuiosque ? ([{ value: "FROTA", label: "Frota" }] as const) : []),
+    ...(isQuiosque ? ([{ value: "FROTA" as const, label: "Frota" }]) : []),
     { value: "COLABORADORES", label: "Colaboradores" },
+    { value: "UNIDADE", label: "Unidade" },
+    { value: "FISCAL", label: "Dados Fiscais" },
+    { value: "TERMOS", label: "Termos de Uso" },
     { value: "IMPRESSORAS", label: "Impressoras" },
   ];
+  const tabs = allTabs.filter((t) => can(TAB_CAPABILITY[t.value]));
 
   const TAB_HELP: Record<Tab, string> = {
     PLANOS: "Cadastre os planos de permanência que aparecem na tela de Entrada — nome, preço, duração e o que cobrar se passar do tempo.",
@@ -38,7 +91,10 @@ export function ConfiguracoesScreen() {
     FIDELIDADE: "Defina recompensas automáticas para clientes recorrentes — ex.: a cada 10 visitas, uma entrada grátis.",
     META: "Configure a meta de faturamento do dia, o horário de fechamento e as regras de bônus para a equipe.",
     FROTA: "Cadastre os carrinhos do Circuito (nome, cor, emoji e foto) e marque quando um estiver em manutenção.",
-    COLABORADORES: "Cadastre novos colaboradores e ative/desative o acesso deles ao sistema.",
+    COLABORADORES: "Cadastre colaboradores, defina o nível de acesso de cada um e ative/desative o acesso ao sistema.",
+    UNIDADE: "Dados da unidade: nome, fuso, virada do dia operacional e o que aparece no cabeçalho do cupom.",
+    FISCAL: "Dados do emitente para NFC-e (produtos) e o cadastro de NFS-e (serviço). Confira com seu contador antes de ligar a emissão.",
+    TERMOS: "Texto que o responsável aceita no check-in. Alterações ficam registradas na trilha de auditoria.",
     IMPRESSORAS: "Informe o nome das impressoras de pulseira e de cupom instaladas neste terminal.",
   };
 
@@ -49,21 +105,29 @@ export function ConfiguracoesScreen() {
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
 
+      {/* Cada painel é guardado individualmente, e não só a tela inteira: as
+          abas têm capacidades diferentes entre si, e o estado `tab` sobrevive
+          a uma troca de colaborador no terminal. */}
       <div role="tabpanel">
-        {tab === "PLANOS" && <PlanosTab unitId={unit.id} activity={isQuiosque ? "CARRINHO" : "PLAYGROUND"} />}
-        {tab === "PRODUTOS" && <ProdutosTab unitId={unit.id} />}
-        {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
-        {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
-        {tab === "META" && <MetaTab unitId={unit.id} isQuiosque={isQuiosque} />}
-        {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
-        {tab === "COLABORADORES" && <ColaboradoresTab />}
-        {tab === "IMPRESSORAS" && <ImpressorasTab unitId={unit.id} />}
+        <RequireCapability capability={TAB_CAPABILITY[tab]}>
+          {tab === "PLANOS" && <PlanosTab unitId={unit.id} activity={isQuiosque ? "CARRINHO" : "PLAYGROUND"} />}
+          {tab === "PRODUTOS" && <ProdutosTab unitId={unit.id} />}
+          {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
+          {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
+          {tab === "META" && <MetaTab unitId={unit.id} />}
+          {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
+          {tab === "COLABORADORES" && <ColaboradoresTab />}
+          {tab === "UNIDADE" && <UnidadeTab unitId={unit.id} />}
+          {tab === "FISCAL" && <FiscalTab unitId={unit.id} />}
+          {tab === "TERMOS" && <TermosTab unitId={unit.id} />}
+          {tab === "IMPRESSORAS" && <ImpressorasTab unitId={unit.id} />}
+        </RequireCapability>
       </div>
     </div>
   );
 }
 
-function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }) {
+function MetaTab({ unitId }: { unitId: string }) {
   const toast = useToast();
   const [goalReais, setGoalReais] = useState("0");
   const [savingGoal, setSavingGoal] = useState(false);
@@ -71,8 +135,6 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
   const [ruleDescription, setRuleDescription] = useState("");
   const [ruleValueReais, setRuleValueReais] = useState("0");
   const [busyRule, setBusyRule] = useState(false);
-  const [termsOfUse, setTermsOfUse] = useState("");
-  const [savingTerms, setSavingTerms] = useState(false);
   const [closingTime, setClosingTime] = useState("");
   const [savingClosingTime, setSavingClosingTime] = useState(false);
 
@@ -82,15 +144,11 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
   function loadRules() {
     Api.bonusRules(unitId).then(setRules);
   }
-  function loadTerms() {
-    if (isQuiosque) Api.unitSetting(unitId, "terms_of_use").then((r) => setTermsOfUse(r.value ?? ""));
-  }
   function loadClosingTime() {
     Api.unitSetting(unitId, "closing_time").then((r) => setClosingTime(r.value ?? ""));
   }
   useEffect(loadGoal, [unitId]);
   useEffect(loadRules, [unitId]);
-  useEffect(loadTerms, [unitId, isQuiosque]);
   useEffect(loadClosingTime, [unitId]);
 
   // As 4 funções abaixo eram só `try { await api() } finally { setBusy(false) }`
@@ -122,18 +180,6 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
       toast.error(err instanceof Error ? err.message : "Não foi possível criar a regra.");
     } finally {
       setBusyRule(false);
-    }
-  }
-
-  async function saveTerms() {
-    setSavingTerms(true);
-    try {
-      await Api.setUnitSetting(unitId, "terms_of_use", termsOfUse);
-      toast.success("Termos de uso salvos.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível salvar os termos de uso.");
-    } finally {
-      setSavingTerms(false);
     }
   }
 
@@ -209,22 +255,13 @@ function MetaTab({ unitId, isQuiosque }: { unitId: string; isQuiosque: boolean }
         ))}
       </Card>
 
-      {isQuiosque && (
-        <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          <h2 title="Texto impresso no cupom não fiscal de entrada do módulo Circuito">Termos de Uso (Circuito)</h2>
-          <label>Texto dos Termos de Uso</label>
-          <textarea
-            value={termsOfUse}
-            onChange={(e) => setTermsOfUse(e.target.value)}
-            rows={6}
-            title="Texto que aparecerá impresso no cupom não fiscal de cada entrada do Circuito"
-            style={{ width: "100%", padding: "10px", borderRadius: "12px", border: "1px solid var(--border-subtle)", fontFamily: "inherit" }}
-          />
-          <Button variant="primary" disabled={savingTerms} onClick={saveTerms} title="Salvar os Termos de Uso">
-            Salvar Termos de Uso
-          </Button>
-        </Card>
-      )}
+      {/* Os Termos de Uso saíram daqui para a aba própria "Termos de Uso":
+          eram gravados com `setUnitSetting` (upsert direto, exige só
+          config.write) enquanto a aba nova grava por `fa_config_set_terms`
+          (exige config.terms.write e audita o texto). Manter os dois
+          caminhos abertos para a mesma chave anularia a capacidade
+          específica — o Owner salvaria por um lado ou pelo outro, com
+          registros diferentes. */}
     </div>
   );
 }
@@ -754,7 +791,23 @@ function ColaboradoresTab() {
       await Api.setEmployeeActive(emp.id, !emp.active);
       load();
     } catch (err) {
+      // O erro pode vir do guard do último proprietário (migration
+      // 20260807000003), e nesse caso a mensagem do banco já explica o que
+      // fazer — mostrar ela crua é melhor que um genérico.
       toast.error(err instanceof Error ? err.message : "Não foi possível atualizar o colaborador");
+    }
+  }
+
+  async function changeRole(emp: Employee, next: Employee["role"]) {
+    if (next === emp.role) return;
+    try {
+      await Api.setEmployeeRole(emp.id, next);
+      toast.success(`${emp.full_name} agora é ${ROLE_LABEL[next]}.`);
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível alterar o nível de acesso");
+      // Recarrega para o select voltar ao valor real caso o servidor recuse.
+      load();
     }
   }
 
@@ -792,8 +845,12 @@ function ColaboradoresTab() {
 
       {showForm && !admin && (
         <Card style={{ padding: "16px", marginBottom: "16px" }}>
-          <p style={{ marginTop: 0, color: "var(--text-muted)" }}>Só um ADMIN pode cadastrar colaborador — confirme com seu PIN.</p>
-          <EmployeeAuthGate requireRole="ADMIN" onAuthenticated={setAdmin} onCancel={() => setShowForm(false)} />
+          <p style={{ marginTop: 0, color: "var(--text-muted)" }}>Só o proprietário pode cadastrar colaborador — confirme com seu PIN.</p>
+          <EmployeeAuthGate
+            requireCapability="config.employees.write"
+            onAuthenticated={setAdmin}
+            onCancel={() => setShowForm(false)}
+          />
         </Card>
       )}
 
@@ -817,15 +874,18 @@ function ColaboradoresTab() {
           </Select>
           <Input label="Jornada semanal contratada (horas)" type="number" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} />
           <Select
-            label="Papel"
-            title="Define o que a pessoa pode fazer no sistema: Operador atende no balcão; Gerente também acessa relatórios; Admin também cadastra colaboradores"
+            label="Nível de acesso"
+            title={ROLE_DESCRIPTION[role]}
             value={role}
             onChange={(e) => setRole(e.target.value as Employee["role"])}
           >
-            <option value="OPERADOR">Operador</option>
-            <option value="GERENTE">Gerente</option>
-            <option value="ADMIN">Admin</option>
+            {(["OPERADOR", "GERENTE", "ADMIN"] as const).map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABEL[r]}
+              </option>
+            ))}
           </Select>
+          <HelpText>{ROLE_DESCRIPTION[role]}</HelpText>
           {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
           <div style={{ display: "flex", gap: "8px" }}>
             <Button variant="primary" disabled={busy || !formValid} onClick={create}>
@@ -843,8 +903,12 @@ function ColaboradoresTab() {
           <h2 style={{ marginTop: 0 }}>Redefinir PIN de {resetPinTarget.full_name}</h2>
           {!resetPinAdmin ? (
             <>
-              <p style={{ color: "var(--text-muted)" }}>Só um ADMIN pode redefinir o PIN de outro colaborador — confirme com seu PIN.</p>
-              <EmployeeAuthGate requireRole="ADMIN" onAuthenticated={setResetPinAdmin} onCancel={closeResetPin} />
+              <p style={{ color: "var(--text-muted)" }}>Só o proprietário pode redefinir o PIN de outro colaborador — confirme com seu PIN.</p>
+              <EmployeeAuthGate
+                requireCapability="config.employees.write"
+                onAuthenticated={setResetPinAdmin}
+                onCancel={closeResetPin}
+              />
             </>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -869,14 +933,26 @@ function ColaboradoresTab() {
 
       {employees.map((e) => (
         <Card key={e.id} style={{ padding: "12px", marginBottom: "8px", opacity: e.active === false ? 0.5 : 1 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <div>
-              <strong>{e.full_name}</strong> — {e.role}
+              <strong>{e.full_name}</strong> — {ROLE_LABEL[e.role]}
               {e.position && <span style={{ color: "var(--text-muted)" }}> · {e.position}</span>}
               {e.contract_type && <span style={{ color: "var(--text-muted)" }}> · {CONTRACT_TYPE_LABEL[e.contract_type]}</span>}
               {e.admission_date && <span style={{ color: "var(--text-muted)" }}> · admitido em {new Date(e.admission_date).toLocaleDateString("pt-BR")}</span>}
             </div>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <Select
+                aria-label={`Nível de acesso de ${e.full_name}`}
+                title={ROLE_DESCRIPTION[e.role]}
+                value={e.role}
+                onChange={(ev) => void changeRole(e, ev.target.value as Employee["role"])}
+              >
+                {(["OPERADOR", "GERENTE", "ADMIN"] as const).map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABEL[r]}
+                  </option>
+                ))}
+              </Select>
               <Button variant="ghost" size="sm" onClick={() => { setResetError(null); setResetPinTarget(e); }}>
                 redefinir PIN
               </Button>
@@ -1139,5 +1215,463 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Unidade
+// ---------------------------------------------------------------------------
+// Migrada de apps/backoffice/src/app/(app)/unidades/page.tsx. A escrita não é
+// mais um UPDATE direto na tabela: passa por fa_config_update_unit, que confere
+// config.unit.write no servidor e audita a alteração.
+function UnidadeTab({ unitId }: { unitId: string }) {
+  const toast = useToast();
+  const { units } = useAppState();
+  const unit = units.find((u) => u.id === unitId);
+
+  const [name, setName] = useState("");
+  const [timezone, setTimezone] = useState("America/Belem");
+  const [cutoffHour, setCutoffHour] = useState("4");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!unit) return;
+    setName(unit.name);
+    setCutoffHour(String(unit.business_day_cutoff_hour ?? 4));
+    setAddress(unit.address ?? "");
+    setPhone(unit.phone ?? "");
+  }, [unit?.id]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await Api.updateUnit(unitId, {
+        name,
+        timezone,
+        businessDayCutoffHour: Number(cutoffHour),
+        address: address || null,
+        phone: phone || null,
+      });
+      toast.success("Dados da unidade salvos. Recarregue a página para ver o nome no cabeçalho.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a unidade.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!unit) return <HelpText>Unidade não encontrada.</HelpText>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Identificação</h2>
+        <Input label="Nome da unidade" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input
+          label="Tipo"
+          value={unit.kind === "QUIOSQUE" ? "Quiosque (Circuito)" : "Loja (Playground)"}
+          disabled
+          title="O tipo define quais telas e planos a unidade usa; mudá-lo depois invalidaria as sessões e planos já cadastrados, por isso não é editável."
+        />
+        <Select label="Fuso horário" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+          <option value="America/Belem">America/Belem (Pará)</option>
+          <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+          <option value="America/Manaus">America/Manaus</option>
+          <option value="America/Fortaleza">America/Fortaleza</option>
+        </Select>
+        <Input
+          label="Hora da virada do dia operacional"
+          type="number"
+          value={cutoffHour}
+          onChange={(e) => setCutoffHour(e.target.value)}
+        />
+        <HelpText>
+          Uma venda feita às 2h da manhã ainda conta no movimento do dia anterior até esta hora. Com 4, o dia
+          operacional vai das 4h de um dia às 3h59 do seguinte — é o que faz o fechamento de caixa da madrugada bater.
+        </HelpText>
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Cabeçalho do cupom</h2>
+        <HelpText>O que sai impresso no topo do comprovante entregue ao responsável.</HelpText>
+        <Input label="Endereço" value={address} onChange={(e) => setAddress(e.target.value)} />
+        <Input label="Telefone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <HelpText>
+          O CNPJ do cupom vem da aba Dados Fiscais — é o mesmo do emitente da nota, e ter dois campos para digitá-lo
+          é o caminho mais curto para eles divergirem.
+        </HelpText>
+      </Card>
+
+      <Button variant="primary" disabled={saving || !name} onClick={save}>
+        Salvar unidade
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dados Fiscais
+// ---------------------------------------------------------------------------
+const CRT_OPTIONS = [
+  { value: 1, label: "1 — Simples Nacional" },
+  { value: 2, label: "2 — Simples Nacional, excesso de sublimite" },
+  { value: 3, label: "3 — Regime Normal" },
+];
+
+const ORIGEM_OPTIONS = [
+  { value: 0, label: "0 — Nacional" },
+  { value: 1, label: "1 — Estrangeira, importação direta" },
+  { value: 2, label: "2 — Estrangeira, adquirida no mercado interno" },
+];
+
+const HEARTBEAT_STALE_MS = 30 * 60 * 1000;
+
+function FiscalTab({ unitId }: { unitId: string }) {
+  const toast = useToast();
+  const [fiscal, setFiscal] = useState<UnitFiscal | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [products, setProducts] = useState<ProductFiscal[]>([]);
+  const [status, setStatus] = useState<FiscalTerminalStatus[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  function load() {
+    Api.unitFiscal(unitId)
+      .then((f) => {
+        setFiscal(f);
+        setForm({
+          cnpj: f.cnpj ?? "",
+          razaoSocial: f.razao_social ?? "",
+          nomeFantasia: f.nome_fantasia ?? "",
+          inscricaoEstadual: f.inscricao_estadual ?? "",
+          inscricaoMunicipal: f.inscricao_municipal ?? "",
+          cnaePrincipal: f.cnae_principal ?? "",
+          crt: String(f.crt ?? 1),
+          endLogradouro: f.end_logradouro ?? "",
+          endNumero: f.end_numero ?? "",
+          endComplemento: f.end_complemento ?? "",
+          endBairro: f.end_bairro ?? "",
+          endMunicipioIbge: f.end_municipio_ibge ?? "1501402",
+          endUf: f.end_uf ?? "PA",
+          endCep: f.end_cep ?? "",
+          fone: f.fone ?? "",
+          fiscalAmbiente: f.fiscal_ambiente ?? "HOMOLOGACAO",
+          fiscalEnabled: String(f.fiscal_enabled ?? false),
+          nfceSerie: String(f.nfce_serie ?? 1),
+          nfceCscId: f.nfce_csc_id ?? "",
+          nfceQrcodeUrlConsulta: f.nfce_qrcode_url_consulta ?? "",
+          nfseItemListaServico: f.nfse_item_lista_servico ?? "",
+          nfseCodigoTributacaoMunicipio: f.nfse_codigo_tributacao_municipio ?? "",
+          nfseAliquotaIssBp: String(f.nfse_aliquota_iss_bp ?? 0),
+          nfseIssRetido: String(f.nfse_iss_retido ?? false),
+          nfseRegimeEspecial: String(f.nfse_regime_especial ?? 6),
+          nfseSerieRps: f.nfse_serie_rps ?? "1",
+          nfseAmbiente: f.nfse_ambiente ?? "HOMOLOGACAO",
+          nfseEnabled: String(f.nfse_enabled ?? false),
+        });
+      })
+      .catch(() => toast.error("Não foi possível carregar os dados fiscais."));
+    Api.productsFiscal(unitId)
+      .then(setProducts)
+      .catch(() => setProducts([]));
+    Api.fiscalTerminalStatus(unitId)
+      .then(setStatus)
+      .catch(() => setStatus([]));
+  }
+  useEffect(load, [unitId]);
+
+  function set(key: string, value: string) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await Api.updateUnitFiscal(unitId, form);
+      toast.success("Dados fiscais salvos.");
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar os dados fiscais.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!fiscal) return <HelpText>Carregando…</HelpText>;
+
+  const nowMs = Date.now();
+  const missingNcm = products.filter((p) => !p.ncm);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <Card style={{ padding: "16px" }}>
+        <HelpText>
+          Confira estes dados com seu contador antes de ligar a emissão. Nada aqui é segredo: o token do CSC e o
+          certificado A1 (.pfx) ficam só no cofre do PC do balcão, nunca no sistema.
+        </HelpText>
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Emitente</h2>
+        <Input label="CNPJ" value={form.cnpj ?? ""} onChange={(e) => set("cnpj", e.target.value)} />
+        <Input label="Razão social" value={form.razaoSocial ?? ""} onChange={(e) => set("razaoSocial", e.target.value)} />
+        <Input label="Nome fantasia" value={form.nomeFantasia ?? ""} onChange={(e) => set("nomeFantasia", e.target.value)} />
+        <Input label="Inscrição estadual" value={form.inscricaoEstadual ?? ""} onChange={(e) => set("inscricaoEstadual", e.target.value)} />
+        <Input label="Inscrição municipal" value={form.inscricaoMunicipal ?? ""} onChange={(e) => set("inscricaoMunicipal", e.target.value)} />
+        <Input label="CNAE principal" value={form.cnaePrincipal ?? ""} onChange={(e) => set("cnaePrincipal", e.target.value)} />
+        <Select label="Regime tributário (CRT)" value={form.crt ?? "1"} onChange={(e) => set("crt", e.target.value)}>
+          {CRT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Endereço do emitente</h2>
+        <Input label="Logradouro" value={form.endLogradouro ?? ""} onChange={(e) => set("endLogradouro", e.target.value)} />
+        <Input label="Número" value={form.endNumero ?? ""} onChange={(e) => set("endNumero", e.target.value)} />
+        <Input label="Complemento" value={form.endComplemento ?? ""} onChange={(e) => set("endComplemento", e.target.value)} />
+        <Input label="Bairro" value={form.endBairro ?? ""} onChange={(e) => set("endBairro", e.target.value)} />
+        <Input label="Código IBGE do município" value={form.endMunicipioIbge ?? ""} onChange={(e) => set("endMunicipioIbge", e.target.value)} />
+        <Input label="UF" value={form.endUf ?? ""} onChange={(e) => set("endUf", e.target.value.toUpperCase().slice(0, 2))} />
+        <Input label="CEP" value={form.endCep ?? ""} onChange={(e) => set("endCep", e.target.value)} />
+        <Input label="Telefone" value={form.fone ?? ""} onChange={(e) => set("fone", e.target.value)} />
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>NFC-e — venda de produtos</h2>
+        <HelpText>
+          Nota de mercadoria (modelo 65). No Pará a autorização é feita pela SVRS desde que a SEFA-PA desativou os
+          webservices próprios — o que continua estadual é a inscrição, o credenciamento e o CSC.
+        </HelpText>
+        <Select label="Ambiente" value={form.fiscalAmbiente ?? "HOMOLOGACAO"} onChange={(e) => set("fiscalAmbiente", e.target.value)}>
+          <option value="HOMOLOGACAO">Homologação (teste, sem valor fiscal)</option>
+          <option value="PRODUCAO">Produção (nota válida)</option>
+        </Select>
+        <Input label="Série" type="number" value={form.nfceSerie ?? "1"} onChange={(e) => set("nfceSerie", e.target.value)} />
+        <Input label="ID do CSC (ex.: 000001)" value={form.nfceCscId ?? ""} onChange={(e) => set("nfceCscId", e.target.value)} />
+        <Input label="URL de consulta do QR Code" value={form.nfceQrcodeUrlConsulta ?? ""} onChange={(e) => set("nfceQrcodeUrlConsulta", e.target.value)} />
+        <Select label="Emissão de NFC-e" value={form.fiscalEnabled ?? "false"} onChange={(e) => set("fiscalEnabled", e.target.value)}>
+          <option value="false">Desligada</option>
+          <option value="true">Ligada</option>
+        </Select>
+        <HelpText>
+          Só ligue depois de uma semana inteira emitindo em homologação sem rejeição. Com a emissão ligada e um
+          produto sem NCM, a venda continua acontecendo normalmente — o documento é que fica bloqueado para correção,
+          nunca o caixa.
+        </HelpText>
+        {missingNcm.length > 0 && form.fiscalEnabled === "true" && (
+          <p style={{ color: "var(--color-error-text)", margin: 0 }}>
+            {missingNcm.length} produto(s) sem NCM: {missingNcm.map((p) => p.name).join(", ")}.
+          </p>
+        )}
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>NFS-e — sessões de brincar</h2>
+        <HelpText>
+          Nota de serviço (ISS, Prefeitura de Belém). Esta aba guarda o CADASTRO; a emissão automática ainda não
+          existe no sistema — ligar a chave abaixo registra a intenção e não emite nada por si só.
+        </HelpText>
+        <Input label="Item da lista de serviços (LC 116)" value={form.nfseItemListaServico ?? ""} onChange={(e) => set("nfseItemListaServico", e.target.value)} />
+        <Input label="Código de tributação do município" value={form.nfseCodigoTributacaoMunicipio ?? ""} onChange={(e) => set("nfseCodigoTributacaoMunicipio", e.target.value)} />
+        <Input
+          label="Alíquota de ISS (%)"
+          type="number"
+          step="0.01"
+          value={((Number(form.nfseAliquotaIssBp ?? 0) || 0) / 100).toString()}
+          onChange={(e) => set("nfseAliquotaIssBp", String(Math.round(Number(e.target.value) * 100)))}
+        />
+        <Select label="ISS retido na fonte" value={form.nfseIssRetido ?? "false"} onChange={(e) => set("nfseIssRetido", e.target.value)}>
+          <option value="false">Não</option>
+          <option value="true">Sim</option>
+        </Select>
+        <Input label="Regime especial de tributação" type="number" value={form.nfseRegimeEspecial ?? "6"} onChange={(e) => set("nfseRegimeEspecial", e.target.value)} />
+        <Input label="Série do RPS" value={form.nfseSerieRps ?? "1"} onChange={(e) => set("nfseSerieRps", e.target.value)} />
+        <Select label="Ambiente" value={form.nfseAmbiente ?? "HOMOLOGACAO"} onChange={(e) => set("nfseAmbiente", e.target.value)}>
+          <option value="HOMOLOGACAO">Homologação</option>
+          <option value="PRODUCAO">Produção</option>
+        </Select>
+        <Select label="Emissão de NFS-e" value={form.nfseEnabled ?? "false"} onChange={(e) => set("nfseEnabled", e.target.value)}>
+          <option value="false">Desligada</option>
+          <option value="true">Ligada (quando a emissão existir)</option>
+        </Select>
+      </Card>
+
+      <Button variant="primary" disabled={saving} onClick={save}>
+        Salvar dados fiscais
+      </Button>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Tributação por produto</h2>
+        <HelpText>Sem NCM, CFOP e CSOSN preenchidos, a NFC-e do item é rejeitada pela SEFAZ.</HelpText>
+        {products.length === 0 && <HelpText>Nenhum produto cadastrado nesta unidade.</HelpText>}
+        {products.map((p) => (
+          <ProdutoFiscalRow key={p.id} product={p} onSaved={load} />
+        ))}
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Emissor no PC do balcão</h2>
+        {status.length === 0 && <HelpText>Nenhum terminal reportou ainda.</HelpText>}
+        {status.map((s) => {
+          const ageMs = nowMs - s.last_heartbeat_ms;
+          const stale = ageMs > HEARTBEAT_STALE_MS;
+          const certExpired = s.cert_not_after_ms != null && s.cert_not_after_ms < nowMs;
+          return (
+            <Card key={s.terminal_id} style={{ padding: "12px" }}>
+              <strong>{s.terminal_id}</strong> · {s.environment ?? "—"}
+              <div style={{ fontSize: "13px", color: stale ? "var(--color-error-text)" : "var(--text-secondary)" }}>
+                {stale ? `Sem contato há ${Math.round(ageMs / 60000)} min` : "Ativo"}
+                {certExpired && " · certificado vencido"}
+                {!s.csc_configured && " · CSC não configurado"}
+                {s.last_error && ` · último erro: ${s.last_error}`}
+              </div>
+            </Card>
+          );
+        })}
+      </Card>
+    </div>
+  );
+}
+
+function ProdutoFiscalRow({ product, onSaved }: { product: ProductFiscal; onSaved: () => void }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [ncm, setNcm] = useState(product.ncm ?? "");
+  const [cest, setCest] = useState(product.cest ?? "");
+  const [cfop, setCfop] = useState(product.cfop ?? "5102");
+  const [csosn, setCsosn] = useState(product.csosn ?? "102");
+  const [origem, setOrigem] = useState(String(product.origem ?? 0));
+  const [unidadeComercial, setUnidadeComercial] = useState(product.unidade_comercial ?? "UN");
+  const [gtin, setGtin] = useState(product.gtin ?? "SEM GTIN");
+
+  async function save() {
+    setSaving(true);
+    try {
+      await Api.updateProductFiscal(product.id, {
+        ncm,
+        cest,
+        cfop,
+        csosn,
+        origem: Number(origem),
+        unidadeComercial,
+        gtin,
+      });
+      toast.success(`Tributação de ${product.name} salva.`);
+      setOpen(false);
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card style={{ padding: "12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>
+          <strong>{product.name}</strong>{" "}
+          {product.ncm ? (
+            <span style={{ color: "var(--text-muted)" }}>NCM {product.ncm}</span>
+          ) : (
+            <span style={{ color: "var(--color-error-text)" }}>sem NCM</span>
+          )}
+        </span>
+        <Button variant="ghost" size="sm" onClick={() => setOpen((o) => !o)}>
+          {open ? "fechar" : "editar"}
+        </Button>
+      </div>
+      {open && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+          <Input label="NCM" value={ncm} onChange={(e) => setNcm(e.target.value)} />
+          <Input label="CEST (se houver)" value={cest} onChange={(e) => setCest(e.target.value)} />
+          <Input label="CFOP" value={cfop} onChange={(e) => setCfop(e.target.value)} />
+          <Input label="CSOSN" value={csosn} onChange={(e) => setCsosn(e.target.value)} />
+          <Select label="Origem" value={origem} onChange={(e) => setOrigem(e.target.value)}>
+            {ORIGEM_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+          <Input label="Unidade comercial" value={unidadeComercial} onChange={(e) => setUnidadeComercial(e.target.value)} />
+          <Input label="GTIN / código de barras" value={gtin} onChange={(e) => setGtin(e.target.value)} />
+          <Button variant="primary" disabled={saving} onClick={save}>
+            Salvar tributação
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Termos de Uso
+// ---------------------------------------------------------------------------
+// Aba própria, e não um campo dentro de Meta: é o texto que o responsável
+// aceita no check-in, então alterá-lo tem efeito jurídico. Grava por
+// fa_config_set_terms, que exige config.terms.write e guarda o texto INTEIRO na
+// trilha de auditoria — a pergunta que importa depois é "o que exatamente foi
+// aceito naquele dia", não "mudou alguma coisa".
+function TermosTab({ unitId }: { unitId: string }) {
+  const toast = useToast();
+  const [terms, setTerms] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    Api.unitSetting(unitId, "terms_of_use")
+      .then((r) => setTerms(r.value ?? ""))
+      .finally(() => setLoaded(true));
+  }, [unitId]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await Api.setTerms(unitId, terms);
+      toast.success("Termos de uso salvos.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar os termos de uso.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!loaded) return <HelpText>Carregando…</HelpText>;
+
+  return (
+    <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+      <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Termos de Uso</h2>
+      <HelpText>
+        Texto impresso no comprovante de entrada e apresentado ao responsável no check-in. Cada alteração fica
+        registrada com autor, data e o texto completo.
+      </HelpText>
+      <textarea
+        value={terms}
+        onChange={(e) => setTerms(e.target.value)}
+        rows={16}
+        aria-label="Texto dos Termos de Uso"
+        style={{
+          width: "100%",
+          padding: "10px",
+          borderRadius: "12px",
+          border: "1px solid var(--border-subtle)",
+          fontFamily: "inherit",
+          lineHeight: 1.5,
+        }}
+      />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>{terms.length} caracteres</span>
+        <Button variant="primary" disabled={saving} onClick={save}>
+          Salvar termos
+        </Button>
+      </div>
+    </Card>
   );
 }

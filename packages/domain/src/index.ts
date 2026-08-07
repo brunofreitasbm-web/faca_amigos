@@ -12,6 +12,7 @@ export * from "./date.js";
 export * from "./printers/gainscha.js";
 export * from "./printers/escpos.js";
 export * from "./utils/wristbandCode.js";
+export * from "./utils/accessCode.js";
 
 
 

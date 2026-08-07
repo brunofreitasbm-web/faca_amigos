@@ -68,15 +68,31 @@ async function wristbandHtml(p: WristbandPayload): Promise<string> {
   </body></html>`;
 }
 
-function receiptHtml(payload: ReceiptPrintPayload): string {
+async function receiptHtml(payload: ReceiptPrintPayload): Promise<string> {
   const { text } = generateEscPosReceipt(payload);
   const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+  // O recibo de guarda leva QR: é a via que os pais apresentam na saída, e o
+  // caminho normal do check-out é a câmera do celular lendo justamente este
+  // código. Sem imagem, sobraria só digitar o código à mão.
+  let qrBlock = "";
+  if (payload.qrValue) {
+    try {
+      const qrSvg = await QRCode.toString(payload.qrValue, { type: "svg", margin: 0, errorCorrectionLevel: "Q" });
+      qrBlock = `<div class="qr">${qrSvg}</div>`;
+    } catch (err) {
+      console.error("[print-bridge] Erro ao gerar QR Code do recibo:", err);
+    }
+  }
+
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 80mm auto; margin: 0; }
       html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
       pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
-    </style></head><body><pre>${esc}</pre></body></html>`;
+      .qr { display: flex; justify-content: center; margin: 2mm 0 3mm 0; }
+      .qr svg { width: 34mm; height: 34mm; }
+    </style></head><body>${qrBlock}<pre>${esc}</pre></body></html>`;
 }
 
 function printHtml(html: string, deviceName: string): Promise<void> {
@@ -138,7 +154,7 @@ export function startPrintBridge(): void {
           await printHtml(html, deviceName);
         }
       } else {
-        const html = receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
+        const html = await receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
         await printHtml(html, deviceName);
       }
 

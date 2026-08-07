@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import type { CSSProperties, InputHTMLAttributes } from "react";
+import type { CSSProperties, InputHTMLAttributes, Ref } from "react";
 
 export type InputVariant = "light" | "dark";
 
@@ -8,6 +8,14 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   error?: string;
   variant?: InputVariant;
   style?: CSSProperties;
+  /**
+   * Encaminhado para o <input> interno. Serve às telas que precisam devolver
+   * o foco ao campo depois de uma ação (o balcão do check-in volta para a
+   * busca assim que uma criança entra, para o operador emendar a próxima
+   * sem tocar na tela). No React 19 `ref` é uma prop comum de componente de
+   * função, então basta declará-la e deixar o spread abaixo levá-la adiante.
+   */
+  ref?: Ref<HTMLInputElement>;
 }
 
 /**

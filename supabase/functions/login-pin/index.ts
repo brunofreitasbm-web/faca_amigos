@@ -9,55 +9,110 @@
 // e-mail; o token volta direto na resposta HTTP e o cliente troca por
 // sessão com `auth.verifyOtp`). Isso preserva `auth.uid()` correto para
 // RLS/audit_log em todo o app, sem nenhum passo de e-mail/senha.
+//
+// FREIO DE FORÇA BRUTA: um PIN de 6 dígitos são 10^6 combinações, e a
+// lista de colaboradores (id + papel) é legível por qualquer terminal —
+// o atacante escolhe direto o Owner. Sem trava, varrer esse espaço contra
+// uma Edge Function é perfeitamente factível. O bloqueio é por
+// employee_id e NÃO por IP de propósito: o balcão inteiro sai por um NAT
+// só, banir IP derrubaria a loja.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import bcrypt from "npm:bcryptjs@2.4.3";
+import { jsonResponse, preflight } from "../_shared/http.ts";
 
 interface LoginPinBody {
   employeeId: string;
   pin: string;
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Mensagem genérica em qualquer falha (colaborador inexistente, inativo,
+// sem PIN cadastrado, bloqueado ou PIN errado) — não dá pra um terminal
+// descobrir por tentativa e erro se um employeeId existe ou está ativo.
+const GENERIC_ERROR = "PIN incorreto";
+const LOCKED_ERROR = "Muitas tentativas. Aguarde alguns minutos e tente de novo.";
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...corsHeaders },
-  });
+// Escada deliberadamente suave no começo: quem erra o PIN de verdade
+// costuma errar 1-2 vezes, e travar o operador no meio do sábado é um
+// problema operacional pior do que 5 tentativas a mais para o atacante.
+const LOCK_STEPS: ReadonlyArray<{ afterFailures: number; lockMs: number }> = [
+  { afterFailures: 5, lockMs: 60_000 },
+  { afterFailures: 8, lockMs: 5 * 60_000 },
+  { afterFailures: 10, lockMs: 15 * 60_000 },
+];
+
+// Janela após a qual o contador de erros esfria sozinho — senão um
+// colaborador que erra uma vez por semana acaba bloqueado por acúmulo.
+const ATTEMPT_DECAY_MS = 30 * 60_000;
+
+function lockMsFor(failedCount: number): number | null {
+  let lock: number | null = null;
+  for (const step of LOCK_STEPS) {
+    if (failedCount >= step.afterFailures) lock = step.lockMs;
+  }
+  return lock;
 }
 
-// Mensagem genérica em qualquer falha (colaborador inexistente, inativo,
-// sem PIN cadastrado ou PIN errado) — não dá pra um terminal descobrir
-// por tentativa e erro se um employeeId existe ou está ativo.
-const GENERIC_ERROR = "PIN incorreto";
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const pre = preflight(req);
+  if (pre) return pre;
+  if (req.method !== "POST") return jsonResponse(req, { error: "method_not_allowed" }, 405);
 
   let body: LoginPinBody;
   try {
     body = await req.json();
   } catch {
-    return jsonResponse({ error: "corpo inválido" }, 400);
+    return jsonResponse(req, { error: "corpo inválido" }, 400);
   }
-  if (!body.employeeId || !body.pin) return jsonResponse({ error: GENERIC_ERROR }, 401);
+  if (!body.employeeId || !body.pin) return jsonResponse(req, { error: GENERIC_ERROR }, 401);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+  const nowMs = Date.now();
+
+  // Trava consultada ANTES do bcrypt: além de barrar o ataque, evita gastar
+  // ~100ms de CPU por tentativa, que por si só é um vetor de exaustão.
+  const { data: attempts } = await adminClient
+    .from("fa_kiosk_pin_attempts")
+    .select("failed_count, last_failed_ms, locked_until_ms")
+    .eq("employee_id", body.employeeId)
+    .maybeSingle();
+
+  if (attempts?.locked_until_ms && attempts.locked_until_ms > nowMs) {
+    return jsonResponse(req, { error: LOCKED_ERROR }, 429);
+  }
+
+  const decayed =
+    attempts?.last_failed_ms != null && nowMs - attempts.last_failed_ms > ATTEMPT_DECAY_MS;
+  const previousFailures = decayed ? 0 : (attempts?.failed_count ?? 0);
+
+  async function registerFailure(): Promise<Response> {
+    const failedCount = previousFailures + 1;
+    const lockMs = lockMsFor(failedCount);
+    await adminClient.from("fa_kiosk_pin_attempts").upsert(
+      {
+        employee_id: body.employeeId,
+        failed_count: failedCount,
+        last_failed_ms: nowMs,
+        locked_until_ms: lockMs === null ? null : nowMs + lockMs,
+      },
+      { onConflict: "employee_id" },
+    );
+    return jsonResponse(req, { error: lockMs === null ? GENERIC_ERROR : LOCKED_ERROR }, lockMs === null ? 401 : 429);
+  }
 
   const { data: employee, error: employeeError } = await adminClient
     .from("fa_kiosk_employees")
     .select("id, full_name, role, active, auth_user_id")
     .eq("id", body.employeeId)
     .single();
+  // Colaborador inexistente não entra na tabela de tentativas (FK), então a
+  // resposta é a genérica direta — sem revelar a diferença por timing além
+  // do inevitável.
   if (employeeError || !employee || !employee.active || !employee.auth_user_id) {
-    return jsonResponse({ error: GENERIC_ERROR }, 401);
+    return jsonResponse(req, { error: GENERIC_ERROR }, 401);
   }
 
   const { data: credentials, error: credentialsError } = await adminClient
@@ -65,23 +120,26 @@ Deno.serve(async (req) => {
     .select("pin_hash")
     .eq("employee_id", employee.id)
     .single();
-  if (credentialsError || !credentials) return jsonResponse({ error: GENERIC_ERROR }, 401);
+  if (credentialsError || !credentials) return await registerFailure();
 
   const pinOk = bcrypt.compareSync(body.pin, credentials.pin_hash);
-  if (!pinOk) return jsonResponse({ error: GENERIC_ERROR }, 401);
+  if (!pinOk) return await registerFailure();
 
   const { data: authUser, error: authUserError } = await adminClient.auth.admin.getUserById(employee.auth_user_id);
-  if (authUserError || !authUser.user?.email) return jsonResponse({ error: GENERIC_ERROR }, 401);
+  if (authUserError || !authUser.user?.email) return jsonResponse(req, { error: GENERIC_ERROR }, 401);
 
   const { data: link, error: linkError } = await adminClient.auth.admin.generateLink({
     type: "magiclink",
     email: authUser.user.email,
   });
   if (linkError || !link?.properties?.hashed_token) {
-    return jsonResponse({ error: "não foi possível iniciar a sessão" }, 500);
+    return jsonResponse(req, { error: "não foi possível iniciar a sessão" }, 500);
   }
 
-  return jsonResponse({
+  // Só zera depois da sessão ter sido efetivamente emitida.
+  await adminClient.from("fa_kiosk_pin_attempts").delete().eq("employee_id", employee.id);
+
+  return jsonResponse(req, {
     tokenHash: link.properties.hashed_token,
     employee: { id: employee.id, full_name: employee.full_name, role: employee.role },
   });

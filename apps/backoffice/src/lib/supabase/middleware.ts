@@ -31,9 +31,16 @@ export async function updateSession(request: NextRequest) {
 
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
 
-  // TODO: login temporariamente desativado a pedido do dono — nenhum usuário
-  // Supabase Auth foi criado ainda. Reativar o bloco abaixo assim que houver
-  // login: reintroduz o redirect para /login quando !user && !isLoginRoute.
+  // O backoffice está sendo desativado (toda a administração passou para
+  // Configurações no kiosk-ui), mas enquanto o deployment existir ele é um
+  // bypass completo do RBAC: sem este redirect, qualquer pessoa com a URL
+  // cria colaboradores e edita dados fiscais. O guard fica ATIVO até o
+  // projeto ser removido do Vercel — ver apps/backoffice/README.md.
+  if (!user && !isLoginRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
 
   if (user && isLoginRoute) {
     const url = request.nextUrl.clone();

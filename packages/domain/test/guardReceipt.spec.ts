@@ -1,0 +1,96 @@
+import { describe, expect, it } from "vitest";
+import { generateEscPosReceipt } from "../src/printers/escpos.js";
+import type { ReceiptPrintPayload } from "../src/printers/escpos.js";
+
+const RECIBO_DE_GUARDA: ReceiptPrintPayload = {
+  title: "Recibo de Guarda",
+  unitName: "Playground Parque Shopping",
+  unitCnpj: "12.345.678/0001-90",
+  employeeName: "Admin Dev",
+  dateTime: "07/08/2026 15:30:00",
+  accessCode: "K7M2P9QX3B7",
+  qrValue: "K7M2P9QX3B7",
+  entryTime: "15:30",
+  expectedExitTime: "16:00",
+  planName: "30 minutos",
+  careNotes: "Usa Abafador | Sensivel a Ruido Alto",
+  items: [{ description: "30 minutos", quantity: 1, amountCents: 4000 }],
+  totalCents: 4000,
+  customerInfo: {
+    childName: "Helena Souza",
+    childBirthDate: "12/03/2019",
+    guardianName: "Maria Souza",
+    guardianCpf: "123.456.789-00",
+    phone: "+5591982501215",
+  },
+};
+
+describe("recibo de guarda (via dos pais, impressa no check-in)", () => {
+  const { text } = generateEscPosReceipt(RECIBO_DE_GUARDA);
+  const linhas = text.split("\n");
+
+  it("destaca o codigo de saida agrupado, que e o que se procura com pressa na porta", () => {
+    expect(text).toContain("CÓDIGO DE SAÍDA");
+    expect(text).toContain("K7M2-P9QX-3B7");
+  });
+
+  it("identifica a crianca e quem a entregou, para valer como prova da guarda", () => {
+    expect(text).toContain("Criança: Helena Souza");
+    expect(text).toContain("Nascimento: 12/03/2019");
+    expect(text).toContain("Resp: Maria Souza");
+    expect(text).toContain("CPF: 123.456.789-00");
+  });
+
+  it("imprime horario de entrada e saida prevista", () => {
+    expect(text).toContain("Entrada: 15:30");
+    expect(text).toContain("Saída prevista: 16:00");
+  });
+
+  it("repete os cuidados informados na entrada", () => {
+    expect(text).toContain("CUIDADOS INFORMADOS PELO RESPONSÁVEL");
+    expect(text).toContain("Usa Abafador");
+  });
+
+  it("nao diz TOTAL: no check-in nada foi pago ainda", () => {
+    expect(text).not.toContain("TOTAL:");
+    expect(text).toContain("PREVISTO (pagar na saída)");
+    expect(text).toContain("Tempo excedente é cobrado à parte.");
+  });
+
+  it("traz as regras de retirada e a linha de assinatura", () => {
+    expect(text).toContain("REGRAS DE RETIRADA");
+    expect(text).toContain("documento com foto");
+    expect(text).toContain("Assinatura do responsável:");
+  });
+
+  it("respeita a largura de 42 colunas da bobina de 80mm", () => {
+    for (const linha of linhas) {
+      expect(linha.length).toBeLessThanOrEqual(42);
+    }
+  });
+
+  it("termina com avanço de papel e corte automatico", () => {
+    expect(text.startsWith("=")).toBe(true);
+    expect(RECIBO_DE_GUARDA.qrValue).toBe(RECIBO_DE_GUARDA.accessCode);
+    const { commandsHex } = generateEscPosReceipt(RECIBO_DE_GUARDA);
+    expect(commandsHex.endsWith("1b64031d564200")).toBe(true);
+  });
+});
+
+describe("cupom de venda (sem accessCode) segue igual", () => {
+  it("continua imprimindo TOTAL e nao imprime regras de retirada", () => {
+    const { text } = generateEscPosReceipt({
+      title: "Comprovante de Saída",
+      unitName: "Playground Parque Shopping",
+      code: "VD260807-00042",
+      items: [{ description: "30 minutos", quantity: 1, amountCents: 4000 }],
+      totalCents: 4000,
+      payments: [{ method: "PIX", amountCents: 4000 }],
+    });
+
+    expect(text).toContain("Código: VD260807-00042");
+    expect(text).toContain("TOTAL:");
+    expect(text).not.toContain("REGRAS DE RETIRADA");
+    expect(text).toContain("Obrigado por brincar com a gente!");
+  });
+});

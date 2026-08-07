@@ -3,14 +3,25 @@ import { Card, Button, HelpText } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import { Api } from "../api/client.js";
 import { PinPad } from "../components/PinPad.js";
-import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
+import { ROLE_LABEL } from "../auth/capabilities.js";
 
-type Mode = { kind: "PICK" } | { kind: "PIN"; employee: TerminalEmployee } | { kind: "ALL" };
+/**
+ * Quem aparece na tela de login. Só id + nome: o PAPEL não é mostrado aqui
+ * de propósito — antes a lista entregava quem era o Owner, o que dava a um
+ * ataque de força bruta o alvo certo de graça. Depois do login o papel volta
+ * a aparecer no cabeçalho, para o colaborador reconhecer a própria conta.
+ */
+interface LoginCandidate {
+  id: string;
+  full_name: string;
+}
+
+type Mode = { kind: "PICK" } | { kind: "PIN"; employee: LoginCandidate } | { kind: "ALL" };
 
 export function LoginScreen() {
   const { terminalEmployees, switchEmployee, forgetEmployee } = useAppState();
   const [mode, setMode] = useState<Mode>({ kind: "PICK" });
-  const [allEmployees, setAllEmployees] = useState<TerminalEmployee[] | null>(null);
+  const [allEmployees, setAllEmployees] = useState<LoginCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -18,7 +29,12 @@ export function LoginScreen() {
     setError(null);
     setMode({ kind: "ALL" });
     if (!allEmployees) {
-      Api.employees().then((list) => setAllEmployees(list.map((e) => ({ id: e.id, full_name: e.full_name, role: e.role }))));
+      Api.employeesForLogin()
+        .then(setAllEmployees)
+        .catch(() => {
+          setAllEmployees([]);
+          setError("Não foi possível carregar a lista. Verifique a conexão.");
+        });
     }
   }
 
@@ -30,7 +46,7 @@ export function LoginScreen() {
         {allEmployees === null && <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Carregando…</p>}
         {allEmployees?.map((emp) => (
           <Card key={emp.id} style={{ padding: "16px", cursor: "pointer" }} onClick={() => { setError(null); setMode({ kind: "PIN", employee: emp }); }}>
-            <strong>{emp.full_name}</strong> — {emp.role}
+            <strong>{emp.full_name}</strong>
           </Card>
         ))}
         <Button variant="ghost" onClick={() => setMode({ kind: "PICK" })}>
@@ -72,7 +88,7 @@ export function LoginScreen() {
       {terminalEmployees.map((emp) => (
         <Card key={emp.id} style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ cursor: "pointer" }} onClick={() => setMode({ kind: "PIN", employee: emp })}>
-            <strong>{emp.full_name}</strong> — {emp.role}
+            <strong>{emp.full_name}</strong> — {ROLE_LABEL[emp.role]}
           </span>
           <Button variant="ghost" title="Esquecer este colaborador neste terminal (ele precisará ser selecionado de novo na lista completa)" onClick={() => forgetEmployee(emp.id)}>
             remover
@@ -93,7 +109,7 @@ function PinEntry({
   onBack,
   onSubmit,
 }: {
-  employee: TerminalEmployee;
+  employee: LoginCandidate;
   busy: boolean;
   error: string | null;
   onBack: () => void;
