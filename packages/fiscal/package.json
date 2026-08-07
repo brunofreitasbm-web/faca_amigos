@@ -1,0 +1,30 @@
+{
+  "name": "@facaamigos/fiscal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Emissão de NFC-e (Fase 4 do plano fiscal): chave de acesso, montagem do XML modelo 65, QR Code, DANFE e assinatura XMLDSig. Lógica testável offline, sem certificado e sem internet — a interface de transporte (nfce/transport.ts) é o único ponto que muda se um dia trocarmos de implementação.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "qrcode": "1.5.4",
+    "xmlbuilder2": "^3.1.1",
+    "xml-crypto": "6.0.1"
+  },
+  "devDependencies": {
+    "@facaamigos/config": "workspace:*",
+    "@types/node": "^22.10.0",
+    "@types/qrcode": "^1.5.5",
+    "eslint": "catalog:",
+    "selfsigned": "^2.4.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
