@@ -37,6 +37,10 @@ export function seedDevData(db: Db, nowMs: number): void {
   insertEmployee(db, { id: adminId, full_name: "Admin Dev", role: "ADMIN", pis: null, cpf_last4: null }, nowMs);
   upsertLocalCredentials(db, adminId, hashPin("000000"), nowMs);
 
+  const admin2Id = uuidv7(nowMs);
+  insertEmployee(db, { id: admin2Id, full_name: "Admin 2", role: "ADMIN", pis: null, cpf_last4: null }, nowMs);
+  upsertLocalCredentials(db, admin2Id, hashPin("000000"), nowMs);
+
   // Planos - Playground (Parque Shopping)
   insertPlan(db, playgroundId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "30 minutos", valueCents: 4000, durationValue: 30, durationUnit: "MINUTO", overageCentsPerMinute: 150, color: "#2ECFB5" }, nowMs);
   insertPlan(db, playgroundId, { id: uuidv7(nowMs), activity: "PLAYGROUND", name: "1 hora", valueCents: 6000, durationValue: 1, durationUnit: "HORA", overageCentsPerMinute: 150, color: "#F0196B" }, nowMs);
