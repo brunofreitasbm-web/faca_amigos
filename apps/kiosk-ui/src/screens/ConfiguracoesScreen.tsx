@@ -320,7 +320,7 @@ function MetaTab({ unitId }: { unitId: string }) {
                 Editar
               </Button>
               {r.active ? (
-                <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActiveRule(r)} disabled={busyRule}>
+                <Button variant="secondary" style={isOwner ? { color: "#d32f2f", borderColor: "#d32f2f" } : undefined} onClick={() => handleToggleActiveRule(r)} disabled={busyRule}>
                   {isOwner ? "Excluir" : "Inativar"}
                 </Button>
               ) : (
@@ -506,7 +506,7 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
               Editar
             </Button>
             {p.active ? (
-              <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActive(p)} disabled={busy}>
+              <Button variant="secondary" style={isOwner ? { color: "#d32f2f", borderColor: "#d32f2f" } : undefined} onClick={() => handleToggleActive(p)} disabled={busy}>
                 {isOwner ? "Excluir" : "Inativar"}
               </Button>
             ) : (
@@ -746,7 +746,7 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
                 Editar
               </Button>
               {p.active ? (
-                <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActive(p)} disabled={busy}>
+                <Button variant="secondary" style={isOwner ? { color: "#d32f2f", borderColor: "#d32f2f" } : undefined} onClick={() => handleToggleActive(p)} disabled={busy}>
                   {isOwner ? "Excluir" : "Inativar"}
                 </Button>
               ) : (
@@ -966,7 +966,7 @@ function ProdutosTab({ unitId }: { unitId: string }) {
               Editar
             </Button>
             {p.active ? (
-              <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActive(p)} disabled={busy}>
+              <Button variant="secondary" style={isOwner ? { color: "#d32f2f", borderColor: "#d32f2f" } : undefined} onClick={() => handleToggleActive(p)} disabled={busy}>
                 {isOwner ? "Excluir" : "Inativar"}
               </Button>
             ) : (
@@ -1088,7 +1088,7 @@ function CuponsTab({ unitId }: { unitId: string }) {
               Editar
             </Button>
             {c.active ? (
-              <Button variant={isOwner ? "danger" : "secondary"} onClick={() => handleToggleActive(c)} disabled={busy}>
+              <Button variant="secondary" style={isOwner ? { color: "#d32f2f", borderColor: "#d32f2f" } : undefined} onClick={() => handleToggleActive(c)} disabled={busy}>
                 {isOwner ? "Excluir" : "Inativar"}
               </Button>
             ) : (

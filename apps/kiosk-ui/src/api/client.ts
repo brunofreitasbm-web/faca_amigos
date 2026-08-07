@@ -112,6 +112,7 @@ export interface Plan {
   durationUnit: "MINUTO" | "HORA";
   overageCentsPerMinute: number;
   color: string;
+  active?: boolean;
 }
 
 export interface Asset {
@@ -132,6 +133,7 @@ export interface Product {
   emoji: string | null;
   price_cents: number;
   stock: number;
+  active?: boolean;
 }
 
 /**
@@ -422,6 +424,7 @@ export interface BonusRule {
   unitId: string;
   description: string;
   rewardValueCents: number;
+  active?: boolean;
 }
 
 export interface Coupon {
@@ -431,7 +434,7 @@ export interface Coupon {
   value: number;
   max_uses: number;
   used_count: number;
-  active: 0 | 1;
+  active: boolean | number;
   description: string | null;
 }
 
@@ -731,10 +734,10 @@ export const Api = {
         .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
         .order("full_name"),
     ),
-  plans: async (unitId: string, activity: string) => {
-    const rows = await unwrap<Record<string, unknown>[]>(
-      supabase().from("fa_kiosk_plans").select("*").eq("unit_id", unitId).eq("activity", activity).eq("active", true),
-    );
+  plans: async (unitId: string, activity: string, onlyActive = true) => {
+    let query = supabase().from("fa_kiosk_plans").select("*").eq("unit_id", unitId).eq("activity", activity);
+    if (onlyActive) query = query.eq("active", true);
+    const rows = await unwrap<Record<string, unknown>[]>(query);
     return rows.map(planFromRow);
   },
   assets: (unitId: string) =>

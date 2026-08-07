@@ -11,6 +11,7 @@ export interface Plan {
   overageCentsPerMinute: number;
   /** Cor usada para identificar o plano no Painel (hex). */
   color: string;
+  active?: boolean;
 }
 
 export interface SessionForQuote {
