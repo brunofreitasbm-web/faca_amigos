@@ -29,7 +29,7 @@ export function CaixaScreen() {
 
   const [closing, setClosing] = useState(false);
   const [declared, setDeclared] = useState<Record<string, string>>({ DINHEIRO: "0", PIX: "0", CREDITO: "0", DEBITO: "0" });
-  const [closeResult, setCloseResult] = useState<{ expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number> } | null>(null);
+  const [closeResult, setCloseResult] = useState<CloseResult | null>(null);
   const [refreshError, setRefreshError] = useState(false);
   // Enquanto isso está preenchido, o fechamento foi enviado mas ficou na fila
   // offline (sem rede no momento) — ainda NÃO aconteceu de fato. O
@@ -70,7 +70,7 @@ export function CaixaScreen() {
       if (detail.idempotencyKey !== pendingCloseKey) return;
       setPendingCloseKey(null);
       if (detail.success) {
-        setCloseResult(detail.data as typeof closeResult extends infer T ? NonNullable<T> : never);
+        setCloseResult(detail.data as CloseResult);
       } else {
         // A fila desistiu (erro de regra de negócio no reenvio, ex.: turno já
         // fechado por outra via) — o fechamento não vai acontecer sozinho.
@@ -129,8 +129,15 @@ export function CaixaScreen() {
       const result = await Api.closeShift(shift.id, { employeeId: employee.id, declared: declaredCents });
       setCloseResult(result);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao fechar turno";
-      setError(msg);
+      if (err instanceof OfflineQueuedError) {
+        // Não é um erro de fato: a chamada foi guardada e será reenviada
+        // sozinha (ver OFFLINE_FLUSH_EVENT acima). O fechamento AINDA NÃO
+        // aconteceu — por isso não mostra o resumo nem sai desta tela.
+        setPendingCloseKey(err.idempotencyKey);
+      } else {
+        const msg = err instanceof Error ? err.message : "Erro ao fechar turno";
+        setError(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -244,12 +251,18 @@ export function CaixaScreen() {
           </div>
         ))}
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
+        {pendingCloseKey && (
+          <p style={{ color: "var(--color-amber)" }}>
+            ⏳ Sem conexão no momento da confirmação — o fechamento foi salvo e será concluído automaticamente assim
+            que a rede voltar. Não feche o turno de novo nem saia desta tela.
+          </p>
+        )}
         <div style={{ display: "flex", gap: "8px" }}>
-          <Button variant="ghost" onClick={() => setClosing(false)} disabled={busy}>
+          <Button variant="ghost" onClick={() => setClosing(false)} disabled={busy || !!pendingCloseKey}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy}>
-            Confirmar fechamento
+          <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy || !!pendingCloseKey}>
+            {pendingCloseKey ? "Aguardando conexão..." : "Confirmar fechamento"}
           </Button>
         </div>
       </div>
