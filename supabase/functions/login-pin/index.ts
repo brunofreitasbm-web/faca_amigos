@@ -18,8 +18,16 @@ interface LoginPinBody {
   pin: string;
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
 }
 
 // Mensagem genérica em qualquer falha (colaborador inexistente, inativo,
@@ -28,6 +36,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 const GENERIC_ERROR = "PIN incorreto";
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
 
   let body: LoginPinBody;
