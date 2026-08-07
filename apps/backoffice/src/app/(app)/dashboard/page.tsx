@@ -90,7 +90,7 @@ export default async function DashboardPage() {
           data={checkinsSeries}
           dataKey="checkins"
           color="var(--chart-3, #6366F1)"
-          valueFormatter={(v) => `${v} check-ins`}
+          format="count"
         />
         <KpiCard
           label="Faturamento hoje (vs. ontem)"
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
           data={revenueSeries}
           dataKey="revenue"
           color="var(--chart-1, #2ECFB5)"
-          valueFormatter={(v) => `R$ ${(v / 100).toFixed(2)}`}
+          format="currency"
         />
       </div>
 

@@ -42,6 +42,11 @@ function Delta({ pct }: { pct: number | null }) {
   );
 }
 
+const kpiFormatters = {
+  count: (v: number) => `${v} check-ins`,
+  currency: (v: number) => `R$ ${(v / 100).toFixed(2)}`,
+} as const;
+
 export function KpiCard({
   label,
   value,
@@ -49,7 +54,7 @@ export function KpiCard({
   data,
   dataKey,
   color,
-  valueFormatter,
+  format,
 }: {
   label: string;
   value: string;
@@ -57,8 +62,9 @@ export function KpiCard({
   data: Record<string, number | string>[];
   dataKey: string;
   color: string;
-  valueFormatter: (v: number) => string;
+  format: keyof typeof kpiFormatters;
 }) {
+  const valueFormatter = kpiFormatters[format];
   return (
     <Card variant="light" subtitle={label}>
       <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "8px" }}>
