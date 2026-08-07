@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Button, Input, Select, DateInput, Tag, Badge, HelpText } from "@facaamigos/ui";
+import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
+import { PhotoCapture } from "../components/PhotoCapture.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import {
@@ -19,12 +20,23 @@ import {
 } from "@facaamigos/domain";
 import { money } from "../format.js";
 
+// Lista padrão e assertiva — o operador marca em vez de descrever do zero
+// na hora do balcão, com a família esperando. Os cinco primeiros itens são
+// os originais do fluxo (não renomear: o texto é gravado por visita e
+// prefila o cadastro seguinte da mesma criança); os demais foram
+// adicionados para cobrir os quadros sensoriais mais comuns fora desses.
 const SENSORY_TAG_OPTIONS = [
   "Sensível a Ruído Alto",
   "Usa Abafador",
   "Acompanhante / Mediador 1:1",
   "Preferência pelo Cantinho da Calma",
   "Alergia Alimentar / Cuidados Especializados",
+  "Aversão a Texturas / Toque",
+  "Sensibilidade à Luz ou Estímulos Visuais",
+  "Dificuldade com Mudança de Rotina",
+  "Comunicação Não-verbal / Uso de Figuras (CAA)",
+  "Evita Contato Físico Inesperado",
+  "Necessidade de Pausas Sensoriais Frequentes",
 ] as const;
 
 /**
@@ -78,9 +90,10 @@ export function EntradaScreen() {
   const [phone, setPhone] = useState("");
   const [favoriteAssetId, setFavoriteAssetId] = useState<string | null>(null);
 
+  const [isNeurodivergent, setIsNeurodivergent] = useState(false);
   const [selectedSensoryTags, setSelectedSensoryTags] = useState<string[]>([]);
   const [customNotes, setCustomNotes] = useState("");
-  const [showCare, setShowCare] = useState(false);
+  const [childPhoto, setChildPhoto] = useState<Blob | null>(null);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [couponCode, setCouponCode] = useState("");
   const [showExtras, setShowExtras] = useState(false);
@@ -175,7 +188,7 @@ export function EntradaScreen() {
       .then((care) => {
         setSelectedSensoryTags(care.sensoryTags);
         setCustomNotes(care.notes);
-        if (care.sensoryTags.length > 0 || care.notes) setShowCare(true);
+        if (care.sensoryTags.length > 0 || care.notes) setIsNeurodivergent(true);
       })
       .catch(() => {});
 
@@ -213,9 +226,10 @@ export function EntradaScreen() {
     setOffer(null);
     setChildName("");
     setBirthDate("");
+    setIsNeurodivergent(false);
     setSelectedSensoryTags([]);
     setCustomNotes("");
-    setShowCare(false);
+    setChildPhoto(null);
     setPlanId(null);
     setCouponCode("");
     setShowExtras(false);
@@ -269,6 +283,16 @@ export function EntradaScreen() {
 
       setDone({ sessionId: res.sessionId, accessCode: res.accessCode, childName: childName.trim() });
       setLastGuardianId(res.guardianId);
+
+      if (childPhoto) {
+        // Fora do try do check-in de propósito: a entrada já foi gravada, e a
+        // foto é só um extra de identificação — uma falha de upload não pode
+        // virar "erro ao fazer check-in" na tela.
+        Api.uploadChildPhoto(res.childId, childPhoto).catch(() =>
+          toast.error("Entrada registrada, mas a foto não pôde ser salva. Você pode tentar de novo na próxima visita."),
+        );
+      }
+
       resetForNextChild(true);
 
       if (activity === "CARRINHO") {
@@ -581,56 +605,66 @@ export function EntradaScreen() {
       )}
 
       {/* ---------------------------------------------------------------- */}
-      {/* Cuidados inclusivos — recolhido, mas nunca escondido              */}
+      {/* Neurodivergência — o checkbox é o gatilho; a área expande inline  */}
+      {/* (grid-template-rows 0fr→1fr), nunca em modal, para não tirar o    */}
+      {/* operador do formulário nem esconder o resto do fluxo.            */}
       {/* ---------------------------------------------------------------- */}
       <section style={{ border: "1px solid var(--border-subtle)", borderRadius: "14px", padding: "12px 14px" }}>
-        <button
-          type="button"
-          onClick={() => setShowCare((v) => !v)}
-          style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer", font: "inherit", padding: 0 }}
-        >
-          <strong style={{ fontSize: "15px" }}>
-            🧩 Cuidados inclusivos
-            {selectedSensoryTags.length > 0 && (
-              <span style={{ marginLeft: "8px", fontSize: "12px", color: "var(--color-teal-text)" }}>
-                {selectedSensoryTags.length} marcado(s)
-              </span>
-            )}
-          </strong>
-          <span aria-hidden style={{ color: "var(--text-muted)" }}>{showCare ? "▲" : "▼"}</span>
-        </button>
+        <Checkbox
+          label="Criança neurodivergente"
+          helpText="Marque para registrar cuidados sensoriais e, se quiser, uma foto para identificação."
+          checked={isNeurodivergent}
+          onChange={(checked) => {
+            setIsNeurodivergent(checked);
+            if (!checked) {
+              setSelectedSensoryTags([]);
+              setCustomNotes("");
+              setChildPhoto(null);
+            }
+          }}
+        />
 
-        {showCare && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "12px" }}>
-            <HelpText>
-              Estas informações são impressas na pulseira e no recibo — é assim que o monitor no salão fica sabendo.
-            </HelpText>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {SENSORY_TAG_OPTIONS.map((tag) => {
-                const isSelected = selectedSensoryTags.includes(tag);
-                return (
-                  <Button
-                    key={tag}
-                    type="button"
-                    variant={isSelected ? "teal" : "ghost"}
-                    size="sm"
-                    onClick={() => toggleSensoryTag(tag)}
-                    style={{ borderRadius: "9999px" }}
-                  >
-                    {isSelected ? "✓ " : "+ "}
-                    {tag}
-                  </Button>
-                );
-              })}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateRows: isNeurodivergent ? "1fr" : "0fr",
+            transition: "grid-template-rows 240ms ease",
+          }}
+        >
+          <div style={{ overflow: "hidden", minHeight: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)" }}>
+              <strong style={{ fontSize: "15px" }}>🧩 Cuidados Inclusivos &amp; Tags Sensoriais</strong>
+              <HelpText>
+                Estas informações são impressas na pulseira e no recibo — é assim que o monitor no salão fica sabendo.
+              </HelpText>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {SENSORY_TAG_OPTIONS.map((tag) => {
+                  const isSelected = selectedSensoryTags.includes(tag);
+                  return (
+                    <Button
+                      key={tag}
+                      type="button"
+                      variant={isSelected ? "teal" : "ghost"}
+                      size="sm"
+                      onClick={() => toggleSensoryTag(tag)}
+                      style={{ borderRadius: "9999px" }}
+                    >
+                      {isSelected ? "✓ " : "+ "}
+                      {tag}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Input
+                label="Outras observações (opcional)"
+                placeholder="Ex: alergia a corantes, brinquedo favorito..."
+                value={customNotes}
+                onChange={(e) => setCustomNotes(e.target.value)}
+              />
+              <PhotoCapture onChange={setChildPhoto} />
             </div>
-            <Input
-              label="Outras observações (opcional)"
-              placeholder="Ex: alergia a corantes, brinquedo favorito..."
-              value={customNotes}
-              onChange={(e) => setCustomNotes(e.target.value)}
-            />
           </div>
-        )}
+        </div>
       </section>
 
       {/* Cupom fica atrás de um toque: é exceção, não rotina. */}

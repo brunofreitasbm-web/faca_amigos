@@ -1341,6 +1341,22 @@ export const Api = {
   setAssetStatus: (id: string, status: Asset["status"]) => unwrap(supabase().from("fa_kiosk_assets").update({ status }).eq("id", id)),
   setAssetPhoto: (id: string, photoUrl: string | null) =>
     unwrap(supabase().from("fa_kiosk_assets").update({ photo_url: photoUrl }).eq("id", id)),
+  // Bucket privado `crianca-fotos` (ver migration fa_kiosk_child_photos) —
+  // diferente de `carrinho-fotos`, sem leitura pública: é foto de criança,
+  // não de equipamento. O caminho é gravado via RPC (fa_set_child_photo_path),
+  // não por UPDATE direto na tabela — mesma regra que vale para o resto de
+  // fa_kiosk_children: escrita só por função SECURITY DEFINER (ver migration
+  // fa_kiosk_temp_anon_read). Exibir a foto de volta exigiria uma signed URL,
+  // fora do escopo deste formulário.
+  uploadChildPhoto: async (childId: string, photo: Blob): Promise<void> => {
+    const path = `${childId}/${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase().storage.from("crianca-fotos").upload(path, photo, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+    if (uploadError) throw new Error(uploadError.message);
+    await unwrap(supabase().rpc("fa_set_child_photo_path", { p_child_id: childId, p_photo_path: path }));
+  },
   // Upload direto para o bucket público `carrinho-fotos` (ver migration
   // fa_kiosk_asset_photos) — aceita apenas JPG/PNG, nome do arquivo prefixado
   // com timestamp para evitar colisão ao trocar a foto de um mesmo carrinho.
