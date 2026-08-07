@@ -16,3 +16,13 @@ project_id = "faca-amigos-kiosk"
 
 [db]
 major_version = 15
+
+# login-pin e list-employees são chamadas ANTES de existir qualquer sessão
+# (tela de login por PIN) — não podem exigir JWT do portão do Supabase.
+# As duas fazem sua própria checagem de autorização internamente (PIN
+# conferido no servidor / só devolvem id+nome via service role).
+[functions.login-pin]
+verify_jwt = false
+
+[functions.list-employees]
+verify_jwt = false
