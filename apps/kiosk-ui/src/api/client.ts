@@ -57,6 +57,7 @@ export interface Employee {
   role: "OPERADOR" | "GERENTE" | "ADMIN";
   cpf?: string | null;
   email?: string | null;
+  phone?: string | null;
   birth_date?: string | null;
   admission_date?: string | null;
   position?: string | null;
@@ -69,6 +70,8 @@ export interface NewEmployeeInput {
   fullName: string;
   role: Employee["role"];
   cpf: string;
+  email: string;
+  phone: string;
   /** PIN de 6 dígitos escolhido pelo ADMIN para o novo colaborador — não existe login por e-mail/senha. */
   pin: string;
   birthDate: string;
@@ -76,6 +79,28 @@ export interface NewEmployeeInput {
   position: string;
   contractType: NonNullable<Employee["contract_type"]>;
   weeklyHoursContracted: number;
+}
+
+export interface EspelhoPontoRecord {
+  atMs: number;
+  kind: "ENTRADA" | "SAIDA" | "INTERVALO_INICIO" | "INTERVALO_FIM";
+  nsr: number;
+}
+
+export interface EspelhoPonto {
+  employee: {
+    id: string;
+    full_name: string;
+    cpf: string | null;
+    position: string | null;
+    role: Employee["role"];
+    admission_date: string | null;
+    weekly_hours_contracted: number | null;
+  };
+  records: EspelhoPontoRecord[];
+  year: number;
+  month: number;
+  timezone: string;
 }
 
 export interface Plan {
@@ -695,7 +720,7 @@ export const Api = {
     unwrap<Employee[]>(
       supabase()
         .from("fa_kiosk_employees")
-        .select("id, full_name, role, cpf, email, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
+        .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
         .eq("active", true)
         .order("full_name"),
     ),
@@ -703,7 +728,7 @@ export const Api = {
     unwrap<Employee[]>(
       supabase()
         .from("fa_kiosk_employees")
-        .select("id, full_name, role, cpf, email, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
+        .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
         .order("full_name"),
     ),
   plans: async (unitId: string, activity: string) => {
@@ -1412,6 +1437,12 @@ export const Api = {
   // chamador ADMIN autenticado, resolvida do lado do servidor.
   setEmployeePin: (employeeId: string, pin: string) =>
     unwrap<{ ok: boolean }>(supabase().functions.invoke("admin-set-employee-pin", { body: { employeeId, pin } })),
+  // Espelho de ponto mensal — a RPC já confere `relatorio.ponto` no banco;
+  // aqui só repassa os parâmetros e devolve o jsonb pronto para impressão.
+  espelhoPonto: (employeeId: string, year: number, month: number) =>
+    unwrap<EspelhoPonto>(
+      supabase().rpc("fa_kiosk_espelho_ponto", { p_employee_id: employeeId, p_year: year, p_month: month }),
+    ),
 
   /**
    * Colaborador correspondente à sessão do Supabase Auth atual. É daqui

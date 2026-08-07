@@ -22,11 +22,16 @@ import { requireCapability } from "../_shared/requireCapability.ts";
 const CONTRACT_TYPES = ["CLT", "ESTAGIO", "AUTONOMO"];
 const ROLES = ["OPERADOR", "GERENTE", "ADMIN"];
 const PIN_PATTERN = /^\d{6}$/;
+const CPF_PATTERN = /^\d{11}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\d{10,11}$/;
 
 interface CreateEmployeeBody {
   fullName: string;
   role: string;
   cpf: string;
+  email: string;
+  phone: string;
   pin: string;
   birthDate: string;
   admissionDate: string;
@@ -55,8 +60,17 @@ Deno.serve(async (req) => {
     return jsonResponse(req, { error: "corpo inválido" }, 400);
   }
 
-  if (!body.fullName || !body.cpf || !body.birthDate || !body.admissionDate || !body.position) {
-    return jsonResponse(req, { error: "preencha nome, CPF, data de nascimento, admissão e cargo" }, 400);
+  if (!body.fullName || !body.cpf || !body.email || !body.phone || !body.birthDate || !body.admissionDate || !body.position) {
+    return jsonResponse(req, { error: "preencha nome, CPF, e-mail, telefone, data de nascimento, admissão e cargo" }, 400);
+  }
+  if (!CPF_PATTERN.test(body.cpf.replace(/\D/g, ""))) {
+    return jsonResponse(req, { error: "CPF precisa ter 11 dígitos" }, 400);
+  }
+  if (!EMAIL_PATTERN.test(body.email.trim())) {
+    return jsonResponse(req, { error: "e-mail inválido" }, 400);
+  }
+  if (!PHONE_PATTERN.test(body.phone.replace(/\D/g, ""))) {
+    return jsonResponse(req, { error: "telefone precisa ter 10 ou 11 dígitos (com DDD)" }, 400);
   }
   if (!ROLES.includes(body.role)) return jsonResponse(req, { error: "papel inválido" }, 400);
   if (!CONTRACT_TYPES.includes(body.contractType)) {
@@ -88,8 +102,10 @@ Deno.serve(async (req) => {
       auth_user_id: createdUser.user.id,
       full_name: body.fullName,
       role: body.role,
-      cpf: body.cpf,
+      cpf: body.cpf.replace(/\D/g, ""),
       cpf_last4: body.cpf.replace(/\D/g, "").slice(-4),
+      email: body.email.trim().toLowerCase(),
+      phone: body.phone.replace(/\D/g, ""),
       birth_date: body.birthDate,
       admission_date: body.admissionDate,
       position: body.position,

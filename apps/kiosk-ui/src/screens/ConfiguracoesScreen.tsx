@@ -19,11 +19,12 @@ import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { RequireCapability } from "../auth/RequireCapability.js";
-import { ROLE_LABEL, ROLE_DESCRIPTION, type Capability } from "../auth/capabilities.js";
+import { ROLE_LABEL, ROLE_DESCRIPTION, FUNCTION_OPTIONS, type Capability } from "../auth/capabilities.js";
 import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
+import { EspelhoPontoModal } from "../components/EspelhoPontoModal.js";
 import { money } from "../format.js";
 
 type Tab =
@@ -35,6 +36,7 @@ type Tab =
   | "META"
   | "FROTA"
   | "COLABORADORES"
+  | "PONTO"
   | "UNIDADE"
   | "FISCAL"
   | "TERMOS"
@@ -45,9 +47,12 @@ type Tab =
  * `Record<Tab, Capability>` faz o build quebrar se uma aba nova nascer sem
  * declarar o que exige — o modo de falha natural seria ela nascer aberta.
  *
- * Todas exigem no mínimo `config.write` (Owner); as três de baixo têm
- * capacidade própria porque o dano de errar nelas é de outra natureza:
- * papel de colaborador, dado fiscal e o texto que o responsável aceita.
+ * Todas exigem no mínimo `config.write` (Owner); as de baixo têm capacidade
+ * própria porque o dano de errar nelas é de outra natureza: papel de
+ * colaborador, dado fiscal, o texto que o responsável aceita — e o Espelho
+ * de Ponto, que é a única aba deste grupo aberta ao Líder (GERENTE), não só
+ * ao Owner: gerar o ponto de terceiros é atribuição de liderança de turno,
+ * não de dono do negócio.
  */
 const TAB_CAPABILITY: Record<Tab, Capability> = {
   PLANOS: "config.write",
@@ -59,6 +64,7 @@ const TAB_CAPABILITY: Record<Tab, Capability> = {
   FROTA: "config.write",
   IMPRESSORAS: "config.write",
   COLABORADORES: "config.employees.write",
+  PONTO: "relatorio.ponto",
   UNIDADE: "config.unit.write",
   FISCAL: "config.fiscal.write",
   TERMOS: "config.terms.write",
@@ -81,6 +87,7 @@ export function ConfiguracoesScreen() {
     { value: "META", label: "Meta" },
     ...(isQuiosque ? ([{ value: "FROTA" as const, label: "Frota" }]) : []),
     { value: "COLABORADORES", label: "Colaboradores" },
+    { value: "PONTO", label: "Espelho de Ponto" },
     { value: "UNIDADE", label: "Unidade" },
     { value: "FISCAL", label: "Dados Fiscais" },
     { value: "TERMOS", label: "Termos de Uso" },
@@ -98,6 +105,7 @@ export function ConfiguracoesScreen() {
     META: "Configure a meta de faturamento do dia, o horário de fechamento e as regras de bônus para a equipe.",
     FROTA: "Cadastre os carrinhos do Circuito (nome, cor, emoji e foto) e marque quando um estiver em manutenção.",
     COLABORADORES: "Cadastre colaboradores, defina o nível de acesso de cada um e ative/desative o acesso ao sistema.",
+    PONTO: "Gere e imprima o espelho de ponto mensal de qualquer colaborador, com as marcações do mês e linha para assinatura.",
     UNIDADE: "Dados da unidade: nome, fuso, virada do dia operacional e o que aparece no cabeçalho do cupom.",
     FISCAL: "Dados do emitente para NFC-e (produtos) e o cadastro de NFS-e (serviço). Confira com seu contador antes de ligar a emissão.",
     TERMOS: "Texto que o responsável aceita no check-in. Alterações ficam registradas na trilha de auditoria.",
@@ -124,6 +132,7 @@ export function ConfiguracoesScreen() {
           {tab === "META" && <MetaTab unitId={unit.id} />}
           {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
           {tab === "COLABORADORES" && <ColaboradoresTab />}
+          {tab === "PONTO" && <EspelhoPontoTab />}
           {tab === "UNIDADE" && <UnidadeTab unitId={unit.id} />}
           {tab === "FISCAL" && <FiscalTab unitId={unit.id} />}
           {tab === "TERMOS" && <TermosTab unitId={unit.id} />}
@@ -1014,23 +1023,67 @@ const CONTRACT_TYPE_LABEL: Record<NonNullable<Employee["contract_type"]>, string
   AUTONOMO: "Autônomo",
 };
 
+/**
+ * Aba própria para o Espelho de Ponto — separada de Colaboradores porque a
+ * capacidade é outra (`relatorio.ponto`, concedida ao Líder) e a de
+ * Colaboradores exige `config.employees.write` (só Owner). Um Líder de
+ * turno gerando o espelho de ponto de terceiros é rotina; cadastrar ou
+ * desligar colaborador não é — misturar as duas na mesma aba abriria a
+ * segunda para quem só deveria ter a primeira.
+ */
+function EspelhoPontoTab() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [espelhoTarget, setEspelhoTarget] = useState<Employee | null>(null);
+
+  useEffect(() => {
+    Api.allEmployees().then(setEmployees);
+  }, []);
+
+  return (
+    <div>
+      <HelpText style={{ marginBottom: "12px" }}>Toque num colaborador para gerar o espelho de ponto do mês desejado.</HelpText>
+      {employees.map((e) => (
+        <Card
+          key={e.id}
+          onClick={() => setEspelhoTarget(e)}
+          style={{ padding: "12px", marginBottom: "8px", cursor: "pointer", opacity: e.active === false ? 0.5 : 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        >
+          <span>
+            <strong>{e.full_name}</strong> — {ROLE_LABEL[e.role]}
+            {e.position && <span style={{ color: "var(--text-muted)" }}> · {e.position}</span>}
+          </span>
+          <span aria-hidden>📄</span>
+        </Card>
+      ))}
+      {employees.length === 0 && <p style={{ color: "var(--text-muted)" }}>Nenhum colaborador cadastrado.</p>}
+
+      {espelhoTarget && <EspelhoPontoModal employee={espelhoTarget} onClose={() => setEspelhoTarget(null)} />}
+    </div>
+  );
+}
+
 function ColaboradoresTab() {
   const toast = useToast();
+  const { can } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [admin, setAdmin] = useState<TerminalEmployee | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [espelhoTarget, setEspelhoTarget] = useState<Employee | null>(null);
 
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<Employee["role"]>("OPERADOR");
   const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [admissionDate, setAdmissionDate] = useState("");
-  const [position, setPosition] = useState("");
+  const [functionKey, setFunctionKey] = useState<string>(FUNCTION_OPTIONS[0]!.value);
   const [contractType, setContractType] = useState<NonNullable<Employee["contract_type"]>>("CLT");
   const [weeklyHours, setWeeklyHours] = useState("44");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const selectedFunction = FUNCTION_OPTIONS.find((f) => f.value === functionKey) ?? FUNCTION_OPTIONS[0]!;
 
   // Redefinir PIN de um colaborador existente — exige o mesmo passo de
   // ADMIN acima, mas fica separado porque age sobre um colaborador já
@@ -1049,13 +1102,14 @@ function ColaboradoresTab() {
   function resetForm() {
     setFullName("");
     setCpf("");
+    setEmail("");
+    setPhone("");
     setPin("");
     setBirthDate("");
     setAdmissionDate("");
-    setPosition("");
+    setFunctionKey(FUNCTION_OPTIONS[0]!.value);
     setContractType("CLT");
     setWeeklyHours("44");
-    setRole("OPERADOR");
   }
 
   async function create() {
@@ -1064,12 +1118,14 @@ function ColaboradoresTab() {
     try {
       await Api.createEmployee({
         fullName,
-        role,
+        role: selectedFunction.role,
         cpf,
+        email,
+        phone,
         pin,
         birthDate,
         admissionDate,
-        position,
+        position: selectedFunction.label,
         contractType,
         weeklyHoursContracted: Number(weeklyHours),
       });
@@ -1132,7 +1188,19 @@ function ColaboradoresTab() {
     }
   }
 
-  const formValid = fullName && cpf && pin.length === 6 && birthDate && admissionDate && position && Number(weeklyHours) > 0;
+  const cpfDigits = cpf.replace(/\D/g, "");
+  const phoneDigits = phone.replace(/\D/g, "");
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const formValid = Boolean(
+    fullName &&
+      cpfDigits.length === 11 &&
+      emailValid &&
+      (phoneDigits.length === 10 || phoneDigits.length === 11) &&
+      pin.length === 6 &&
+      birthDate &&
+      admissionDate &&
+      Number(weeklyHours) > 0,
+  );
 
   return (
     <div>
@@ -1157,15 +1225,35 @@ function ColaboradoresTab() {
         <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Novo colaborador</h2>
           <Input label="Nome completo" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <Input label="CPF" value={cpf} onChange={(e) => setCpf(e.target.value)} />
+          <Input
+            label="CPF"
+            value={cpf}
+            onChange={(e) => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))}
+            error={cpf && cpfDigits.length !== 11 ? "CPF precisa ter 11 dígitos" : undefined}
+          />
+          <Input
+            label="E-mail"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={email && !emailValid ? "E-mail inválido" : undefined}
+          />
+          <Input
+            label="Telefone (com DDD)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
+            error={phone && phoneDigits.length !== 10 && phoneDigits.length !== 11 ? "Telefone precisa ter 10 ou 11 dígitos" : undefined}
+          />
           <Input
             label="PIN de 6 dígitos (login deste colaborador)"
+            type="password"
+            inputMode="numeric"
+            autoComplete="new-password"
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
           />
           <Input label="Data de nascimento" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           <Input label="Data de admissão" type="date" value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
-          <Input label="Cargo / função" value={position} onChange={(e) => setPosition(e.target.value)} />
           <Select label="Tipo de contrato" value={contractType} onChange={(e) => setContractType(e.target.value as typeof contractType)}>
             <option value="CLT">CLT</option>
             <option value="ESTAGIO">Estágio</option>
@@ -1173,18 +1261,20 @@ function ColaboradoresTab() {
           </Select>
           <Input label="Jornada semanal contratada (horas)" type="number" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} />
           <Select
-            label="Nível de acesso"
-            title={ROLE_DESCRIPTION[role]}
-            value={role}
-            onChange={(e) => setRole(e.target.value as Employee["role"])}
+            label="Função"
+            title={ROLE_DESCRIPTION[selectedFunction.role]}
+            value={functionKey}
+            onChange={(e) => setFunctionKey(e.target.value)}
           >
-            {(["OPERADOR", "GERENTE", "ADMIN"] as const).map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABEL[r]}
+            {FUNCTION_OPTIONS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
               </option>
             ))}
           </Select>
-          <HelpText>{ROLE_DESCRIPTION[role]}</HelpText>
+          <HelpText>
+            Nível de acesso: <strong>{ROLE_LABEL[selectedFunction.role]}</strong> — {ROLE_DESCRIPTION[selectedFunction.role]}
+          </HelpText>
           {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
           <div style={{ display: "flex", gap: "8px" }}>
             <Button variant="primary" disabled={busy || !formValid} onClick={create}>
@@ -1213,6 +1303,9 @@ function ColaboradoresTab() {
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <Input
                 label="Novo PIN de 6 dígitos"
+                type="password"
+                inputMode="numeric"
+                autoComplete="new-password"
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
               />
@@ -1255,6 +1348,11 @@ function ColaboradoresTab() {
               <Button variant="ghost" size="sm" onClick={() => { setResetError(null); setResetPinTarget(e); }}>
                 redefinir PIN
               </Button>
+              {can("relatorio.ponto") && (
+                <Button variant="ghost" size="sm" onClick={() => setEspelhoTarget(e)} title="Gerar e imprimir o espelho de ponto mensal deste colaborador">
+                  📄 espelho de ponto
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={() => toggleActive(e)}>
                 {e.active === false ? "reativar" : "desativar"}
               </Button>
@@ -1262,6 +1360,8 @@ function ColaboradoresTab() {
           </div>
         </Card>
       ))}
+
+      {espelhoTarget && <EspelhoPontoModal employee={espelhoTarget} onClose={() => setEspelhoTarget(null)} />}
     </div>
   );
 }
