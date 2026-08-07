@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Button, Modal, Tag } from "@facaamigos/ui";
+import { useEffect } from "react";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 import { Api, systemStatus } from "../api/client.js";
@@ -11,28 +10,38 @@ interface ReceiptPrintModalProps {
 }
 
 /**
- * Cupom não fiscal (80mm): enfileira o pedido em fa_kiosk_print_jobs ao
- * abrir, sem exigir clique do operador nem abrir o diálogo nativo do
- * navegador — o print bridge local (apps/kiosk) assina essa fila e manda
- * direto para a impressora configurada em Configurações > Impressoras. Se
- * a fila falhar (ex.: sem unidade selecionada), cai no caminho antigo
- * (janela + window.print()) como último recurso — melhor um diálogo
- * aparecendo do que nenhum cupom saindo.
+ * Impressão automática de cupom não fiscal (80mm / Apptech T271U):
+ * Ao efetuar qualquer pagamento (check-in, checkout, PDV), este componente
+ * enfileira o cupom em `fa_kiosk_print_jobs` para ser impresso SILENCIOSA
+ * E AUTOMATICAMENTE pelo print bridge local, sem exibir nenhum pop-up na tela
+ * e sem exigir qualquer clique do operador.
  */
 export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
   const { unit } = useAppState();
   const { text } = generateEscPosReceipt(data);
-  const [status, setStatus] = useState<"queuing" | "queued" | "fallback">("queuing");
 
   function handleBrowserPrint() {
-    const printWindow = window.open("", "_blank", "width=420,height=600");
-    if (!printWindow) {
-      systemStatus.dispatchEvent(new CustomEvent("print-blocked"));
+    let iframe = document.getElementById("fa-receipt-print-iframe") as HTMLIFrameElement | null;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "fa-receipt-print-iframe";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.visibility = "hidden";
+      document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
       return;
     }
-    systemStatus.dispatchEvent(new CustomEvent("print-ok"));
 
-    printWindow.document.write(`
+    doc.open();
+    doc.write(`
       <!DOCTYPE html>
       <html lang="pt-BR">
         <head>
@@ -40,77 +49,58 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
           <title>Cupom Não Fiscal — FaçaAmigos</title>
           <style>
             @page { size: 80mm auto; margin: 0; }
-            html, body { margin: 0 !important; padding: 4mm !important; background: #fff !important; }
-            pre { font-family: "Courier New", monospace; font-size: 11px; white-space: pre-wrap; margin: 0; }
+            html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
+            pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
           </style>
         </head>
         <body>
           <pre>${text.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
       </html>
     `);
-    printWindow.document.close();
+    doc.close();
+
+    systemStatus.dispatchEvent(new CustomEvent("print-ok"));
+
+    setTimeout(() => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Erro ao disparar impressão do iframe do cupom:", err);
+      }
+    }, 150);
   }
 
   useEffect(() => {
+    let isMounted = true;
+
     if (!unit) {
-      setStatus("fallback");
       handleBrowserPrint();
+      onClose();
       return;
     }
+
     Api.queuePrintJob(unit.id, "RECEIPT", data)
-      .then(() => setStatus("queued"))
-      .catch(() => {
-        setStatus("fallback");
-        handleBrowserPrint();
+      .then(() => {
+        if (isMounted) {
+          onClose();
+        }
+      })
+      .catch((err) => {
+        console.warn("Fila de impressão indisponível, disparando impressão automática:", err);
+        if (isMounted) {
+          handleBrowserPrint();
+          onClose();
+        }
       });
+
+    return () => {
+      isMounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <Modal
-      title={
-        <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontFamily: "var(--font-display)", color: "var(--color-primary-hover)" }}>Cupom Não Fiscal</span>
-          <Tag color="var(--color-teal)">80mm</Tag>
-        </span>
-      }
-      onClose={onClose}
-      maxWidth="420px"
-      zIndex={9999}
-      bodyStyle={{ display: "flex", flexDirection: "column", gap: "16px" }}
-    >
-        {status === "queued" && <Tag color="var(--color-teal)">✓ Enviado para a impressora configurada</Tag>}
-        {status === "fallback" && <Tag color="var(--color-amber)">⚠️ Fila de impressão indisponível — abrindo diálogo do navegador</Tag>}
-
-        <pre
-          style={{
-            background: "#ffffff",
-            color: "#141414",
-            padding: "12px",
-            borderRadius: "12px",
-            border: "2px dashed var(--border-subtle)",
-            fontFamily: "monospace",
-            fontSize: "10px",
-            whiteSpace: "pre-wrap",
-            maxHeight: "320px",
-            overflowY: "auto",
-          }}
-        >
-          {text}
-        </pre>
-
-        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-          <Button variant="ghost" onClick={handleBrowserPrint} title="Abrir o diálogo de impressão do navegador manualmente">
-            🖨️ Imprimir pelo navegador
-          </Button>
-        </div>
-    </Modal>
-  );
+  // Retorna null para não exibir NENHUM modal ou pop-up na tela do operador
+  return null;
 }

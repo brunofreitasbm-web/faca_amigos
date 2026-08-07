@@ -14,7 +14,8 @@ describe("generateGainschaGS2208DTSPL", () => {
     });
 
     expect(tspl).toContain("SIZE 270 mm, 20 mm");
-    expect(tspl).toContain('BARCODE 420,20,"128",65,1,0,2,2,"987654"');
+    expect(tspl).toContain('QRCODE 420,5,M,3,A,0,"987654"');
+    expect(tspl).toContain('TEXT 420,115,"2",0,1,1,"#987654"');
     expect(tspl).toContain('TEXT 900,25,"4",0,1,1,"CRIANCA: HELENA SOUZA"');
     expect(tspl).toContain('TEXT 900,90,"2",0,1,1,"RESP: MARIA SOUZA (+5591982501215)"');
     expect(tspl).toContain('TEXT 1650,30,"3",0,1,1,"ENTRADA: 14:30"');

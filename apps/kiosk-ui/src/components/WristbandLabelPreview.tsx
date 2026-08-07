@@ -1,4 +1,6 @@
+import { getFriendlyWristbandCode } from "@facaamigos/domain";
 import type { WristbandData } from "./WristbandPrintModal.js";
+import { WristbandQRCode } from "./WristbandQRCode.js";
 
 interface WristbandLabelPreviewProps {
   data: WristbandData;
@@ -12,6 +14,8 @@ interface WristbandLabelPreviewProps {
  * layout e arriscar as duas versões divergirem com o tempo.
  */
 export function WristbandLabelPreview({ data, entryTime }: WristbandLabelPreviewProps) {
+  const friendlyCode = getFriendlyWristbandCode(data.wristbandCode);
+
   return (
     <div className="wristband-printable" style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: "16px", minWidth: "680px" }}>
       <div style={{ borderRight: "2px solid #141414", paddingRight: "12px" }}>
@@ -23,9 +27,12 @@ export function WristbandLabelPreview({ data, entryTime }: WristbandLabelPreview
         </span>
       </div>
 
-      <div style={{ textAlign: "center", borderRight: "2px solid #141414", paddingRight: "12px" }}>
-        <div style={{ fontSize: "18px", fontWeight: "bold", letterSpacing: "1px", background: "#f0f0f0", padding: "2px 8px", borderRadius: "4px" }}>
-          #{data.wristbandCode}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", borderRight: "2px solid #141414", paddingRight: "12px" }}>
+        <WristbandQRCode value={data.wristbandCode} size={58} />
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "15px", fontWeight: "bold", letterSpacing: "1px", background: "#f0f0f0", padding: "2px 6px", borderRadius: "4px", border: "1px solid #ccc" }}>
+            #{friendlyCode}
+          </div>
         </div>
       </div>
 

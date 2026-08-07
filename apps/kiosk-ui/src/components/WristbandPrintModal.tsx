@@ -48,31 +48,40 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
   }
 
   function handleBrowserPrint() {
+    let iframe = document.getElementById("fa-wristband-print-iframe") as HTMLIFrameElement | null;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "fa-wristband-print-iframe";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.visibility = "hidden";
+      document.body.appendChild(iframe);
+    }
+
     const printableElement = document.querySelector(".wristband-printable");
     if (!printableElement) {
-      setTimeout(() => window.print(), 50);
+      window.print();
       return;
     }
 
-    const printWindow = window.open("", "_blank", "width=800,height=300");
-    if (!printWindow) {
-      systemStatus.dispatchEvent(new CustomEvent("print-blocked"));
-      setTimeout(() => window.print(), 50);
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
       return;
     }
-    systemStatus.dispatchEvent(new CustomEvent("print-ok"));
 
-    printWindow.document.write(`
+    doc.open();
+    doc.write(`
       <!DOCTYPE html>
       <html lang="pt-BR">
         <head>
           <meta charset="UTF-8">
           <title>Impressão de Pulseira — FaçaAmigos</title>
           <style>
-            /* Sem a palavra "landscape" aqui: combinada com um tamanho
-               explícito width×height ela é redundante (270mm > 20mm já
-               define a orientação) e faz o Chrome travar no "Carregando
-               visualização..." da caixa de impressão indefinidamente. */
             @page {
               size: 270mm 20mm;
               margin: 0;
@@ -97,22 +106,31 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
               background: #ffffff;
               color: #000000;
             }
+            .wristband-printable svg {
+              max-height: 18mm;
+              width: auto;
+            }
           </style>
         </head>
         <body>
           <div class="wristband-printable">
             ${printableElement.innerHTML}
           </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
       </html>
     `);
-    printWindow.document.close();
+    doc.close();
+
+    systemStatus.dispatchEvent(new CustomEvent("print-ok"));
+
+    setTimeout(() => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Erro ao disparar impressão do iframe:", err);
+      }
+    }, 150);
   }
 
   function handleCopyTspl() {

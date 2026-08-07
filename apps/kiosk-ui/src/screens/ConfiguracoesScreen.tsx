@@ -8,6 +8,7 @@ import { useToast } from "../state/ToastContext.js";
 import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
+import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import { money } from "../format.js";
 
 type Tab = "PLANOS" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "META" | "FROTA" | "COLABORADORES" | "IMPRESSORAS";
@@ -933,11 +934,33 @@ const SAMPLE_RECEIPT = generateEscPosReceipt({
   payments: [{ method: "Cartão de Crédito", amountCents: 7500 }],
 });
 
+const COMMON_WRISTBAND_PRINTERS = [
+  "Apptech T271U",
+  "Gainscha GS-2208D",
+  "Zebra ZD220",
+  "Zebra GC420t",
+  "Argox OS-214plus",
+  "Elgin L42 Pro",
+];
+
+const COMMON_RECEIPT_PRINTERS = [
+  "Apptech T271U",
+  "Elgin i9",
+  "Elgin i8",
+  "Bematech MP-4200 TH",
+  "Epson TM-T20",
+  "Daruma DR800",
+  "POS-80",
+];
+
 function ImpressorasTab({ unitId }: { unitId: string }) {
   const toast = useToast();
   const [wristbandPrinter, setWristbandPrinter] = useState("");
   const [receiptPrinter, setReceiptPrinter] = useState("");
   const [saving, setSaving] = useState<"WRISTBAND" | "RECEIPT" | null>(null);
+  const [testingReceipt, setTestingReceipt] = useState(false);
+  const [testingWristband, setTestingWristband] = useState(false);
+  const [showWristbandTestModal, setShowWristbandTestModal] = useState(false);
 
   useEffect(() => {
     Api.unitSetting(unitId, "printer_wristband").then((r) => setWristbandPrinter(r.value ?? ""));
@@ -949,7 +972,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     try {
       const key = kind === "WRISTBAND" ? "printer_wristband" : "printer_receipt";
       await Api.setUnitSetting(unitId, key, kind === "WRISTBAND" ? wristbandPrinter : receiptPrinter);
-      toast.success("Impressora salva.");
+      toast.success("Impressora salva com sucesso.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível salvar a impressora.");
     } finally {
@@ -957,35 +980,135 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     }
   }
 
+  async function testReceiptPrint() {
+    setTestingReceipt(true);
+    try {
+      await Api.queuePrintJob(unitId, "RECEIPT", {
+        title: "Teste de Impressão",
+        unitName: "Unidade FaçaAmigos",
+        employeeName: "Operador Kiosk",
+        code: "TESTE-T271U",
+        items: [
+          { description: "Cupom de Teste Apptech T271U", quantity: 1, amountCents: 0 },
+          { description: "Verificação de Enquadramento", quantity: 1, amountCents: 0 },
+        ],
+        totalCents: 0,
+        payments: [{ method: "Teste do Sistema", amountCents: 0 }],
+        customerInfo: { childName: "Criança Teste", guardianName: "Responsável Teste" },
+        footerNote: "Teste de enquadramento 80mm OK!",
+      });
+      toast.success("Cupom de teste enviado para a fila de impressão!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar cupom de teste.");
+    } finally {
+      setTestingReceipt(false);
+    }
+  }
+
+  async function testWristbandPrint() {
+    setTestingWristband(true);
+    try {
+      await Api.queuePrintJob(unitId, "WRISTBAND", {
+        wristbandCode: "TESTE-01",
+        childName: "Criança Teste",
+        guardianName: "Responsável Teste",
+        phone: "(11) 99999-9999",
+        planName: "Plano Teste 1h",
+        notes: "Teste de enquadramento OK",
+        entryTime: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      });
+      toast.success("Pulseira de teste enviada para a fila de impressão!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar pulseira de teste.");
+    } finally {
+      setTestingWristband(false);
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
-        Digite o nome exato da impressora como ela aparece instalada no Windows deste terminal. O print bridge local usa esse nome para
+        Digite ou selecione o nome exato da impressora como ela aparece instalada no Windows deste terminal (Painel de Controle &gt; Dispositivos e Impressoras). O print bridge local usa esse nome para
         imprimir direto, sem abrir diálogo nenhum na tela.
       </p>
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+
+      {/* IMPRESSORA DE PULSEIRAS */}
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
         <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Pulseiras</h2>
-        <Input placeholder="Ex: Gainscha GS-2208D" value={wristbandPrinter} onChange={(e) => setWristbandPrinter(e.target.value)} />
-        <Button variant="primary" size="sm" loading={saving === "WRISTBAND"} onClick={() => save("WRISTBAND")} style={{ alignSelf: "flex-start" }}>
-          Salvar
-        </Button>
-      </Card>
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Cupons</h2>
-        <Input placeholder="Ex: Elgin i9" value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} />
-        <Button variant="primary" size="sm" loading={saving === "RECEIPT"} onClick={() => save("RECEIPT")} style={{ alignSelf: "flex-start" }}>
-          Salvar
-        </Button>
+        <Input placeholder="Ex: Gainscha GS-2208D, Zebra ZD220" value={wristbandPrinter} onChange={(e) => setWristbandPrinter(e.target.value)} />
+        
+        <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 600 }}>Clique para escolher:</span>
+          {COMMON_WRISTBAND_PRINTERS.map((model) => (
+            <Button
+              key={model}
+              variant={wristbandPrinter === model ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => setWristbandPrinter(model)}
+            >
+              + {model}
+            </Button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
+          <Button variant="primary" size="sm" loading={saving === "WRISTBAND"} onClick={() => save("WRISTBAND")}>
+            Salvar Impressora
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setShowWristbandTestModal(true)}>
+            🖨️ Abrir Diálogo / Imprimir Pulseira de Teste
+          </Button>
+          <Button variant="ghost" size="sm" loading={testingWristband} onClick={testWristbandPrint} title="Enviar job diretamente para a fila de impressão do Electron (print bridge)">
+            ⚡ Enviar para Fila de Impressão
+          </Button>
+        </div>
+
+        {showWristbandTestModal && (
+          <WristbandPrintModal
+            data={SAMPLE_WRISTBAND}
+            onClose={() => setShowWristbandTestModal(false)}
+          />
+        )}
       </Card>
 
+      {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <h2 style={{ margin: 0, fontSize: "16px" }}>Impressora de Cupons Não Fiscais (80mm / Apptech T271U)</h2>
+        <Input placeholder="Ex: Apptech T271U, Elgin i9, POS-80" value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} />
+        
+        <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 600 }}>Clique para escolher:</span>
+          {COMMON_RECEIPT_PRINTERS.map((model) => (
+            <Button
+              key={model}
+              variant={receiptPrinter === model ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => setReceiptPrinter(model)}
+            >
+              + {model}
+            </Button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+          <Button variant="primary" size="sm" loading={saving === "RECEIPT"} onClick={() => save("RECEIPT")}>
+            Salvar Impressora
+          </Button>
+          <Button variant="secondary" size="sm" loading={testingReceipt} onClick={testReceiptPrint}>
+            🖨️ Enviar Cupom de Teste
+          </Button>
+        </div>
+      </Card>
+
+      {/* VISUALIZAÇÃO RÁPIDA */}
       <div>
-        <h2 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Visualização rápida</h2>
+        <h2 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Visualização rápida de impressão</h2>
         <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: "0 0 12px 0" }}>
-          Layout de exemplo — não imprime nada, só mostra como pulseira e cupom vão sair.
+          Layout em tempo real — mostra o enquadramento exato de 42 colunas como sairá na impressora Apptech T271U.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Pulseira (Gainscha GS-2208D — 20mm × 270mm)</h3>
+            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Pulseira (Gainscha / Zebra — 20mm × 270mm)</h3>
             <div
               style={{
                 background: "#ffffff",
@@ -1001,7 +1124,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
             </div>
           </Card>
           <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Cupom não fiscal (80mm)</h3>
+            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Cupom não fiscal (Apptech T271U / 80mm - 42 Colunas)</h3>
             <pre
               style={{
                 background: "#ffffff",
@@ -1009,10 +1132,13 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
                 padding: "12px",
                 borderRadius: "12px",
                 border: "2px dashed var(--border-subtle)",
-                fontFamily: "monospace",
-                fontSize: "10px",
-                whiteSpace: "pre-wrap",
-                maxHeight: "320px",
+                fontFamily: '"Consolas", "Courier New", monospace',
+                fontSize: "11px",
+                lineHeight: "1.25",
+                fontWeight: 600,
+                whiteSpace: "pre",
+                maxHeight: "340px",
+                overflowX: "auto",
                 overflowY: "auto",
                 margin: 0,
               }}

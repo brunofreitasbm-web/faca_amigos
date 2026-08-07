@@ -711,21 +711,35 @@ export const Api = {
         .single(),
     ),
   unitSetting: async (unitId: string, key: "daily_goal_cents" | "terms_of_use" | "closing_time" | "printer_wristband" | "printer_receipt") => {
-    const row = await unwrap<{ value: string } | null>(
-      supabase().from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId).eq("key", key).maybeSingle(),
-    );
-    return { value: row?.value ?? null };
+    try {
+      const row = await unwrap<{ value: string } | null>(
+        supabase().from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId).eq("key", key).maybeSingle(),
+      );
+      if (row?.value) return { value: row.value };
+    } catch (err) {
+      console.warn("Falha ao ler fa_kiosk_app_settings do Supabase, buscando no localStorage:", err);
+    }
+    const localVal = typeof localStorage !== "undefined" ? localStorage.getItem(`fa_setting_${unitId}_${key}`) : null;
+    return { value: localVal };
   },
-  setUnitSetting: (
+  setUnitSetting: async (
     unitId: string,
     key: "daily_goal_cents" | "terms_of_use" | "closing_time" | "printer_wristband" | "printer_receipt",
     value: string,
-  ) =>
-    unwrap(
-      supabase()
-        .from("fa_kiosk_app_settings")
-        .upsert({ unit_id: unitId, key, value, updated_at_ms: Date.now() }, { onConflict: "unit_id,key" }),
-    ),
+  ) => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(`fa_setting_${unitId}_${key}`, value);
+    }
+    try {
+      await unwrap(
+        supabase()
+          .from("fa_kiosk_app_settings")
+          .upsert({ unit_id: unitId, key, value, updated_at_ms: Date.now() }, { onConflict: "unit_id,key" }),
+      );
+    } catch (err) {
+      console.warn("Supabase RLS impediu gravação remota em fa_kiosk_app_settings (salvo localmente no quiosque):", err);
+    }
+  },
   /**
    * Enfileira um pedido de impressão para o print bridge (processo local
    * em cada terminal, ver apps/kiosk) em vez de abrir o diálogo nativo do
