@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { Button, Modal, Tag } from "@facaamigos/ui";
 import { generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import { Api, systemStatus } from "../api/client.js";
@@ -25,11 +26,29 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
   const [showTspl, setShowTspl] = useState(false);
   const [copied, setCopied] = useState(false);
   const [queueStatus, setQueueStatus] = useState<"idle" | "queuing" | "queued" | "error">("idle");
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   const tsplCommands = generateGainschaGS2208DTSPL({
     ...data,
     entryTime: nowStr,
   });
+
+  // O wristband_code é um payload assinado (FA1|W|<id>|<hash>) — longo
+  // demais pra caber como texto na etiqueta de 20mm. QR code é o que
+  // realmente cabe no layout e ainda dá pra ler com leitor de câmera.
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(data.wristbandCode, { margin: 0, width: 160 })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [data.wristbandCode]);
 
   async function handleQueuePrint() {
     if (!unit) {
@@ -155,10 +174,12 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
               </span>
             </div>
 
-            <div style={{ textAlign: "center", borderRight: "2px solid #141414", paddingRight: "12px" }}>
-              <div style={{ fontSize: "18px", fontWeight: "bold", letterSpacing: "1px", background: "#f0f0f0", padding: "2px 8px", borderRadius: "4px" }}>
-                #{data.wristbandCode}
-              </div>
+            <div style={{ textAlign: "center", borderRight: "2px solid #141414", paddingRight: "12px", flexShrink: 0 }}>
+              {qrDataUrl ? (
+                <img src={qrDataUrl} alt={`Código da pulseira: ${data.wristbandCode}`} width={56} height={56} style={{ display: "block" }} />
+              ) : (
+                <div style={{ width: 56, height: 56, background: "#f0f0f0", borderRadius: "4px" }} />
+              )}
             </div>
 
             <div style={{ borderRight: "2px solid #141414", paddingRight: "12px" }}>

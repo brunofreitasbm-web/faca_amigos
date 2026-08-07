@@ -15,12 +15,14 @@
     "@facaamigos/domain": "workspace:*",
     "@facaamigos/ui": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
+    "qrcode": "^1.5.4",
     "react": "catalog:",
     "react-dom": "catalog:",
     "recharts": "^2.15.0"
   },
   "devDependencies": {
     "@facaamigos/config": "workspace:*",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",

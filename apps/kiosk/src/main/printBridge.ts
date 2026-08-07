@@ -1,6 +1,7 @@
 import { BrowserWindow } from "electron";
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
+import QRCode from "qrcode";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 
@@ -32,8 +33,11 @@ interface WristbandPayload {
   entryTime?: string;
 }
 
-function wristbandHtml(p: WristbandPayload): string {
+async function wristbandHtml(p: WristbandPayload): Promise<string> {
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  // wristband_code é um payload assinado (FA1|W|<id>|<hash>) — longo demais
+  // pra caber como texto na etiqueta de 20mm, por isso vira QR code.
+  const qrDataUrl = await QRCode.toDataURL(p.wristbandCode, { margin: 0, width: 160 });
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 270mm 20mm; margin: 0; }
@@ -42,12 +46,12 @@ function wristbandHtml(p: WristbandPayload): string {
             align-items: center; justify-content: space-between; background: #fff; color: #000; }
       .cell { border-right: 2px solid #141414; padding-right: 12px; }
       .name { font-size: 16px; font-weight: bold; color: #F0196B; display: block; }
-      .code { font-size: 18px; font-weight: bold; letter-spacing: 1px; background: #f0f0f0; padding: 2px 8px; border-radius: 4px; }
+      .qr { width: 56px; height: 56px; display: block; }
       .notes { font-size: 10px; color: #d9534f; font-weight: bold; }
     </style></head><body>
     <div class="wb">
       <div class="cell"><span class="name">FaçaAmigos</span><span style="font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:1px">Playground Inclusivo</span></div>
-      <div class="cell" style="text-align:center"><div class="code">#${esc(p.wristbandCode)}</div></div>
+      <div class="cell" style="text-align:center;flex-shrink:0"><img class="qr" src="${qrDataUrl}" alt="Código da pulseira" /></div>
       <div class="cell">
         <div style="font-size:11px;color:#666">Criança:</div>
         <div style="font-size:15px;font-weight:800">${esc(p.childName)}</div>
@@ -120,7 +124,9 @@ export function startPrintBridge(): void {
         throw new Error(`Nenhuma impressora de ${job.kind === "WRISTBAND" ? "pulseira" : "cupom"} configurada (Configurações > Impressoras)`);
       }
       const html =
-        job.kind === "WRISTBAND" ? wristbandHtml(job.payload_json as unknown as WristbandPayload) : receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
+        job.kind === "WRISTBAND"
+          ? await wristbandHtml(job.payload_json as unknown as WristbandPayload)
+          : receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
       await printHtml(html, deviceName);
       await supabase.from("fa_kiosk_print_jobs").update({ status: "PRINTED", printed_at_ms: Date.now() }).eq("id", job.id);
       console.log(`[print-bridge] job ${job.id} (${job.kind}) impresso em "${deviceName}".`);
