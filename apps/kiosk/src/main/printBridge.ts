@@ -1,18 +1,9 @@
 import { BrowserWindow } from "electron";
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
-import { generateEscPosReceipt } from "@facaamigos/domain";
-import type { ReceiptPrintPayload } from "@facaamigos/domain";
-
-/**
- * Fase 6 do plano, finalmente implementada: assina fa_kiosk_print_jobs
- * (Supabase Realtime) e manda o trabalho direto pra impressora do
- * sistema operacional via `webContents.print({ silent: true })` — sem
- * diálogo nenhum na tela do quiosque. `fa_kiosk_print_jobs` só aceita
- * UPDATE de `service_role` (RLS, migration 20260806000009), então este
- * processo precisa da service role key — configurada só aqui, neste
- * terminal, nunca no kiosk-ui (que roda com a anon key no navegador).
- */
+import { generateEscPosReceipt, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
+import type { ReceiptPrintPayload, WristbandPrintPayload } from "@facaamigos/domain";
+import { printRawWindows } from "./rawPrint.js";
 
 interface PrintJobRow {
   id: string;
@@ -138,9 +129,19 @@ export function startPrintBridge(): void {
       if (!deviceName) {
         throw new Error(`Nenhuma impressora de ${job.kind === "WRISTBAND" ? "pulseira" : "cupom"} configurada (Configurações > Impressoras)`);
       }
-      const html =
-        job.kind === "WRISTBAND" ? await wristbandHtml(job.payload_json as unknown as WristbandPayload) : receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
-      await printHtml(html, deviceName);
+
+      if (job.kind === "WRISTBAND") {
+        const tspl = generateGainschaGS2208DTSPL(job.payload_json as unknown as WristbandPrintPayload);
+        const printedRaw = await printRawWindows(tspl, deviceName);
+        if (!printedRaw) {
+          const html = await wristbandHtml(job.payload_json as unknown as WristbandPayload);
+          await printHtml(html, deviceName);
+        }
+      } else {
+        const html = receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
+        await printHtml(html, deviceName);
+      }
+
       await supabase.from("fa_kiosk_print_jobs").update({ status: "PRINTED", printed_at_ms: Date.now() }).eq("id", job.id);
       console.log(`[print-bridge] job ${job.id} (${job.kind}) impresso em "${deviceName}".`);
     } catch (err) {
