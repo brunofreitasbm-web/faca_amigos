@@ -8,6 +8,7 @@ import type {
   Coupon,
   Employee,
   LoyaltyRule,
+  Package,
   Plan,
   Product,
   ProductFiscal,
@@ -27,6 +28,7 @@ import { money } from "../format.js";
 
 type Tab =
   | "PLANOS"
+  | "PACOTES"
   | "PRODUTOS"
   | "CUPONS"
   | "FIDELIDADE"
@@ -49,6 +51,7 @@ type Tab =
  */
 const TAB_CAPABILITY: Record<Tab, Capability> = {
   PLANOS: "config.write",
+  PACOTES: "config.write",
   PRODUTOS: "config.write",
   CUPONS: "config.write",
   FIDELIDADE: "config.write",
@@ -71,6 +74,7 @@ export function ConfiguracoesScreen() {
 
   const allTabs: { value: Tab; label: string }[] = [
     { value: "PLANOS", label: "Planos de Preços" },
+    { value: "PACOTES", label: "Pacotes" },
     { value: "PRODUTOS", label: "Produtos" },
     { value: "CUPONS", label: "Cupons" },
     { value: "FIDELIDADE", label: "Fidelidade" },
@@ -86,6 +90,8 @@ export function ConfiguracoesScreen() {
 
   const TAB_HELP: Record<Tab, string> = {
     PLANOS: "Cadastre os planos de permanência que aparecem na tela de Entrada — nome, preço, duração e o que cobrar se passar do tempo.",
+    PACOTES:
+      "Pacotes de horas oferecidos como upgrade ao cliente VIP no check-in. Quem escolhe qual oferecer é o sistema: o pacote de valor imediatamente acima do que a família já gastou no mês, e só se ele baixar o custo por hora dela.",
     PRODUTOS: "Cadastre os itens vendidos avulsos no PDV (loja/lanchonete) e o estoque disponível de cada um.",
     CUPONS: "Crie códigos de desconto ou parceria que o operador pode aplicar na tela de Entrada.",
     FIDELIDADE: "Defina recompensas automáticas para clientes recorrentes — ex.: a cada 10 visitas, uma entrada grátis.",
@@ -111,6 +117,7 @@ export function ConfiguracoesScreen() {
       <div role="tabpanel">
         <RequireCapability capability={TAB_CAPABILITY[tab]}>
           {tab === "PLANOS" && <PlanosTab unitId={unit.id} activity={isQuiosque ? "CARRINHO" : "PLAYGROUND"} />}
+          {tab === "PACOTES" && <PacotesTab unitId={unit.id} activity={isQuiosque ? "CARRINHO" : "PLAYGROUND"} />}
           {tab === "PRODUTOS" && <ProdutosTab unitId={unit.id} />}
           {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
           {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
@@ -372,6 +379,232 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
           </span>
         </Card>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Pacotes de horas + calibragem do motor de cross-selling.
+ *
+ * As duas coisas moram na mesma aba porque são a mesma decisão: um
+ * pacote só existe para ser oferecido, e o limiar de quem recebe a
+ * oferta é o outro lado da mesma moeda. Separá-los faria o Owner
+ * cadastrar preços numa tela e descobrir noutra por que ninguém está
+ * vendo a oferta.
+ */
+function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND" | "CARRINHO" }) {
+  const toast = useToast();
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [name, setName] = useState("");
+  const [priceReais, setPriceReais] = useState("0");
+  const [includedHours, setIncludedHours] = useState("10");
+  const [validityDays, setValidityDays] = useState("30");
+  const [benefitText, setBenefitText] = useState("");
+  const [color, setColor] = useState("#FF7A00");
+  const [busy, setBusy] = useState(false);
+
+  const [vipVisits, setVipVisits] = useState("4");
+  const [windowDays, setWindowDays] = useState("30");
+  const [cooldownDays, setCooldownDays] = useState("15");
+  const [savingRules, setSavingRules] = useState(false);
+
+  function load() {
+    Api.packages(unitId, false).then(setPackages).catch(() => {});
+  }
+  useEffect(load, [unitId]);
+
+  useEffect(() => {
+    Api.unitSetting(unitId, "upsell_vip_visits").then((r) => setVipVisits(r.value ?? "4")).catch(() => {});
+    Api.unitSetting(unitId, "upsell_vip_window_days").then((r) => setWindowDays(r.value ?? "30")).catch(() => {});
+    Api.unitSetting(unitId, "upsell_cooldown_days").then((r) => setCooldownDays(r.value ?? "15")).catch(() => {});
+  }, [unitId]);
+
+  const priceCents = Math.round(Number(priceReais) * 100);
+  const includedMinutes = Math.round(Number(includedHours) * 60);
+  // Prévia do custo/hora enquanto o Owner digita: é o número que decide se
+  // o pacote chega a ser oferecido (o motor só propõe pacote que BAIXA o
+  // custo/hora do cliente). Sem a prévia, um pacote caro demais é
+  // cadastrado, some da tela e ninguém entende o porquê.
+  const hourlyCents = includedMinutes > 0 ? Math.round((priceCents * 60) / includedMinutes) : 0;
+
+  async function create() {
+    setBusy(true);
+    try {
+      await Api.createPackage({
+        unitId,
+        activity,
+        name,
+        priceCents,
+        includedMinutes,
+        validityDays: Math.max(1, Math.round(Number(validityDays))),
+        benefitText: benefitText.trim(),
+        color,
+      });
+      setName("");
+      setBenefitText("");
+      load();
+      toast.success("Pacote criado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível criar o pacote.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggle(pkg: Package) {
+    try {
+      await Api.setPackageActive(pkg.id, !pkg.active);
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível alterar o pacote.");
+    }
+  }
+
+  async function saveRules() {
+    setSavingRules(true);
+    try {
+      await Promise.all([
+        Api.setUnitSetting(unitId, "upsell_vip_visits", String(Math.max(1, Math.round(Number(vipVisits))))),
+        Api.setUnitSetting(unitId, "upsell_vip_window_days", String(Math.max(1, Math.round(Number(windowDays))))),
+        Api.setUnitSetting(unitId, "upsell_cooldown_days", String(Math.max(0, Math.round(Number(cooldownDays))))),
+      ]);
+      toast.success("Regras do motor VIP salvas.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar as regras.");
+    } finally {
+      setSavingRules(false);
+    }
+  }
+
+  const canCreate = Boolean(name.trim()) && Boolean(benefitText.trim()) && priceCents > 0 && includedMinutes > 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        <h2>Novo pacote</h2>
+        <HelpText>
+          O valor cheio é a âncora: o cliente paga só a diferença entre ele e o que já gastou no mês. O benefício é lido
+          em voz alta pelo operador, então escreva a frase exata — ex.: “2 horas extras e um lanche”.
+        </HelpText>
+        <Input label="Nome do pacote" placeholder="Ex.: Pacote Amigo 10h" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input
+          label="Valor de tabela (R$)"
+          type="number"
+          value={priceReais}
+          onChange={(e) => setPriceReais(e.target.value)}
+          title="Preço cheio do pacote — é contra ele que o gasto do mês do cliente é comparado"
+        />
+        <Input
+          label="Horas incluídas"
+          type="number"
+          step="0.5"
+          value={includedHours}
+          onChange={(e) => setIncludedHours(e.target.value)}
+          title="Total de horas de brincadeira que o pacote dá"
+        />
+        <Input
+          label="Validade (dias)"
+          type="number"
+          value={validityDays}
+          onChange={(e) => setValidityDays(e.target.value)}
+          title="Por quantos dias o saldo de horas continua valendo depois da compra"
+        />
+        <Input
+          label="Benefício (frase do script de venda)"
+          placeholder="Ex.: 2 horas extras e um lanche por visita"
+          value={benefitText}
+          onChange={(e) => setBenefitText(e.target.value)}
+        />
+        <div>
+          <label>Cor do pacote</label>
+          <div style={{ display: "flex", gap: "4px" }}>
+            {PLAN_COLOR_OPTIONS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                aria-label={`Cor ${COLOR_NAMES[c] ?? c}`}
+                aria-pressed={color === c}
+                title={COLOR_NAMES[c] ?? c}
+                style={{ width: "28px", height: "28px", borderRadius: "50%", background: c, border: color === c ? "3px solid var(--color-dark)" : "1px solid var(--border-subtle)" }}
+              />
+            ))}
+          </div>
+        </div>
+        {includedMinutes > 0 && priceCents > 0 && (
+          <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+            Custo por hora deste pacote: <strong>{money(hourlyCents)}</strong> — ele só será oferecido a quem hoje paga
+            mais do que isso por hora.
+          </div>
+        )}
+        <Button variant="primary" disabled={busy || !canCreate} onClick={create}>
+          Criar pacote
+        </Button>
+      </Card>
+
+      {packages.map((p) => {
+        const hourly = Math.round((p.priceCents * 60) / p.includedMinutes);
+        return (
+          <Card
+            key={p.id}
+            style={{ padding: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", opacity: p.active ? 1 : 0.5 }}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+              <span style={{ width: "14px", height: "14px", borderRadius: "50%", background: p.color, display: "inline-block", flexShrink: 0 }} />
+              <span>
+                <strong>{p.name}</strong>
+                <br />
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  {(p.includedMinutes / 60).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h · {p.validityDays} dias ·{" "}
+                  {p.benefitText}
+                </span>
+              </span>
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+              <span style={{ textAlign: "right" }}>
+                <strong>{money(p.priceCents)}</strong>
+                <br />
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{money(hourly)}/h</span>
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => toggle(p)} title={p.active ? "Parar de oferecer este pacote" : "Voltar a oferecer este pacote"}>
+                {p.active ? "Desativar" : "Ativar"}
+              </Button>
+            </span>
+          </Card>
+        );
+      })}
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        <h2>Regras do motor VIP</h2>
+        <HelpText>
+          Quem recebe a oferta e por quanto tempo ela para de aparecer depois de uma recusa. O padrão é 4 visitas em 30
+          dias e 15 dias de espera.
+        </HelpText>
+        <Input
+          label="Visitas para virar VIP"
+          type="number"
+          value={vipVisits}
+          onChange={(e) => setVipVisits(e.target.value)}
+          title="Número de check-ins dentro da janela que faz a criança receber o selo VIP e a oferta"
+        />
+        <Input
+          label="Janela de contagem (dias)"
+          type="number"
+          value={windowDays}
+          onChange={(e) => setWindowDays(e.target.value)}
+          title="Período móvel em que as visitas são contadas — 30 dias significa 'nos últimos 30 dias', não 'neste mês'"
+        />
+        <Input
+          label="Espera após recusa (dias)"
+          type="number"
+          value={cooldownDays}
+          onChange={(e) => setCooldownDays(e.target.value)}
+          title="Quantos dias a oferta fica bloqueada para o responsável que recusou"
+        />
+        <Button variant="primary" disabled={savingRules} onClick={saveRules}>
+          Salvar regras
+        </Button>
+      </Card>
     </div>
   );
 }

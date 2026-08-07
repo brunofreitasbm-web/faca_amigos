@@ -58,6 +58,14 @@
        (ou fundo sólido com texto branco por cima, ex. Badge solid_*)
        deve trocar para a variante -text. Medido com a mesma fórmula de
        packages/ui/src/tokens/contrast.ts, coberto em test/status.spec.ts. */
+  /* Laranja de conversão — cor do card de oferta de upgrade na Entrada.
+     Não é uma cor nova de marca: é o #FF7A00 que já existia como opção de
+     cor de plano/carrinho, promovido a token porque agora carrega
+     significado ("isto é uma oferta"), e um hex solto repetido em três
+     telas deixa de ser ajustável. */
+  --color-orange:       #FF7A00;
+  --color-orange-text:  #B35400;  /* 5.02:1 sobre branco (base #FF7A00 é 2.61:1) */
+
   --color-teal-text:    #1D8273;  /* 4.69:1 sobre branco (base #2ECFB5 é 1.96:1) */
   --color-amber-text:   #996D18;  /* 4.60:1 sobre branco (base #C99020 é 2.80:1) */
   --color-success-text: #1A8454;  /* 4.69:1 sobre branco (base #28C880 é 2.17:1) */

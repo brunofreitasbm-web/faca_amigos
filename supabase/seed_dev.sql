@@ -106,5 +106,26 @@ with
     union all
     select id, 'PLAYGROUND', 10, 'ENTRADA_GRATIS', 1 from grao_para
     returning 1
+  ),
+  -- Pacotes de upgrade (motor de cross-selling). Os valores foram
+  -- escolhidos para funcionar como escada de ancoragem sobre os planos
+  -- avulsos acima: o avulso de 1 hora custa R$ 60/h, e cada pacote baixa
+  -- o custo/hora conforme sobe de degrau (R$ 50 → 45 → 40). O motor só
+  -- oferece pacote que reduz o custo/hora do cliente, então uma escada
+  -- que não desce nunca apareceria no balcão.
+  packages_seed as (
+    insert into fa_kiosk_packages (unit_id, activity, name, price_cents, included_minutes, validity_days, benefit_text, color, sort_order)
+    select id, 'PLAYGROUND', 'Pacote Amigo 5h', 25000, 300, 30, '5 horas de brincadeira para usar quando quiser', '#2ECFB5', 1 from playground
+    union all
+    select id, 'PLAYGROUND', 'Pacote Amigão 10h', 45000, 600, 30, '10 horas mais uma meia antiderrapante de brinde', '#FF7A00', 2 from playground
+    union all
+    select id, 'PLAYGROUND', 'Pacote Melhores Amigos 20h', 80000, 1200, 60, '20 horas, 60 dias de validade e prioridade no Cantinho da Calma', '#A020EE', 3 from playground
+    union all
+    select id, 'PLAYGROUND', 'Pacote Amigo 5h', 25000, 300, 30, '5 horas de brincadeira para usar quando quiser', '#2ECFB5', 1 from grao_para
+    union all
+    select id, 'PLAYGROUND', 'Pacote Amigão 10h', 45000, 600, 30, '10 horas mais uma meia antiderrapante de brinde', '#FF7A00', 2 from grao_para
+    union all
+    select id, 'CARRINHO', 'Pacote Circuito 3h', 30000, 180, 30, '3 horas de circuito com o carrinho preferido reservado', '#2ECFB5', 1 from circuito
+    returning 1
   )
 select 'seed ok' as status;

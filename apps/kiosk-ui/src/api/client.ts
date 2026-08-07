@@ -186,6 +186,108 @@ export interface ChildMatch {
   phone_e164: string | null;
   guardian_name: string | null;
   cpf: string | null;
+  /** Check-ins na janela móvel do motor VIP (30 dias por padrão). */
+  visits_in_window: number;
+  /** Selo VIP: atingiu o número de visitas na janela. Decidido no banco. */
+  is_vip: boolean;
+}
+
+/**
+ * Pacote de recorrência vendável como upgrade (`fa_kiosk_packages`).
+ *
+ * Não confundir com `Plan`: plano é a permanência avulsa desta visita
+ * (15 min, 1 hora); pacote é o produto mensal, com saldo de horas e
+ * validade, que o motor de cross-selling oferece.
+ */
+export interface Package {
+  id: string;
+  activity: "PLAYGROUND" | "CARRINHO";
+  name: string;
+  priceCents: number;
+  includedMinutes: number;
+  validityDays: number;
+  benefitText: string;
+  color: string;
+  active: boolean;
+}
+
+/**
+ * Resposta de `fa_upsell_offer`. Como em `ResolvedAccessCode`, cada
+ * `reason` é uma situação real de balcão e não um erro — "esta criança
+ * não tem oferta hoje" é o caso comum:
+ *
+ *   OK                   há oferta; o card de conversão deve aparecer
+ *   SEM_VIP              ainda não bateu as 4 visitas na janela
+ *   COOLDOWN             o responsável recusou há menos de 15 dias
+ *   JA_TEM_PACOTE        já comprou e ainda tem saldo — não se oferece de novo
+ *   SEM_GASTO_NO_MES     sem avulsos pagos no mês: não há âncora de preço
+ *   SEM_HORAS_APURADAS   sem tempo fechado no mês: o custo/hora seria inventado
+ *   SEM_PACOTE_SUPERIOR  nenhum pacote acima do gasto que baixe o custo/hora
+ *   SEM_RESPONSAVEL      criança sem vínculo — nada a ofertar a ninguém
+ */
+export type UpsellReason =
+  | "OK"
+  | "SEM_VIP"
+  | "COOLDOWN"
+  | "JA_TEM_PACOTE"
+  | "SEM_GASTO_NO_MES"
+  | "SEM_HORAS_APURADAS"
+  | "SEM_PACOTE_SUPERIOR"
+  | "SEM_RESPONSAVEL"
+  | "UNIDADE_INVALIDA"
+  | "CRIANCA_INVALIDA";
+
+export interface UpsellOffer {
+  eligible: boolean;
+  reason: UpsellReason;
+  isVip?: boolean;
+  visitsInWindow?: number;
+  visitsWindowDays?: number;
+  visitsRequired?: number;
+  cooldownUntilMs?: number;
+  offerId?: string;
+  guardianId?: string;
+  guardianName?: string;
+  childId?: string;
+  childName?: string;
+  spendCents?: number;
+  consumedMinutes?: number;
+  package?: {
+    id: string;
+    name: string;
+    priceCents: number;
+    includedMinutes: number;
+    validityDays: number;
+    benefitText: string;
+    color: string;
+  };
+  deltaCents?: number;
+  hourlyAvulsoCents?: number;
+  hourlyPlanCents?: number;
+  /** Script já parametrizado, montado no banco. A UI só o exibe. */
+  scriptText?: string;
+}
+
+/**
+ * Chaves de `fa_kiosk_app_settings` que a UI lê/escreve. É uma união
+ * fechada, e não `string`, para que uma chave digitada errado falhe no
+ * build em vez de gravar em silêncio uma configuração que ninguém lê.
+ */
+export type UnitSettingKey =
+  | "daily_goal_cents"
+  | "terms_of_use"
+  | "closing_time"
+  | "printer_wristband"
+  | "printer_receipt"
+  // Calibragem do motor de cross-selling (ver migration 20260807000008).
+  | "upsell_vip_visits"
+  | "upsell_vip_window_days"
+  | "upsell_cooldown_days";
+
+export interface VipFlag {
+  child_id: string;
+  visits_in_window: number;
+  is_vip: boolean;
 }
 
 /**
@@ -232,6 +334,7 @@ export interface ActiveSessionEntry {
   asset: { id: string; name: string; emoji: string; photo_url: string | null } | null;
   session: {
     id: string;
+    child_id: string;
     child_name_snapshot: string;
     activity: "PLAYGROUND" | "CARRINHO";
     checkin_at_ms: number;
@@ -247,6 +350,8 @@ export interface ActiveSessionEntry {
     sensory_tags?: string[];
     paused_at_ms: number | null;
     paused_ms_total: number;
+    /** Minutos de pacote pré-pago ainda válidos do responsável, se houver. */
+    package_balance_minutes?: number;
   };
   quote: {
     lines: QuoteLine[];
@@ -404,6 +509,20 @@ function planFromRow(row: Record<string, unknown>): Plan {
   };
 }
 
+function packageFromRow(row: Record<string, unknown>): Package {
+  return {
+    id: row.id as string,
+    activity: row.activity as Package["activity"],
+    name: row.name as string,
+    priceCents: row.price_cents as number,
+    includedMinutes: row.included_minutes as number,
+    validityDays: row.validity_days as number,
+    benefitText: row.benefit_text as string,
+    color: row.color as string,
+    active: Boolean(row.active),
+  };
+}
+
 function bonusRuleFromRow(row: Record<string, unknown>): BonusRule {
   return {
     id: row.id as string,
@@ -448,6 +567,8 @@ export interface ActiveSessionsRaw {
   guardianById: Map<string, Record<string, unknown>>;
   assetById: Map<string, Record<string, unknown>>;
   childById: Map<string, Record<string, unknown>>;
+  /** Saldo de pacote ainda válido, por responsável (minutos). */
+  packageBalanceByGuardian: Map<string, number>;
 }
 
 /**
@@ -460,19 +581,33 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
   const sessions = await unwrap<Record<string, unknown>[]>(
     supabase().from("fa_kiosk_sessions").select("*").eq("unit_id", unitId).eq("status", "ATIVA"),
   );
-  if (sessions.length === 0) return { sessions: [], planById: new Map(), guardianById: new Map(), assetById: new Map(), childById: new Map() };
+  if (sessions.length === 0)
+    return {
+      sessions: [],
+      planById: new Map(),
+      guardianById: new Map(),
+      assetById: new Map(),
+      childById: new Map(),
+      packageBalanceByGuardian: new Map(),
+    };
 
   const planIds = [...new Set(sessions.map((s) => s.plan_id as string))];
   const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
   const assetIds = [...new Set(sessions.map((s) => s.asset_id as string | null).filter((id): id is string => Boolean(id)))];
   const childIds = [...new Set(sessions.map((s) => s.child_id as string))];
-  const [plans, guardians, assets, children] = await Promise.all([
+  const [plans, guardians, assets, children, balances] = await Promise.all([
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("*").in("id", planIds)),
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164").in("id", guardianIds)),
     assetIds.length === 0
       ? Promise.resolve([])
       : unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_assets").select("id, name, emoji, photo_url").in("id", assetIds)),
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_children").select("id, birth_date").in("id", childIds)),
+    // Saldo de pacote pré-pago. Sem isto o card mostraria o preço cheio e o
+    // fechamento cobraria menos — o operador leria a diferença como erro do
+    // sistema justamente na frente do cliente que comprou o pacote.
+    unwrap<{ guardian_id: string; remaining_minutes: number }[]>(
+      supabase().rpc("fa_kiosk_guardian_package_balance", { p_unit_id: unitId, p_guardian_ids: guardianIds }),
+    ).catch(() => []),
   ]);
   return {
     sessions,
@@ -480,6 +615,7 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
     guardianById: new Map(guardians.map((g) => [g.id as string, g])),
     assetById: new Map(assets.map((a) => [a.id as string, a])),
     childById: new Map(children.map((c) => [c.id as string, c])),
+    packageBalanceByGuardian: new Map(balances.map((b) => [b.guardian_id, b.remaining_minutes])),
   };
 }
 
@@ -506,6 +642,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
     return {
       session: {
         id: row.id as string,
+        child_id: row.child_id as string,
         child_name_snapshot: row.child_name_snapshot as string,
         activity: row.activity as "PLAYGROUND" | "CARRINHO",
         checkin_at_ms: row.checkin_at_ms as number,
@@ -524,6 +661,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         sensory_tags: (row.sensory_tags as string[] | null) ?? undefined,
         paused_at_ms: (row.paused_at_ms as number | null) ?? null,
         paused_ms_total: (row.paused_ms_total as number) ?? 0,
+        package_balance_minutes: raw.packageBalanceByGuardian.get(row.guardian_id as string),
       },
       quote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
@@ -584,9 +722,13 @@ export const Api = {
         .eq("unit_id", unitId)
         .eq("active", true),
     ),
-  searchChildren: async (q: string) => {
+  // `unitId` é opcional só porque o limiar do selo VIP tem padrão global;
+  // passando-o, a busca respeita o limiar configurado para a unidade.
+  searchChildren: async (q: string, unitId?: string) => {
     if (!q || q.length < 2) return [];
-    return unwrap<ChildMatch[]>(supabase().rpc("fa_kiosk_search_children", { p_query: q }));
+    return unwrap<ChildMatch[]>(
+      supabase().rpc("fa_kiosk_search_children", { p_query: q, p_unit_id: unitId ?? null }),
+    );
   },
   /**
    * Cuidados inclusivos registrados na última visita da criança.
@@ -613,6 +755,93 @@ export const Api = {
     return { assetId };
   },
   activeSessions: (unitId: string) => fetchActiveSessions(unitId),
+
+  // ── Motor de cross-selling ─────────────────────────────────────────
+  /**
+   * Oferta de upgrade para esta criança, ou o motivo de não haver.
+   *
+   * Nunca lança por "não tem oferta": a tela chama isto a cada criança
+   * identificada no balcão, e o não-elegível é a maioria dos casos. Só
+   * falha de rede/permissão vira exceção.
+   */
+  upsellOffer: (unitId: string, childId: string, guardianId?: string | null, employeeId?: string | null) =>
+    unwrap<UpsellOffer>(
+      supabase().rpc("fa_upsell_offer", {
+        p_unit_id: unitId,
+        p_child_id: childId,
+        p_guardian_id: guardianId ?? null,
+        p_employee_id: employeeId ?? null,
+      }),
+    ),
+  /** Recusa registrada + cooldown de 15 dias aplicado ao responsável. */
+  upsellRecusar: (offerId: string, employeeId?: string | null) =>
+    unwrap<{ outcome: string; cooldownUntilMs: number; cooldownDays: number }>(
+      supabase().rpc("fa_upsell_recusar", { p_offer_id: offerId, p_employee_id: employeeId ?? null }),
+    ),
+  /**
+   * Aceite: cobra a DIFERENÇA anunciada no script, gera o pedido, o saldo
+   * do pacote e o comprovante impresso — tudo na mesma transação do banco.
+   * O valor não é enviado daqui de propósito: quem decide quanto cobrar é
+   * a oferta gravada, não a tela.
+   */
+  upsellVenderPacote: (body: {
+    offerId: string;
+    employeeId: string;
+    payments: { method: string; amountCents: number }[];
+  }) =>
+    callResilient<{
+      orderId: string;
+      orderCode: string;
+      chargedCents: number;
+      guardianPackageId: string;
+      expiresAtMs: number;
+    }>("fa_upsell_vender_pacote", {
+      p_offer_id: body.offerId,
+      p_payments: body.payments,
+      p_employee_id: body.employeeId,
+    }),
+  /** Selo VIP de várias crianças numa consulta só (cards do Painel). */
+  vipFlags: async (unitId: string, childIds: string[]) => {
+    if (childIds.length === 0) return new Map<string, VipFlag>();
+    const rows = await unwrap<VipFlag[]>(
+      supabase().rpc("fa_kiosk_vip_flags", { p_unit_id: unitId, p_child_ids: childIds }),
+    );
+    return new Map(rows.map((r) => [r.child_id, r]));
+  },
+  packages: async (unitId: string, onlyActive = true) => {
+    let query = supabase().from("fa_kiosk_packages").select("*").eq("unit_id", unitId);
+    if (onlyActive) query = query.eq("active", true);
+    const rows = await unwrap<Record<string, unknown>[]>(query.order("price_cents"));
+    return rows.map(packageFromRow);
+  },
+  createPackage: (body: {
+    unitId: string;
+    activity: Package["activity"];
+    name: string;
+    priceCents: number;
+    includedMinutes: number;
+    validityDays: number;
+    benefitText: string;
+    color: string;
+  }) =>
+    unwrap<{ id: string }>(
+      supabase()
+        .from("fa_kiosk_packages")
+        .insert({
+          unit_id: body.unitId,
+          activity: body.activity,
+          name: body.name,
+          price_cents: body.priceCents,
+          included_minutes: body.includedMinutes,
+          validity_days: body.validityDays,
+          benefit_text: body.benefitText,
+          color: body.color,
+        })
+        .select("id")
+        .single(),
+    ),
+  setPackageActive: (id: string, active: boolean) =>
+    unwrap(supabase().from("fa_kiosk_packages").update({ active }).eq("id", id)),
   redeemableRewards: (childId: string) =>
     unwrap<RedeemableReward[]>(
       supabase()
@@ -878,7 +1107,7 @@ export const Api = {
         .select("id")
         .single(),
     ),
-  unitSetting: async (unitId: string, key: "daily_goal_cents" | "terms_of_use" | "closing_time" | "printer_wristband" | "printer_receipt") => {
+  unitSetting: async (unitId: string, key: UnitSettingKey) => {
     try {
       const row = await unwrap<{ value: string } | null>(
         supabase().from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId).eq("key", key).maybeSingle(),
@@ -892,7 +1121,7 @@ export const Api = {
   },
   setUnitSetting: async (
     unitId: string,
-    key: "daily_goal_cents" | "terms_of_use" | "closing_time" | "printer_wristband" | "printer_receipt",
+    key: UnitSettingKey,
     value: string,
   ) => {
     if (typeof localStorage !== "undefined") {

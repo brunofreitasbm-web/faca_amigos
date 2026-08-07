@@ -36,6 +36,7 @@ export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
     guardianById: new Map(),
     assetById: new Map(),
     childById: new Map(),
+    packageBalanceByGuardian: new Map(),
   });
   const [entries, setEntries] = useState<ActiveSessionEntry[]>([]);
   const [status, setStatus] = useState<ActiveSessionsStatus>("loading");

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Button, Input, Select, DateInput, Tag, HelpText } from "@facaamigos/ui";
+import { Card, Button, Input, Select, DateInput, Tag, Badge, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { Asset, ChildMatch, Coupon, Plan } from "../api/client.js";
+import type { Asset, ChildMatch, Coupon, Plan, UpsellOffer } from "../api/client.js";
+import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import {
@@ -88,6 +89,11 @@ export function EntradaScreen() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ sessionId: string; accessCode: string; childName: string } | null>(null);
 
+  // Oferta de upgrade da criança identificada. `null` cobre os dois casos
+  // em que não há card: ainda não consultado e não elegível — a tela trata
+  // os dois igual, então não vale um estado a mais para distingui-los.
+  const [offer, setOffer] = useState<UpsellOffer | null>(null);
+
   const [lastGuardianId, setLastGuardianId] = useState<string | null>(null);
   const [closingTime, setClosingTime] = useState<string | undefined>(undefined);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -129,13 +135,13 @@ export function EntradaScreen() {
     const term = digits.length >= 3 && digits.length >= trimmed.length - 4 ? digits : trimmed;
     setSearching(true);
     const handle = setTimeout(() => {
-      Api.searchChildren(term)
+      Api.searchChildren(term, unit?.id)
         .then(setMatches)
         .catch(() => setMatches([]))
         .finally(() => setSearching(false));
     }, 220);
     return () => clearTimeout(handle);
-  }, [query, matchedChild]);
+  }, [query, matchedChild, unit?.id]);
 
   function pickMatch(match: ChildMatch) {
     setMatchedChild(match);
@@ -147,6 +153,21 @@ export function EntradaScreen() {
     setCpf(match.cpf ? formatCpf(match.cpf) : "");
     setMatches([]);
     setFavoriteAssetId(null);
+    setOffer(null);
+
+    // Oferta de upgrade. Consultada aqui, e não no `submit`, porque o
+    // script precisa chegar ao operador ANTES de a conversa virar "qual
+    // plano?" — depois de escolhido o plano, propor outra coisa é desfazer
+    // uma decisão já tomada na frente do cliente.
+    //
+    // `.catch(() => {})` de propósito: um erro aqui não pode aparecer como
+    // falha do check-in. Sem oferta, o atendimento segue exatamente como
+    // sempre seguiu.
+    if (unit) {
+      Api.upsellOffer(unit.id, match.id, null, employee?.id)
+        .then((result) => setOffer(result.eligible ? result : null))
+        .catch(() => setOffer(null));
+    }
 
     // Cuidados da última visita vêm marcados: quem tem necessidade sensorial
     // continua tendo na visita seguinte.
@@ -175,6 +196,7 @@ export function EntradaScreen() {
     setShowNewForm(true);
     setMatchedChild(null);
     setMatches([]);
+    setOffer(null);
     // O que o operador já digitou na busca quase sempre é o nome da criança.
     if (query.trim() && !/\d/.test(query)) setChildName(query.trim());
   }
@@ -188,6 +210,7 @@ export function EntradaScreen() {
     setMatches([]);
     setMatchedChild(null);
     setShowNewForm(false);
+    setOffer(null);
     setChildName("");
     setBirthDate("");
     setSelectedSensoryTags([]);
@@ -333,6 +356,11 @@ export function EntradaScreen() {
         </div>
       )}
 
+      {/* Oferta de upgrade — acima de tudo, inclusive do nome da criança.
+          É o único elemento laranja do fluxo de Entrada, e some assim que
+          o operador registra o aceite ou a recusa. */}
+      {offer && <UpsellOfferCard offer={offer} onResolved={() => setOffer(null)} />}
+
       {/* ---------------------------------------------------------------- */}
       {/* 1. Quem é a criança                                              */}
       {/* ---------------------------------------------------------------- */}
@@ -353,7 +381,14 @@ export function EntradaScreen() {
             }}
           >
             <div style={{ flex: 1, minWidth: "200px" }}>
-              <strong style={{ fontSize: "17px", display: "block" }}>{childName}</strong>
+              <strong style={{ fontSize: "17px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                {childName}
+                {matchedChild?.is_vip && (
+                  <Badge variant="vip" title={`${matchedChild.visits_in_window} visitas nos últimos 30 dias`}>
+                    ★ VIP
+                  </Badge>
+                )}
+              </strong>
               <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
                 {guardianName}
                 {phone ? ` · ${phone}` : ""}
@@ -406,7 +441,14 @@ export function EntradaScreen() {
                       font: "inherit",
                     }}
                   >
-                    <strong style={{ fontSize: "15px" }}>{m.full_name}</strong>
+                    <strong style={{ fontSize: "15px", display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                      {m.full_name}
+                      {m.is_vip && (
+                        <Badge variant="vip" title={`${m.visits_in_window} visitas nos últimos 30 dias`}>
+                          ★ VIP
+                        </Badge>
+                      )}
+                    </strong>
                     <br />
                     <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                       {m.guardian_name ?? "sem responsável"}

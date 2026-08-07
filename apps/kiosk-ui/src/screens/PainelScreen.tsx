@@ -57,12 +57,38 @@ export function PainelScreen() {
   // Contingência: recibo perdido E etiqueta ilegível. Passa pela conferência
   // do documento antes de cair no mesmo fechamento financeiro de sempre.
   const [manualExitFor, setManualExitFor] = useState<ActiveSessionEntry | null>(null);
+  const [vipChildIds, setVipChildIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!unit) return;
     const activity = unit.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
     Api.plans(unit.id, activity).then(setPlanOptions);
   }, [unit]);
+
+  // Selo VIP dos cards. Uma chamada para a lista inteira, refeita só quando
+  // o conjunto de crianças no salão muda — o `useActiveSessions` recalcula
+  // a contagem regressiva a cada segundo, e pendurar isto no mesmo tick
+  // seria uma consulta por segundo para um dado que muda uma vez por visita.
+  const childIdsKey = entries
+    .map((e) => e.session.child_id)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    if (!unit || childIdsKey === "") {
+      setVipChildIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    Api.vipFlags(unit.id, childIdsKey.split(","))
+      .then((flags) => {
+        if (cancelled) return;
+        setVipChildIds(new Set([...flags.values()].filter((f) => f.is_vip).map((f) => f.child_id)));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [unit?.id, childIdsKey]);
 
   // Faturamento muda bem mais devagar que a ocupação — repolla num intervalo mais espaçado.
   useEffect(() => {
@@ -349,10 +375,20 @@ export function PainelScreen() {
                     )
                   )}
                   <div style={{ minWidth: 0 }}>
-                    <strong className="painel-card-name" style={{ display: "block" }}>
+                    <strong className="painel-card-name" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      {/* Selo estático e de alto contraste, ao lado do nome:
+                          é o sinal de que esta família merece um atendimento
+                          diferenciado, e precisa ser lido de relance num
+                          painel cheio. Sem animação de propósito — ver a
+                          variante `vip` do Badge. */}
+                      {vipChildIds.has(session.child_id) && (
+                        <Badge variant="vip" title="Cliente VIP — 4 ou mais visitas nos últimos 30 dias">
+                          ★ VIP
+                        </Badge>
+                      )}
                       {session.child_name_snapshot}
                       {session.child_birth_date && (
-                        <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> · {formatAge(session.child_birth_date)}</span>
+                        <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}>· {formatAge(session.child_birth_date)}</span>
                       )}
                     </strong>
                     {session.guardian_name_snapshot && (
@@ -424,6 +460,15 @@ export function PainelScreen() {
               {isExceeded && !isPaused && (
                 <Badge variant="solid_pink" title="Tempo do plano já foi ultrapassado — minutos e valor extra somados em tempo real">
                   🔴 +{quote.timing.overMinutes} min excedente{overageLine ? ` (+${money(overageLine.cents)})` : ""}
+                </Badge>
+              )}
+
+              {/* Saldo de pacote: o fechamento vai abater estes minutos, então
+                  o valor estimado acima não é o que será cobrado. Dizer isso
+                  aqui evita o operador contestar o próprio sistema no caixa. */}
+              {(session.package_balance_minutes ?? 0) > 0 && (
+                <Badge variant="solid_orange" title="Este responsável tem pacote pré-pago — o tempo sai do saldo no fechamento">
+                  🎟️ Pacote: {session.package_balance_minutes} min de saldo
                 </Badge>
               )}
 

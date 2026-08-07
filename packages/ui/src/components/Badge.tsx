@@ -9,7 +9,9 @@ export type BadgeVariant =
   | "neutral"
   | "solid_pink"
   | "solid_teal"
-  | "solid_amber";
+  | "solid_amber"
+  | "solid_orange"
+  | "vip";
 
 export interface BadgeProps extends Omit<HTMLAttributes<HTMLSpanElement>, "children"> {
   variant?: BadgeVariant;
@@ -66,6 +68,22 @@ export function Badge({ variant = "pink", children, style: styleProp, ...rest }:
     solid_pink: { background: "var(--color-primary-hover)", color: "#fff", border: "none" },
     solid_teal: { background: "var(--color-teal-text)", color: "#fff", border: "none" },
     solid_amber: { background: "var(--color-amber-text)", color: "#fff", border: "none" },
+    solid_orange: { background: "var(--color-orange-text)", color: "#fff", border: "none" },
+    // Selo VIP. Deliberadamente ESTÁTICO (nenhuma animação, nenhum blink,
+    // ao contrário do selo de frequência antigo) e no par de maior
+    // contraste da paleta: amarelo da marca sobre o verde-escuro do logo,
+    // 8.96:1 — mais que o dobro do exigido por AA. É informação que o
+    // operador precisa captar de relance, com a família na frente dele,
+    // numa lista onde tudo o mais é claro; e num espaço pensado para
+    // crianças neurodivergentes, o que pisca compete com a atenção em vez
+    // de dirigi-la.
+    vip: {
+      background: "var(--color-dark)",
+      color: "var(--color-yellow)",
+      border: "1px solid var(--color-dark)",
+      fontWeight: 700,
+      letterSpacing: "0.08em",
+    },
   };
 
   const style: CSSProperties = {

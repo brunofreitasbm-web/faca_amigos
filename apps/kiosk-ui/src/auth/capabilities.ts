@@ -13,6 +13,7 @@ export const CAPABILITIES = [
   "sessao.cancel",
   "sessao.change_plan",
   "pdv.sell",
+  "venda.upsell",
   "venda.estorno",
   "caixa.open_close",
   "caixa.sangria",
