@@ -41,9 +41,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // colaborador cadastrado, sem exigir e-mail/senha/PIN. `loginWithPassword`/
   // `switchEmployee` continuam existindo abaixo para quando o login voltar.
   useEffect(() => {
-    Api.employees().then((list) => {
-      if (list.length > 0) setEmployee((current) => current ?? { id: list[0]!.id, full_name: list[0]!.full_name, role: list[0]!.role });
-    });
+    Api.employees()
+      .then((list) => {
+        if (list.length > 0) setEmployee((current) => current ?? { id: list[0]!.id, full_name: list[0]!.full_name, role: list[0]!.role });
+      })
+      .catch((err) => {
+        console.error("Falha ao carregar colaboradores para o login automático:", err);
+      });
   }, []);
 
   const value = useMemo<AppStateValue>(
