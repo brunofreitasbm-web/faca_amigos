@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input, Tabs } from "@facaamigos/ui";
+import { Button, Card, Input, Tabs, HelpText } from "@facaamigos/ui";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
 import type { Asset, BonusRule, Coupon, Employee, LoyaltyRule, Plan, Product } from "../api/client.js";
@@ -31,10 +31,23 @@ export function ConfiguracoesScreen() {
     { value: "IMPRESSORAS", label: "Impressoras" },
   ];
 
+  const TAB_HELP: Record<Tab, string> = {
+    PLANOS: "Cadastre os planos de permanência que aparecem na tela de Entrada — nome, preço, duração e o que cobrar se passar do tempo.",
+    PRODUTOS: "Cadastre os itens vendidos avulsos no PDV (loja/lanchonete) e o estoque disponível de cada um.",
+    CUPONS: "Crie códigos de desconto ou parceria que o operador pode aplicar na tela de Entrada.",
+    FIDELIDADE: "Defina recompensas automáticas para clientes recorrentes — ex.: a cada 10 visitas, uma entrada grátis.",
+    META: "Configure a meta de faturamento do dia, o horário de fechamento e as regras de bônus para a equipe.",
+    FROTA: "Cadastre os carrinhos do Circuito (nome, cor, emoji e foto) e marque quando um estiver em manutenção.",
+    COLABORADORES: "Cadastre novos colaboradores e ative/desative o acesso deles ao sistema.",
+    IMPRESSORAS: "Informe o nome das impressoras de pulseira e de cupom instaladas neste terminal.",
+  };
+
   return (
     <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações</h1>
+      <HelpText>Ajustes da operação — o que é cadastrado aqui aparece depois nas outras telas do sistema.</HelpText>
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
+      <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
 
       <div role="tabpanel">
         {tab === "PLANOS" && <PlanosTab unitId={unit.id} activity={isQuiosque ? "CARRINHO" : "PLAYGROUND"} />}
@@ -286,7 +299,13 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
             </select>
           </div>
         </div>
-        <Input label="Excedente por minuto (R$)" type="number" value={overageReais} onChange={(e) => setOverageReais(e.target.value)} />
+        <Input
+          label="Excedente por minuto (R$)"
+          type="number"
+          value={overageReais}
+          onChange={(e) => setOverageReais(e.target.value)}
+          title="Valor cobrado por minuto quando a criança fica no espaço além da duração do plano"
+        />
         <div>
           <label>Cor no Painel</label>
           <div style={{ display: "flex", gap: "4px" }}>
@@ -810,7 +829,7 @@ function ColaboradoresTab() {
           </div>
           <Input label="Jornada semanal contratada (horas)" type="number" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} />
           <div>
-            <label>Papel</label>
+            <label title="Define o que a pessoa pode fazer no sistema: Operador atende no balcão; Gerente também acessa relatórios; Admin também cadastra colaboradores">Papel</label>
             <select value={role} onChange={(e) => setRole(e.target.value as Employee["role"])}>
               <option value="OPERADOR">Operador</option>
               <option value="GERENTE">Gerente</option>

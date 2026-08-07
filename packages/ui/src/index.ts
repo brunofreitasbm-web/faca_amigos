@@ -7,6 +7,7 @@ export * from "./components/Input.js";
 export * from "./components/DateInput.js";
 export * from "./components/BrandLockup.js";
 export * from "./components/AsyncState.js";
+export * from "./components/HelpText.js";
 export * from "./components/Modal.js";
 export * from "./components/Tabs.js";
 export * from "./tokens/contrast.js";

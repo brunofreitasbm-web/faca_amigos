@@ -28,7 +28,7 @@ export default async function PlanosPage() {
 
   return (
     <div>
-      <PageTitle>Planos</PageTitle>
+      <PageTitle description="Planos de permanência vendidos na tela de Entrada do balcão — preço, duração e o que cobrar se a criança passar do tempo.">Planos</PageTitle>
 
       <DataTable<Plan>
         columns={[
@@ -71,7 +71,13 @@ export default async function PlanosPage() {
           <option value="MINUTO">Minuto</option>
           <option value="HORA">Hora</option>
         </LabeledSelect>
-        <Input name="overage" type="number" step="0.01" label="Excedente/min (R$)" />
+        <Input
+          name="overage"
+          type="number"
+          step="0.01"
+          label="Excedente/min (R$)"
+          title="Valor cobrado por minuto quando a criança ficar além da duração do plano"
+        />
       </EntityForm>
     </div>
   );

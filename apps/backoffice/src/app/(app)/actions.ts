@@ -140,6 +140,27 @@ export async function updateUnitSettings(
   return result;
 }
 
+export async function updateUnitReceiptInfo(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const result = await runAction(
+    () =>
+      supabase
+        .from("fa_kiosk_units")
+        .update({
+          address: (formData.get("address") as string) || null,
+          phone: (formData.get("phone") as string) || null,
+          cnpj: (formData.get("cnpj") as string) || null,
+        })
+        .eq("id", String(formData.get("unit_id"))),
+    "Dados do cupom salvos com sucesso.",
+  );
+  if (result.ok) revalidatePath("/configuracoes");
+  return result;
+}
+
 // Campo opcional do form -> null se vazio, nunca string vazia no banco
 // (Fase 1 do plano fiscal: cadastro do emitente e tributação de produto).
 function optionalText(formData: FormData, key: string): string | null {

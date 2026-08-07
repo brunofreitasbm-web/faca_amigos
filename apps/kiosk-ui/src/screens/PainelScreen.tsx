@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon } from "@facaamigos/ui";
+import { Card, Button, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
@@ -233,6 +233,10 @@ export function PainelScreen() {
           <p style={{ margin: "4px 0 0 0", color: "var(--text-secondary)", fontSize: "14px" }}>
             Acompanhamento em tempo real das crianças no playground
           </p>
+          <HelpText style={{ marginTop: "4px" }}>
+            Toque num cartão para selecioná-lo (fica com borda rosa) e depois em "Fechar sessões" para cobrar. O
+            rótulo colorido (verde/amarelo/vermelho) mostra o tempo restante do plano — vermelho já ultrapassou.
+          </HelpText>
         </div>
 
         {/* Gauge de Ocupação do Parque */}

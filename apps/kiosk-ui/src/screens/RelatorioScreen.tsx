@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, DateInput, Tabs, contrastRatio } from "@facaamigos/ui";
+import { Card, DateInput, Tabs, contrastRatio, HelpText } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
 import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -29,10 +29,22 @@ export function RelatorioScreen() {
     ...(isQuiosque ? ([{ value: "FROTA", label: "Frota (mapa de calor)" }] as const) : []),
   ];
 
+  const TAB_HELP: Record<Tab, string> = {
+    VENDAS: "Quanto foi vendido em cada dia e por forma de pagamento, num período escolhido.",
+    PLANOS: "Quantidade de cada plano vendido, hoje e no mês — ajuda a ver o que está mais popular.",
+    VISITAS: "Quantas crianças entraram por dia, num período escolhido.",
+    ANIVERSARIANTES: "Lista de crianças cadastradas que fazem aniversário no mês selecionado — útil para ações de marketing.",
+    TURNOS: "Histórico de turnos de caixa abertos e fechados nesta unidade.",
+    PONTO: "Horas trabalhadas por colaborador e o registro bruto de cada marcação de ponto, para conferência.",
+    FROTA: "Quais carrinhos foram mais e menos usados no período — ajuda a decidir manutenção e reposição.",
+  };
+
   return (
     <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Relatório</h1>
+      <HelpText>Consulte aqui o histórico de vendas, visitas e movimentações — use as abas abaixo para escolher o que ver.</HelpText>
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
+      <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
 
       <div role="tabpanel">
         {tab === "VENDAS" && <VendasTab unitId={unit.id} />}

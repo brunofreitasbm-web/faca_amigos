@@ -29,6 +29,9 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ fontSize: 18, margin: "0 0 8px" }}>FaçaAmigos — Back-office</h1>
+        <p style={{ fontSize: 13, color: "var(--text-muted, #888)", margin: "0 0 4px" }}>
+          Painel de gestão — use o e-mail e senha da sua conta de colaborador.
+        </p>
         <input name="email" type="email" placeholder="E-mail" required autoComplete="email" />
         <input
           name="password"

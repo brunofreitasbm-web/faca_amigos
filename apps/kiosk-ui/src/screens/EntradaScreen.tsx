@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Input, DateInput, Tag } from "@facaamigos/ui";
+import { Card, Button, Input, DateInput, Tag, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -242,9 +242,17 @@ export function EntradaScreen() {
   return (
     <div style={{ maxWidth: "720px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
       <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Entrada</h1>
+      <HelpText>
+        Registre aqui a chegada de uma criança: escolha o plano, identifique a criança e o responsável, e confirme
+        no botão rosa no final da página. O comprovante de entrada é impresso automaticamente.
+      </HelpText>
 
       <section>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px" }}>1. Plano de Permanência</h2>
+        <HelpText style={{ marginBottom: "8px" }}>
+          Toque no plano que a criança vai usar. Planos apagados (esmaecidos) não cabem mais até o fechamento de
+          hoje.
+        </HelpText>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           {plans.map((plan) => {
             const fits = remainingMinutes === null || planDurationMinutes(plan) <= remainingMinutes;
@@ -394,6 +402,7 @@ export function EntradaScreen() {
 
       <section>
         <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "var(--text-muted)" }}>Cupom de Desconto / Parceria (opcional)</label>
+        <HelpText style={{ marginBottom: "4px" }}>Só selecione se o responsável apresentar um cupom válido — o desconto é aplicado automaticamente no fechamento.</HelpText>
         <select value={couponCode} onChange={(e) => setCouponCode(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
           <option value="">Nenhum</option>
           {coupons.map((c) => (

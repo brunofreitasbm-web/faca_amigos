@@ -57,7 +57,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <PageTitle>Painel</PageTitle>
+      <PageTitle description="Visão geral do negócio: unidades cadastradas, check-ins e faturamento de hoje comparados com ontem.">Painel</PageTitle>
       <div
         style={{
           display: "grid",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Modal } from "@facaamigos/ui";
+import { Button, Card, Modal, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Employee, PontoRecord } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -8,10 +8,10 @@ import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 
 const KINDS = [
-  { value: "ENTRADA", label: "Entrada" },
-  { value: "INTERVALO_INICIO", label: "Início do intervalo" },
-  { value: "INTERVALO_FIM", label: "Fim do intervalo" },
-  { value: "SAIDA", label: "Saída" },
+  { value: "ENTRADA", label: "Entrada", help: "Registrar que você chegou para trabalhar agora" },
+  { value: "INTERVALO_INICIO", label: "Início do intervalo", help: "Registrar que você está saindo para o intervalo/almoço" },
+  { value: "INTERVALO_FIM", label: "Fim do intervalo", help: "Registrar que você voltou do intervalo/almoço" },
+  { value: "SAIDA", label: "Saída", help: "Registrar que você está indo embora ao final do expediente" },
 ] as const;
 
 function formatTime(ms: number): string {
@@ -76,9 +76,14 @@ export function PontoScreen() {
   return (
     <div style={{ maxWidth: "560px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
       <h1 style={{ fontFamily: "var(--font-display)" }}>Bater ponto</h1>
+      <HelpText>
+        Registro obrigatório de horário de trabalho. Toque no seu nome na lista abaixo, confirme que é você com
+        login/PIN e depois escolha o que está registrando (chegada, saída ou intervalo).
+      </HelpText>
 
       {!selected ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <HelpText icon="👆">Toque no seu nome para começar:</HelpText>
           {employees.map((emp) => (
             <Card key={emp.id} onClick={() => setSelected(emp)} style={{ cursor: "pointer", padding: "12px" }}>
               {emp.full_name}
@@ -97,7 +102,7 @@ export function PontoScreen() {
           <h2>{authedAs.full_name}</h2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
             {KINDS.map((k) => (
-              <Button key={k.value} variant="secondary" size="lg" disabled={busy} onClick={() => bater(k.value)}>
+              <Button key={k.value} variant="secondary" size="lg" disabled={busy} title={k.help} onClick={() => bater(k.value)}>
                 {k.label}
               </Button>
             ))}
