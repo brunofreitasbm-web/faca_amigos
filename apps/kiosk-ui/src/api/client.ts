@@ -517,6 +517,27 @@ export interface PlanSold {
   activity: "PLAYGROUND" | "CARRINHO";
   sessions_count: number;
 }
+/**
+ * Um registro por entrada. `id` é o identificador estável da sessão (nunca
+ * muda, nunca se repete, mesmo para a mesma criança/responsável em dias e
+ * horários diferentes) — é a referência para rastreio posterior por
+ * questões jurídicas. `access_code` é o código curto impresso na pulseira
+ * e no recibo: operacional, não é a chave de auditoria.
+ */
+export interface SessionAudit {
+  id: string;
+  access_code: string | null;
+  checkin_at_ms: number;
+  checkout_at_ms: number | null;
+  status: string;
+  activity: "PLAYGROUND" | "CARRINHO";
+  child_name: string;
+  guardian_name: string;
+  guardian_phone: string | null;
+  guardian_cpf: string | null;
+  plan_name: string | null;
+  employee_name: string | null;
+}
 
 /**
  * Data do dia operacional (AAAA-MM-DD) de uma unidade. O dia só vira
@@ -1674,5 +1695,54 @@ export const Api = {
       at_ms: r.at_ms as number,
       nsr: r.nsr as number,
     })) as FolhaPontoRow[];
+  },
+  reportSessions: async (unitId: string, from: string, to: string) => {
+    const sessions = await unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_sessions")
+        .select("id, access_code, checkin_at_ms, checkout_at_ms, status, activity, child_name_snapshot, guardian_id, plan_id, checkin_by_employee_id")
+        .eq("unit_id", unitId)
+        .gte("business_date", from)
+        .lte("business_date", to)
+        .order("checkin_at_ms", { ascending: false }),
+    );
+    if (sessions.length === 0) return [] as SessionAudit[];
+
+    const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
+    const planIds = [...new Set(sessions.map((s) => s.plan_id as string).filter(Boolean))];
+    const employeeIds = [...new Set(sessions.map((s) => s.checkin_by_employee_id as string).filter(Boolean))];
+
+    const [guardians, plans, employees] = await Promise.all([
+      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164, cpf").in("id", guardianIds)),
+      planIds.length > 0
+        ? unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("id, name").in("id", planIds))
+        : Promise.resolve([]),
+      employeeIds.length > 0
+        ? unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_employees").select("id, full_name").in("id", employeeIds))
+        : Promise.resolve([]),
+    ]);
+    const guardianById = new Map(guardians.map((g) => [g.id as string, g]));
+    const planById = new Map(plans.map((p) => [p.id as string, p]));
+    const employeeById = new Map(employees.map((e) => [e.id as string, e]));
+
+    return sessions.map((s) => {
+      const guardian = guardianById.get(s.guardian_id as string);
+      const plan = planById.get(s.plan_id as string);
+      const employee = employeeById.get(s.checkin_by_employee_id as string);
+      return {
+        id: s.id as string,
+        access_code: s.access_code as string | null,
+        checkin_at_ms: s.checkin_at_ms as number,
+        checkout_at_ms: s.checkout_at_ms as number | null,
+        status: s.status as string,
+        activity: s.activity as "PLAYGROUND" | "CARRINHO",
+        child_name: s.child_name_snapshot as string,
+        guardian_name: (guardian?.full_name as string | undefined) ?? "—",
+        guardian_phone: (guardian?.phone_e164 as string | undefined) ?? null,
+        guardian_cpf: (guardian?.cpf as string | undefined) ?? null,
+        plan_name: (plan?.name as string | undefined) ?? null,
+        employee_name: (employee?.full_name as string | undefined) ?? null,
+      } satisfies SessionAudit;
+    });
   },
 };

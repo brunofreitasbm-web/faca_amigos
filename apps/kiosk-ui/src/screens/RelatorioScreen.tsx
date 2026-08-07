@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
-import { Card, DateInput, Select, Tabs, contrastRatio, HelpText } from "@facaamigos/ui";
+import { useEffect, useMemo, useState } from "react";
+import { Card, DateInput, Input, Select, Tabs, contrastRatio, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, ShiftSummary } from "../api/client.js";
+import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, SessionAudit, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
+import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { AssetUsageChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
 
-type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
+type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
 
 function isoDate(d: Date): string {
@@ -79,6 +80,7 @@ export function RelatorioScreen() {
     { value: "VENDAS", label: "Vendas" },
     { value: "PLANOS", label: "Planos vendidos" },
     { value: "VISITAS", label: "Visitas" },
+    { value: "SESSOES", label: "Sessões (auditoria)" },
     { value: "ANIVERSARIANTES", label: "Crianças (aniversário)" },
     { value: "TURNOS", label: "Movimentação de Caixa" },
     { value: "PONTO", label: "Folha de Ponto" },
@@ -89,6 +91,7 @@ export function RelatorioScreen() {
     VENDAS: "Quanto foi vendido em cada dia e por forma de pagamento, no período e origem escolhidos.",
     PLANOS: "Quantidade de cada plano vendido no período — incluindo dados importados do Safoplay quando selecionados.",
     VISITAS: "Quantas crianças entraram por dia no período e origem selecionados.",
+    SESSOES: "Registro de cada entrada individual — horário, criança, responsável que acompanhou e quem atendeu no balcão. Para consulta e rastreio posterior, inclusive para fins jurídicos.",
     ANIVERSARIANTES: "Lista de crianças cadastradas que fazem aniversário no mês selecionado.",
     TURNOS: "Histórico de turnos de caixa abertos e fechados nesta unidade.",
     PONTO: "Horas trabalhadas por colaborador e o registro bruto de cada marcação de ponto no período.",
@@ -149,6 +152,7 @@ export function RelatorioScreen() {
         {tab === "VENDAS" && <VendasTab unitId={unit.id} from={from} to={to} />}
         {tab === "PLANOS" && <PlanosTab unitId={unit.id} from={from} to={to} />}
         {tab === "VISITAS" && <VisitasTab unitId={unit.id} from={from} to={to} />}
+        {tab === "SESSOES" && <SessoesTab unitId={unit.id} from={from} to={to} />}
         {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
         {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
         {tab === "PONTO" && <PontoTab from={from} to={to} />}
@@ -328,6 +332,96 @@ function VisitasTab({ unitId, from, to }: { unitId: string; from: string; to: st
               <tr>
                 <td colSpan={2} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
                   Nenhuma visita encontrada no período e origem selecionados.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+const SESSION_STATUS_LABEL: Record<string, string> = {
+  ATIVA: "No parque",
+  AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
+  FINALIZADA: "Finalizada",
+};
+
+function SessoesTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
+  const [sessions, setSessions] = useState<SessionAudit[]>([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    Api.reportSessions(unitId, from, to).then(setSessions);
+  }, [unitId, from, to]);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return sessions;
+    const digits = term.replace(/\D/g, "");
+    return sessions.filter((s) => {
+      if (s.id.toLowerCase().includes(term)) return true;
+      if (s.access_code?.toLowerCase().includes(term)) return true;
+      if (s.child_name.toLowerCase().includes(term)) return true;
+      if (s.guardian_name.toLowerCase().includes(term)) return true;
+      if (digits.length >= 3) {
+        if (s.guardian_cpf?.includes(digits)) return true;
+        if (s.guardian_phone?.includes(digits)) return true;
+      }
+      return false;
+    });
+  }, [sessions, search]);
+
+  return (
+    <div style={{ marginTop: "16px" }}>
+      <div style={{ maxWidth: "420px", marginBottom: "16px" }}>
+        <Input
+          label="Buscar por ID da sessão, código, criança, responsável, CPF ou telefone"
+          placeholder="Ex.: id da sessão, Helena, 91982501215"
+          value={search}
+          autoComplete="off"
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <Card style={{ padding: "8px", overflowX: "auto" }}>
+        <table className="report-table">
+          <thead>
+            <tr>
+              <th>ID da sessão</th>
+              <th>Criança</th>
+              <th>Responsável</th>
+              <th>Contato</th>
+              <th>Entrada</th>
+              <th>Saída</th>
+              <th>Status</th>
+              <th>Atendido por</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((s) => (
+              <tr key={s.id}>
+                <td style={{ fontFamily: "monospace", fontSize: "11px", color: "var(--text-muted)", userSelect: "all" }} title="Identificador estável da sessão — use para rastreio posterior">
+                  {s.id}
+                </td>
+                <td>{s.child_name}</td>
+                <td>{s.guardian_name}</td>
+                <td style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                  {s.guardian_phone ? formatPhoneBr(s.guardian_phone) : "—"}
+                  {s.guardian_cpf ? ` · ${formatCpf(s.guardian_cpf)}` : ""}
+                </td>
+                <td>{new Date(s.checkin_at_ms).toLocaleString("pt-BR")}</td>
+                <td>{s.checkout_at_ms ? new Date(s.checkout_at_ms).toLocaleString("pt-BR") : "—"}</td>
+                <td>{SESSION_STATUS_LABEL[s.status] ?? s.status}</td>
+                <td>{s.employee_name ?? "—"}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                  {sessions.length === 0
+                    ? "Nenhuma sessão encontrada no período e origem selecionados."
+                    : "Nenhuma sessão corresponde à busca."}
                 </td>
               </tr>
             )}
