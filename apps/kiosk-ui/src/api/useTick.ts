@@ -72,7 +72,7 @@ export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
     refetch();
 
     const channel = supabase()
-      .channel(`fa_kiosk_sessions:unit:${unitId}`)
+      .channel(`fa_kiosk_sessions:unit:${unitId}:${Math.random().toString(36).substring(7)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "fa_kiosk_sessions", filter: `unit_id=eq.${unitId}` }, refetch)
       .subscribe();
 

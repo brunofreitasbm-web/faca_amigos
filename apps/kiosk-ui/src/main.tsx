@@ -14,20 +14,24 @@ window.addEventListener("online", () => void flushOfflineQueue());
 setInterval(() => void flushOfflineQueue(), 30_000);
 void flushOfflineQueue();
 
+import { ErrorBoundary } from "./components/ErrorBoundary.js";
+
 const container = document.getElementById("root");
 if (!container) throw new Error("#root não encontrado");
 
 createRoot(container).render(
   <StrictMode>
-    <ToastProvider>
-      <ConfirmProvider>
-        <AuthProvider>
-          <AppStateProvider>
-            <App />
-          </AppStateProvider>
-        </AuthProvider>
-        <SystemStatusOverlay />
-      </ConfirmProvider>
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <ConfirmProvider>
+          <AuthProvider>
+            <AppStateProvider>
+              <App />
+            </AppStateProvider>
+          </AuthProvider>
+          <SystemStatusOverlay />
+        </ConfirmProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

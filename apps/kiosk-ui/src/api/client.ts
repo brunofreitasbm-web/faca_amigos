@@ -1617,7 +1617,7 @@ export const Api = {
     const rows = await unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_ponto_records")
-        .select("employee_id, kind, at_ms, nsr, fa_kiosk_employees(full_name, weekly_hours_contracted)")
+        .select("employee_id, kind, at_ms, nsr, fa_kiosk_employees!employee_id(full_name, weekly_hours_contracted)")
         .gte("at_ms", fromMs)
         .lte("at_ms", toMs)
         .order("at_ms", { ascending: false }),
