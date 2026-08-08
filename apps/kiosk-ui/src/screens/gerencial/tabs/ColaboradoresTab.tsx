@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Card, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
-import type { Employee } from "../../../api/client.js";
+import type { Employee, PersonalInfoStatus } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { useAuth } from "../../../auth/AuthContext.js";
@@ -14,6 +14,7 @@ export function ColaboradoresTab() {
   const { can } = useAuth();
   const { units } = useAppState();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [cadastroStatus, setCadastroStatus] = useState<Map<string, boolean>>(new Map());
   const [showForm, setShowForm] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [espelhoTarget, setEspelhoTarget] = useState<Employee | null>(null);
@@ -45,6 +46,12 @@ export function ColaboradoresTab() {
 
   function load() {
     Api.allEmployees().then(setEmployees);
+    // Quem já completou o auto-cadastro de RH (módulo "Cadastro de
+    // Colaboradores") — só pra sinalizar quem o RH ainda precisa cobrar,
+    // não expõe o conteúdo dos dados aqui.
+    Api.personalInfoStatus()
+      .then((rows: PersonalInfoStatus[]) => setCadastroStatus(new Map(rows.map((r) => [r.employeeId, r.completed]))))
+      .catch(() => setCadastroStatus(new Map()));
   }
   useEffect(load, []);
   useEffect(() => setUnitIds(units.map((u) => u.id)), [units]);
@@ -361,6 +368,11 @@ export function ColaboradoresTab() {
                         {roleBadgeStyle.label}
                       </span>
                       {e.active === false ? <Tag color="var(--text-muted)">Inativo</Tag> : <Tag color="var(--color-teal, #1d9b84)">Ativo</Tag>}
+                      {cadastroStatus.get(e.id) ? (
+                        <Tag color="var(--color-teal, #1d9b84)">📋 Cadastro completo</Tag>
+                      ) : (
+                        <Tag color="var(--color-warning, #b45309)">⚠️ Cadastro pendente</Tag>
+                      )}
                     </div>
                     <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>
                       {e.position || ROLE_LABEL[e.role]}
