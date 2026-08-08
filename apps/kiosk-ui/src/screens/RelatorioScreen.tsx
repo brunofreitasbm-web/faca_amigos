@@ -8,13 +8,13 @@ import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { AssetUsageChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
 
 type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
-type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
+export type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
 
-function isoDate(d: Date): string {
+export function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function computeDatesForPeriod(period: PeriodPreset, customFrom: string, customTo: string): { from: string; to: string } {
+export function computeDatesForPeriod(period: PeriodPreset, customFrom: string, customTo: string): { from: string; to: string } {
   const now = new Date();
   if (period === "today") {
     const todayStr = isoDate(now);
@@ -150,7 +150,7 @@ export function RelatorioScreen() {
 
       <div role="tabpanel">
         {tab === "VENDAS" && <VendasTab unitId={unit.id} from={from} to={to} />}
-        {tab === "PLANOS" && <PlanosTab unitId={unit.id} from={from} to={to} />}
+        {tab === "PLANOS" && <PlanosVendidosTab unitId={unit.id} from={from} to={to} />}
         {tab === "VISITAS" && <VisitasTab unitId={unit.id} from={from} to={to} />}
         {tab === "SESSOES" && <SessoesTab unitId={unit.id} from={from} to={to} />}
         {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
@@ -162,7 +162,7 @@ export function RelatorioScreen() {
   );
 }
 
-function VendasTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
+export function VendasTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
   const [byDay, setByDay] = useState<DailySales[]>([]);
   const [byMethod, setByMethod] = useState<RevenueByMethod[]>([]);
 
@@ -221,7 +221,7 @@ function VendasTab({ unitId, from, to }: { unitId: string; from: string; to: str
   );
 }
 
-function PlanosTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
+export function PlanosVendidosTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
   const [plansSold, setPlansSold] = useState<PlanSold[]>([]);
 
   useEffect(() => {
@@ -301,7 +301,7 @@ function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
   );
 }
 
-function VisitasTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
+export function VisitasTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
   const [visits, setVisits] = useState<DailyVisits[]>([]);
 
   useEffect(() => {
@@ -348,7 +348,8 @@ const SESSION_STATUS_LABEL: Record<string, string> = {
   FINALIZADA: "Finalizada",
 };
 
-function SessoesTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
+export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
+  const { units } = useAppState();
   const [sessions, setSessions] = useState<SessionAudit[]>([]);
   const [search, setSearch] = useState("");
 
@@ -389,6 +390,7 @@ function SessoesTab({ unitId, from, to }: { unitId: string; from: string; to: st
           <thead>
             <tr>
               <th>ID da sessão</th>
+              {unitId === null && <th>Unidade</th>}
               <th>Criança</th>
               <th>Responsável</th>
               <th>Contato</th>
@@ -404,6 +406,7 @@ function SessoesTab({ unitId, from, to }: { unitId: string; from: string; to: st
                 <td style={{ fontFamily: "monospace", fontSize: "11px", color: "var(--text-muted)", userSelect: "all" }} title="Identificador estável da sessão — use para rastreio posterior">
                   {s.id}
                 </td>
+                {unitId === null && <td style={{ fontSize: "12px" }}>{units.find((u) => u.id === s.unit_id)?.name ?? "—"}</td>}
                 <td>{s.child_name}</td>
                 <td>{s.guardian_name}</td>
                 <td style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
@@ -418,7 +421,7 @@ function SessoesTab({ unitId, from, to }: { unitId: string; from: string; to: st
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                <td colSpan={unitId === null ? 9 : 8} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
                   {sessions.length === 0
                     ? "Nenhuma sessão encontrada no período e origem selecionados."
                     : "Nenhuma sessão corresponde à busca."}
@@ -648,7 +651,7 @@ function PontoTab({ from, to }: { from: string; to: string }) {
   );
 }
 
-function FrotaHeatmapTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
+export function FrotaHeatmapTab({ unitId, from, to }: { unitId: string; from: string; to: string }) {
   const [usage, setUsage] = useState<AssetUsage[]>([]);
 
   useEffect(() => {

@@ -30,6 +30,7 @@ import { CaixaScreen } from "./screens/CaixaScreen.js";
 import { PontoScreen } from "./screens/PontoScreen.js";
 import { RelatorioScreen } from "./screens/RelatorioScreen.js";
 import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
+import { GerencialApp } from "./screens/gerencial/GerencialApp.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
   { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir a pulseira e o recibo de guarda", icon: <SignInIcon /> },
@@ -54,7 +55,7 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
 };
 
 export function App() {
-  const { unit, setUnitId, employee, logout, restoring } = useAppState();
+  const { unit, setUnitId, gerencial, setGerencial, employee, logout, restoring } = useAppState();
   const { can, loading: loadingCapabilities } = useAuth();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
@@ -82,7 +83,10 @@ export function App() {
       confirmLabel: "Trocar módulo",
       cancelLabel: "Cancelar",
     });
-    if (ok) setUnitId("");
+    if (ok) {
+      setUnitId("");
+      setGerencial(false);
+    }
   }
 
   async function handleLogout() {
@@ -103,6 +107,12 @@ export function App() {
   }
 
   if (!employee) return <LoginScreen />;
+
+  // Modo Gerencial: fora do contexto das 3 unidades, é onde o Owner configura
+  // o que vale para várias unidades de uma vez e vê relatórios cross-unit.
+  if (gerencial) {
+    return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
+  }
 
   // Se nenhuma operação/módulo foi selecionado ainda, exibe a Tela Inicial de Seleção de Módulo
   if (!unit) {

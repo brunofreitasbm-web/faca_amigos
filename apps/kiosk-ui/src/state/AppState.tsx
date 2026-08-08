@@ -14,6 +14,9 @@ interface AppStateValue {
   units: Unit[];
   unit: Unit | null;
   setUnitId: (id: string) => void;
+  /** Modo Gerencial: fora das 3 unidades, configura o que vale para várias de uma vez. */
+  gerencial: boolean;
+  setGerencial: (value: boolean) => void;
   employee: TerminalEmployee | null;
   terminalEmployees: TerminalEmployee[];
   switchEmployee: (employeeId: string, pin: string) => Promise<void>;
@@ -28,6 +31,7 @@ const AppStateContext = createContext<AppStateValue | null>(null);
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [unitId, setUnitId] = useState<string | null>(null);
+  const [gerencial, setGerencial] = useState(false);
   const [employee, setEmployee] = useState<TerminalEmployee | null>(null);
   const [terminalEmployees, setTerminalEmployees] = useState<TerminalEmployee[]>(listTerminalEmployees());
   const [restoring, setRestoring] = useState(true);
@@ -89,6 +93,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       units,
       unit: units.find((u) => u.id === unitId) ?? null,
       setUnitId,
+      gerencial,
+      setGerencial,
       employee,
       terminalEmployees,
       restoring,
@@ -108,9 +114,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await supabase().auth.signOut();
         setEmployee(null);
         setUnitId(null);
+        setGerencial(false);
       },
     }),
-    [units, unitId, employee, terminalEmployees, restoring],
+    [units, unitId, gerencial, employee, terminalEmployees, restoring],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

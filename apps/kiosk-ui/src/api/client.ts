@@ -64,6 +64,8 @@ export interface Employee {
   contract_type?: "CLT" | "ESTAGIO" | "AUTONOMO" | null;
   weekly_hours_contracted?: number | null;
   active?: boolean;
+  /** Unidades em que o colaborador atua — só preenchido por `Api.allEmployees()` (Gerencial). */
+  unitIds?: string[];
 }
 
 export interface NewEmployeeInput {
@@ -113,6 +115,8 @@ export interface Plan {
   overageCentsPerMinute: number;
   color: string;
   active?: boolean;
+  /** Só preenchido por `Api.plansAllUnits()` (Gerencial). */
+  unitId?: string;
 }
 
 export interface Asset {
@@ -134,6 +138,8 @@ export interface Product {
   price_cents: number;
   stock: number;
   active?: boolean;
+  /** Só preenchido por `Api.productsAllUnits()` (Gerencial). */
+  unit_id?: string;
 }
 
 /**
@@ -236,6 +242,8 @@ export interface Package {
   benefitText: string;
   color: string;
   active: boolean;
+  /** Só preenchido por `Api.packagesAllUnits()` (Gerencial). */
+  unitId?: string;
 }
 
 /**
@@ -436,6 +444,8 @@ export interface Coupon {
   used_count: number;
   active: boolean | number;
   description: string | null;
+  /** Só preenchido por `Api.couponsAllUnits()` (Gerencial). */
+  unitId?: string;
 }
 
 export interface LoyaltyRule {
@@ -444,6 +454,8 @@ export interface LoyaltyRule {
   triggerVisits: number;
   rewardKind: "ENTRADA_GRATIS" | "DESCONTO_PCT" | "MINUTOS_EXTRA";
   rewardValue: number;
+  /** Só preenchido por `Api.loyaltyRulesAllUnits()` (Gerencial). */
+  unitId?: string;
 }
 
 export interface RedeemableReward {
@@ -526,6 +538,7 @@ export interface PlanSold {
  */
 export interface SessionAudit {
   id: string;
+  unit_id: string;
   access_code: string | null;
   checkin_at_ms: number;
   checkout_at_ms: number | null;
@@ -560,6 +573,8 @@ function planFromRow(row: Record<string, unknown>): Plan {
     durationUnit: row.duration_unit as Plan["durationUnit"],
     overageCentsPerMinute: row.overage_cents_per_minute as number,
     color: row.color as string,
+    active: Boolean(row.active),
+    unitId: row.unit_id as string | undefined,
   };
 }
 
@@ -574,6 +589,7 @@ function packageFromRow(row: Record<string, unknown>): Package {
     benefitText: row.benefit_text as string,
     color: row.color as string,
     active: Boolean(row.active),
+    unitId: row.unit_id as string | undefined,
   };
 }
 
@@ -583,6 +599,7 @@ function bonusRuleFromRow(row: Record<string, unknown>): BonusRule {
     unitId: row.unit_id as string,
     description: row.description as string,
     rewardValueCents: row.reward_value_cents as number,
+    active: Boolean(row.active),
   };
 }
 
@@ -596,6 +613,7 @@ function couponFromRow(row: Record<string, unknown>): Coupon {
     used_count: row.used_count as number,
     active: row.active ? 1 : 0,
     description: (row.description as string | null) ?? null,
+    unitId: row.unit_id as string | undefined,
   };
 }
 
@@ -606,6 +624,7 @@ function loyaltyRuleFromRow(row: Record<string, unknown>): LoyaltyRule {
     triggerVisits: row.trigger_visits as number,
     rewardKind: row.reward_kind as LoyaltyRule["rewardKind"],
     rewardValue: row.reward_value as number,
+    unitId: row.unit_id as string | undefined,
   };
 }
 
@@ -748,17 +767,31 @@ export const Api = {
         .eq("active", true)
         .order("full_name"),
     ),
-  allEmployees: () =>
-    unwrap<Employee[]>(
-      supabase()
-        .from("fa_kiosk_employees")
-        .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
-        .order("full_name"),
-    ),
+  allEmployees: async () => {
+    const [employees, links] = await Promise.all([
+      unwrap<Employee[]>(
+        supabase()
+          .from("fa_kiosk_employees")
+          .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
+          .order("full_name"),
+      ),
+      unwrap<{ employee_id: string; unit_id: string }[]>(supabase().from("fa_kiosk_employee_units").select("employee_id, unit_id")),
+    ]);
+    const unitIdsByEmployee = new Map<string, string[]>();
+    for (const link of links) {
+      unitIdsByEmployee.set(link.employee_id, [...(unitIdsByEmployee.get(link.employee_id) ?? []), link.unit_id]);
+    }
+    return employees.map((e) => ({ ...e, unitIds: unitIdsByEmployee.get(e.id) ?? [] }));
+  },
   plans: async (unitId: string, activity: string, onlyActive = true) => {
     let query = supabase().from("fa_kiosk_plans").select("*").eq("unit_id", unitId).eq("activity", activity);
     if (onlyActive) query = query.eq("active", true);
     const rows = await unwrap<Record<string, unknown>[]>(query);
+    return rows.map(planFromRow);
+  },
+  /** Todos os planos de todas as unidades — Gerencial. */
+  plansAllUnits: async () => {
+    const rows = await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("*"));
     return rows.map(planFromRow);
   },
   assets: (unitId: string) =>
@@ -776,6 +809,11 @@ export const Api = {
     if (onlyActive) query = query.eq("active", true);
     return unwrap<Product[]>(query);
   },
+  /** Todos os produtos de todas as unidades — Gerencial. */
+  productsAllUnits: () =>
+    unwrap<Product[]>(
+      supabase().from("fa_kiosk_products").select("id, name, description, emoji, price_cents, stock, active, unit_id"),
+    ),
   // `unitId` é opcional só porque o limiar do selo VIP tem padrão global;
   // passando-o, a busca respeita o limiar configurado para a unidade.
   searchChildren: async (q: string, unitId?: string) => {
@@ -881,6 +919,11 @@ export const Api = {
     let query = supabase().from("fa_kiosk_packages").select("*").eq("unit_id", unitId);
     if (onlyActive) query = query.eq("active", true);
     const rows = await unwrap<Record<string, unknown>[]>(query.order("price_cents"));
+    return rows.map(packageFromRow);
+  },
+  /** Todos os pacotes de todas as unidades — Gerencial. */
+  packagesAllUnits: async () => {
+    const rows = await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_packages").select("*").order("price_cents"));
     return rows.map(packageFromRow);
   },
   createPackage: (body: {
@@ -1179,6 +1222,11 @@ export const Api = {
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_rules").select("*").eq("unit_id", unitId).eq("active", true)).then(
       (rows) => rows.map(bonusRuleFromRow),
     ),
+  /** Todas as regras de bonificação de todas as unidades (ativas e inativas) — Gerencial. */
+  bonusRulesAllUnits: () =>
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_rules").select("*")).then((rows) =>
+      rows.map(bonusRuleFromRow),
+    ),
   createBonusRule: (body: { unitId: string; description: string; rewardValueCents: number }) =>
     unwrap<{ id: string }>(
       supabase()
@@ -1283,13 +1331,13 @@ export const Api = {
     return { totalCents };
   },
   /** Quantidade de sessões vendidas por tipo de plano no intervalo de dias operacionais. */
-  reportPlansSold: async (unitId: string, from: string, to: string) => {
+  reportPlansSold: async (unitId: string | null, from: string, to: string) => {
     let query = supabase()
       .from("fa_kiosk_sessions")
       .select("plan_id, fa_kiosk_plans(name, color, activity)")
-      .eq("unit_id", unitId)
       .gte("business_date", from)
       .lte("business_date", to);
+    if (unitId) query = query.eq("unit_id", unitId);
     const rows = await unwrap<Record<string, unknown>[]>(query);
     const map = new Map<string, { plan_id: string; plan_name: string; plan_color: string; activity: PlanSold["activity"]; sessions_count: number }>();
     for (const r of rows) {
@@ -1329,6 +1377,9 @@ export const Api = {
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_coupons").select("*").eq("unit_id", unitId)).then((rows) =>
       rows.map(couponFromRow),
     ),
+  /** Todos os cupons de todas as unidades — Gerencial. */
+  couponsAllUnits: () =>
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_coupons").select("*")).then((rows) => rows.map(couponFromRow)),
   createCoupon: (body: { unitId: string; code: string; kind: Coupon["kind"]; value: number; description?: string }) =>
     unwrap<{ id: string }>(
       supabase()
@@ -1342,6 +1393,11 @@ export const Api = {
     unwrap(supabase().from("fa_kiosk_coupons").update({ code: body.code, kind: body.kind, value: body.value, description: body.description ?? null }).eq("id", id)),
   loyaltyRules: (unitId: string) =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_loyalty_rules").select("*").eq("unit_id", unitId)).then((rows) =>
+      rows.map(loyaltyRuleFromRow),
+    ),
+  /** Todas as regras de fidelidade de todas as unidades — Gerencial. */
+  loyaltyRulesAllUnits: () =>
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_loyalty_rules").select("*")).then((rows) =>
       rows.map(loyaltyRuleFromRow),
     ),
   createLoyaltyRule: (body: {
@@ -1485,6 +1541,9 @@ export const Api = {
   // chamador ADMIN autenticado, resolvida do lado do servidor.
   setEmployeePin: (employeeId: string, pin: string) =>
     unwrap<{ ok: boolean }>(supabase().functions.invoke("admin-set-employee-pin", { body: { employeeId, pin } })),
+  /** Substitui o conjunto de unidades em que o colaborador atua — Gerencial. */
+  setEmployeeUnits: (employeeId: string, unitIds: string[]) =>
+    unwrap(supabase().rpc("fa_config_set_employee_units", { p_employee_id: employeeId, p_unit_ids: unitIds })),
   // Espelho de ponto mensal — a RPC já confere `relatorio.ponto` no banco;
   // aqui só repassa os parâmetros e devolve o jsonb pronto para impressão.
   espelhoPonto: (employeeId: string, year: number, month: number) =>
@@ -1588,14 +1647,18 @@ export const Api = {
   // cafbda6), então todo relatório voltava 404. Reescritos como consultas
   // diretas ao Supabase, agregadas no cliente (mesmo padrão de
   // apps/backoffice/.../relatorios/page.tsx).
-  reportSales: async (unitId: string, from: string, to: string) => {
+  // `unitId: null` no relatório de vendas/visitas/planos/frota/sessões
+  // significa "todas as unidades" — usado pelo Gerencial, que enxerga as 3
+  // de uma vez (mesmo padrão de apps/backoffice/.../relatorios/page.tsx,
+  // que resolvia esse mesmo dilema antes de ser desativado).
+  reportSales: async (unitId: string | null, from: string, to: string) => {
     let ordersQuery = supabase()
       .from("fa_kiosk_orders")
       .select("id, business_date, total_cents")
-      .eq("unit_id", unitId)
       .eq("status", "PAGA")
       .gte("business_date", from)
       .lte("business_date", to);
+    if (unitId) ordersQuery = ordersQuery.eq("unit_id", unitId);
     const orders = await unwrap<Record<string, unknown>[]>(ordersQuery);
     const byDayMap = new Map<string, { orders_count: number; total_cents: number }>();
     for (const o of orders) {
@@ -1623,8 +1686,9 @@ export const Api = {
     }
     return { byDay, byMethod };
   },
-  reportVisits: async (unitId: string, from: string, to: string) => {
-    let query = supabase().from("fa_kiosk_sessions").select("business_date").eq("unit_id", unitId).gte("business_date", from).lte("business_date", to);
+  reportVisits: async (unitId: string | null, from: string, to: string) => {
+    let query = supabase().from("fa_kiosk_sessions").select("business_date").gte("business_date", from).lte("business_date", to);
+    if (unitId) query = query.eq("unit_id", unitId);
     const sessions = await unwrap<Record<string, unknown>[]>(query);
     const map = new Map<string, number>();
     for (const s of sessions) {
@@ -1696,16 +1760,15 @@ export const Api = {
       nsr: r.nsr as number,
     })) as FolhaPontoRow[];
   },
-  reportSessions: async (unitId: string, from: string, to: string) => {
-    const sessions = await unwrap<Record<string, unknown>[]>(
-      supabase()
-        .from("fa_kiosk_sessions")
-        .select("id, access_code, checkin_at_ms, checkout_at_ms, status, activity, child_name_snapshot, guardian_id, plan_id, checkin_by_employee_id")
-        .eq("unit_id", unitId)
-        .gte("business_date", from)
-        .lte("business_date", to)
-        .order("checkin_at_ms", { ascending: false }),
-    );
+  reportSessions: async (unitId: string | null, from: string, to: string) => {
+    let sessionsQuery = supabase()
+      .from("fa_kiosk_sessions")
+      .select("id, unit_id, access_code, checkin_at_ms, checkout_at_ms, status, activity, child_name_snapshot, guardian_id, plan_id, checkin_by_employee_id")
+      .gte("business_date", from)
+      .lte("business_date", to)
+      .order("checkin_at_ms", { ascending: false });
+    if (unitId) sessionsQuery = sessionsQuery.eq("unit_id", unitId);
+    const sessions = await unwrap<Record<string, unknown>[]>(sessionsQuery);
     if (sessions.length === 0) return [] as SessionAudit[];
 
     const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
@@ -1731,6 +1794,7 @@ export const Api = {
       const employee = employeeById.get(s.checkin_by_employee_id as string);
       return {
         id: s.id as string,
+        unit_id: s.unit_id as string,
         access_code: s.access_code as string | null,
         checkin_at_ms: s.checkin_at_ms as number,
         checkout_at_ms: s.checkout_at_ms as number | null,
