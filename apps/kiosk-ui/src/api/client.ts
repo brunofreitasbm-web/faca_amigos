@@ -474,12 +474,39 @@ export type UnitSettingKey =
   // um plano de permanência a partir de N minutos. Ver migration
   // fa_kiosk_session_extra_items_upsell.
   | "upsell_quick_product_id"
-  | "upsell_quick_trigger_minutes";
+  | "upsell_quick_trigger_minutes"
+  // Modelo do contrato de prestação de serviços dos planos acima de 2h
+  // (banco de horas). Editável no Gerencial > Contrato; impresso em A4.
+  | "hour_bank_contract_template"
+  // Validade do banco de horas em dias (padrão 45 — mesmo default do banco).
+  | "hour_bank_validity_days";
 
 export interface VipFlag {
   child_id: string;
   visits_in_window: number;
   is_vip: boolean;
+}
+
+/** Saldo do banco de horas de uma criança (`fa_kiosk_hour_bank_balance`). */
+export interface HourBankBalance {
+  child_id: string;
+  remaining_minutes: number;
+  /** Vencimento mais próximo entre os créditos válidos — o que a Entrada mostra. */
+  next_expiry_ms: number;
+}
+
+/** Dados cadastrais do Contratante para o contrato dos planos >2h. */
+export interface GuardianContractInfo {
+  id: string;
+  fullName: string;
+  cpf: string | null;
+  rg: string | null;
+  email: string | null;
+  phone: string | null;
+  addressLine: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressZip: string | null;
 }
 
 /**
@@ -544,6 +571,10 @@ export interface ActiveSessionEntry {
     paused_ms_total: number;
     /** Minutos de pacote pré-pago ainda válidos do responsável, se houver. */
     package_balance_minutes?: number;
+    /** Entrada feita pelo banco de horas da criança (sem plano vendido). */
+    uses_hour_bank?: boolean;
+    /** Saldo alocado no check-in — a "duração do plano" da sessão de banco. */
+    hour_bank_allocated_minutes?: number;
   };
   quote: {
     lines: QuoteLine[];
@@ -592,6 +623,15 @@ export interface EnvelopeMovement {
   employee_id: string;
   at_ms: number;
   fa_kiosk_shifts: { unit_id: string }[];
+}
+
+export interface UnitEnvelopeBalance {
+  unit_id: string;
+  unit_name: string;
+  pending_cents: number;
+  pending_count: number;
+  oldest_pending_at_ms: number | null;
+  last_collected_at_ms: number | null;
 }
 
 export interface UnitCashStatus {
@@ -855,7 +895,9 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
       packageBalanceByGuardian: new Map(),
     };
 
-  const planIds = [...new Set(sessions.map((s) => s.plan_id as string))];
+  // Sessões de banco de horas não têm plano (plan_id nulo) — não entram
+  // na consulta de planos; o pseudo-plano delas é montado no compute.
+  const planIds = [...new Set(sessions.map((s) => s.plan_id as string | null).filter((id): id is string => Boolean(id)))];
   const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
   const assetIds = [...new Set(sessions.map((s) => s.asset_id as string | null).filter((id): id is string => Boolean(id)))];
   const childIds = [...new Set(sessions.map((s) => s.child_id as string))];
@@ -885,7 +927,22 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
 
 export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: number): ActiveSessionEntry[] {
   return raw.sessions.map((row) => {
-    const plan = raw.planById.get(row.plan_id as string)!;
+    const usesHourBank = Boolean(row.uses_hour_bank);
+    // Sessão de banco de horas: não existe plano vendido. O pseudo-plano
+    // reusa o mesmo motor de preço — valor 0, duração = saldo alocado no
+    // check-in e excedente pela tarifa congelada do crédito de origem.
+    const plan: Plan = usesHourBank
+      ? {
+          id: "HOUR_BANK",
+          activity: row.activity as Plan["activity"],
+          name: "Banco de Horas",
+          valueCents: 0,
+          durationValue: (row.hour_bank_allocated_minutes as number | null) ?? 0,
+          durationUnit: "MINUTO",
+          overageCentsPerMinute: (row.hour_bank_overage_cents_per_minute as number | null) ?? 0,
+          color: "#2ECFB5",
+        }
+      : raw.planById.get(row.plan_id as string)!;
     const guardian = raw.guardianById.get(row.guardian_id as string);
     const assetRow = row.asset_id ? raw.assetById.get(row.asset_id as string) : undefined;
     const childRow = raw.childById.get(row.child_id as string);
@@ -926,6 +983,8 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         paused_at_ms: (row.paused_at_ms as number | null) ?? null,
         paused_ms_total: (row.paused_ms_total as number) ?? 0,
         package_balance_minutes: raw.packageBalanceByGuardian.get(row.guardian_id as string),
+        uses_hour_bank: usesHourBank,
+        hour_bank_allocated_minutes: (row.hour_bank_allocated_minutes as number | null) ?? undefined,
       },
       quote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
@@ -1172,11 +1231,48 @@ export const Api = {
         .maybeSingle(),
     ),
 
+  /** Saldo do banco de horas (planos >2h) por criança — vale em qualquer unidade. */
+  hourBankBalances: async (childIds: string[]) => {
+    if (childIds.length === 0) return new Map<string, HourBankBalance>();
+    const rows = await unwrap<HourBankBalance[]>(
+      supabase().rpc("fa_kiosk_hour_bank_balance", { p_child_ids: childIds }),
+    );
+    return new Map(rows.map((r) => [r.child_id, r]));
+  },
+  /** Dados cadastrais do responsável para preencher o contrato dos planos >2h. */
+  guardianContractInfo: (guardianId: string) =>
+    unwrap<GuardianContractInfo>(
+      supabase().rpc("fa_kiosk_guardian_contract_info", { p_guardian_id: guardianId }),
+    ),
+  updateGuardianContractInfo: (body: {
+    guardianId: string;
+    rg?: string;
+    email?: string;
+    addressLine?: string;
+    addressCity?: string;
+    addressState?: string;
+    addressZip?: string;
+  }) =>
+    unwrap<void>(
+      supabase().rpc("fa_kiosk_guardian_contract_info_update", {
+        p_guardian_id: body.guardianId,
+        p_rg: body.rg ?? null,
+        p_email: body.email ?? null,
+        p_address_line: body.addressLine ?? null,
+        p_address_city: body.addressCity ?? null,
+        p_address_state: body.addressState ?? null,
+        p_address_zip: body.addressZip ?? null,
+      }),
+    ),
+
   checkin: (body: {
     unitId: string;
     activity: "PLAYGROUND" | "CARRINHO";
     assetId?: string;
-    planId: string;
+    /** Nulo quando a entrada é pelo banco de horas (useHourBank). */
+    planId: string | null;
+    /** Entrada pelo saldo do banco de horas da criança (exige criança já cadastrada). */
+    useHourBank?: boolean;
     employeeId: string;
     child: { id?: string; fullName: string; birthDate: string; inclusiveEligible: boolean; inclusiveProofType?: string };
     guardian: { id?: string; fullName: string; cpf: string; phoneE164: string };
@@ -1196,12 +1292,15 @@ export const Api = {
       exitPin: string;
       wristbandCode: string;
       ticketCode: string;
+      /** Minutos do banco de horas alocados nesta entrada (só quando useHourBank). */
+      hourBankAllocatedMinutes: number | null;
     }>(
       "fa_checkin",
       {
         p_unit_id: body.unitId,
         p_activity: body.activity,
         p_plan_id: body.planId,
+        p_use_hour_bank: body.useHourBank ?? false,
         p_asset_id: body.assetId ?? null,
         p_guardian: { id: body.guardian.id, fullName: body.guardian.fullName, cpf: body.guardian.cpf, phoneE164: body.guardian.phoneE164 },
         p_child: {
@@ -1323,8 +1422,17 @@ export const Api = {
     return unwrap<EnvelopeMovement[]>(query);
   },
   // Saldo físico em caixa por unidade agora (ver RPC fa_units_cash_status) —
-  // usado pela aba gerencial "Saldo em Caixa".
+  // usado como linha secundária da aba gerencial "Saldo em Envelopes".
   unitsCashStatus: () => unwrap<UnitCashStatus[]>(supabase().rpc("fa_units_cash_status")),
+  // Saldo em envelopes pendentes (ainda na loja) por unidade — aba gerencial
+  // "Saldo em Envelopes" (ver RPC fa_units_envelope_balance).
+  unitsEnvelopeBalance: () => unwrap<UnitEnvelopeBalance[]>(supabase().rpc("fa_units_envelope_balance")),
+  // Marca todos os envelopes pendentes da unidade como recolhidos pelo gestor.
+  collectEnvelopes: (unitId: string, employeeId: string) =>
+    callResilient<{ ok: boolean; collected_count: number; collected_cents: number }>("fa_collect_envelopes", {
+      p_unit_id: unitId,
+      p_employee_id: employeeId,
+    }),
   revenueByMethod: async (shiftId: string) => {
     const rows = await unwrap<{ method: string; amount_cents: number }[]>(
       supabase().from("fa_kiosk_payments").select("method, amount_cents, fa_kiosk_orders!inner(shift_id)").eq("fa_kiosk_orders.shift_id", shiftId),

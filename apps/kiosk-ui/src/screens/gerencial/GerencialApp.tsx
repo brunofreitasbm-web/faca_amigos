@@ -14,10 +14,11 @@ import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
 import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
 import { AberturaFechamentoTab } from "./tabs/AberturaFechamentoTab.js";
 import { FotosEnvelopeTab } from "./tabs/FotosEnvelopeTab.js";
-import { SaldoCaixaTab } from "./tabs/SaldoCaixaTab.js";
+import { SaldoEnvelopesTab } from "./tabs/SaldoEnvelopesTab.js";
 import { HistoricoTab } from "./tabs/HistoricoTab.js";
+import { ContratoTab } from "./tabs/ContratoTab.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_CAIXA" | "HISTORICO";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "PLANOS", label: "Planos de Preços" },
@@ -31,8 +32,9 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "RELATORIOS", label: "Relatórios" },
   { value: "ABERTURA_FECHAMENTO", label: "Abertura e Fechamento" },
   { value: "FOTOS_ENVELOPE", label: "Fotos de Envelope" },
-  { value: "SALDO_CAIXA", label: "Saldo em Caixa" },
+  { value: "SALDO_ENVELOPES", label: "Saldo em Envelopes" },
   { value: "HISTORICO", label: "Histórico" },
+  { value: "CONTRATO", label: "Contrato (Planos 2h+)" },
 ];
 
 const TAB_HELP: Record<GerencialTab, string> = {
@@ -47,8 +49,9 @@ const TAB_HELP: Record<GerencialTab, string> = {
   RELATORIOS: "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só.",
   ABERTURA_FECHAMENTO: "Horário de abertura e fechamento do caixa de cada loja, quem abriu/fechou e o troco inicial.",
   FOTOS_ENVELOPE: "Fotos dos envelopes de sangria registrados em cada loja, com valor e operador responsável.",
-  SALDO_CAIXA: "Quanto dinheiro físico tem na gaveta de cada loja neste momento.",
+  SALDO_ENVELOPES: "Quanto cada loja tem guardado em envelopes de sangria ainda não recolhidos, e o que há na gaveta agora.",
   HISTORICO: "Fluxograma visual de onde o dinheiro do turno veio e para onde foi, para facilitar a conferência.",
+  CONTRATO: "Modelo do contrato de prestação de serviços dos planos acima de 2h (banco de horas), impresso em A4 na Entrada com timbre da unidade.",
 };
 
 
@@ -111,8 +114,9 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "RELATORIOS" && <GerencialRelatorioTab />}
               {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
               {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
-              {tab === "SALDO_CAIXA" && <SaldoCaixaTab />}
+              {tab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
               {tab === "HISTORICO" && <HistoricoTab />}
+              {tab === "CONTRATO" && <ContratoTab />}
             </div>
           </div>
         </RequireCapability>

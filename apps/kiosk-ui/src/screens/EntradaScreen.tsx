@@ -4,6 +4,8 @@ import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan, Product, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { PhotoCapture } from "../components/PhotoCapture.js";
+import { ContractModal } from "../components/ContractModal.js";
+import { formatPlanoHoras } from "../contract/contractTemplate.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import {
@@ -100,7 +102,20 @@ export function EntradaScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ sessionId: string; accessCode: string; exitPin: string; childName: string } | null>(null);
+  const [done, setDone] = useState<{
+    sessionId: string;
+    accessCode: string;
+    exitPin: string;
+    childName: string;
+    guardianId: string;
+    /** Plano vendido acima de 2h — habilita o botão de imprimir o contrato. */
+    contractPlan: { name: string; valueCents: number; minutes: number } | null;
+  } | null>(null);
+  const [contractOpen, setContractOpen] = useState(false);
+
+  // Saldo do banco de horas da criança identificada (planos >2h de visitas
+  // anteriores, em qualquer unidade). null = sem saldo ou não consultado.
+  const [hourBank, setHourBank] = useState<{ remainingMinutes: number; nextExpiryMs: number } | null>(null);
 
   // Oferta de upgrade da criança identificada. `null` cobre os dois casos
   // em que não há card: ainda não consultado e não elegível — a tela trata
@@ -200,6 +215,17 @@ export function EntradaScreen() {
     setMatches([]);
     setFavoriteAssetId(null);
     setOffer(null);
+    setHourBank(null);
+
+    // Saldo do banco de horas (planos >2h de visitas anteriores, em
+    // qualquer unidade): consultado aqui para a opção "Usar banco de
+    // horas" já aparecer junto dos planos, antes de vender um novo.
+    Api.hourBankBalances([match.id])
+      .then((map) => {
+        const b = map.get(match.id);
+        setHourBank(b && b.remaining_minutes > 0 ? { remainingMinutes: b.remaining_minutes, nextExpiryMs: b.next_expiry_ms } : null);
+      })
+      .catch(() => setHourBank(null));
 
     // Oferta de upgrade. Consultada aqui, e não no `submit`, porque o
     // script precisa chegar ao operador ANTES de a conversa virar "qual
@@ -276,6 +302,7 @@ export function EntradaScreen() {
     setMatchedChild(null);
     setShowNewForm(false);
     setOffer(null);
+    setHourBank(null);
     setChildName("");
     setBirthDate("");
     setIsNeurodivergent(false);
@@ -297,7 +324,12 @@ export function EntradaScreen() {
   }
 
   const identified = Boolean(matchedChild) || showNewForm;
+  // Sentinela do "plano" Banco de Horas: reusa o fluxo de seleção/validação
+  // dos planos sem virar um plano de verdade.
+  const HOUR_BANK = "HOUR_BANK";
+  const usingHourBank = planId === HOUR_BANK;
   const selectedPlan = plans.find((p) => p.id === planId);
+  const threshold = 120;
 
   const readiness = useMemo(() => {
     if (!identified) return "Identifique a criança para continuar";
@@ -320,7 +352,8 @@ export function EntradaScreen() {
         unitId: unit.id,
         activity,
         assetId: assetId ?? undefined,
-        planId: planId!,
+        planId: usingHourBank ? null : planId!,
+        useHourBank: usingHourBank,
         employeeId: employee.id,
         child: { id: matchedChild?.id, fullName: childName.trim(), birthDate, inclusiveEligible: false },
         guardian: {
@@ -329,12 +362,24 @@ export function EntradaScreen() {
           cpf: normalizeCpf(cpf),
           phoneE164: normalizePhoneE164(phone),
         },
-        couponCode: couponCode || undefined,
+        couponCode: usingHourBank ? undefined : couponCode || undefined,
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
       });
 
-      setDone({ sessionId: res.sessionId, accessCode: res.accessCode, exitPin: res.exitPin, childName: childName.trim() });
+      setDone({
+        sessionId: res.sessionId,
+        accessCode: res.accessCode,
+        exitPin: res.exitPin,
+        childName: childName.trim(),
+        guardianId: res.guardianId,
+        // Plano acima de 2h vendido agora: habilita o botão do contrato de
+        // prestação de serviços (banco de horas garantido em contrato).
+        contractPlan:
+          selectedPlan && planDurationMinutes(selectedPlan) > threshold
+            ? { name: selectedPlan.name, valueCents: selectedPlan.valueCents, minutes: planDurationMinutes(selectedPlan) }
+            : null,
+      });
       setLastGuardianId(res.guardianId);
 
       if (quickUpsellAccepted && quickProduct) {
@@ -435,6 +480,17 @@ export function EntradaScreen() {
               <strong style={{ fontFamily: "var(--font-display)", letterSpacing: "3px" }}>{done.exitPin}</strong>
             </span>
           </div>
+          {done.contractPlan && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setContractOpen(true)}
+              title="Preencher os dados do Responsável Contratante e imprimir o contrato em A4 (2 vias)"
+              style={{ borderColor: "var(--color-teal)", color: "var(--color-teal-text)" }}
+            >
+              📄 Imprimir contrato do plano
+            </Button>
+          )}
           {lastGuardianId && (
             <Button
               variant="secondary"
@@ -635,9 +691,41 @@ export function EntradaScreen() {
       <section>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px 0" }}>2. Plano de permanência</h2>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          {/* Banco de horas antes dos planos pagos, de propósito: a regra é
+              usar o saldo que a família já pagou ANTES de vender plano novo. */}
+          {matchedChild && hourBank && (
+            <Card
+              onClick={() => setPlanId(HOUR_BANK)}
+              title="Usar o saldo de horas já pago em visitas anteriores (vale em qualquer unidade)"
+              style={{
+                cursor: "pointer",
+                padding: "14px 18px",
+                minWidth: "180px",
+                borderRadius: "16px",
+                border: usingHourBank ? "2px solid var(--color-teal)" : "2px dashed var(--color-teal)",
+                background: usingHourBank ? "rgba(46, 207, 181, 0.10)" : "var(--surface-card)",
+              }}
+            >
+              <strong style={{ fontSize: "16px", display: "block", color: "var(--color-teal-text)" }}>
+                🕐 Usar banco de horas
+              </strong>
+              <div style={{ fontSize: "18px", color: "var(--color-teal-text)", fontWeight: "bold", marginTop: "2px" }}>
+                {formatPlanoHoras(hourBank.remainingMinutes)} disponíveis
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                vence {new Date(hourBank.nextExpiryMs).toLocaleDateString("pt-BR")} · sem custo de entrada
+              </div>
+            </Card>
+          )}
           {plans.map((plan) => {
-            const fits = remainingMinutes === null || planDurationMinutes(plan) <= remainingMinutes;
             const minutes = planDurationMinutes(plan);
+            // Planos acima de 2h não são mais bloqueados perto do fechamento:
+            // a sobra vira crédito no banco de horas em vez de se perder.
+            // Só continuam bloqueados quando o shopping já está fechando.
+            const fits =
+              remainingMinutes === null ||
+              minutes <= remainingMinutes ||
+              (minutes > threshold && remainingMinutes > 0);
             return (
               <Card
                 key={plan.id}
@@ -854,9 +942,25 @@ export function EntradaScreen() {
           style={{ borderRadius: "9999px", padding: "16px" }}
           title="Registrar a entrada e imprimir a pulseira e o recibo de guarda"
         >
-          Confirmar entrada{selectedPlan ? ` — ${money(selectedPlan.valueCents + (quickUpsellAccepted && quickProduct ? quickProduct.price_cents : 0))}` : ""}
+          Confirmar entrada
+          {usingHourBank
+            ? " — Banco de horas (R$ 0,00)"
+            : selectedPlan
+              ? ` — ${money(selectedPlan.valueCents + (quickUpsellAccepted && quickProduct ? quickProduct.price_cents : 0))}`
+              : ""}
         </Button>
       </div>
+
+      {/* Contrato dos planos acima de 2h: dados do Responsável Contratante
+          + impressão A4 com timbre da unidade, em 2 vias. */}
+      {contractOpen && done?.contractPlan && (
+        <ContractModal
+          guardianId={done.guardianId}
+          childName={done.childName}
+          plan={done.contractPlan}
+          onClose={() => setContractOpen(false)}
+        />
+      )}
 
       {/* Modal de Cross-Selling Automático para pacotes >= 1h */}
       {crossSellModalOpen && (
