@@ -2,6 +2,7 @@ import { quoteForSession } from "@facaamigos/domain";
 import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
+import { compressImageForUpload } from "../lib/imageCompression.js";
 
 export interface ApiError {
   error: string;
@@ -560,9 +561,48 @@ export interface Shift {
 }
 
 export interface CashMovement {
+  id: string;
   kind: "TROCO_INICIAL" | "SANGRIA" | "SUPRIMENTO" | "AJUSTE";
   amount_cents: number;
   reason: string | null;
+  envelope_number: string | null;
+  photo_url: string | null;
+  employee_id: string;
+  at_ms: number;
+}
+
+export interface UnitShiftRow {
+  id: string;
+  unit_id: string;
+  status: "ABERTO" | "FECHADO";
+  opening_cash_cents: number;
+  opened_at_ms: number;
+  closed_at_ms: number | null;
+  opened_by_employee_id: string;
+  closed_by_employee_id: string | null;
+}
+
+export interface EnvelopeMovement {
+  id: string;
+  shift_id: string;
+  amount_cents: number;
+  reason: string | null;
+  envelope_number: string | null;
+  photo_url: string | null;
+  employee_id: string;
+  at_ms: number;
+  fa_kiosk_shifts: { unit_id: string }[];
+}
+
+export interface UnitCashStatus {
+  unit_id: string;
+  unit_name: string;
+  shift_id: string | null;
+  status: "ABERTO" | "FECHADO" | null;
+  opened_at_ms: number | null;
+  closed_at_ms: number | null;
+  opening_cash_cents: number | null;
+  current_cash_cents: number | null;
 }
 
 export interface ShiftSale {
@@ -1224,18 +1264,67 @@ export const Api = {
       "fa_close_shift",
       { p_shift_id: shiftId, p_employee_id: body.employeeId, p_declared: body.declared },
     ),
-  cashMovement: (shiftId: string, body: { employeeId: string; kind: string; amountCents: number; reason?: string }) =>
+  cashMovement: (shiftId: string, body: { employeeId: string; kind: string; amountCents: number; reason?: string; envelopeNumber?: string; photoUrl?: string }) =>
     callResilient("fa_record_cash_movement", {
       p_shift_id: shiftId,
       p_kind: body.kind,
       p_amount_cents: body.amountCents,
       p_reason: body.reason ?? null,
       p_employee_id: body.employeeId,
+      p_envelope_number: body.envelopeNumber ?? null,
+      p_photo_url: body.photoUrl ?? null,
     }),
   cashMovements: (shiftId: string) =>
     unwrap<CashMovement[]>(
-      supabase().from("fa_kiosk_cash_movements").select("kind, amount_cents, reason").eq("shift_id", shiftId),
+      supabase()
+        .from("fa_kiosk_cash_movements")
+        .select("id, kind, amount_cents, reason, envelope_number, photo_url, employee_id, at_ms")
+        .eq("shift_id", shiftId)
+        .order("at_ms", { ascending: true }),
     ),
+  // Upload direto para o bucket público `envelope-fotos` (ver migration
+  // fa_kiosk_envelope_photos_cash_status) — mesmo padrão de uploadAssetPhoto,
+  // mas comprimida antes: foto de câmera sem redimensionar chegava a vários
+  // MB por envelope e inflava o Storage sem necessidade (ver imageCompression.ts).
+  uploadEnvelopePhoto: async (unitId: string, file: File): Promise<string> => {
+    const optimized = await compressImageForUpload(file);
+    const ext = optimized.type === "image/png" ? "png" : "jpg";
+    const path = `${unitId}/${Date.now()}.${ext}`;
+    const { error } = await supabase().storage.from("envelope-fotos").upload(path, optimized, {
+      contentType: optimized.type,
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    const { data } = supabase().storage.from("envelope-fotos").getPublicUrl(path);
+    return data.publicUrl;
+  },
+  // Histórico de abertura/fechamento de turno por unidade (ou todas, se
+  // unitId for null) — usado pela aba gerencial "Abertura e Fechamento".
+  unitShifts: (unitId: string | null) => {
+    let query = supabase()
+      .from("fa_kiosk_shifts")
+      .select("id, unit_id, status, opening_cash_cents, opened_at_ms, closed_at_ms, opened_by_employee_id, closed_by_employee_id")
+      .order("opened_at_ms", { ascending: false })
+      .limit(100);
+    if (unitId) query = query.eq("unit_id", unitId);
+    return unwrap<UnitShiftRow[]>(query);
+  },
+  // Sangrias com número de envelope registrado (com ou sem foto ainda),
+  // mais recentes primeiro — usado pela aba gerencial "Fotos de Envelope".
+  envelopeMovements: (unitId: string | null) => {
+    let query = supabase()
+      .from("fa_kiosk_cash_movements")
+      .select("id, shift_id, amount_cents, reason, envelope_number, photo_url, employee_id, at_ms, fa_kiosk_shifts!inner(unit_id)")
+      .eq("kind", "SANGRIA")
+      .not("envelope_number", "is", null)
+      .order("at_ms", { ascending: false })
+      .limit(200);
+    if (unitId) query = query.eq("fa_kiosk_shifts.unit_id", unitId);
+    return unwrap<EnvelopeMovement[]>(query);
+  },
+  // Saldo físico em caixa por unidade agora (ver RPC fa_units_cash_status) —
+  // usado pela aba gerencial "Saldo em Caixa".
+  unitsCashStatus: () => unwrap<UnitCashStatus[]>(supabase().rpc("fa_units_cash_status")),
   revenueByMethod: async (shiftId: string) => {
     const rows = await unwrap<{ method: string; amount_cents: number }[]>(
       supabase().from("fa_kiosk_payments").select("method, amount_cents, fa_kiosk_orders!inner(shift_id)").eq("fa_kiosk_orders.shift_id", shiftId),

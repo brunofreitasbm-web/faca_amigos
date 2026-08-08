@@ -37,15 +37,16 @@ export function CaixaScreen() {
   // OFFLINE_FLUSH_EVENT abaixo resolve isso quando a fila reenviar sozinha.
   const [pendingCloseKey, setPendingCloseKey] = useState<string | null>(null);
 
-  // Estados do Modal "Registrar Envelope" (Módulo FaçaAmigos)
+  // Estados do Modal "Registrar Envelope"
   const [envelopeModalOpen, setEnvelopeModalOpen] = useState(false);
   const [envelopeNum, setEnvelopeNum] = useState("");
   const [envelopeVal, setEnvelopeVal] = useState("0");
   const [envelopeObs, setEnvelopeObs] = useState("");
+  const [envelopePhoto, setEnvelopePhoto] = useState<File | null>(null);
   const [envelopeBusy, setEnvelopeBusy] = useState(false);
 
   async function handleSaveEnvelope() {
-    if (!unit || !employee) return;
+    if (!unit || !employee || !shift) return;
     const amountCents = Math.round(Number(envelopeVal) * 100);
     if (amountCents <= 0) {
       alert("Informe um valor válido maior que zero para o envelope.");
@@ -53,36 +54,22 @@ export function CaixaScreen() {
     }
     setEnvelopeBusy(true);
     try {
-      // 1. Envia registro para a API de sangrias/envelopes do Módulo FaçaAmigos
-      await fetch("/api/caixa/sangrias", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          shift_id: shift?.id,
-          unit_id: unit.id,
-          amount_cents: amountCents,
-          reason: envelopeObs ? `Envelope #${envelopeNum}: ${envelopeObs}` : `Envelope #${envelopeNum}`,
-          envelope_number: envelopeNum,
-          employee_id: employee.id,
-          employee_name: employee.full_name,
-        }),
+      const photoUrl = envelopePhoto ? await Api.uploadEnvelopePhoto(unit.id, envelopePhoto) : undefined;
+      await Api.cashMovement(shift.id, {
+        employeeId: employee.id,
+        kind: "SANGRIA",
+        amountCents,
+        reason: envelopeObs || undefined,
+        envelopeNumber: envelopeNum,
+        photoUrl,
       });
-
-      // 2. Se o turno estiver aberto, lança também a sangria no controle do turno
-      if (shift) {
-        await Api.cashMovement(shift.id, {
-          employeeId: employee.id,
-          kind: "SANGRIA",
-          amountCents,
-          reason: `Envelope #${envelopeNum}${envelopeObs ? ` - ${envelopeObs}` : ""}`,
-        });
-      }
 
       alert(`Envelope #${envelopeNum} registrado com sucesso!`);
       setEnvelopeModalOpen(false);
       setEnvelopeNum("");
       setEnvelopeVal("0");
       setEnvelopeObs("");
+      setEnvelopePhoto(null);
       await refresh();
     } catch {
       alert("Erro ao registrar o envelope.");
@@ -249,6 +236,15 @@ export function CaixaScreen() {
               value={envelopeObs}
               onChange={(e) => setEnvelopeObs(e.target.value)}
             />
+            <div>
+              <label style={{ fontSize: "13px", fontWeight: "bold", display: "block", marginBottom: "4px" }}>Foto do Envelope (opcional — JPG ou PNG)</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                capture="environment"
+                onChange={(e) => setEnvelopePhoto(e.target.files?.[0] ?? null)}
+              />
+            </div>
 
             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "16px" }}>
               <Button
@@ -278,7 +274,6 @@ export function CaixaScreen() {
   if (shift === null) {
     return (
       <div style={{ maxWidth: "420px", margin: "60px auto", display: "flex", flexDirection: "column", gap: "16px" }}>
-        {renderEnvelopeModal()}
         <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno</h1>
         <HelpText>
           É preciso abrir o turno de caixa antes de vender no PDV ou fechar atendimentos. Informe quanto dinheiro
@@ -286,14 +281,9 @@ export function CaixaScreen() {
         </HelpText>
         <Input label="Troco inicial (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
-            Abrir turno
-          </Button>
-          <Button variant="secondary" size="lg" onClick={() => setEnvelopeModalOpen(true)}>
-            ✉️ Registrar Envelope
-          </Button>
-        </div>
+        <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
+          Abrir turno
+        </Button>
       </div>
     );
   }

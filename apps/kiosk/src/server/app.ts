@@ -16,12 +16,19 @@ import { registerPosVisitaRoutes } from "./routes/pos-visita.js";
 import { registerAniversariosRoutes } from "./routes/aniversarios.js";
 import { registerCaixaFaRoutes } from "./routes/caixa-fa.js";
 import { registerTickChannel } from "./ws-tick.js";
+import { registerStaticSpa } from "./staticSpa.js";
 import { ValidationError, ConflictError } from "./validate.js";
 import type { TlsMaterial } from "./tls.js";
 
 export interface BuildAppOptions {
   /** Quando presente, o servidor sobe em HTTPS (seção 7.3 do plano) — ver src/server/tls.ts. */
   tls?: TlsMaterial;
+  /**
+   * Diretório do build da SPA (apps/kiosk-ui/dist). Quando presente, o
+   * servidor a serve na raiz com fallback SPA — o import de `electron`
+   * fica fora daqui de propósito: main.ts e start.ts resolvem o caminho.
+   */
+  uiDist?: string;
 }
 
 /**
@@ -68,6 +75,8 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
   registerAniversariosRoutes(app, ctx);
   registerCaixaFaRoutes(app, ctx);
   registerTickChannel(app, ctx);
+
+  if (opts.uiDist) await registerStaticSpa(app, opts.uiDist);
 
   return app;
 }

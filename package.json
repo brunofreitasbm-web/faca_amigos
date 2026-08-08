@@ -13,10 +13,14 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
+    "icons": "node scripts/generate-icons.mjs",
+    "dist:kiosk": "turbo run build --filter=@facaamigos/kiosk... --filter=@facaamigos/kiosk-ui... && pnpm icons && pnpm --filter @facaamigos/kiosk dist",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\""
   },
   "devDependencies": {
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.33.5",
     "turbo": "^2.3.0",
     "typescript": "^5.7.0",
     "prettier": "^3.4.0"

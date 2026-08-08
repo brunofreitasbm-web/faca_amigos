@@ -30,6 +30,8 @@
     "eslint": "catalog:",
     "typescript": "catalog:",
     "vite": "^5.4.11",
-    "vitest": "catalog:"
+    "vite-plugin-pwa": "^0.20.5",
+    "vitest": "catalog:",
+    "workbox-window": "^7.4.1"
   }
 }

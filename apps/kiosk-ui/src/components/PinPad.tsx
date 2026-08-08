@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button, BackspaceIcon } from "@facaamigos/ui";
 
 interface PinPadProps {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: () => void;
+  onSubmit: (pin?: string) => void;
   disabled?: boolean;
+  hasError?: boolean;
 }
 
 /**
@@ -13,17 +14,27 @@ interface PinPadProps {
  * dia deve ser mais clicável, digitar o mínimo). Usado para PIN de
  * login e troca rápida de operador entre atendimentos (seção 7.1).
  *
- * Além dos botões na tela, escuta o teclado físico via `keydown` global:
- * balcões com teclado numérico USB conectado não devem obrigar o operador
- * a tocar na tela para cada dígito. `document`, não um `onKeyDown` no
- * container, porque o foco pode estar em qualquer lugar (o teclado numérico
- * costuma nem ter um elemento pra focar) — e some ao desmontar, então dois
- * PinPad nunca competem pelo mesmo evento.
+ * Entra automaticamente ao atingir 6 dígitos (dispensa o Enter).
+ * Além dos botões na tela, escuta o teclado físico via `keydown` global.
  */
-export function PinPad({ value, onChange, onSubmit, disabled }: PinPadProps) {
+export function PinPad({ value, onChange, onSubmit, disabled, hasError }: PinPadProps) {
+  const [shaking, setShaking] = useState(false);
+
+  useEffect(() => {
+    if (hasError) {
+      setShaking(true);
+      const timer = setTimeout(() => setShaking(false), 450);
+      return () => clearTimeout(timer);
+    }
+  }, [hasError]);
+
   function press(digit: string) {
-    if (value.length >= 6) return;
-    onChange(value + digit);
+    if (disabled || value.length >= 6) return;
+    const next = value + digit;
+    onChange(next);
+    if (next.length === 6) {
+      onSubmit(next);
+    }
   }
 
   useEffect(() => {
@@ -31,8 +42,14 @@ export function PinPad({ value, onChange, onSubmit, disabled }: PinPadProps) {
     function handleKeydown(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (/^[0-9]$/.test(e.key)) {
-        e.preventDefault();
-        onChange((value + e.key).slice(0, 6));
+        if (value.length < 6) {
+          e.preventDefault();
+          const next = value + e.key;
+          onChange(next);
+          if (next.length === 6) {
+            onSubmit(next);
+          }
+        }
       } else if (e.key === "Backspace") {
         e.preventDefault();
         onChange(value.slice(0, -1));
@@ -42,7 +59,7 @@ export function PinPad({ value, onChange, onSubmit, disabled }: PinPadProps) {
       } else if (e.key === "Enter") {
         if (value.length === 6) {
           e.preventDefault();
-          onSubmit();
+          onSubmit(value);
         }
       }
     }
@@ -51,8 +68,17 @@ export function PinPad({ value, onChange, onSubmit, disabled }: PinPadProps) {
   }, [value, onChange, onSubmit, disabled]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
-      <div style={{ fontFamily: "var(--font-body)", fontSize: "28px", letterSpacing: "8px", minHeight: "36px" }}>
+    <div className={shaking ? "pin-pad-shake" : ""} style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
+      <div
+        style={{
+          fontFamily: "var(--font-body)",
+          fontSize: "28px",
+          letterSpacing: "8px",
+          minHeight: "36px",
+          color: hasError ? "var(--color-error-text, #ef4444)" : "inherit",
+          transition: "color 0.2s ease",
+        }}
+      >
         {"•".repeat(value.length).padEnd(6, "○")}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 64px)", gap: "10px" }}>
@@ -71,8 +97,8 @@ export function PinPad({ value, onChange, onSubmit, disabled }: PinPadProps) {
           <BackspaceIcon />
         </Button>
       </div>
-      <Button variant="primary" size="lg" fullWidth disabled={disabled || value.length !== 6} onClick={onSubmit}>
-        Entrar
+      <Button variant="primary" size="lg" fullWidth disabled={disabled || value.length !== 6} onClick={() => onSubmit(value)}>
+        {disabled ? "Validando…" : "Entrar"}
       </Button>
     </div>
   );

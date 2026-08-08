@@ -3,7 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withTransaction, type Db } from "./connection.js";
 
-const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "migrations");
+// No app Electron empacotado o bundle esbuild muda o import.meta.url e os
+// .sql viajam como extraResources — o caminho real chega por env var.
+const MIGRATIONS_DIR =
+  process.env.FACAAMIGOS_MIGRATIONS_DIR ?? join(dirname(fileURLToPath(import.meta.url)), "migrations");
 
 /**
  * Aplica em ordem os arquivos .sql de `migrations/` ainda não

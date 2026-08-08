@@ -9,7 +9,6 @@ export interface PosVisitaItem {
   phone_e164: string;
   child_name: string;
   last_visit_date: string;
-  last_visit_date: string;
   status: "PENDENTE" | "CONTATADO";
   notes?: string;
   updated_at_ms: number;

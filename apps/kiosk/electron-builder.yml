@@ -1,0 +1,35 @@
+# Instalador Windows one-click (NSIS). Fluxo completo: `pnpm dist:kiosk`
+# na raiz (builda workspace + ícones + kiosk-ui antes de empacotar).
+appId: br.com.facaamigos.kiosk
+productName: FacaAmigos Kiosk
+directories:
+  output: release
+  buildResources: build
+files:
+  - bundle/**
+  - package.json
+asar: true
+npmRebuild: false
+extraResources:
+  # SPA servida pelo Fastify local (ver src/server/staticSpa.ts)
+  - from: ../kiosk-ui/dist
+    to: kiosk-ui
+  # Migrations .sql lidas em runtime (ver packages/db-local/src/migrate.ts)
+  - from: ../../packages/db-local/dist/migrations
+    to: migrations
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: FacaAmigos-Kiosk-Setup-${version}.${ext}
+nsis:
+  oneClick: true
+  # perMachine + elevação: necessário para o installer.nsh abrir a porta
+  # 7317 no firewall (acesso LAN aos tablets) — custa um prompt de UAC.
+  perMachine: true
+  allowElevation: true
+  runAfterFinish: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  include: build/installer.nsh

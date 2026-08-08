@@ -247,6 +247,25 @@ export function EntradaScreen() {
     if (query.trim() && !/\d/.test(query)) setChildName(query.trim());
   }
 
+  // Próxima criança do MESMO responsável (irmão/irmã). Os dados do
+  // responsável já ficam preservados pelo resetForNextChild(true) após o
+  // check-in — este atalho só abre o cadastro direto, com eles prefilados,
+  // em vez de deixar o operador descobrir isso sozinho pela dica de texto.
+  // Pode ser tocado quantas vezes forem as crianças da família.
+  function addSiblingChild() {
+    setQuery("");
+    setChildName("");
+    setBirthDate("");
+    setIsNeurodivergent(false);
+    setSelectedSensoryTags([]);
+    setCustomNotes("");
+    setChildPhoto(null);
+    setShowNewForm(true);
+    setMatchedChild(null);
+    setMatches([]);
+    setOffer(null);
+  }
+
   function toggleSensoryTag(tag: string) {
     setSelectedSensoryTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   }
@@ -416,6 +435,16 @@ export function EntradaScreen() {
               <strong style={{ fontFamily: "var(--font-display)", letterSpacing: "3px" }}>{done.exitPin}</strong>
             </span>
           </div>
+          {lastGuardianId && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={addSiblingChild}
+              title={`Registrar a entrada de mais uma criança de ${guardianName}`}
+            >
+              ＋ Mais uma criança deste responsável
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={reprint} title="Reenviar as duas vias para a impressora">
             🖨️ Reimprimir
           </Button>
@@ -558,8 +587,11 @@ export function EntradaScreen() {
         {showNewForm && (
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "14px", border: "1px solid var(--border-subtle)", borderRadius: "14px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ fontSize: "14px" }}>Cadastro novo</strong>
-              <Button variant="ghost" size="sm" onClick={() => resetForNextChild(false)}>
+              <strong style={{ fontSize: "14px" }}>
+                Cadastro novo
+                {lastGuardianId && guardianName ? ` — responsável ${guardianName} já preenchido` : ""}
+              </strong>
+              <Button variant="ghost" size="sm" onClick={() => resetForNextChild(Boolean(lastGuardianId))}>
                 Voltar para a busca
               </Button>
             </div>
@@ -581,9 +613,19 @@ export function EntradaScreen() {
         )}
 
         {lastGuardianId && !matchedChild && !showNewForm && (
-          <Tag color="var(--color-teal)" title="Os dados do responsável seguem preenchidos para o irmão/irmã">
-            ➕ Mesmo responsável ({guardianName}) — busque ou cadastre a próxima criança
-          </Tag>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <Tag color="var(--color-teal)" title="Os dados do responsável seguem preenchidos para o irmão/irmã">
+              ➕ Mesmo responsável ({guardianName}) — busque ou cadastre a próxima criança
+            </Tag>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={addSiblingChild}
+              title={`Cadastrar mais uma criança de ${guardianName}, com os dados do responsável já preenchidos`}
+            >
+              ＋ Mais uma criança deste responsável
+            </Button>
+          </div>
         )}
       </section>
 
@@ -667,6 +709,22 @@ export function EntradaScreen() {
             <Tag color="var(--color-teal)" style={{ marginBottom: "8px" }}>
               Carrinho de sempre já reservado
             </Tag>
+          )}
+          {assets.length > 0 && assets.every((a) => a.status !== "DISPONIVEL") && (
+            <div
+              role="alert"
+              style={{
+                fontSize: "13px",
+                color: "var(--color-error-text)",
+                background: "rgba(232,48,48,0.08)",
+                border: "1px solid var(--color-error)",
+                borderRadius: "10px",
+                padding: "8px 12px",
+                marginBottom: "10px",
+              }}
+            >
+              ⚠️ Lotação máxima atingida: todos os {assets.length} carrinhos cadastrados estão em uso ou em manutenção.
+            </div>
           )}
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             {assets.map((asset) => (

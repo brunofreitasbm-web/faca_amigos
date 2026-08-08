@@ -34,6 +34,10 @@ import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
 import { PosVisitaScreen } from "./screens/PosVisitaScreen.js";
 import { AniversariosScreen } from "./screens/AniversariosScreen.js";
 import { GerencialApp } from "./screens/gerencial/GerencialApp.js";
+import { ConnectDeviceModal } from "./components/ConnectDeviceModal.js";
+import { ConnectionStatusChip } from "./components/ConnectionStatusChip.js";
+import { InstallPwaBanner } from "./components/InstallPwaBanner.js";
+import { isElectronLocal } from "./pwa.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
   { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir a pulseira e o recibo de guarda", icon: <SignInIcon /> },
@@ -66,6 +70,7 @@ export function App() {
   const { can, loading: loadingCapabilities } = useAuth();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
+  const [showConnectModal, setShowConnectModal] = useState(false);
 
   // Cada módulo/unidade selecionado sempre abre direto no Painel (tela principal do sistema).
   useEffect(() => {
@@ -182,7 +187,23 @@ export function App() {
           ))}
         </nav>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <ConnectionStatusChip />
+
+          {/* Pareamento por QR: só faz sentido no computador do balcão —
+              no celular/tablet quem guia a instalação é o InstallPwaBanner. */}
+          {isElectronLocal() && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowConnectModal(true)}
+              title="Conectar celular/tablet lendo um QR Code — instala o aplicativo no aparelho"
+              style={{ fontSize: "12px", border: "1px solid var(--color-teal)", color: "var(--color-teal-text)", background: "rgba(29, 155, 132, 0.08)" }}
+            >
+              📱 Conectar celular/tablet
+            </Button>
+          )}
+
           <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: "var(--weight-semibold)" as unknown as number }}>
             {employee.full_name} · {ROLE_LABEL[employee.role]}
           </span>
@@ -208,6 +229,10 @@ export function App() {
           </Button>
         </div>
       </header>
+
+      {showConnectModal && <ConnectDeviceModal onClose={() => setShowConnectModal(false)} />}
+
+      <InstallPwaBanner />
 
       {/* flex:1 + minHeight:0 é o que faz o filho poder ser 100% de altura
           sem estourar o pai — sem minHeight:0 um flex item nunca encolhe

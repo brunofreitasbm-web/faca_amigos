@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Api, systemStatus } from "../api/client.js";
+import { systemStatus } from "../api/client.js";
+import { isElectronLocal } from "../pwa.js";
 
 type Failure = "backend" | "print" | null;
 
@@ -15,6 +16,10 @@ export function SystemStatusOverlay() {
 
   useEffect(() => {
     function onBackendDown() {
+      // Só no desktop/Electron existe backend local (127.0.0.1:7317). No
+      // celular/tablet (PWA da Vercel) esse evento nunca deve cobrir a
+      // tela — lá o estado de rede é o ConnectionStatusChip do cabeçalho.
+      if (!isElectronLocal()) return;
       setFailure((prev) => prev ?? "backend");
     }
     function onBackendUp() {
@@ -39,12 +44,16 @@ export function SystemStatusOverlay() {
     };
   }, []);
 
-  // Enquanto o backend estiver marcado como fora do ar, tenta reconectar sozinho.
+  // Enquanto o backend estiver marcado como fora do ar, tenta reconectar
+  // sozinho — sondando o próprio servidor local (/api/health), não o
+  // Supabase: Api.units() hoje vai para a nuvem e daria falso "voltou".
   useEffect(() => {
     if (failure !== "backend") return;
     const interval = setInterval(() => {
-      Api.units()
-        .then(() => setFailure(null))
+      fetch("/api/health", { cache: "no-store" })
+        .then((res) => {
+          if (res.ok) setFailure(null);
+        })
         .catch(() => {});
     }, 3000);
     return () => clearInterval(interval);

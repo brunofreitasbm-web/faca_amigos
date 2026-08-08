@@ -167,3 +167,14 @@ body {
 .report-table tbody tr:hover td {
   background: var(--surface-sunken);
 }
+
+/* ---------- PinPad: Animação e feedback visual de erro ---------- */
+@keyframes pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-10px); }
+  40%, 80% { transform: translateX(10px); }
+}
+
+.pin-pad-shake {
+  animation: pin-shake 0.4s ease-in-out;
+}

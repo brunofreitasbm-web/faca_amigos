@@ -12,11 +12,12 @@ import { MetasTab } from "./tabs/MetasTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
 import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
-import { FaMensalTab } from "./tabs/FaMensalTab.js";
-import { FaDashboardTab } from "./tabs/FaDashboardTab.js";
-import { FaHistoricoTab } from "./tabs/FaHistoricoTab.js";
+import { AberturaFechamentoTab } from "./tabs/AberturaFechamentoTab.js";
+import { FotosEnvelopeTab } from "./tabs/FotosEnvelopeTab.js";
+import { SaldoCaixaTab } from "./tabs/SaldoCaixaTab.js";
+import { HistoricoTab } from "./tabs/HistoricoTab.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS" | "FOLHA" | "FA_MENSAL" | "FA_DASHBOARD" | "FA_HISTORICO";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_CAIXA" | "HISTORICO";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "PLANOS", label: "Planos de Preços" },
@@ -28,9 +29,10 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "COLABORADORES", label: "Colaboradores" },
   { value: "FOLHA", label: "Folha de Pagamento" },
   { value: "RELATORIOS", label: "Relatórios" },
-  { value: "FA_MENSAL", label: "Menu Mensal (FA)" },
-  { value: "FA_DASHBOARD", label: "Dashboard (FA)" },
-  { value: "FA_HISTORICO", label: "Histórico (FA)" },
+  { value: "ABERTURA_FECHAMENTO", label: "Abertura e Fechamento" },
+  { value: "FOTOS_ENVELOPE", label: "Fotos de Envelope" },
+  { value: "SALDO_CAIXA", label: "Saldo em Caixa" },
+  { value: "HISTORICO", label: "Histórico" },
 ];
 
 const TAB_HELP: Record<GerencialTab, string> = {
@@ -43,9 +45,10 @@ const TAB_HELP: Record<GerencialTab, string> = {
   COLABORADORES: "Cadastro único de toda a equipe — escolha em qual(is) unidade(s) cada colaborador atua.",
   FOLHA: "Extrato mensal de salários, dados bancários e fechamento da folha para conferência e exportação/Bradesco.",
   RELATORIOS: "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só.",
-  FA_MENSAL: "Visão mensal consolidada FaçaAmigos com fechamentos, metas diárias e locações por competência.",
-  FA_DASHBOARD: "Indicadores em tempo real, velocidade de vendas (30m, 1h, 2h) e retenção do Módulo FaçaAmigos.",
-  FA_HISTORICO: "Histórico auditável de registros de envelopes, sangrias e movimentações operacionais.",
+  ABERTURA_FECHAMENTO: "Horário de abertura e fechamento do caixa de cada loja, quem abriu/fechou e o troco inicial.",
+  FOTOS_ENVELOPE: "Fotos dos envelopes de sangria registrados em cada loja, com valor e operador responsável.",
+  SALDO_CAIXA: "Quanto dinheiro físico tem na gaveta de cada loja neste momento.",
+  HISTORICO: "Fluxograma visual de onde o dinheiro do turno veio e para onde foi, para facilitar a conferência.",
 };
 
 
@@ -106,9 +109,10 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "COLABORADORES" && <ColaboradoresTab />}
               {tab === "FOLHA" && <FolhaPagamentoTab />}
               {tab === "RELATORIOS" && <GerencialRelatorioTab />}
-              {tab === "FA_MENSAL" && <FaMensalTab />}
-              {tab === "FA_DASHBOARD" && <FaDashboardTab />}
-              {tab === "FA_HISTORICO" && <FaHistoricoTab />}
+              {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
+              {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
+              {tab === "SALDO_CAIXA" && <SaldoCaixaTab />}
+              {tab === "HISTORICO" && <HistoricoTab />}
             </div>
           </div>
         </RequireCapability>

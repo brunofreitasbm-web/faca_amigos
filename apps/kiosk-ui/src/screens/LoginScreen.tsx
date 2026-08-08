@@ -123,11 +123,15 @@ function PinEntry({
       <PinPad
         value={pin}
         onChange={setPin}
-        onSubmit={() => {
-          onSubmit(pin);
-          setPin("");
+        onSubmit={(completedPin) => {
+          const pinToSubmit = completedPin || pin;
+          if (pinToSubmit.length === 6) {
+            onSubmit(pinToSubmit);
+            setPin("");
+          }
         }}
         disabled={busy}
+        hasError={Boolean(error)}
       />
       <Button variant="ghost" onClick={onBack}>
         não é você? trocar

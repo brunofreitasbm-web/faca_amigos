@@ -19,6 +19,7 @@ release/
 apps/kiosk/dist/
 apps/kiosk/out/
 apps/kiosk/release/
+apps/kiosk/bundle/
 *.exe
 *.msi
 *.dmg

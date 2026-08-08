@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { ActiveSessionEntry, Plan } from "../api/client.js";
+import type { ActiveSessionEntry, Plan, Asset } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
@@ -60,6 +60,12 @@ export function PainelScreen() {
   // do documento antes de cair no mesmo fechamento financeiro de sempre.
   const [manualExitFor, setManualExitFor] = useState<ActiveSessionEntry | null>(null);
   const [vipChildIds, setVipChildIds] = useState<Set<string>>(new Set());
+  const [assets, setAssets] = useState<Asset[]>([]);
+
+  useEffect(() => {
+    if (!unit) return;
+    Api.assets(unit.id).then(setAssets).catch(() => setAssets([]));
+  }, [unit, entries.length]);
 
   useEffect(() => {
     if (!unit) return;
@@ -230,7 +236,7 @@ export function PainelScreen() {
 
   if (!unit) return null;
 
-  const maxCapacity = unit.kind === "LOJA" ? 22 : 10;
+  const maxCapacity = unit.kind === "LOJA" ? 22 : (assets.length > 0 ? assets.length : 12);
   const currentOccupancy = entries.length;
   const occupancyPercent = Math.min(100, Math.round((currentOccupancy / maxCapacity) * 100));
 
@@ -264,7 +270,9 @@ export function PainelScreen() {
         <div>
           <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 3vw, 28px)" }}>Painel</h1>
           <p style={{ margin: "4px 0 0 0", color: "var(--text-secondary)", fontSize: "14px" }}>
-            Acompanhamento em tempo real das crianças no playground
+            {unit.kind === "QUIOSQUE"
+              ? "Acompanhamento em tempo real dos carrinhos no circuito"
+              : "Acompanhamento em tempo real das crianças no playground"}
           </p>
           <HelpText style={{ marginTop: "4px" }}>
             Toque num cartão para selecioná-lo (fica com borda rosa) e depois em "Fechar sessões" para cobrar. O
@@ -275,7 +283,7 @@ export function PainelScreen() {
         {/* Gauge de Ocupação do Parque */}
         <div style={{ minWidth: "280px", flex: "0 1 340px" }} className="capacity-container">
           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "13px", fontWeight: "bold" }}>
-            <span>Ocupação: {currentOccupancy} / {maxCapacity} crianças</span>
+            <span>Ocupação: {currentOccupancy} / {maxCapacity} {unit.kind === "QUIOSQUE" ? "carrinhos" : "crianças"}</span>
             <span style={{ color: capacityTextColor }}>{occupancyPercent}% ({capacityLabel})</span>
           </div>
           <div className="capacity-bar-track">
