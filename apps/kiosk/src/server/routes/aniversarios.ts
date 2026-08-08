@@ -19,11 +19,6 @@ const ANIVERSARIO_TEMPLATES = [
     message: "Parabéns, {crianca}! 🎂🎈 O Faça Amigos deseja um aniversário repleto de alegria e brincadeiras! Como nosso presente especial para o(a) {crianca}, vocês ganharam 30 MINUTOS GRÁTIS na próxima visita este mês! Apresente esta mensagem na recepção. 🎉🎁",
   },
   {
-    id: "felicitacao_simples",
-    title: "Felicitação Carinhosa",
-    message: "Hoje o dia é todo do(a) {crianca}! 🎈✨ A equipe do Faça Amigos deseja um feliz aniversário com muita diversão! Venha comemorar com a gente! 🎠🍿",
-  },
-  {
     id: "cupom_aniversario",
     title: "Convite para Festa / Pacote Especial",
     message: "Olá {responsavel}! O aniversário do(a) {crianca} está chegando! 🎉 Sabia que você pode comemorar esse dia especial aqui no Faça Amigos? Fale com nossa equipe para garantir um pacote exclusivo com desconto de aniversário! 🎁🎂",

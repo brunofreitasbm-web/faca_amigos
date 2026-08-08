@@ -91,4 +91,41 @@ export function registerCaixaFaRoutes(app: FastifyInstance, ctx: AppContext): vo
     bonificacaoStore.set(id, item);
     return { success: true, item };
   });
+
+  app.get<{ Querystring: { unitId?: string; competencia?: string } }>("/api/caixa/gerencial-fa-stats", async (req) => {
+    const { unitId, competencia } = req.query;
+    let sangrias = sangriasStore;
+    let bonificacoes = Array.from(bonificacaoStore.values());
+
+    if (unitId && unitId !== "todas") {
+      sangrias = sangrias.filter((s) => s.unit_id === unitId);
+      bonificacoes = bonificacoes.filter((b) => b.unit_id === unitId);
+    }
+
+    if (competencia) {
+      bonificacoes = bonificacoes.filter((b) => b.business_date.startsWith(competencia));
+    }
+
+    const totalSangriasCents = sangrias.reduce((acc, s) => acc + s.amount_cents, 0);
+    const totalEnvelopes = sangrias.filter((s) => Boolean(s.envelope_number)).length;
+    const totalLocacoes = bonificacoes.reduce((acc, b) => acc + b.locacoes_count, 0);
+    const totalVendas30m = bonificacoes.reduce((acc, b) => acc + b.vendas_30m, 0);
+    const totalVendas1h = bonificacoes.reduce((acc, b) => acc + b.vendas_1h, 0);
+    const totalVendas2h = bonificacoes.reduce((acc, b) => acc + b.vendas_2h, 0);
+
+    return {
+      stats: {
+        totalSangriasCents,
+        totalEnvelopes,
+        totalLocacoes,
+        totalVendas30m,
+        totalVendas1h,
+        totalVendas2h,
+        diasComLancamento: bonificacoes.length,
+      },
+      sangrias,
+      bonificacoes,
+    };
+  });
 }
+

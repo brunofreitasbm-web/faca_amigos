@@ -52,6 +52,17 @@ export interface Unit {
   cnpj?: string | null;
 }
 
+export interface Birthday {
+  id: string;
+  full_name: string;
+  birth_date: string;
+  age_turning: number;
+  guardian_name: string;
+  phone_e164: string;
+  day_of_month: number;
+  is_today: boolean;
+}
+
 export interface Employee {
   id: string;
   full_name: string;
@@ -1366,6 +1377,29 @@ export const Api = {
   bonusRulesAllUnits: () =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_rules").select("*")).then((rows) =>
       rows.map(bonusRuleFromRow),
+    ),
+
+  /**
+   * Aniversariantes do mês, só desta unidade — uma criança só aparece aqui
+   * se já teve check-in nesta unidade (fa_kiosk_children não tem unit_id
+   * próprio). Sem esse filtro, uma unidade veria os aniversariantes de
+   * todas as outras.
+   */
+  birthdaysByUnit: (unitId: string, month: number) =>
+    unwrap<Birthday[]>(supabase().rpc("fa_kiosk_birthdays_by_unit", { p_unit_id: unitId, p_month: month })).then(
+      (rows) => rows.sort((a, b) => a.day_of_month - b.day_of_month),
+    ),
+  /** Pool de 1000 mensagens de felicitação para sortear uma por criança. */
+  birthdayMessages: () =>
+    unwrap<{ id: number; message: string }[]>(supabase().from("fa_kiosk_birthday_messages").select("id, message")),
+  /**
+   * Registra que a felicitação já foi enviada este ano, nesta unidade — o
+   * card correspondente some da lista (fa_kiosk_birthdays_by_unit passa a
+   * excluí-lo) e só volta a aparecer no aniversário do ano seguinte.
+   */
+  markBirthdaySent: (unitId: string, childId: string, employeeId: string | null) =>
+    unwrap<null>(
+      supabase().rpc("fa_kiosk_mark_birthday_sent", { p_unit_id: unitId, p_child_id: childId, p_employee_id: employeeId }),
     ),
   createBonusRule: (body: { unitId: string; description: string; rewardValueCents: number }) =>
     unwrap<{ id: string }>(
