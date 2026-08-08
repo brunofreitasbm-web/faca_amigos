@@ -12,8 +12,11 @@ import {
   ChartBarIcon,
   GearIcon,
   ArrowClockwiseIcon,
+  ListIcon,
+  XIcon,
 } from "@facaamigos/ui";
 import { unitBrandFor } from "./branding/unitBrand.js";
+import { useSwipeNavigation } from "./hooks/useSwipeNavigation.js";
 import { useAppState } from "./state/AppState.js";
 import { useConfirm } from "./state/ConfirmContext.js";
 import { useAuth } from "./auth/AuthContext.js";
@@ -75,6 +78,7 @@ export function App() {
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   // Cada módulo/unidade selecionado sempre abre direto no Painel (tela principal do sistema).
   useEffect(() => {
@@ -91,6 +95,26 @@ export function App() {
     const firstAllowed = SCREENS.find((s) => can(SCREEN_CAPABILITY[s.value]));
     if (firstAllowed) setScreen(firstAllowed.value);
   }, [loadingCapabilities, employee, screen, can]);
+
+  // Calculado antes dos retornos antecipados abaixo (tela de login, seleção
+  // de módulo etc.) porque o gesto de arrastar já precisa dele — hooks não
+  // podem vir depois de um `return` condicional.
+  const visibleScreens = SCREENS.filter((s) => can(SCREEN_CAPABILITY[s.value]));
+
+  const swipeHandlers = useSwipeNavigation(
+    () => {
+      // Arrastar para a esquerda: próximo módulo, como virar a página.
+      const index = visibleScreens.findIndex((s) => s.value === screen);
+      const next = index !== -1 ? visibleScreens[index + 1] : undefined;
+      if (next) setScreen(next.value);
+    },
+    () => {
+      // Arrastar para a direita: módulo anterior.
+      const index = visibleScreens.findIndex((s) => s.value === screen);
+      const prev = index > 0 ? visibleScreens[index - 1] : undefined;
+      if (prev) setScreen(prev.value);
+    },
+  );
 
   async function handleChangeModule() {
     const ok = await confirm({
@@ -145,7 +169,6 @@ export function App() {
     return <SelectModuleScreen />;
   }
 
-  const visibleScreens = SCREENS.filter((s) => can(SCREEN_CAPABILITY[s.value]));
   const ScreenComponent = SCREEN_COMPONENTS[screen];
   const brand = unitBrandFor(unit.name);
 
@@ -174,17 +197,53 @@ export function App() {
           title={`${brand.icon} ${unit.name}`}
         />
 
-        <nav style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginLeft: "12px" }}>
+        {/* Só aparece em telas de celular (ver .kiosk-nav-toggle no
+            app.css) — no computador o menu completo já cabe ao lado da
+            marca e fica sempre aberto. */}
+        <button
+          type="button"
+          className="kiosk-nav-toggle"
+          onClick={() => setNavOpen((open) => !open)}
+          aria-expanded={navOpen}
+          aria-controls="kiosk-nav-menu"
+          title={navOpen ? "Fechar menu de módulos" : "Abrir menu de módulos"}
+          style={{
+            marginLeft: "12px",
+            width: "36px",
+            height: "36px",
+            flexShrink: 0,
+            display: "none",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "50%",
+            border: "1px solid var(--border-subtle)",
+            background: "var(--surface-card)",
+            color: "var(--color-primary-hover)",
+            cursor: "pointer",
+            fontSize: "18px",
+          }}
+        >
+          {navOpen ? <XIcon /> : <ListIcon />}
+        </button>
+
+        <nav id="kiosk-nav-menu" className={`kiosk-nav${navOpen ? " is-open" : ""}`} style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginLeft: "12px" }}>
           {/* Esconder o que o colaborador não pode fazer é UX, não segurança:
               quem protege é a RLS e as RPCs fa_config_*. Por isso a tela em
-              si também é guardada logo abaixo, com <RequireCapability>. */}
+              si também é guardada logo abaixo, com <RequireCapability>.
+              O contorno em cada botão (mesmo os "ghost") é de propósito:
+              sem ele, rótulo + ícone rosa sobre fundo branco se confundem
+              com texto comum — o contorno é o que avisa "isto é clicável". */}
           {visibleScreens.map((s) => (
             <Button
               key={s.value}
               variant={screen === s.value ? "teal" : "ghost"}
               size="sm"
               title={s.help}
-              onClick={() => setScreen(s.value)}
+              onClick={() => {
+                setScreen(s.value);
+                setNavOpen(false);
+              }}
+              style={{ border: screen === s.value ? "1px solid transparent" : "1px solid var(--border-subtle)" }}
             >
               {s.icon} {s.label}
             </Button>
@@ -246,7 +305,9 @@ export function App() {
           é desligada de propósito: com o cabeçalho quebrando em várias
           linhas, a altura fixa sobrava pouco espaço pro quadro — melhor
           deixar a página inteira rolar do que espremer o conteúdo. */}
-      <main className="kiosk-main" style={{ flex: 1, minHeight: 0 }}>
+      {/* Arrastar o dedo para os lados troca de módulo — gesto extra além
+          da barra/menu, pensado para o celular (ver useSwipeNavigation). */}
+      <main className="kiosk-main" style={{ flex: 1, minHeight: 0 }} {...swipeHandlers}>
         {ScreenComponent && (
           <RequireCapability capability={SCREEN_CAPABILITY[screen]}>
             <ScreenComponent />
