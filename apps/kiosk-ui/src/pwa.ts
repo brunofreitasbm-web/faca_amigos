@@ -22,11 +22,64 @@ export function isStandalone(): boolean {
   );
 }
 
+type UpdateListener = (updateFn: () => void) => void;
+const updateListeners = new Set<UpdateListener>();
+
+let updateAvailable = false;
+let updateSW: ((reloadPage?: boolean) => Promise<void>) | null = null;
+
+export function subscribePwaUpdate(listener: UpdateListener): () => void {
+  updateListeners.add(listener);
+  if (updateAvailable && updateSW) {
+    listener(() => void applyPwaUpdate());
+  }
+  return () => {
+    updateListeners.delete(listener);
+  };
+}
+
+export function applyPwaUpdate(): void {
+  if (updateSW) {
+    void updateSW(true);
+  } else {
+    window.location.reload();
+  }
+}
+
 export function setupPwa(): void {
   if (isElectronLocal()) return;
   if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+
   // Import dinâmico: o módulo virtual só é resolvido quando necessário.
   void import("virtual:pwa-register").then(({ registerSW }) => {
-    registerSW({ immediate: true });
+    updateSW = registerSW({
+      immediate: true,
+      onNeedRefresh() {
+        updateAvailable = true;
+        updateListeners.forEach((fn) => fn(() => void applyPwaUpdate()));
+      },
+      onRegisteredSW(_swUrl, registration) {
+        if (!registration) return;
+
+        // Checar atualizações periodicamente (a cada 15 minutos)
+        const INTERVAL_MS = 15 * 60 * 1000;
+        setInterval(() => {
+          if (navigator.onLine) {
+            void registration.update();
+          }
+        }, INTERVAL_MS);
+
+        // Checar quando a tela ganha foco ou quando a internet reconecta
+        const checkUpdate = () => {
+          if (document.visibilityState === "visible" && navigator.onLine) {
+            void registration.update();
+          }
+        };
+
+        document.addEventListener("visibilitychange", checkUpdate);
+        window.addEventListener("online", checkUpdate);
+      },
+    });
   });
 }
+

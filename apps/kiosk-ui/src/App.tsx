@@ -38,6 +38,7 @@ import { GerencialApp } from "./screens/gerencial/GerencialApp.js";
 import { ConnectDeviceModal } from "./components/ConnectDeviceModal.js";
 import { ConnectionStatusChip } from "./components/ConnectionStatusChip.js";
 import { InstallPwaBanner } from "./components/InstallPwaBanner.js";
+import { UpdatePwaBanner } from "./components/UpdatePwaBanner.js";
 import { isElectronLocal } from "./pwa.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
@@ -236,6 +237,7 @@ export function App() {
       {showConnectModal && <ConnectDeviceModal onClose={() => setShowConnectModal(false)} />}
 
       <InstallPwaBanner />
+      <UpdatePwaBanner />
 
       {/* flex:1 + minHeight:0 é o que faz o filho poder ser 100% de altura
           sem estourar o pai — sem minHeight:0 um flex item nunca encolhe

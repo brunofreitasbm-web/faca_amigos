@@ -1,0 +1,50 @@
+FaçaAmigos — Pacote de publicação da Landing Page (/playground)
+================================================================
+
+O QUE É ISSO
+-------------
+Site institucional: FaçaAmigos — Playground Inclusivo (Parque Shopping Belém)
+URL final: https://institutofacaamigos.com.br/playground/
+
+COMO PUBLICAR
+--------------
+1. Faça upload de TODOS os arquivos e pastas deste pacote para a mesma pasta
+   do servidor/host que corresponde a "institutofacaamigos.com.br/playground/".
+   - Mantenha a estrutura de pastas exatamente como está (a pasta "img/" tem
+     que ficar dentro da mesma pasta do index.html).
+2. Confirme que os seguintes arquivos ficam acessíveis publicamente
+   (abra cada URL no navegador para testar):
+   - https://institutofacaamigos.com.br/playground/
+   - https://institutofacaamigos.com.br/playground/robots.txt
+   - https://institutofacaamigos.com.br/playground/sitemap.xml
+   - https://institutofacaamigos.com.br/playground/google877c2b37d3c979fb.html
+     (esse arquivo é de verificação do Google Search Console — não mexer no
+     conteúdo dele, ele precisa ficar exatamente como está)
+3. Se o host tiver algum cache/CDN (Cloudflare, cache do cPanel, etc.),
+   limpe o cache depois do upload para garantir que a versão nova entre no ar.
+
+CONTEÚDO DO PACOTE
+--------------------
+- index.html              → página principal (HTML, CSS e JS já embutidos)
+- robots.txt               → instrui buscadores a indexar o site e aponta o sitemap
+- sitemap.xml               → mapa do site para o Google Search Console
+- google877c2b37d3c979fb.html → arquivo de verificação de propriedade do Google
+- img/                       → imagens usadas na página (fotos do espaço, equipe, etc.)
+
+RASTREAMENTO JÁ CONFIGURADO NO index.html (não precisa mexer)
+----------------------------------------------------------------
+- Google Analytics 4 (ID G-Q7LHH3C9P8) — origem de tráfego, sessões, páginas
+- Microsoft Clarity (ID xz0butjjbh) — mapa de calor + gravação de sessão
+- Hotjar/Contentsquare — segundo mapa de calor + gravação de sessão
+- SEO: Open Graph, Twitter Card, canonical e dados estruturados (Schema.org
+  LocalBusiness) para aparecer melhor no Google e ao compartilhar o link
+
+CHECKLIST PÓS-PUBLICAÇÃO (quem publica ou o Bruno faz depois)
+------------------------------------------------------------------
+[ ] Verificar a propriedade em https://search.google.com/search-console
+    (usa o arquivo google877c2b37d3c979fb.html já incluído)
+[ ] Enviar o sitemap.xml dentro do Search Console (menu "Sitemaps")
+[ ] Conferir no Google Analytics (Tempo real) se aparecem visitas ao abrir o site
+[ ] Conferir no Microsoft Clarity se novas gravações estão chegando
+
+Dúvidas técnicas: falar com Bruno (brunofreitasbm@gmail.com).
