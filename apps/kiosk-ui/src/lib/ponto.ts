@@ -13,13 +13,8 @@ export interface WorkedMinutesResult {
 }
 
 /**
- * Total trabalhado a partir de marcações brutas de ponto (ENTRADA/SAIDA/
- * INTERVALO_INICIO/INTERVALO_FIM). Como as marcações são sequenciais e
- * imutáveis, o total é (soma das SAIDA − soma das ENTRADA) menos
- * (soma dos INTERVALO_FIM − soma dos INTERVALO_INICIO) — não precisa
- * parear dia a dia. Nunca altera valor a pagar sozinho: é só para exibição
- * lado a lado com a jornada contratada.
- */
+  * Total trabalhado a partir de marcações brutas de ponto.
+  */
 export function computeWorkedMinutes(records: PontoRecordForCalc[]): WorkedMinutesResult {
   const countByKind: Record<PontoKind, number> = {
     ENTRADA: 0,
@@ -46,12 +41,9 @@ export function computeWorkedMinutes(records: PontoRecordForCalc[]): WorkedMinut
   return { minutes, incomplete };
 }
 
-// América/Belém (Pará) não observa horário de verão desde 2019 — UTC-3 o
-// ano inteiro. Único fuso do negócio hoje (mesmo fallback usado pela RPC
-// fa_kiosk_espelho_ponto), então um offset fixo é suficiente aqui.
 const BUSINESS_TIMEZONE_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
 
-/** Início (inclusive) e fim (exclusivo) de um mês, em ms, no fuso do negócio. */
+/** Início (inclusive) e fim (exclusivo) de um mês, em ms, no fuso do negócio (UTC-3). */
 export function monthRangeMs(year: number, month: number): { fromMs: number; toMs: number } {
   return {
     fromMs: Date.UTC(year, month - 1, 1) + BUSINESS_TIMEZONE_UTC_OFFSET_MS,

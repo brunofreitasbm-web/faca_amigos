@@ -11,8 +11,9 @@ import { FidelidadeTab } from "./tabs/FidelidadeTab.js";
 import { MetasTab } from "./tabs/MetasTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
+import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS" | "FOLHA";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "PLANOS", label: "Planos de Preços" },
@@ -22,6 +23,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "FIDELIDADE", label: "Fidelidade" },
   { value: "METAS", label: "Metas" },
   { value: "COLABORADORES", label: "Colaboradores" },
+  { value: "FOLHA", label: "Folha de Pagamento" },
   { value: "RELATORIOS", label: "Relatórios" },
 ];
 
@@ -33,8 +35,10 @@ const TAB_HELP: Record<GerencialTab, string> = {
   FIDELIDADE: "Recompensas automáticas para clientes recorrentes.",
   METAS: "Regras de bonificação da equipe quando a meta diária é batida. Meta de faturamento e horário de fechamento continuam por unidade, em Configurações.",
   COLABORADORES: "Cadastro único de toda a equipe — escolha em qual(is) unidade(s) cada colaborador atua.",
+  FOLHA: "Extrato mensal de salários, dados bancários e fechamento da folha para conferência e exportação/Bradesco.",
   RELATORIOS: "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só.",
 };
+
 
 export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogout: () => void | Promise<void> }) {
   const { employee } = useAppState();
@@ -91,6 +95,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "FIDELIDADE" && <FidelidadeTab />}
               {tab === "METAS" && <MetasTab />}
               {tab === "COLABORADORES" && <ColaboradoresTab />}
+              {tab === "FOLHA" && <FolhaPagamentoTab />}
               {tab === "RELATORIOS" && <GerencialRelatorioTab />}
             </div>
           </div>

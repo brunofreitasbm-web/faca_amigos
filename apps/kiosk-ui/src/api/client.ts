@@ -1,6 +1,7 @@
 import { quoteForSession } from "@facaamigos/domain";
 import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
+import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
 
 export interface ApiError {
   error: string;
@@ -66,6 +67,70 @@ export interface Employee {
   active?: boolean;
   /** Unidades em que o colaborador atua — só preenchido por `Api.allEmployees()` (Gerencial). */
   unitIds?: string[];
+}
+
+export interface FolhaPagamentoEmployee {
+  id: string;
+  fullName: string;
+  cpf: string | null;
+  position: string | null;
+  weeklyHoursContracted: number | null;
+  workedMinutes: number;
+  workedIncomplete: boolean;
+  salaryBaseCents: number | null;
+  bankCode: string | null;
+  bankAgencia: string | null;
+  bankAgenciaDv: string | null;
+  bankConta: string | null;
+  bankContaDv: string | null;
+  bankAccountType: string | null;
+  pixKey: string | null;
+}
+
+export interface ClosedPayrollItem {
+  id: string;
+  employee_id: string | null;
+  full_name_snapshot: string;
+  cpf_snapshot: string | null;
+  bank_code_snapshot: string | null;
+  bank_agencia_snapshot: string | null;
+  bank_agencia_dv_snapshot: string | null;
+  bank_conta_snapshot: string | null;
+  bank_conta_dv_snapshot: string | null;
+  bank_account_type_snapshot: string | null;
+  salary_base_cents: number;
+  adjustment_cents: number;
+  adjustment_note: string | null;
+  total_cents: number;
+  hours_contracted: number | null;
+  hours_worked_minutes: number | null;
+}
+
+export interface ClosedRun {
+  id: string;
+  year: number;
+  month: number;
+  totalCents: number;
+  createdAtMs: number;
+  items: ClosedPayrollItem[];
+}
+
+export interface PayrollCloseItem {
+  employeeId: string;
+  fullName: string;
+  cpf: string | null;
+  bankCode: string | null;
+  bankAgencia: string | null;
+  bankAgenciaDv: string | null;
+  bankConta: string | null;
+  bankContaDv: string | null;
+  bankAccountType: string | null;
+  salaryBaseCents: number;
+  adjustmentCents: number;
+  adjustmentNote: string | null;
+  totalCents: number;
+  hoursContracted: number | null;
+  hoursWorkedMinutes: number | null;
 }
 
 export interface NewEmployeeInput {
@@ -1809,4 +1874,161 @@ export const Api = {
       } satisfies SessionAudit;
     });
   },
+  getFolhaPagamentoData: async (unitId: string, year: number, month: number) => {
+    const { fromMs, toMs } = monthRangeMs(year, month);
+    const [employees, payrollInfos, pontoRecords, runs] = await Promise.all([
+      unwrap<Record<string, unknown>[]>(
+        supabase()
+          .from("fa_kiosk_employees")
+          .select("id, full_name, cpf, position, weekly_hours_contracted")
+          .eq("unit_id", unitId)
+          .eq("active", true)
+          .order("full_name"),
+      ),
+      unwrap<Record<string, unknown>[]>(
+        supabase().from("fa_kiosk_employee_payroll_info").select("*"),
+      ).catch(() => []),
+      unwrap<Record<string, unknown>[]>(
+        supabase()
+          .from("fa_kiosk_ponto_records")
+          .select("employee_id, kind, at_ms")
+          .eq("unit_id", unitId)
+          .gte("at_ms", fromMs)
+          .lt("at_ms", toMs),
+      ),
+      unwrap<Record<string, unknown>[]>(
+        supabase()
+          .from("fa_kiosk_payroll_runs")
+          .select("id, year, month, total_cents, created_at_ms, fa_kiosk_payroll_items(*)")
+          .eq("unit_id", unitId)
+          .order("year", { ascending: false })
+          .order("month", { ascending: false }),
+      ).catch(() => []),
+    ]);
+
+    const payrollInfoByEmployee = new Map((payrollInfos ?? []).map((p) => [p.employee_id as string, p]));
+
+    const pontoByEmployee = new Map<string, { kind: PontoKind; at_ms: number }[]>();
+    for (const record of pontoRecords ?? []) {
+      const list = pontoByEmployee.get(record.employee_id as string) ?? [];
+      list.push({ kind: record.kind as PontoKind, at_ms: record.at_ms as number });
+      pontoByEmployee.set(record.employee_id as string, list);
+    }
+
+    const folhaEmployees: FolhaPagamentoEmployee[] = (employees ?? []).map((e) => {
+      const info = payrollInfoByEmployee.get(e.id as string);
+      const worked = computeWorkedMinutes(pontoByEmployee.get(e.id as string) ?? []);
+      return {
+        id: e.id as string,
+        fullName: e.full_name as string,
+        cpf: (e.cpf as string | null) ?? null,
+        position: (e.position as string | null) ?? null,
+        weeklyHoursContracted: (e.weekly_hours_contracted as number | null) ?? null,
+        workedMinutes: worked.minutes,
+        workedIncomplete: worked.incomplete,
+        salaryBaseCents: (info?.salary_base_cents as number | null) ?? null,
+        bankCode: (info?.bank_code as string | null) ?? null,
+        bankAgencia: (info?.bank_agencia as string | null) ?? null,
+        bankAgenciaDv: (info?.bank_agencia_dv as string | null) ?? null,
+        bankConta: (info?.bank_conta as string | null) ?? null,
+        bankContaDv: (info?.bank_conta_dv as string | null) ?? null,
+        bankAccountType: (info?.bank_account_type as string | null) ?? null,
+        pixKey: (info?.pix_key as string | null) ?? null,
+      };
+    });
+
+    const parsedRuns: ClosedRun[] = (runs ?? []).map((r) => ({
+      id: r.id as string,
+      year: r.year as number,
+      month: r.month as number,
+      totalCents: r.total_cents as number,
+      createdAtMs: r.created_at_ms as number,
+      items: (r.fa_kiosk_payroll_items as Record<string, unknown>[] ?? []).map((item) => ({
+        id: item.id as string,
+        employee_id: (item.employee_id as string | null) ?? null,
+        full_name_snapshot: item.full_name_snapshot as string,
+        cpf_snapshot: (item.cpf_snapshot as string | null) ?? null,
+        bank_code_snapshot: (item.bank_code_snapshot as string | null) ?? null,
+        bank_agencia_snapshot: (item.bank_agencia_snapshot as string | null) ?? null,
+        bank_agencia_dv_snapshot: (item.bank_agencia_dv_snapshot as string | null) ?? null,
+        bank_conta_snapshot: (item.bank_conta_snapshot as string | null) ?? null,
+        bank_conta_dv_snapshot: (item.bank_conta_dv_snapshot as string | null) ?? null,
+        bank_account_type_snapshot: (item.bank_account_type_snapshot as string | null) ?? null,
+        salary_base_cents: item.salary_base_cents as number,
+        adjustment_cents: item.adjustment_cents as number,
+        adjustment_note: (item.adjustment_note as string | null) ?? null,
+        total_cents: item.total_cents as number,
+        hours_contracted: (item.hours_contracted as number | null) ?? null,
+        hours_worked_minutes: (item.hours_worked_minutes as number | null) ?? null,
+      })),
+    }));
+
+    const closedRun = parsedRuns.find((r) => r.year === year && r.month === month) ?? null;
+
+    return {
+      employees: folhaEmployees,
+      runs: parsedRuns,
+      closedRun,
+    };
+  },
+  updatePayrollInfo: async (
+    employeeId: string,
+    info: {
+      salaryBaseCents: number | null;
+      bankCode: string | null;
+      bankAgencia: string | null;
+      bankAgenciaDv: string | null;
+      bankConta: string | null;
+      bankContaDv: string | null;
+      bankAccountType: string | null;
+      pixKey: string | null;
+    },
+  ) => {
+    await unwrap(
+      supabase().from("fa_kiosk_employee_payroll_info").upsert(
+        {
+          employee_id: employeeId,
+          salary_base_cents: info.salaryBaseCents,
+          bank_code: info.bankCode,
+          bank_agencia: info.bankAgencia,
+          bank_agencia_dv: info.bankAgenciaDv,
+          bank_conta: info.bankConta,
+          bank_conta_dv: info.bankContaDv,
+          bank_account_type: info.bankAccountType,
+          pix_key: info.pixKey,
+          updated_at_ms: Date.now(),
+        },
+        { onConflict: "employee_id" },
+      ),
+    );
+  },
+  closePayrollRun: async (unitId: string, year: number, month: number, items: PayrollCloseItem[]) => {
+    const formattedItems = items.map((item) => ({
+      employee_id: item.employeeId,
+      full_name_snapshot: item.fullName,
+      cpf_snapshot: item.cpf,
+      bank_code_snapshot: item.bankCode,
+      bank_agencia_snapshot: item.bankAgencia,
+      bank_agencia_dv_snapshot: item.bankAgenciaDv,
+      bank_conta_snapshot: item.bankConta,
+      bank_conta_dv_snapshot: item.bankContaDv,
+      bank_account_type_snapshot: item.bankAccountType,
+      salary_base_cents: item.salaryBaseCents,
+      adjustment_cents: item.adjustmentCents,
+      adjustment_note: item.adjustmentNote,
+      total_cents: item.totalCents,
+      hours_contracted: item.hoursContracted,
+      hours_worked_minutes: item.hoursWorkedMinutes,
+    }));
+
+    await unwrap(
+      supabase().rpc("fa_kiosk_close_payroll_run", {
+        p_unit_id: unitId,
+        p_year: year,
+        p_month: month,
+        p_items: formattedItems,
+      }),
+    );
+  },
 };
+

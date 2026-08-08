@@ -1,19 +1,11 @@
-"use client";
-
-import { Button } from "@/components/design-system";
-import type { ClosedPayrollItem } from "./FolhaPagamentoTable";
+import { Button } from "@facaamigos/ui";
+import type { ClosedPayrollItem } from "../../../api/client.js";
 
 interface PayrollCsvDownloadButtonProps {
   items: ClosedPayrollItem[];
   filenameSuffix: string;
 }
 
-/**
- * Mesmo padrão de export usado em relatorios/ReportFilters.tsx (data URI +
- * link temporário, sem dependência de xlsx). Esta planilha é um relatório de
- * conferência/fechamento — o Bradesco Net Empresa (Multipag) não aceita
- * upload direto de Excel/CSV para pagamento de salários, só CNAB240.
- */
 export function PayrollCsvDownloadButton({ items, filenameSuffix }: PayrollCsvDownloadButtonProps) {
   function handleDownload() {
     const rows = [
@@ -43,7 +35,7 @@ export function PayrollCsvDownloadButton({ items, filenameSuffix }: PayrollCsvDo
 
   return (
     <Button type="button" variant="teal" size="sm" onClick={handleDownload}>
-      Baixar planilha
+      Baixar planilha (Bradesco / Conferência)
     </Button>
   );
 }
