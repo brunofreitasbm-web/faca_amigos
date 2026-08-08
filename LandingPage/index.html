@@ -2277,6 +2277,67 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Job Application Form Submission ("Venha Fazer Parte do Nosso Time")
+  const jobForm = document.getElementById('job-form');
+  if (jobForm) {
+    jobForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const errorBox = document.getElementById('job-form-error');
+      const submitBtn = document.getElementById('job-form-submit');
+      const resumeInput = document.getElementById('job-curriculo');
+      errorBox.style.display = 'none';
+
+      const resumeFile = resumeInput.files[0];
+      if (!resumeFile || resumeFile.type !== 'application/pdf') {
+        errorBox.textContent = 'Por favor, selecione um arquivo PDF.';
+        errorBox.style.display = 'block';
+        return;
+      }
+      if (resumeFile.size > 5 * 1024 * 1024) {
+        errorBox.textContent = 'O currículo deve ter até 5MB.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('full_name', document.getElementById('job-nome').value);
+      formData.append('email', document.getElementById('job-email').value);
+      formData.append('phone', document.getElementById('job-telefone').value);
+      formData.append('course', document.getElementById('job-curso').value);
+      formData.append('desired_area', document.getElementById('job-area').value);
+      formData.append('opportunity_type', document.getElementById('job-tipo').value);
+      formData.append('resume', resumeFile);
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+
+      fetch('https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/job-application-webhook', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2anZwZHpzZmpkcHlhYmJ6enVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1MDYwNjksImV4cCI6MjEwMDA4MjA2OX0.QdYzftTxdmYY8r_7sVe0mjjOqJ4nnOR3iyiWN18cgsQ'
+        },
+        body: formData
+      })
+        .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) throw new Error(data.error || 'Falha ao enviar candidatura');
+          jobForm.innerHTML = `
+            <div style="text-align:center; padding: 10px 0;">
+              <h4 style="color:var(--indigo); margin-bottom:12px; font-family:'Quicksand',sans-serif; font-size:1.3rem;">Candidatura enviada! 🎉</h4>
+              <p style="color:var(--ink-soft); font-size:0.95rem; line-height:1.4;">Obrigado pelo interesse em fazer parte do FaçaAmigos. Nosso time de RH vai analisar seu currículo e entrar em contato.</p>
+            </div>
+          `;
+        })
+        .catch((err) => {
+          errorBox.textContent = err.message || 'Não foi possível enviar sua candidatura. Tente novamente.';
+          errorBox.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Enviar Candidatura';
+        });
+    });
+  }
+
 });
 
 // Contact Modal ("Fale Conosco")
@@ -2286,6 +2347,15 @@ function openContactModal() {
 
 function closeContactModal() {
   document.getElementById('contactModalOverlay').classList.remove('active');
+}
+
+// Job Application Modal ("Venha Fazer Parte do Nosso Time")
+function openJobModal() {
+  document.getElementById('jobModalOverlay').classList.add('active');
+}
+
+function closeJobModal() {
+  document.getElementById('jobModalOverlay').classList.remove('active');
 }
 
 </script>

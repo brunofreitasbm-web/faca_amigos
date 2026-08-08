@@ -27,6 +27,8 @@ export const CAPABILITIES = [
   "config.unit.write",
   "config.fiscal.write",
   "config.terms.write",
+  "talentos.read",
+  "talentos.write",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];

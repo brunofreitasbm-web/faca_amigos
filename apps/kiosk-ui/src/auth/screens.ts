@@ -8,6 +8,7 @@ export type Screen =
   | "CAIXA"
   | "POS_VISITA"
   | "ANIVERSARIOS"
+  | "BANCO_TALENTOS"
   | "PONTO"
   | "RELATORIO"
   | "CONFIGURACOES";
