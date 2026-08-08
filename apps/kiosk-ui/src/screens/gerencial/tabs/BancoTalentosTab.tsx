@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, Button, Badge } from "@facaamigos/ui";
-import { Api } from "../api/client.js";
-import type { JobApplication } from "../api/client.js";
-import { useToast } from "../state/ToastContext.js";
+import { Api } from "../../../api/client.js";
+import type { JobApplication } from "../../../api/client.js";
+import { useToast } from "../../../state/ToastContext.js";
 
 const OPPORTUNITY_LABEL: Record<JobApplication["opportunity_type"], string> = {
   ESTAGIO: "Estágio",
@@ -29,13 +29,17 @@ const STATUS_OPTIONS: JobApplication["status"][] = ["NOVO", "EM_ANALISE", "CONTA
 /**
  * Banco de Talentos — candidaturas recebidas pelo formulário "Venha Fazer
  * Parte do Nosso Time" da landing page (Edge Function
- * job-application-webhook), triadas aqui pelo RH (Líder/Owner).
+ * job-application-webhook), triadas aqui pelo RH (Owner).
+ *
+ * Mora no Gerencial (não mais num módulo por unidade) porque a candidatura
+ * não pertence a nenhuma unidade específica — é cadastro único, como
+ * Colaboradores e Folha de Pagamento ao lado.
  *
  * O currículo fica num bucket privado (`curriculos`): o link de download é
  * gerado sob demanda no clique via signed URL de 60s (Api.jobApplicationResumeUrl),
  * nunca guardado em cache — o mesmo motivo do bucket não ter getPublicUrl.
  */
-export function BancoTalentosScreen() {
+export function BancoTalentosTab() {
   const toast = useToast();
   const [items, setItems] = useState<JobApplication[]>([]);
   const [statusFilter, setStatusFilter] = useState<JobApplication["status"] | "TODOS">("TODOS");
@@ -76,17 +80,8 @@ export function BancoTalentosScreen() {
   const visibleItems = statusFilter === "TODOS" ? items : items.filter((i) => i.status === statusFilter);
 
   return (
-    <div style={{ padding: "24px", maxWidth: "1200px", margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
-        <div>
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "28px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
-            🌟 Banco de Talentos
-          </h1>
-          <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "14px" }}>
-            Candidaturas recebidas pelo site — analise o currículo e atualize o status conforme a triagem avança.
-          </p>
-        </div>
-
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--text-secondary)" }}>Status:</span>
           <select

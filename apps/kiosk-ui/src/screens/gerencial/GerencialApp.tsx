@@ -18,8 +18,9 @@ import { FotosEnvelopeTab } from "./tabs/FotosEnvelopeTab.js";
 import { SaldoEnvelopesTab } from "./tabs/SaldoEnvelopesTab.js";
 import { HistoricoTab } from "./tabs/HistoricoTab.js";
 import { ContratoTab } from "./tabs/ContratoTab.js";
+import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "TALENTOS" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO" | "TALENTOS";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "PLANOS", label: "Planos de Preços" },
@@ -31,6 +32,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "COLABORADORES", label: "Colaboradores" },
   { value: "TALENTOS", label: "Banco de Talentos" },
   { value: "FOLHA", label: "Folha de Pagamento" },
+  { value: "TALENTOS", label: "Banco de Talentos" },
   { value: "RELATORIOS", label: "Relatórios" },
   { value: "ABERTURA_FECHAMENTO", label: "Abertura e Fechamento" },
   { value: "FOTOS_ENVELOPE", label: "Fotos de Envelope" },
@@ -49,6 +51,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
   COLABORADORES: "Cadastro único de toda a equipe — escolha em qual(is) unidade(s) cada colaborador atua.",
   TALENTOS: "Candidaturas recebidas pelo site — analise o currículo e atualize o status conforme a triagem avança.",
   FOLHA: "Extrato mensal de salários, dados bancários e fechamento da folha para conferência e exportação/Bradesco.",
+  TALENTOS: "Candidaturas recebidas pelo formulário \"Venha Fazer Parte do Nosso Time\" da landing page — analise o currículo e atualize o status conforme a triagem avança.",
   RELATORIOS: "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só.",
   ABERTURA_FECHAMENTO: "Horário de abertura e fechamento do caixa de cada loja, quem abriu/fechou e o troco inicial.",
   FOTOS_ENVELOPE: "Fotos dos envelopes de sangria registrados em cada loja, com valor e operador responsável.",
@@ -115,6 +118,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "COLABORADORES" && <ColaboradoresTab />}
               {tab === "TALENTOS" && <BancoTalentosScreen />}
               {tab === "FOLHA" && <FolhaPagamentoTab />}
+              {tab === "TALENTOS" && <BancoTalentosTab />}
               {tab === "RELATORIOS" && <GerencialRelatorioTab />}
               {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
               {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
