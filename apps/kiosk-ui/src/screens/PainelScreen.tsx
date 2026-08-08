@@ -259,7 +259,7 @@ export function PainelScreen() {
     // sessões (abaixo) rola internamente quando não cabe tudo. Cabeçalho,
     // meta do dia e os botões flutuantes ficam sempre visíveis, sem rolar
     // a página inteira, no computador, tablet ou celular.
-    <div style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", padding: "clamp(12px, 2.5vw, 24px)", gap: "clamp(10px, 2vw, 20px)" }}>
+    <div className="painel-shell" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", padding: "clamp(12px, 2.5vw, 24px)", gap: "clamp(10px, 2vw, 20px)" }}>
       <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
           <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 3vw, 28px)" }}>Painel</h1>
@@ -297,8 +297,10 @@ export function PainelScreen() {
         </div>
       )}
 
-      {/* Única área com rolagem própria da tela — contida, nunca a página toda. */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: "4px" }}>
+      {/* Única área com rolagem própria da tela — contida, nunca a página toda.
+          No celular (.painel-scroll no app.css) isso é desligado: a
+          prioridade lá é ver o quadro inteiro, então quem rola é a página. */}
+      <div className="painel-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: "4px" }}>
         <div className="painel-grid">
         {entries.map((entry) => {
           const { session, quote, plan, asset } = entry;

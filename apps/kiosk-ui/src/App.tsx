@@ -124,7 +124,7 @@ export function App() {
   const brand = unitBrandFor(unit.name);
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <div className="kiosk-shell" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Régua da operação: a faixa de cor mais persistente da tela, para
           o operador saber em que unidade está sem precisar ler nada. */}
       <div style={{ flexShrink: 0, height: "3px", background: brand.accent }} />
@@ -194,8 +194,12 @@ export function App() {
 
       {/* flex:1 + minHeight:0 é o que faz o filho poder ser 100% de altura
           sem estourar o pai — sem minHeight:0 um flex item nunca encolhe
-          abaixo do seu conteúdo, e a rolagem "vaza" pra página inteira. */}
-      <main style={{ flex: 1, minHeight: 0 }}>
+          abaixo do seu conteúdo, e a rolagem "vaza" pra página inteira.
+          Em telas de celular (ver .kiosk-main no app.css) essa contenção
+          é desligada de propósito: com o cabeçalho quebrando em várias
+          linhas, a altura fixa sobrava pouco espaço pro quadro — melhor
+          deixar a página inteira rolar do que espremer o conteúdo. */}
+      <main className="kiosk-main" style={{ flex: 1, minHeight: 0 }}>
         {ScreenComponent && (
           <RequireCapability capability={SCREEN_CAPABILITY[screen]}>
             <ScreenComponent />

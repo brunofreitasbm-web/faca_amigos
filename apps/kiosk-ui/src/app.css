@@ -23,6 +23,42 @@ body {
   overflow-y: auto;
 }
 
+/* Em telas de celular a régua acima vira um estorvo: o cabeçalho (marca +
+   menu + usuário) quebra em várias linhas de tão estreito, e a altura fixa
+   em 100dvh sobra pouco espaço pro quadro — dá a sensação de tela travada,
+   só vendo um pedacinho por vez. Aqui a prioridade muda: deixa a página
+   inteira rolar (cabeçalho incluso) em vez de espremer o conteúdo numa
+   área de rolagem interna minúscula. As classes abaixo (kiosk-shell,
+   kiosk-main, painel-shell, painel-scroll) espelham os estilos inline dos
+   respectivos componentes — o !important é necessário só porque o React
+   aplica altura/flex via style inline, que sempre vence CSS externo sem
+   ele. */
+@media (max-width: 768px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+
+  body {
+    overflow-y: visible;
+  }
+
+  .kiosk-shell,
+  .kiosk-main,
+  .painel-shell {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .painel-scroll {
+    flex: none !important;
+    overflow-y: visible !important;
+    padding-right: 0 !important;
+  }
+}
+
 /* ---------- Painel: cards fluidos ----------
 
    O tamanho do card não é fixo: ele acompanha o espaço que sobra, do
