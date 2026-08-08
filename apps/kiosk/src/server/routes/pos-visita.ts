@@ -9,7 +9,8 @@ export interface PosVisitaItem {
   phone_e164: string;
   child_name: string;
   last_visit_date: string;
-  status: "PENDENTE" | "CONTATADO" | "SATISFEITO" | "INSATISFEITO";
+  last_visit_date: string;
+  status: "PENDENTE" | "CONTATADO";
   notes?: string;
   updated_at_ms: number;
 }
@@ -19,19 +20,9 @@ const posVisitaStore: Map<string, PosVisitaItem> = new Map();
 const POS_VISITA_TEMPLATES = [
   {
     id: "padrao_agradecimento",
-    title: "Agradecimento Padrão",
-    message: "Olá {responsavel}! Tudo bem? Agradecemos muito a visita do(a) {crianca} no Faça Amigos! Como foi a experiência de vocês hoje? Se puder nos dar um feedback, ficaremos muito felizes! 😊🎈",
-  },
-  {
-    id: "retorno_convite",
-    title: "Convite de Retorno",
-    message: "Olá {responsavel}! Sentimos falta do(a) {crianca} aqui no Faça Amigos! Que tal nos fazer uma visita neste final de semana? Temos novidades te esperando! 🎠🍿",
-  },
-  {
-    id: "pesquisa_satisfacao",
-    title: "Pesquisa de Satisfação",
-    message: "Olá {responsavel}! Sua opinião é essencial para nós. De 0 a 10, como você avalia o atendimento e a segurança do Faça Amigos na sua última visita com o(a) {crianca}? 🌟",
-  },
+    title: "Agradecimento e Convite",
+    message: "Olá {responsavel}! Tudo bem? 😊 Nós do Faça Amigos amamos receber a visita do(a) {crianca}!\n\nEsperamos que a experiência tenha sido incrível! Já estamos com saudades e preparamos muitas novidades divertidas para a próxima brincadeira! 🎈\n\n⭐ Avalie a gente com 5 estrelas no Google e garanta 10% de DESCONTO na sua próxima visita no Faça Amigos Circuito (válido por 7 dias)! \n👉 https://institutofacaamigos.com.br/playground/index.html\n\nTe esperamos em breve!",
+  }
 ];
 
 export function registerPosVisitaRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -42,16 +33,20 @@ export function registerPosVisitaRoutes(app: FastifyInstance, ctx: AppContext): 
       const rows = ctx.db
         .prepare(
           `SELECT g.id as g_id, g.full_name as guardian_name, g.phone_e164, c.full_name as child_name,
-                  MAX(vl.at_ms) as last_visit_ms
+                  MAX(s.checkout_at_ms) as last_visit_ms
            FROM guardians g
-           JOIN child_guardians cg ON cg.guardian_id = g.id
-           JOIN children c ON c.id = cg.child_id
-           LEFT JOIN visit_log vl ON vl.child_id = c.id
+           JOIN sessions s ON s.guardian_id = g.id
+           JOIN children c ON c.id = s.child_id
+           LEFT JOIN coupons cp ON cp.code = '5STARS_' || SUBSTR(UPPER(g.id), 1, 8)
+           WHERE s.unit_id = ?
+             AND s.status = 'FINALIZADA'
+             AND s.checkout_at_ms IS NOT NULL
+             AND cp.id IS NULL
            GROUP BY g.id, c.id
            ORDER BY last_visit_ms DESC
            LIMIT 50`
         )
-        .all() as Array<{ g_id: string; guardian_name: string; phone_e164: string; child_name: string; last_visit_ms: number | null }>;
+        .all(unitId || "loja") as Array<{ g_id: string; guardian_name: string; phone_e164: string; child_name: string; last_visit_ms: number | null }>;
 
       const results: PosVisitaItem[] = rows.map((r) => {
         const id = `pv_${r.g_id}`;
@@ -108,5 +103,36 @@ export function registerPosVisitaRoutes(app: FastifyInstance, ctx: AppContext): 
 
   app.get("/api/pos-visita/templates", async () => {
     return { templates: POS_VISITA_TEMPLATES };
+  });
+
+  app.post<{ Body: { guardian_id: string; unit_id?: string } }>("/api/pos-visita/google-review-callback", async (req) => {
+    const { guardian_id, unit_id } = req.body;
+    
+    // Tenta encontrar o ID da unidade Circuito se não for provido
+    let targetUnitId = unit_id;
+    if (!targetUnitId) {
+      const row = ctx.db.prepare("SELECT id FROM units WHERE name LIKE '%Circuito%' LIMIT 1").get() as { id: string } | undefined;
+      targetUnitId = row?.id || "loja";
+    }
+
+    const couponId = uuidv7();
+    const code = `5STARS_${guardian_id.substring(0, 8).toUpperCase()}`;
+
+    try {
+      ctx.db.prepare(`
+        INSERT INTO coupons (
+          id, unit_id, code, kind, value, max_uses, used_count, active, description, created_at_ms
+        ) VALUES (?, ?, ?, 'DESCONTO_PCT', 10, 1, 0, 1, '10% desconto - 5 Avaliação Google', ?)
+        ON CONFLICT(unit_id, code) DO UPDATE SET
+          active = 1,
+          value = 10,
+          created_at_ms = excluded.created_at_ms
+      `).run(couponId, targetUnitId, code, ctx.nowMs());
+
+      return { success: true, message: "Cupom de 10% gerado com sucesso!", code };
+    } catch (err) {
+      app.log.error(err);
+      return { success: false, error: "Erro ao gerar cupom" };
+    }
   });
 }

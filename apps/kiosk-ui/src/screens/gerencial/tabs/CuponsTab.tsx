@@ -75,8 +75,20 @@ export function CuponsTab() {
     }
   }
 
+  const reviewCoupons = coupons.filter((c) => c.description === "10% desconto - 5 Avaliação Google");
+  const totalReviewIssued = reviewCoupons.length;
+  const totalReviewUsed = reviewCoupons.reduce((acc, c) => acc + c.used_count, 0);
+
   return (
     <div>
+      <Card style={{ padding: "16px", marginBottom: "16px", background: "var(--surface-sunken)", borderLeft: "4px solid var(--color-primary)", borderRadius: "12px" }}>
+        <h3 style={{ fontSize: "16px", margin: "0 0 8px 0", color: "var(--text-primary)" }}>⭐ Desempenho: Avaliações do Google</h3>
+        <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>
+          <strong>{totalReviewIssued}</strong> descontos (cupons) emitidos <br/>
+          <strong>{totalReviewUsed}</strong> resgatados pelos clientes ({totalReviewIssued > 0 ? Math.round((totalReviewUsed / totalReviewIssued) * 100) : 0}% de conversão)
+        </p>
+      </Card>
+
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>

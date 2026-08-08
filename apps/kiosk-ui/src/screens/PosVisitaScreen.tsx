@@ -8,7 +8,7 @@ interface PosVisitaItem {
   phone_e164: string;
   child_name: string;
   last_visit_date: string;
-  status: "PENDENTE" | "CONTATADO" | "SATISFEITO" | "INSATISFEITO";
+  status: "PENDENTE" | "CONTATADO";
   notes?: string;
 }
 
@@ -25,6 +25,14 @@ export function PosVisitaScreen() {
   const [filter, setFilter] = useState<string>("TODOS");
   const [selectedTemplate, setSelectedTemplate] = useState<string>("padrao_agradecimento");
   const [customNotes, setCustomNotes] = useState<Record<string, string>>({});
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  useEffect(() => {
+    if (cooldownSeconds > 0) {
+      const timer = setTimeout(() => setCooldownSeconds((prev) => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownSeconds]);
 
   useEffect(() => {
     fetch(`/api/pos-visita?unitId=${unit?.id || ""}`)
@@ -36,7 +44,7 @@ export function PosVisitaScreen() {
         setItems([
           { id: "pv_1", guardian_name: "Mariana Silva", phone_e164: "+5591988887777", child_name: "Lucas Silva", last_visit_date: new Date().toISOString().split("T")[0] || "2026-08-08", status: "PENDENTE" },
           { id: "pv_2", guardian_name: "Roberto Lima", phone_e164: "+5591999991111", child_name: "Sophia Lima", last_visit_date: "2026-08-05", status: "CONTATADO", notes: "Adoraram o brinquedo de carrinhos" },
-          { id: "pv_3", guardian_name: "Camila Rocha", phone_e164: "+5591977772222", child_name: "Enzo Rocha", last_visit_date: "2026-08-04", status: "SATISFEITO", notes: "Muito elogiado pelos monitores" },
+          { id: "pv_3", guardian_name: "Camila Rocha", phone_e164: "+5591977772222", child_name: "Enzo Rocha", last_visit_date: "2026-08-04", status: "PENDENTE", notes: "Muito elogiado pelos monitores" },
         ]);
       });
 
@@ -47,8 +55,11 @@ export function PosVisitaScreen() {
       })
       .catch(() => {
         setTemplates([
-          { id: "padrao_agradecimento", title: "Agradecimento Padrão", message: "Olá {responsavel}! Tudo bem? Agradecemos a visita do(a) {crianca} no Faça Amigos! Como foi a experiência de vocês hoje?" },
-          { id: "retorno_convite", title: "Convite de Retorno", message: "Olá {responsavel}! Sentimos falta do(a) {crianca} no Faça Amigos! Venha nos visitar neste final de semana! 🎈" },
+          { 
+            id: "padrao_agradecimento", 
+            title: "Agradecimento e Convite", 
+            message: "Olá {responsavel}! Tudo bem? 😊 Nós do Faça Amigos amamos receber a visita do(a) {crianca}!\n\nEsperamos que a experiência tenha sido incrível! Já estamos com saudades e preparamos muitas novidades divertidas para a próxima brincadeira! 🎈\n\n⭐ Avalie a gente com 5 estrelas no Google e garanta 10% de DESCONTO na sua próxima visita no Faça Amigos Circuito (válido por 7 dias)! \n👉 https://institutofacaamigos.com.br/playground/index.html\n\nTe esperamos em breve!" 
+          }
         ]);
       });
   }, [unit?.id]);
@@ -60,12 +71,26 @@ export function PosVisitaScreen() {
   }
 
   function handleSendWhatsApp(item: PosVisitaItem) {
+    if (cooldownSeconds > 0) return;
+
     const rawPhone = item.phone_e164.replace(/\D/g, "");
     const text = encodeURIComponent(getFormattedMessage(selectedTemplate, item.guardian_name, item.child_name));
     const url = `https://wa.me/${rawPhone}?text=${text}`;
     window.open(url, "_blank");
 
-    handleUpdateStatus(item.id, "CONTATADO");
+    // Gerar cooldown aleatório entre 5 e 20 segundos
+    const randomCooldown = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
+    setCooldownSeconds(randomCooldown);
+
+    // Remove imediatamente da interface
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
+
+    // Atualiza apenas no backend
+    fetch("/api/pos-visita", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, status: "CONTATADO", notes: customNotes[item.id] }),
+    }).catch(() => null);
   }
 
   function handleUpdateStatus(id: string, newStatus: PosVisitaItem["status"]) {
@@ -94,7 +119,7 @@ export function PosVisitaScreen() {
         </div>
 
         <div style={{ display: "flex", gap: "8px" }}>
-          {["TODOS", "PENDENTE", "CONTATADO", "SATISFEITO", "INSATISFEITO"].map((st) => (
+          {["TODOS", "PENDENTE", "CONTATADO"].map((st) => (
             <Button
               key={st}
               variant={filter === st ? "teal" : "ghost"}
@@ -153,12 +178,8 @@ export function PosVisitaScreen() {
               </div>
               <Badge
                 variant={
-                  item.status === "SATISFEITO"
-                    ? "teal"
-                    : item.status === "CONTATADO"
+                  item.status === "CONTATADO"
                     ? "amber"
-                    : item.status === "INSATISFEITO"
-                    ? "solid_amber"
                     : "neutral"
                 }
               >
@@ -180,28 +201,13 @@ export function PosVisitaScreen() {
 
             <div style={{ display: "flex", gap: "8px", marginTop: "auto", paddingTop: "8px" }}>
               <Button
-                variant="teal"
+                variant={cooldownSeconds > 0 ? "ghost" : "teal"}
                 size="sm"
+                disabled={cooldownSeconds > 0}
                 onClick={() => handleSendWhatsApp(item)}
                 style={{ flex: 1, fontWeight: "bold" }}
               >
-                📱 Enviar WhatsApp
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleUpdateStatus(item.id, "SATISFEITO")}
-                title="Marcar como Satisfeito"
-              >
-                👍
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleUpdateStatus(item.id, "INSATISFEITO")}
-                title="Marcar como Insatisfeito"
-              >
-                👎
+                {cooldownSeconds > 0 ? `⏳ Aguarde (${cooldownSeconds}s)` : "📱 Enviar WhatsApp"}
               </Button>
             </div>
           </Card>
