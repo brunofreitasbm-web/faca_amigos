@@ -133,7 +133,7 @@ export interface PayrollCloseItem {
   hoursWorkedMinutes: number | null;
 }
 
-/** Dados de RH que o próprio colaborador preenche — módulo "Cadastro de Colaboradores". */
+/** Dados de RH preenchidos no convite de cadastro — ver OnboardingInviteScreen. */
 export interface EmployeePersonalInfo {
   ctpsNumero?: string | null;
   ctpsSerie?: string | null;
@@ -144,7 +144,6 @@ export interface EmployeePersonalInfo {
   nomePai?: string | null;
   estadoCivil?: string | null;
   escolaridade?: string | null;
-  racaCor?: string | null;
   cep?: string | null;
   logradouro?: string | null;
   numero?: string | null;
@@ -154,7 +153,6 @@ export interface EmployeePersonalInfo {
   uf?: string | null;
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
-  completedAtMs?: number | null;
 }
 
 export interface PersonalInfoStatus {
@@ -187,6 +185,11 @@ export interface OnboardingCompleteInput {
   pin: string;
   personalInfo?: EmployeePersonalInfo;
   pixKey?: string;
+  /** Conta corrente, sem dígito da agência — só o dígito da conta é pedido. */
+  bankCode?: string;
+  bankAgencia?: string;
+  bankConta?: string;
+  bankContaDv?: string;
 }
 
 export interface NewEmployeeInput {
@@ -210,6 +213,15 @@ export interface EspelhoPontoRecord {
   nsr: number;
 }
 
+export interface EspelhoPontoUnit {
+  name: string;
+  razaoSocial: string | null;
+  nomeFantasia: string | null;
+  cnpj: string | null;
+  address: string | null;
+  phone: string | null;
+}
+
 export interface EspelhoPonto {
   employee: {
     id: string;
@@ -219,7 +231,14 @@ export interface EspelhoPonto {
     role: Employee["role"];
     admission_date: string | null;
     weekly_hours_contracted: number | null;
+    birth_date: string | null;
+    rg_numero: string | null;
+    rg_orgao_emissor: string | null;
+    ctps_numero: string | null;
+    ctps_serie: string | null;
+    ctps_uf: string | null;
   };
+  units: EspelhoPontoUnit[];
   records: EspelhoPontoRecord[];
   year: number;
   month: number;
@@ -1672,41 +1691,7 @@ export const Api = {
       supabase().rpc("fa_kiosk_espelho_ponto", { p_employee_id: employeeId, p_year: year, p_month: month }),
     ),
 
-  // Módulo "Cadastro de Colaboradores": o próprio colaborador lê/grava só a
-  // própria linha, via RPCs security definer que ignoram qualquer
-  // employee_id vindo do cliente (migration 20260807000014).
-  myPersonalInfo: async (): Promise<EmployeePersonalInfo | null> => {
-    const rows = await unwrap<Record<string, unknown>[]>(supabase().rpc("fa_kiosk_my_personal_info"));
-    const row = rows[0];
-    if (!row) return null;
-    return {
-      ctpsNumero: row.ctps_numero as string | null,
-      ctpsSerie: row.ctps_serie as string | null,
-      ctpsUf: row.ctps_uf as string | null,
-      rgNumero: row.rg_numero as string | null,
-      rgOrgaoEmissor: row.rg_orgao_emissor as string | null,
-      nomeMae: row.nome_mae as string | null,
-      nomePai: row.nome_pai as string | null,
-      estadoCivil: row.estado_civil as string | null,
-      escolaridade: row.escolaridade as string | null,
-      racaCor: row.raca_cor as string | null,
-      cep: row.cep as string | null,
-      logradouro: row.logradouro as string | null,
-      numero: row.numero as string | null,
-      complemento: row.complemento as string | null,
-      bairro: row.bairro as string | null,
-      cidade: row.cidade as string | null,
-      uf: row.uf as string | null,
-      emergencyContactName: row.emergency_contact_name as string | null,
-      emergencyContactPhone: row.emergency_contact_phone as string | null,
-      completedAtMs: row.completed_at_ms as number | null,
-    };
-  },
-  updateMyPersonalInfo: (payload: EmployeePersonalInfo) =>
-    unwrap(supabase().rpc("fa_kiosk_update_own_personal_info", { p_payload: payload })),
-  myPix: () => unwrap<string | null>(supabase().rpc("fa_kiosk_my_pix")),
-  updateMyPix: (pixKey: string) => unwrap(supabase().rpc("fa_kiosk_update_own_pix", { p_pix_key: pixKey })),
-  /** Quem já completou o auto-cadastro — Gerencial > Colaboradores, exige `folha_pagamento.read`. */
+  /** Quem já completou o cadastro via convite — Gerencial > Colaboradores, exige `folha_pagamento.read`. */
   personalInfoStatus: async (): Promise<PersonalInfoStatus[]> => {
     const rows = await unwrap<Array<{ employee_id: string; completed: boolean }>>(
       supabase().rpc("fa_kiosk_personal_info_status"),

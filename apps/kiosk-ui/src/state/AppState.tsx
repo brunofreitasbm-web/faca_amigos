@@ -17,9 +17,6 @@ interface AppStateValue {
   /** Modo Gerencial: fora das 3 unidades, configura o que vale para várias de uma vez. */
   gerencial: boolean;
   setGerencial: (value: boolean) => void;
-  /** Módulo "Cadastro de Colaboradores": o próprio colaborador completa os dados de RH. */
-  selfCadastro: boolean;
-  setSelfCadastro: (value: boolean) => void;
   employee: TerminalEmployee | null;
   terminalEmployees: TerminalEmployee[];
   switchEmployee: (employeeId: string, pin: string) => Promise<void>;
@@ -35,7 +32,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [gerencial, setGerencial] = useState(false);
-  const [selfCadastro, setSelfCadastro] = useState(false);
   const [employee, setEmployee] = useState<TerminalEmployee | null>(null);
   const [terminalEmployees, setTerminalEmployees] = useState<TerminalEmployee[]>(listTerminalEmployees());
   const [restoring, setRestoring] = useState(true);
@@ -99,8 +95,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setUnitId,
       gerencial,
       setGerencial,
-      selfCadastro,
-      setSelfCadastro,
       employee,
       terminalEmployees,
       restoring,
@@ -121,10 +115,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setEmployee(null);
         setUnitId(null);
         setGerencial(false);
-        setSelfCadastro(false);
       },
     }),
-    [units, unitId, gerencial, selfCadastro, employee, terminalEmployees, restoring],
+    [units, unitId, gerencial, employee, terminalEmployees, restoring],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

@@ -11,9 +11,6 @@ const ESCOLARIDADE_OPTIONS = [
   "Superior completo",
   "Pós-graduação",
 ];
-// Categorias oficiais do IBGE/eSocial — não é lista livre de propósito, para
-// bater com o que a folha de pagamento precisa declarar.
-const RACA_COR_OPTIONS = ["Branca", "Preta", "Parda", "Amarela", "Indígena", "Prefiro não informar"];
 const UF_OPTIONS = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR",
   "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
@@ -23,26 +20,38 @@ export const emptyPersonalInfo: EmployeePersonalInfo = {
   ctpsNumero: "", ctpsSerie: "", ctpsUf: "",
   rgNumero: "", rgOrgaoEmissor: "",
   nomeMae: "", nomePai: "",
-  estadoCivil: "", escolaridade: "", racaCor: "",
+  estadoCivil: "", escolaridade: "",
   cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "",
   emergencyContactName: "", emergencyContactPhone: "",
 };
 
+export interface BankInfo {
+  bankCode: string;
+  bankAgencia: string;
+  bankConta: string;
+  bankContaDv: string;
+}
+
+export const emptyBankInfo: BankInfo = { bankCode: "", bankAgencia: "", bankConta: "", bankContaDv: "" };
+
 /**
- * Documentos + filiação + endereço + contato de emergência + Pix — usado
- * tanto no módulo "Cadastro de Colaboradores" (colaborador já logado
- * completando os próprios dados) quanto na tela pública de convite (pessoa
- * ainda sem conta, criando o cadastro do zero). Controlado: quem usa decide
- * onde o estado mora e o que fazer ao salvar.
+ * Documentos + filiação + endereço + contato de emergência + dados
+ * bancários — usado na tela pública de convite (pessoa ainda sem conta,
+ * criando o cadastro do zero). Controlado: quem usa decide onde o estado
+ * mora e o que fazer ao salvar.
  */
 export function PersonalInfoFormFields({
   form,
   onChange,
+  bankInfo,
+  onBankInfoChange,
   pixKey,
   onPixKeyChange,
 }: {
   form: EmployeePersonalInfo;
   onChange: <K extends keyof EmployeePersonalInfo>(key: K, value: EmployeePersonalInfo[K]) => void;
+  bankInfo: BankInfo;
+  onBankInfoChange: <K extends keyof BankInfo>(key: K, value: BankInfo[K]) => void;
   pixKey: string;
   onPixKeyChange: (value: string) => void;
 }) {
@@ -75,10 +84,6 @@ export function PersonalInfoFormFields({
             <option value="">Selecione</option>
             {ESCOLARIDADE_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
           </Select>
-          <Select label="Raça/cor" value={form.racaCor ?? ""} onChange={(e) => onChange("racaCor", e.target.value)}>
-            <option value="">Selecione</option>
-            {RACA_COR_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
-          </Select>
         </div>
       </Card>
 
@@ -109,9 +114,13 @@ export function PersonalInfoFormFields({
       <Card style={{ padding: "20px", borderRadius: "18px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "17px", margin: "0 0 12px 0" }}>Dados bancários</h2>
         <HelpText style={{ marginTop: 0 }}>
-          Só a chave Pix é preenchida por aqui. Salário e conta bancária completa ficam a cargo do Owner.
+          Conta corrente para depósito. O salário em si fica a cargo do Owner.
         </HelpText>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginTop: "8px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px", marginTop: "8px" }}>
+          <Input label="Banco" placeholder="Ex: 237 - Bradesco" value={bankInfo.bankCode} onChange={(e) => onBankInfoChange("bankCode", e.target.value)} />
+          <Input label="Agência" value={bankInfo.bankAgencia} onChange={(e) => onBankInfoChange("bankAgencia", e.target.value.replace(/\D/g, ""))} />
+          <Input label="Conta corrente (sem dígito)" value={bankInfo.bankConta} onChange={(e) => onBankInfoChange("bankConta", e.target.value.replace(/\D/g, ""))} />
+          <Input label="Dígito" maxLength={2} value={bankInfo.bankContaDv} onChange={(e) => onBankInfoChange("bankContaDv", e.target.value.replace(/\D/g, "").slice(0, 2))} />
           <Input label="Chave Pix" placeholder="CPF, e-mail, telefone ou chave aleatória" value={pixKey} onChange={(e) => onPixKeyChange(e.target.value)} />
         </div>
       </Card>

@@ -27,6 +27,16 @@ function formatCpf(cpf: string | null): string {
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function formatCtps(numero: string | null, serie: string | null, uf: string | null): string {
+  if (!numero) return "—";
+  return [numero, serie, uf].filter(Boolean).join(" / ");
+}
+
 /** Dia (1-31) e "HH:mm" de um timestamp, no fuso da unidade — não em UTC cru. */
 function dayAndTimeInTz(atMs: number, timeZone: string): { day: number; time: string } {
   const parts = new Intl.DateTimeFormat("pt-BR", {
@@ -38,6 +48,31 @@ function dayAndTimeInTz(atMs: number, timeZone: string): { day: number; time: st
   }).formatToParts(new Date(atMs));
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return { day: Number(get("day")), time: `${get("hour")}:${get("minute")}` };
+}
+
+/**
+ * Timbre do espelho — marca FaçaAmigos com cores fixas em hex, não
+ * `var(--...)`: este bloco é copiado por `innerHTML` para dentro de um
+ * `<iframe>` isolado na hora de imprimir (ver handlePrint), que não herda
+ * os tokens CSS da página. Cores hardcoded são o que garante que a marca
+ * saia com a cor certa tanto na prévia quanto no papel.
+ */
+function Timbre() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+      <svg width="34" height="39" viewBox="0 0 64 74" fill="none" aria-hidden="true">
+        <g fill="none" strokeLinecap="round" strokeWidth="12">
+          <path d="M16 50 V36 a10 10 0 0 1 20 0 V44" stroke="#FFE234" />
+          <path d="M28 44 V36 a10 10 0 0 1 20 0 V50" stroke="#2ECFB5" opacity="0.93" />
+        </g>
+        <circle cx="26" cy="66" r="6.5" fill="#F0196B" />
+      </svg>
+      <span style={{ fontSize: "20px", fontWeight: "bold" }}>
+        <span style={{ color: "#1A3F35" }}>Faça</span>
+        <span style={{ color: "#F0196B" }}>Amigos</span>
+      </span>
+    </div>
+  );
 }
 
 interface DayRow {
@@ -189,10 +224,36 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
           className="espelho-printable"
           style={{ background: "#fff", color: "#141414", padding: "16px", borderRadius: "8px", overflowX: "auto" }}
         >
-          <h1>Espelho de Ponto Mensal — {MONTH_LABEL[data.month - 1]}/{data.year}</h1>
+          <Timbre />
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+            <h1 style={{ margin: 0 }}>Espelho de Ponto Mensal — {MONTH_LABEL[data.month - 1]}/{data.year}</h1>
+            <span style={{ fontSize: "11px", color: "#555" }}>
+              Emitido em {new Date().toLocaleDateString("pt-BR")} às {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </div>
+
+          {data.units.length > 0 && (
+            <div style={{ fontSize: "12px", marginBottom: "10px", paddingBottom: "10px", borderBottom: "1px solid #999" }}>
+              {data.units.map((u) => (
+                <div key={u.name} style={{ marginBottom: "2px" }}>
+                  <strong>{u.nomeFantasia ?? u.name}</strong>
+                  {u.razaoSocial ? ` — ${u.razaoSocial}` : ""}
+                  {u.cnpj ? ` · CNPJ ${u.cnpj}` : ""}
+                  {u.address ? ` · ${u.address}` : ""}
+                  {u.phone ? ` · ${u.phone}` : ""}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="header-grid">
             <div><strong>Colaborador:</strong> {data.employee.full_name}</div>
             <div><strong>CPF:</strong> {formatCpf(data.employee.cpf)}</div>
+            <div><strong>RG:</strong> {data.employee.rg_numero ?? "—"}{data.employee.rg_orgao_emissor ? ` (${data.employee.rg_orgao_emissor})` : ""}</div>
+            <div><strong>CTPS:</strong> {formatCtps(data.employee.ctps_numero, data.employee.ctps_serie, data.employee.ctps_uf)}</div>
+            <div><strong>Data de nascimento:</strong> {formatDate(data.employee.birth_date)}</div>
+            <div><strong>Data de admissão:</strong> {formatDate(data.employee.admission_date)}</div>
             <div><strong>Função:</strong> {data.employee.position ?? ROLE_LABEL[data.employee.role]}</div>
             <div><strong>Jornada semanal contratada:</strong> {data.employee.weekly_hours_contracted ?? "—"}h</div>
           </div>

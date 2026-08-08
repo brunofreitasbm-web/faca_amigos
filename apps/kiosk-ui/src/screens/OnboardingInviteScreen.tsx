@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Button, BrandLockup, Card, HelpText, Input } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { EmployeePersonalInfo, OnboardingInviteInfo } from "../api/client.js";
-import { PersonalInfoFormFields, emptyPersonalInfo } from "../components/PersonalInfoFormFields.js";
+import { PersonalInfoFormFields, emptyPersonalInfo, emptyBankInfo } from "../components/PersonalInfoFormFields.js";
+import type { BankInfo } from "../components/PersonalInfoFormFields.js";
 
 type Status = "loading" | "invalid" | "ready" | "done";
 
@@ -25,6 +26,7 @@ export function OnboardingInviteScreen({ inviteId, token }: { inviteId: string; 
   const [birthDate, setBirthDate] = useState("");
   const [pin, setPin] = useState("");
   const [form, setForm] = useState<EmployeePersonalInfo>(emptyPersonalInfo);
+  const [bankInfo, setBankInfo] = useState<BankInfo>(emptyBankInfo);
   const [pixKey, setPixKey] = useState("");
 
   useEffect(() => {
@@ -39,6 +41,10 @@ export function OnboardingInviteScreen({ inviteId, token }: { inviteId: string; 
 
   function set<K extends keyof EmployeePersonalInfo>(key: K, value: EmployeePersonalInfo[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function setBank<K extends keyof BankInfo>(key: K, value: BankInfo[K]) {
+    setBankInfo((prev) => ({ ...prev, [key]: value }));
   }
 
   const cpfDigits = cpf.replace(/\D/g, "");
@@ -63,6 +69,10 @@ export function OnboardingInviteScreen({ inviteId, token }: { inviteId: string; 
         pin,
         personalInfo: form,
         pixKey: pixKey || undefined,
+        bankCode: bankInfo.bankCode || undefined,
+        bankAgencia: bankInfo.bankAgencia || undefined,
+        bankConta: bankInfo.bankConta || undefined,
+        bankContaDv: bankInfo.bankContaDv || undefined,
       });
       setStatus("done");
     } catch (err) {
@@ -139,7 +149,7 @@ export function OnboardingInviteScreen({ inviteId, token }: { inviteId: string; 
         </div>
       </Card>
 
-      <PersonalInfoFormFields form={form} onChange={set} pixKey={pixKey} onPixKeyChange={setPixKey} />
+      <PersonalInfoFormFields form={form} onChange={set} bankInfo={bankInfo} onBankInfoChange={setBank} pixKey={pixKey} onPixKeyChange={setPixKey} />
 
       {error && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{error}</p>}
 

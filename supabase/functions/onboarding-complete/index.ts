@@ -24,7 +24,6 @@ interface PersonalInfoInput {
   nomePai?: string;
   estadoCivil?: string;
   escolaridade?: string;
-  racaCor?: string;
   cep?: string;
   logradouro?: string;
   numero?: string;
@@ -47,6 +46,10 @@ interface CompleteBody {
   pin: string;
   personalInfo?: PersonalInfoInput;
   pixKey?: string;
+  bankCode?: string;
+  bankAgencia?: string;
+  bankConta?: string;
+  bankContaDv?: string;
 }
 
 function randomInternalPassword(): string {
@@ -147,7 +150,6 @@ Deno.serve(async (req) => {
     nome_pai: nullIfEmpty(pi.nomePai),
     estado_civil: nullIfEmpty(pi.estadoCivil),
     escolaridade: nullIfEmpty(pi.escolaridade),
-    raca_cor: nullIfEmpty(pi.racaCor),
     cep: nullIfEmpty(pi.cep),
     logradouro: nullIfEmpty(pi.logradouro),
     numero: nullIfEmpty(pi.numero),
@@ -160,10 +162,20 @@ Deno.serve(async (req) => {
     completed_at_ms: Date.now(),
   });
 
-  if (nullIfEmpty(body.pixKey)) {
+  const bankPayload = {
+    pix_key: nullIfEmpty(body.pixKey),
+    bank_code: nullIfEmpty(body.bankCode),
+    bank_agencia: nullIfEmpty(body.bankAgencia),
+    bank_conta: nullIfEmpty(body.bankConta),
+    bank_conta_dv: nullIfEmpty(body.bankContaDv),
+    // Só conta corrente é oferecida neste formulário — poupança continua
+    // exclusiva do cadastro manual do Owner, se algum dia for preciso.
+    bank_account_type: nullIfEmpty(body.bankCode) || nullIfEmpty(body.bankAgencia) || nullIfEmpty(body.bankConta) ? "CORRENTE" : null,
+  };
+  if (Object.values(bankPayload).some((v) => v !== null)) {
     await adminClient.from("fa_kiosk_employee_payroll_info").insert({
       employee_id: employeeRow.id,
-      pix_key: nullIfEmpty(body.pixKey),
+      ...bankPayload,
     });
   }
 

@@ -22,7 +22,6 @@ import { SCREEN_CAPABILITY, type Screen } from "./auth/screens.js";
 import { ROLE_LABEL } from "./auth/capabilities.js";
 import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
-import { MeuCadastroScreen } from "./screens/MeuCadastroScreen.js";
 import { OnboardingInviteScreen } from "./screens/OnboardingInviteScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
 import { SaidaScreen } from "./screens/SaidaScreen.js";
@@ -57,8 +56,7 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
 };
 
 export function App() {
-  const { unit, setUnitId, gerencial, setGerencial, selfCadastro, setSelfCadastro, employee, logout, restoring } =
-    useAppState();
+  const { unit, setUnitId, gerencial, setGerencial, employee, logout, restoring } = useAppState();
   const { can, loading: loadingCapabilities } = useAuth();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
@@ -125,12 +123,6 @@ export function App() {
   // o que vale para várias unidades de uma vez e vê relatórios cross-unit.
   if (gerencial) {
     return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
-  }
-
-  // Módulo "Cadastro de Colaboradores": qualquer colaborador logado completa
-  // os próprios dados de RH, sem depender de unidade/operação selecionada.
-  if (selfCadastro) {
-    return <MeuCadastroScreen onExit={() => setSelfCadastro(false)} />;
   }
 
   // Se nenhuma operação/módulo foi selecionado ainda, exibe a Tela Inicial de Seleção de Módulo
