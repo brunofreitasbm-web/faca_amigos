@@ -231,3 +231,73 @@ export async function updateProductFiscal(_prev: ActionResult, formData: FormDat
   if (result.ok) revalidatePath("/produtos");
   return result;
 }
+
+// Salário-base e dados bancários vivem em fa_kiosk_employee_payroll_info,
+// separada de fa_kiosk_employees (que tem policy de leitura aberta a
+// qualquer colaborador autenticado) — RLS restringe leitura/escrita aqui a
+// quem tem a capacidade folha_pagamento.read/write (só Owner).
+export async function updatePayrollInfo(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  const salaryInput = optionalText(formData, "salary_base");
+  const result = await runAction(
+    () =>
+      supabase.from("fa_kiosk_employee_payroll_info").upsert(
+        {
+          employee_id: String(formData.get("employee_id")),
+          salary_base_cents: salaryInput ? Math.round(Number(salaryInput) * 100) : null,
+          bank_code: optionalText(formData, "bank_code"),
+          bank_agencia: optionalText(formData, "bank_agencia"),
+          bank_agencia_dv: optionalText(formData, "bank_agencia_dv"),
+          bank_conta: optionalText(formData, "bank_conta"),
+          bank_conta_dv: optionalText(formData, "bank_conta_dv"),
+          bank_account_type: optionalText(formData, "bank_account_type"),
+          pix_key: optionalText(formData, "pix_key"),
+          updated_at_ms: Date.now(),
+        },
+        { onConflict: "employee_id" },
+      ),
+    "Dados bancários salvos com sucesso.",
+  );
+  if (result.ok) revalidatePath("/folha-pagamento");
+  return result;
+}
+
+export interface PayrollCloseItem {
+  employeeId: string;
+  fullName: string;
+  cpf: string | null;
+  bankCode: string | null;
+  bankAgencia: string | null;
+  bankAgenciaDv: string | null;
+  bankConta: string | null;
+  bankContaDv: string | null;
+  bankAccountType: string | null;
+  salaryBaseCents: number;
+  adjustmentCents: number;
+  adjustmentNote: string | null;
+  totalCents: number;
+  hoursContracted: number | null;
+  hoursWorkedMinutes: number | null;
+}
+
+// Chamada direta pelo client component (não é um <form action>): a lista de
+// itens revisados na tela não cabe bem num FormData. fa_kiosk_close_payroll_run
+// (security definer) cria o run + todos os itens numa transação só e reforça
+// folha_pagamento.write no banco, não só na UI.
+export async function closePayrollRun(
+  unitId: string,
+  year: number,
+  month: number,
+  items: PayrollCloseItem[],
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fa_kiosk_close_payroll_run", {
+    p_unit_id: unitId,
+    p_year: year,
+    p_month: month,
+    p_items: items,
+  });
+  if (error) return { ok: false, message: error.message };
+  revalidatePath("/folha-pagamento");
+  return { ok: true, message: "Folha de pagamento fechada com sucesso." };
+}
