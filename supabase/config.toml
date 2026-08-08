@@ -26,3 +26,15 @@ verify_jwt = false
 
 [functions.list-employees]
 verify_jwt = false
+
+# Link de convite individual: a pessoa ainda não tem conta/sessão nenhuma
+# quando abre o link e preenche o próprio cadastro — mesma razão do
+# login-pin acima. A autorização real é o token do convite, conferido no
+# servidor em supabase/functions/_shared/onboardingInvite.ts.
+# create-onboarding-invite NÃO entra aqui: quem gera o convite já está
+# logado como ADMIN, então continua exigindo JWT normalmente.
+[functions.onboarding-invite-info]
+verify_jwt = false
+
+[functions.onboarding-complete]
+verify_jwt = false

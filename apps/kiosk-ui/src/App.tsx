@@ -23,6 +23,7 @@ import { ROLE_LABEL } from "./auth/capabilities.js";
 import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { MeuCadastroScreen } from "./screens/MeuCadastroScreen.js";
+import { OnboardingInviteScreen } from "./screens/OnboardingInviteScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
 import { SaidaScreen } from "./screens/SaidaScreen.js";
 import { PainelScreen } from "./screens/PainelScreen.js";
@@ -99,6 +100,16 @@ export function App() {
       cancelLabel: "Cancelar",
     });
     if (ok) await logout();
+  }
+
+  // Link de convite individual (?convite=<inviteId>.<token>): quem abre
+  // ainda não tem NENHUMA conta/sessão — precisa vir ANTES até da checagem
+  // de sessão salva abaixo, senão essa pessoa nunca sairia da tela de
+  // "Carregando…"/login por PIN.
+  const inviteParam = new URLSearchParams(window.location.search).get("convite");
+  if (inviteParam) {
+    const [inviteId, token] = inviteParam.split(".");
+    if (inviteId && token) return <OnboardingInviteScreen inviteId={inviteId} token={token} />;
   }
 
   // Enquanto a sessão salva não foi conferida, não decide nada: mostrar a

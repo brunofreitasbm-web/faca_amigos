@@ -162,6 +162,33 @@ export interface PersonalInfoStatus {
   completed: boolean;
 }
 
+export interface CreateOnboardingInviteInput {
+  role: Employee["role"];
+  position: string;
+  unitIds: string[];
+  fullNameHint?: string;
+  admissionDate?: string;
+}
+
+export interface OnboardingInviteInfo {
+  position: string;
+  unitNames: string[];
+  fullNameHint: string | null;
+}
+
+export interface OnboardingCompleteInput {
+  inviteId: string;
+  token: string;
+  fullName: string;
+  cpf?: string;
+  email?: string;
+  phone?: string;
+  birthDate?: string;
+  pin: string;
+  personalInfo?: EmployeePersonalInfo;
+  pixKey?: string;
+}
+
 export interface NewEmployeeInput {
   fullName: string;
   role: Employee["role"];
@@ -1686,6 +1713,20 @@ export const Api = {
     );
     return rows.map((r) => ({ employeeId: r.employee_id, completed: r.completed }));
   },
+
+  // Link de convite individual — gerar exige sessão de ADMIN (JWT), as
+  // outras duas rodam ANTES de qualquer conta existir (anon, ver
+  // supabase/config.toml) e por isso não passam por `supabase().rpc`.
+  createOnboardingInvite: (body: CreateOnboardingInviteInput) =>
+    unwrap<{ inviteId: string; token: string; expiresAtMs: number }>(
+      supabase().functions.invoke("create-onboarding-invite", { body }),
+    ),
+  onboardingInviteInfo: (inviteId: string, token: string) =>
+    unwrap<OnboardingInviteInfo>(
+      supabase().functions.invoke("onboarding-invite-info", { body: { inviteId, token } }),
+    ),
+  onboardingComplete: (body: OnboardingCompleteInput) =>
+    unwrap<{ id: string }>(supabase().functions.invoke("onboarding-complete", { body })),
 
   /**
    * Colaborador correspondente à sessão do Supabase Auth atual. É daqui

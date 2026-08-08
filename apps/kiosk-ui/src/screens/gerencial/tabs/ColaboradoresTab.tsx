@@ -44,6 +44,54 @@ export function ColaboradoresTab() {
   const [unitsTargetIds, setUnitsTargetIds] = useState<string[]>([]);
   const [unitsBusy, setUnitsBusy] = useState(false);
 
+  // Link de convite individual: o Owner decide função/cargo/unidade(s)/
+  // admissão aqui — quem preenche o convite depois só completa os próprios
+  // dados pessoais, nunca escolhe o próprio nível de acesso.
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteFunctionKey, setInviteFunctionKey] = useState<string>(FUNCTION_OPTIONS[0]!.value);
+  const [inviteUnitIds, setInviteUnitIds] = useState<string[]>(units.map((u) => u.id));
+  const [inviteFullNameHint, setInviteFullNameHint] = useState("");
+  const [inviteAdmissionDate, setInviteAdmissionDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const inviteSelectedFunction = FUNCTION_OPTIONS.find((f) => f.value === inviteFunctionKey) ?? FUNCTION_OPTIONS[0]!;
+
+  function closeInviteModal() {
+    setShowInviteModal(false);
+    setInviteFunctionKey(FUNCTION_OPTIONS[0]!.value);
+    setInviteUnitIds(units.map((u) => u.id));
+    setInviteFullNameHint("");
+    setInviteAdmissionDate(new Date().toISOString().slice(0, 10));
+    setInviteError(null);
+    setInviteLink(null);
+  }
+
+  async function generateInvite() {
+    setInviteBusy(true);
+    setInviteError(null);
+    try {
+      const { inviteId, token } = await Api.createOnboardingInvite({
+        role: inviteSelectedFunction.role,
+        position: inviteSelectedFunction.label,
+        unitIds: inviteUnitIds,
+        fullNameHint: inviteFullNameHint.trim() || undefined,
+        admissionDate: inviteAdmissionDate || undefined,
+      });
+      setInviteLink(`${window.location.origin}${window.location.pathname}?convite=${inviteId}.${token}`);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Não foi possível gerar o convite");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!inviteLink) return;
+    await navigator.clipboard.writeText(inviteLink);
+    toast.success("Link copiado.");
+  }
+
   function load() {
     Api.allEmployees().then(setEmployees);
     // Quem já completou o auto-cadastro de RH (módulo "Cadastro de
@@ -183,9 +231,14 @@ export function ColaboradoresTab() {
             <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>Equipe e Colaboradores</h2>
             <HelpText>{employees.length} colaboradores cadastrados, nas 3 unidades.</HelpText>
           </div>
-          <Button variant="primary" onClick={() => setShowForm(true)} style={{ borderRadius: "9999px" }}>
-            ⚡ + Novo colaborador rápido
-          </Button>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <Button variant="secondary" onClick={() => setShowInviteModal(true)} style={{ borderRadius: "9999px" }}>
+              🔗 Gerar link de cadastro
+            </Button>
+            <Button variant="primary" onClick={() => setShowForm(true)} style={{ borderRadius: "9999px" }}>
+              ⚡ + Novo colaborador rápido
+            </Button>
+          </div>
         </div>
       )}
 
@@ -318,6 +371,56 @@ export function ColaboradoresTab() {
                 Cancelar
               </Button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {showInviteModal && (
+        <Modal onClose={closeInviteModal} title="🔗 Gerar link de cadastro">
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {!inviteLink ? (
+              <>
+                <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
+                  Escolha a função, unidade(s) e data de admissão — quem abrir o link só completa os próprios dados
+                  pessoais e escolhe o PIN, sem poder alterar o nível de acesso.
+                </p>
+                <Select label="Função e Permissão *" title={ROLE_DESCRIPTION[inviteSelectedFunction.role]} value={inviteFunctionKey} onChange={(e) => setInviteFunctionKey(e.target.value)}>
+                  {FUNCTION_OPTIONS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label} ({ROLE_LABEL[f.role]})
+                    </option>
+                  ))}
+                </Select>
+                <UnitCheckboxGroup units={units} selected={inviteUnitIds} onChange={setInviteUnitIds} />
+                <Input label="Data de admissão" type="date" value={inviteAdmissionDate} onChange={(e) => setInviteAdmissionDate(e.target.value)} />
+                <Input label="Nome (opcional, se já souber)" value={inviteFullNameHint} onChange={(e) => setInviteFullNameHint(e.target.value)} />
+                {inviteError && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{inviteError}</p>}
+                <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                  <Button variant="primary" disabled={inviteBusy || inviteUnitIds.length === 0} onClick={generateInvite} style={{ borderRadius: "9999px", flex: 1 }}>
+                    {inviteBusy ? "Gerando…" : "Gerar link"}
+                  </Button>
+                  <Button variant="ghost" onClick={closeInviteModal}>
+                    Cancelar
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
+                  Válido por 7 dias ou até a pessoa preencher — o que vier primeiro. Mande por um canal que só ela
+                  tenha acesso (WhatsApp direto, por exemplo).
+                </p>
+                <Input label="Link de cadastro" value={inviteLink} readOnly onFocus={(e) => e.target.select()} />
+                <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                  <Button variant="primary" onClick={copyInviteLink} style={{ borderRadius: "9999px", flex: 1 }}>
+                    📋 Copiar link
+                  </Button>
+                  <Button variant="ghost" onClick={closeInviteModal}>
+                    Fechar
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}
