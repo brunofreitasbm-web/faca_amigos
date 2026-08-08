@@ -154,6 +154,7 @@ export function FolhaPagamentoTab() {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [tablesMissing, setTablesMissing] = useState<boolean>(false);
 
   const [employees, setEmployees] = useState<FolhaPagamentoEmployee[]>([]);
   const [runs, setRuns] = useState<ClosedRun[]>([]);
@@ -176,6 +177,7 @@ export function FolhaPagamentoTab() {
       setEmployees(res.employees);
       setRuns(res.runs);
       setClosedRun(res.closedRun);
+      setTablesMissing(res.tablesMissing);
       setRowState(buildInitialRowState(res.employees));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar folha de pagamento");
@@ -183,6 +185,7 @@ export function FolhaPagamentoTab() {
       setLoading(false);
     }
   }, [selectedUnitId, year, month]);
+
 
   useEffect(() => {
     loadData();
@@ -295,7 +298,17 @@ export function FolhaPagamentoTab() {
       {loading && <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>Carregando folha de pagamento...</p>}
       {error && <p style={{ color: "var(--color-error-text)", fontSize: "14px" }}>{error}</p>}
 
+      {tablesMissing && (
+        <div style={{ padding: "14px 18px", marginBottom: "16px", borderRadius: "8px", background: "rgba(234, 179, 8, 0.12)", border: "1px solid rgba(234, 179, 8, 0.3)", color: "var(--text-primary)" }}>
+          <strong style={{ display: "block", marginBottom: "4px" }}>⚠️ Tabelas da Folha de Pagamento pendentes no Supabase</strong>
+          <p style={{ margin: 0, fontSize: "13px", lineHeight: "1.5", color: "var(--text-secondary)" }}>
+            As tabelas da folha (<code>fa_kiosk_employee_payroll_info</code> e <code>fa_kiosk_payroll_runs</code>) ainda não foram criadas no banco de dados do Supabase. Para habilitar o salvamento de dados bancários e fechamento da folha no ambiente online, execute a migration <code>20260807000013_fa_kiosk_payroll.sql</code> no <strong>SQL Editor</strong> do painel Supabase.
+          </p>
+        </div>
+      )}
+
       {!loading && !error && (
+
         <>
           {closedRun ? (
             <ClosedPayrollView closedRun={closedRun} />

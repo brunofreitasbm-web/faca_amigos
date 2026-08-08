@@ -1876,6 +1876,7 @@ export const Api = {
   },
   getFolhaPagamentoData: async (unitId: string, year: number, month: number) => {
     const { fromMs, toMs } = monthRangeMs(year, month);
+    let tablesMissing = false;
     const [employees, payrollInfos, pontoRecords, runs] = await Promise.all([
       unwrap<Record<string, unknown>[]>(
         supabase()
@@ -1887,7 +1888,10 @@ export const Api = {
       ),
       unwrap<Record<string, unknown>[]>(
         supabase().from("fa_kiosk_employee_payroll_info").select("*"),
-      ).catch(() => []),
+      ).catch(() => {
+        tablesMissing = true;
+        return [];
+      }),
       unwrap<Record<string, unknown>[]>(
         supabase()
           .from("fa_kiosk_ponto_records")
@@ -1903,8 +1907,12 @@ export const Api = {
           .eq("unit_id", unitId)
           .order("year", { ascending: false })
           .order("month", { ascending: false }),
-      ).catch(() => []),
+      ).catch(() => {
+        tablesMissing = true;
+        return [];
+      }),
     ]);
+
 
     const payrollInfoByEmployee = new Map((payrollInfos ?? []).map((p) => [p.employee_id as string, p]));
 
@@ -1969,7 +1977,9 @@ export const Api = {
       employees: folhaEmployees,
       runs: parsedRuns,
       closedRun,
+      tablesMissing,
     };
+
   },
   updatePayrollInfo: async (
     employeeId: string,
