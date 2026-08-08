@@ -145,6 +145,17 @@ export function GearIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+// Hamburger — abre/fecha o menu de módulos retrátil no celular (App.tsx),
+// onde a barra de navegação completa não cabe ao lado da marca sem quebrar
+// em várias linhas.
+export function ListIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z" />
+    </IconBase>
+  );
+}
+
 export function ArrowClockwiseIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconBase {...props}>

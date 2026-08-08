@@ -59,6 +59,37 @@ body {
   }
 }
 
+/* ---------- Menu de módulos retrátil (celular) ----------
+
+   No computador a barra de módulos (Entrada, Painel, PDV...) cabe toda ao
+   lado da marca. No celular ela não cabe: ou quebra em 3-4 linhas e empurra
+   o conteúdo pra baixo da dobra, ou fica pequena demais para tocar com
+   segurança. Abaixo de 768px ela vira um menu escondido por padrão, aberto
+   por um botão hambúrguer (App.tsx controla o estado; aqui só a exibição).
+
+   O `!important` é necessário pelo mesmo motivo do bloco acima: o React
+   define `display` inline em ambos os elementos, que sempre vence CSS
+   externo sem ele. */
+@media (max-width: 768px) {
+  .kiosk-nav-toggle {
+    display: inline-flex !important;
+  }
+
+  .kiosk-nav {
+    display: none !important;
+    flex-basis: 100%;
+    order: 3;
+    margin-left: 0 !important;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .kiosk-nav.is-open {
+    display: flex !important;
+  }
+}
+
 /* ---------- Painel: cards fluidos ----------
 
    O tamanho do card não é fixo: ele acompanha o espaço que sobra, do
