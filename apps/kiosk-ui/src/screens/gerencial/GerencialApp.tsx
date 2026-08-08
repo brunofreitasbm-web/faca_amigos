@@ -10,6 +10,7 @@ import { CuponsTab } from "./tabs/CuponsTab.js";
 import { FidelidadeTab } from "./tabs/FidelidadeTab.js";
 import { MetasTab } from "./tabs/MetasTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
+import { BancoTalentosScreen } from "../BancoTalentosScreen.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
 import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
 import { AberturaFechamentoTab } from "./tabs/AberturaFechamentoTab.js";
@@ -18,7 +19,7 @@ import { SaldoEnvelopesTab } from "./tabs/SaldoEnvelopesTab.js";
 import { HistoricoTab } from "./tabs/HistoricoTab.js";
 import { ContratoTab } from "./tabs/ContratoTab.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "TALENTOS" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "PLANOS", label: "Planos de Preços" },
@@ -28,6 +29,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "FIDELIDADE", label: "Fidelidade" },
   { value: "METAS", label: "Metas" },
   { value: "COLABORADORES", label: "Colaboradores" },
+  { value: "TALENTOS", label: "Banco de Talentos" },
   { value: "FOLHA", label: "Folha de Pagamento" },
   { value: "RELATORIOS", label: "Relatórios" },
   { value: "ABERTURA_FECHAMENTO", label: "Abertura e Fechamento" },
@@ -45,6 +47,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
   FIDELIDADE: "Recompensas automáticas para clientes recorrentes.",
   METAS: "Regras de bonificação da equipe quando a meta diária é batida. Meta de faturamento e horário de fechamento continuam por unidade, em Configurações.",
   COLABORADORES: "Cadastro único de toda a equipe — escolha em qual(is) unidade(s) cada colaborador atua.",
+  TALENTOS: "Candidaturas recebidas pelo site — analise o currículo e atualize o status conforme a triagem avança.",
   FOLHA: "Extrato mensal de salários, dados bancários e fechamento da folha para conferência e exportação/Bradesco.",
   RELATORIOS: "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só.",
   ABERTURA_FECHAMENTO: "Horário de abertura e fechamento do caixa de cada loja, quem abriu/fechou e o troco inicial.",
@@ -110,6 +113,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "FIDELIDADE" && <FidelidadeTab />}
               {tab === "METAS" && <MetasTab />}
               {tab === "COLABORADORES" && <ColaboradoresTab />}
+              {tab === "TALENTOS" && <BancoTalentosScreen />}
               {tab === "FOLHA" && <FolhaPagamentoTab />}
               {tab === "RELATORIOS" && <GerencialRelatorioTab />}
               {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
