@@ -1469,6 +1469,7 @@ footer a:hover {
  <h2 style="color: var(--indigo); font-weight: 800; font-size: 1.8rem; letter-spacing:-1px;">Faça<span style="color: var(--coral);">Amigos</span></h2>
  <div class="navbar-actions">
  <button type="button" class="btn btn-outline btn-sm" onclick="openContactModal()">Fale Conosco</button>
+ <button type="button" class="btn btn-outline btn-sm" onclick="openJobModal()">Venha Fazer Parte do Nosso Time</button>
  <a href="#precos" class="btn btn-outline btn-sm">Ver Preços</a>
  <a href="https://www.instagram.com/facaamigos.belem/" target="_blank" rel="noopener" aria-label="Instagram" style="color: var(--indigo); font-size: 1.5rem; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--gray-100); transition: var(--transition);" onmouseover="this.style.background='var(--sun)'" onmouseout="this.style.background='var(--gray-100)'">
  <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
@@ -1942,6 +1943,7 @@ footer a:hover {
  <p>Aberto todos os dias das 10h às 22h</p>
  <p style="margin-top: 24px; color: var(--ink-soft);">Desenvolvido com foco na experiência das famílias.</p>
  <p style="margin-top: 12px;"><a href="#" onclick="openContactModal(); return false;" style="color: #fff; text-decoration: underline;">Fale Conosco / Dúvidas, Sugestões e Críticas</a></p>
+ <p style="margin-top: 12px;"><a href="#" onclick="openJobModal(); return false;" style="color: #fff; text-decoration: underline;">Venha Fazer Parte do Nosso Time</a></p>
  </div>
  </footer>
 
@@ -1968,6 +1970,56 @@ footer a:hover {
  </div>
  <div class="btn-block">
  <button type="submit" class="btn btn-primary" style="width: 100%;">Enviar Mensagem</button>
+ </div>
+ </form>
+ </div>
+ </div>
+
+ <!-- Modal: Venha Fazer Parte do Nosso Time -->
+ <div class="contact-modal-overlay" id="jobModalOverlay" onclick="if(event.target===this) closeJobModal()">
+ <div class="contact-modal">
+ <button type="button" class="contact-modal-close" onclick="closeJobModal()" aria-label="Fechar">✕</button>
+ <h3>Venha Fazer Parte do Nosso Time 🌟</h3>
+ <p>Preencha seus dados e envie seu currículo em PDF. Nosso time de RH vai analisar sua candidatura.</p>
+ <form id="job-form">
+ <div class="form-group">
+ <input type="text" id="job-nome" class="form-control" placeholder="Nome completo" required>
+ </div>
+ <div class="form-group">
+ <input type="email" id="job-email" class="form-control" placeholder="E-mail" required>
+ </div>
+ <div class="form-group">
+ <input type="tel" id="job-telefone" class="form-control" placeholder="WhatsApp" required>
+ </div>
+ <div class="form-group">
+ <input type="text" id="job-curso" class="form-control" placeholder="Curso (se estiver estudando)">
+ </div>
+ <div class="form-group">
+ <select id="job-area" class="form-control" required>
+ <option value="" disabled selected>Área pretendida</option>
+ <option value="RECEPCAO">Recepção</option>
+ <option value="VENDEDOR">Vendedor(a)</option>
+ <option value="CAIXA">Caixa</option>
+ <option value="MONITOR">Monitor(a) de Brincadeira</option>
+ <option value="LIDERANCA">Liderança / Supervisão</option>
+ <option value="OUTRA">Outra</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <select id="job-tipo" class="form-control" required>
+ <option value="" disabled selected>Tipo de oportunidade</option>
+ <option value="ESTAGIO">Estágio</option>
+ <option value="REMUNERADO">Vaga remunerada (CLT)</option>
+ <option value="BOLSA">Bolsa</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label for="job-curriculo" style="display:block; margin-bottom:8px; font-size:0.9rem; color: var(--ink-soft);">Currículo (PDF, até 5MB)</label>
+ <input type="file" id="job-curriculo" class="form-control" accept="application/pdf" required>
+ </div>
+ <div id="job-form-error" style="display:none; color: var(--coral); font-size:0.9rem; margin-bottom:12px;"></div>
+ <div class="btn-block">
+ <button type="submit" id="job-form-submit" class="btn btn-primary" style="width: 100%;">Enviar Candidatura</button>
  </div>
  </form>
  </div>
