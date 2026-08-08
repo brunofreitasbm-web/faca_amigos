@@ -21,9 +21,11 @@ const POS_VISITA_TEMPLATES = [
   {
     id: "padrao_agradecimento",
     title: "Agradecimento e Convite",
-    message: "Olá {responsavel}! Tudo bem? 😊 Nós do Faça Amigos amamos receber a visita do(a) {crianca}!\n\nEsperamos que a experiência tenha sido incrível! Já estamos com saudades e preparamos muitas novidades divertidas para a próxima brincadeira! 🎈\n\n⭐ Avalie a gente com 5 estrelas no Google e garanta 10% de DESCONTO na sua próxima visita no Faça Amigos Circuito (válido por 7 dias)! \n👉 https://institutofacaamigos.com.br/playground/index.html\n\nTe esperamos em breve!",
+    message: "Olá {responsavel}! Tudo bem? 😊 Nós do Faça Amigos amamos receber a visita do(a) {crianca}!\n\nEsperamos que a experiência tenha sido incrível! Já estamos com saudades e preparamos muitas novidades divertidas para a próxima brincadeira! 🎈\n\n⭐ Avalie a gente com 5 estrelas no Google e garanta 10% de DESCONTO na sua próxima visita no Faça Amigos Circuito (válido por 7 dias)! \n👉 https://institutofacaamigos.com.br/playground/index.html?id={id_do_responsavel}\n\nTe esperamos em breve!",
   }
 ];
+
+import { generateRandomPosVisitaMessage } from "./pos-visita-generator.js";
 
 export function registerPosVisitaRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get<{ Querystring: { unitId?: string } }>("/api/pos-visita", async (req) => {
@@ -101,8 +103,10 @@ export function registerPosVisitaRoutes(app: FastifyInstance, ctx: AppContext): 
     return { success: true, item };
   });
 
-  app.get("/api/pos-visita/templates", async () => {
-    return { templates: POS_VISITA_TEMPLATES };
+  app.get<{ Querystring: { seed?: string } }>("/api/pos-visita/templates", async (req) => {
+    const seedNum = req.query.seed ? parseInt(req.query.seed, 10) : undefined;
+    const template = generateRandomPosVisitaMessage(seedNum);
+    return { templates: [template] };
   });
 
   app.post<{ Body: { guardian_id: string; unit_id?: string } }>("/api/pos-visita/google-review-callback", async (req) => {

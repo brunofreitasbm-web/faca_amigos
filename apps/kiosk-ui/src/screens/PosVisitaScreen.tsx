@@ -64,17 +64,17 @@ export function PosVisitaScreen() {
       });
   }, [unit?.id]);
 
-  function getFormattedMessage(templateId: string, guardianName: string, childName: string) {
+  function getFormattedMessage(templateId: string, guardianName: string, childName: string, guardianId: string) {
     const tmpl = templates.find((t) => t.id === templateId) || templates[0];
     if (!tmpl) return "";
-    return tmpl.message.replace("{responsavel}", guardianName).replace("{crianca}", childName);
+    return tmpl.message.replace("{responsavel}", guardianName).replace("{crianca}", childName).replace("{id_do_responsavel}", guardianId.replace("pv_", ""));
   }
 
   function handleSendWhatsApp(item: PosVisitaItem) {
     if (cooldownSeconds > 0) return;
 
     const rawPhone = item.phone_e164.replace(/\D/g, "");
-    const text = encodeURIComponent(getFormattedMessage(selectedTemplate, item.guardian_name, item.child_name));
+    const text = encodeURIComponent(getFormattedMessage(selectedTemplate, item.guardian_name, item.child_name, item.id));
     const url = `https://wa.me/${rawPhone}?text=${text}`;
     window.open(url, "_blank");
 
@@ -135,9 +135,26 @@ export function PosVisitaScreen() {
 
       {/* Modelo de mensagem selecionado */}
       <Card style={{ padding: "20px", marginBottom: "24px", borderRadius: "16px", background: "var(--surface-card)" }}>
-        <h3 style={{ fontSize: "16px", margin: "0 0 12px 0", color: "var(--text-primary)" }}>
-          💬 Modelo de Mensagem Selecionado
-        </h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+          <h3 style={{ fontSize: "16px", margin: 0, color: "var(--text-primary)" }}>
+            💬 Modelo de Mensagem Selecionado
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const randomSeed = Math.floor(Math.random() * 3000);
+              fetch(`/api/pos-visita/templates?seed=${randomSeed}`)
+                .then((res) => res.json())
+                .then((data) => {
+                  if (data.templates) setTemplates(data.templates);
+                });
+            }}
+            style={{ fontSize: "13px", fontWeight: "600" }}
+          >
+            🎲 Sortear Outra Frase (3.000 combinações)
+          </Button>
+        </div>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
           {templates.map((tmpl) => (
             <Button
