@@ -36,7 +36,6 @@ import { RelatorioScreen } from "./screens/RelatorioScreen.js";
 import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
 import { PosVisitaScreen } from "./screens/PosVisitaScreen.js";
 import { AniversariosScreen } from "./screens/AniversariosScreen.js";
-import { BancoTalentosScreen } from "./screens/BancoTalentosScreen.js";
 import { GerencialApp } from "./screens/gerencial/GerencialApp.js";
 import { ConnectDeviceModal } from "./components/ConnectDeviceModal.js";
 import { ConnectionStatusChip } from "./components/ConnectionStatusChip.js";
@@ -52,7 +51,6 @@ const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon:
   { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento", icon: <WalletIcon /> },
   { value: "POS_VISITA", label: "Pós-Visita", help: "Acompanhamento de satisfação dos clientes e mensagens pós-atendimento via WhatsApp", icon: <span>📱</span> },
   { value: "ANIVERSARIOS", label: "Aniversários", help: "Acompanhar aniversariantes do mês e enviar cupons/felicitações", icon: <span>🎂</span> },
-  { value: "BANCO_TALENTOS", label: "Banco de Talentos", help: "Analisar candidaturas recebidas pelo site e acompanhar a triagem de currículos", icon: <span>🌟</span> },
   { value: "PONTO", label: "Ponto", help: "Bater o ponto: registrar entrada, intervalo e saída do colaborador", icon: <ClockIcon /> },
   { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa e folha de ponto de períodos anteriores", icon: <ChartBarIcon /> },
   { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, colaboradores, unidade, dados fiscais e termos de uso", icon: <GearIcon /> },
@@ -66,7 +64,6 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
   CAIXA: CaixaScreen,
   POS_VISITA: PosVisitaScreen,
   ANIVERSARIOS: AniversariosScreen,
-  BANCO_TALENTOS: BancoTalentosScreen,
   PONTO: PontoScreen,
   RELATORIO: RelatorioScreen,
   CONFIGURACOES: ConfiguracoesScreen,
