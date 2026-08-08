@@ -31,6 +31,8 @@ import { CaixaScreen } from "./screens/CaixaScreen.js";
 import { PontoScreen } from "./screens/PontoScreen.js";
 import { RelatorioScreen } from "./screens/RelatorioScreen.js";
 import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
+import { PosVisitaScreen } from "./screens/PosVisitaScreen.js";
+import { AniversariosScreen } from "./screens/AniversariosScreen.js";
 import { GerencialApp } from "./screens/gerencial/GerencialApp.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
@@ -39,6 +41,8 @@ const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon:
   { value: "PAINEL", label: "Painel", help: "Ver todas as crianças que estão no espaço agora, quanto tempo já ficaram e fechar o atendimento (cobrar) quando forem embora", icon: <GridIcon /> },
   { value: "PDV", label: "PDV", help: "Vender produtos avulsos (loja/lanchonete), sem estar ligado a uma entrada", icon: <ShoppingCartIcon /> },
   { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento", icon: <WalletIcon /> },
+  { value: "POS_VISITA", label: "Pós-Visita", help: "Acompanhamento de satisfação dos clientes e mensagens pós-atendimento via WhatsApp", icon: <span>📱</span> },
+  { value: "ANIVERSARIOS", label: "Aniversários", help: "Acompanhar aniversariantes do mês e enviar cupons/felicitações", icon: <span>🎂</span> },
   { value: "PONTO", label: "Ponto", help: "Bater o ponto: registrar entrada, intervalo e saída do colaborador", icon: <ClockIcon /> },
   { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa e folha de ponto de períodos anteriores", icon: <ChartBarIcon /> },
   { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, colaboradores, unidade, dados fiscais e termos de uso", icon: <GearIcon /> },
@@ -50,6 +54,8 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
   PAINEL: PainelScreen,
   PDV: PdvScreen,
   CAIXA: CaixaScreen,
+  POS_VISITA: PosVisitaScreen,
+  ANIVERSARIOS: AniversariosScreen,
   PONTO: PontoScreen,
   RELATORIO: RelatorioScreen,
   CONFIGURACOES: ConfiguracoesScreen,

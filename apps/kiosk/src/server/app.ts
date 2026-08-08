@@ -12,6 +12,9 @@ import { registerShiftRoutes } from "./routes/shifts.js";
 import { registerPontoRoutes } from "./routes/ponto.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerReportRoutes } from "./routes/reports.js";
+import { registerPosVisitaRoutes } from "./routes/pos-visita.js";
+import { registerAniversariosRoutes } from "./routes/aniversarios.js";
+import { registerCaixaFaRoutes } from "./routes/caixa-fa.js";
 import { registerTickChannel } from "./ws-tick.js";
 import { ValidationError, ConflictError } from "./validate.js";
 import type { TlsMaterial } from "./tls.js";
@@ -61,6 +64,9 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
   registerPontoRoutes(app, ctx);
   registerAuthRoutes(app, ctx);
   registerReportRoutes(app, ctx);
+  registerPosVisitaRoutes(app, ctx);
+  registerAniversariosRoutes(app, ctx);
+  registerCaixaFaRoutes(app, ctx);
   registerTickChannel(app, ctx);
 
   return app;

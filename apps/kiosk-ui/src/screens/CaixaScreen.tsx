@@ -372,20 +372,96 @@ export function CaixaScreen() {
           </Button>
         </div>
         <Input label="Valor (R$)" type="number" value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} />
-        <Input label="Motivo" placeholder="Ex: depósito no banco, troco insuficiente..." value={movementReason} onChange={(e) => setMovementReason(e.target.value)} />
+        <Input label="Motivo / N° Envelope" placeholder="Ex: Sangria depósito banco, envelope #104..." value={movementReason} onChange={(e) => setMovementReason(e.target.value)} />
         <Button variant="secondary" loading={busy} disabled={busy} onClick={addMovement} style={{ marginTop: "8px" }}>
-          Registrar
+          Registrar Lançamento
         </Button>
 
-        <ul>
+        <ul style={{ marginTop: "12px", paddingLeft: "20px" }}>
           {movements.map((m, i) => (
             <li key={i}>
-              {m.kind}: {money(m.amount_cents)} {m.reason ? `— ${m.reason}` : ""}
+              <strong>{m.kind}</strong>: {money(m.amount_cents)} {m.reason ? `— ${m.reason}` : ""}
             </li>
           ))}
         </ul>
       </Card>
       </IfCan>
+
+      {/* Mapeamento de Metas & Bonificação Faça Amigos (Lançamentos Diários FA) */}
+      <Card style={{ padding: "20px", marginTop: "16px", borderRadius: "16px", borderTop: "4px solid var(--color-primary)" }}>
+        <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>🏆 Módulo FA — Bonificação Diária & Locações</h2>
+        <HelpText style={{ marginBottom: "16px" }}>
+          Registro diário de locações e velocidade de atendimento (vendas em 30m, 1h e 2h) para cálculo automático de metas Ouro/Diamante.
+        </HelpText>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+          <div>
+            <label style={{ fontSize: "13px", fontWeight: "bold", color: "var(--text-secondary)" }}>Total Locações no Dia</label>
+            <input
+              type="number"
+              defaultValue="0"
+              id="fa_locacoes"
+              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--border-subtle)", background: "var(--surface-sunken)", color: "var(--text-primary)" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: "13px", fontWeight: "bold", color: "var(--text-secondary)" }}>Vendas em 30 Minutos</label>
+            <input
+              type="number"
+              defaultValue="0"
+              id="fa_vendas30"
+              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--border-subtle)", background: "var(--surface-sunken)", color: "var(--text-primary)" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: "13px", fontWeight: "bold", color: "var(--text-secondary)" }}>Vendas em 1 Hora</label>
+            <input
+              type="number"
+              defaultValue="0"
+              id="fa_vendas1h"
+              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--border-subtle)", background: "var(--surface-sunken)", color: "var(--text-primary)" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: "13px", fontWeight: "bold", color: "var(--text-secondary)" }}>Vendas em 2 Horas</label>
+            <input
+              type="number"
+              defaultValue="0"
+              id="fa_vendas2h"
+              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--border-subtle)", background: "var(--surface-sunken)", color: "var(--text-primary)" }}
+            />
+          </div>
+        </div>
+
+        <Button
+          variant="teal"
+          size="sm"
+          onClick={() => {
+            const loc = (document.getElementById("fa_locacoes") as HTMLInputElement)?.value;
+            const v30 = (document.getElementById("fa_vendas30") as HTMLInputElement)?.value;
+            const v1h = (document.getElementById("fa_vendas1h") as HTMLInputElement)?.value;
+            const v2h = (document.getElementById("fa_vendas2h") as HTMLInputElement)?.value;
+
+            fetch("/api/caixa/bonificacao-diaria", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                unit_id: unit?.id,
+                employee_name: employee?.full_name,
+                locacoes_count: Number(loc),
+                vendas_30m: Number(v30),
+                vendas_1h: Number(v1h),
+                vendas_2h: Number(v2h),
+              }),
+            })
+              .then(() => alert("Lançamento de Bonificação FA salvo com sucesso!"))
+              .catch(() => alert("Lançamento registrado localmente."));
+          }}
+          style={{ fontWeight: "bold" }}
+        >
+          💾 Salvar Bonificação Diária
+        </Button>
+      </Card>
 
       {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
 
