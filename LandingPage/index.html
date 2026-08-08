@@ -6,7 +6,81 @@
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>FaçaAmigos — Playground Inclusivo no Parque Shopping Belém</title>
  <meta name="description" content="O playground inclusivo de Belém. Espaço seguro, equipe especializada e acolhimento para todas as crianças, dentro do Parque Shopping. Todos os dias, 10h às 22h.">
- 
+ <link rel="canonical" href="https://institutofacaamigos.com.br/playground/">
+
+ <!-- Open Graph / redes sociais (Instagram, WhatsApp, Facebook) -->
+ <meta property="og:type" content="business.business">
+ <meta property="og:site_name" content="FaçaAmigos">
+ <meta property="og:title" content="FaçaAmigos — Playground Inclusivo no Parque Shopping Belém">
+ <meta property="og:description" content="O playground inclusivo de Belém. Espaço seguro, equipe especializada e acolhimento para todas as crianças, dentro do Parque Shopping. Todos os dias, 10h às 22h.">
+ <meta property="og:url" content="https://institutofacaamigos.com.br/playground/">
+ <meta property="og:image" content="https://institutofacaamigos.com.br/playground/img/playground.jpg">
+ <meta property="og:locale" content="pt_BR">
+
+ <!-- Twitter/X Card -->
+ <meta name="twitter:card" content="summary_large_image">
+ <meta name="twitter:title" content="FaçaAmigos — Playground Inclusivo no Parque Shopping Belém">
+ <meta name="twitter:description" content="O playground inclusivo de Belém. Espaço seguro, equipe especializada e acolhimento para todas as crianças, dentro do Parque Shopping.">
+ <meta name="twitter:image" content="https://institutofacaamigos.com.br/playground/img/playground.jpg">
+
+ <!-- Dados estruturados (Schema.org) para o Google entender que somos um estabelecimento local -->
+ <script type="application/ld+json">
+ {
+   "@context": "https://schema.org",
+   "@type": "LocalBusiness",
+   "name": "FaçaAmigos — Playground Inclusivo",
+   "image": "https://institutofacaamigos.com.br/playground/img/playground.jpg",
+   "url": "https://institutofacaamigos.com.br/playground/",
+   "telephone": "+55 91 9234-7673",
+   "priceRange": "$$",
+   "address": {
+     "@type": "PostalAddress",
+     "streetAddress": "Av. Augusto Montenegro, 4300 — Parque Shopping Belém",
+     "addressLocality": "Belém",
+     "addressRegion": "PA",
+     "addressCountry": "BR"
+   },
+   "openingHoursSpecification": {
+     "@type": "OpeningHoursSpecification",
+     "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+     "opens": "10:00",
+     "closes": "22:00"
+   },
+   "sameAs": [
+     "https://www.instagram.com/facaamigos.belem/"
+   ]
+ }
+ </script>
+
+ <!-- ============================================================
+      ANALYTICS & MAPA DE CALOR
+      Substitua os placeholders abaixo pelos IDs reais assim que
+      criar as contas (veja o guia enviado no chat). Até lá estes
+      scripts ficam inativos e não afetam a performance do site.
+      ============================================================ -->
+
+ <!-- Google tag (gtag.js) -->
+ <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q7LHH3C9P8"></script>
+ <script>
+   window.dataLayer = window.dataLayer || [];
+   function gtag(){dataLayer.push(arguments);}
+   gtag('js', new Date());
+
+   gtag('config', 'G-Q7LHH3C9P8');
+ </script>
+
+ <!-- Microsoft Clarity (mapa de calor + gravação de sessão, gratuito) -->
+ <script type="text/javascript">
+   (function(c,l,a,r,i,t,y){
+       c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+       t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+       y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+   })(window, document, "clarity", "script", "xz0butjjbh");
+ </script>
+
+ <!-- Hotjar (mapa de calor + gravação de sessão) -->
+ <script src="https://t.contentsquare.net/uxa/c3b9c7ee91c87.js" defer></script>
+
  <!-- CSS -->
  <style>
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap');
@@ -1992,7 +2066,19 @@ footer a:hover {
  <input type="tel" id="job-telefone" class="form-control" placeholder="WhatsApp" required>
  </div>
  <div class="form-group">
- <input type="text" id="job-curso" class="form-control" placeholder="Curso (se estiver estudando)">
+ <input type="text" id="job-curso" class="form-control" list="job-curso-sugestoes" placeholder="Curso (ex: Psicologia, Terapia Ocupacional, Educação Física...)">
+ <datalist id="job-curso-sugestoes">
+ <option value="Psicologia">
+ <option value="Terapia Ocupacional">
+ <option value="Educação Física">
+ <option value="Pedagogia">
+ <option value="Fonoaudiologia">
+ <option value="Fisioterapia">
+ <option value="Enfermagem">
+ <option value="Administração">
+ <option value="Recursos Humanos">
+ <option value="Marketing">
+ </datalist>
  </div>
  <div class="form-group">
  <select id="job-area" class="form-control" required>

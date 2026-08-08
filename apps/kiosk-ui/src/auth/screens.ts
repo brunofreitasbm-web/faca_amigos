@@ -29,6 +29,7 @@ export const SCREEN_CAPABILITY: Record<Screen, Capability> = {
   CAIXA: "caixa.open_close",
   POS_VISITA: "relatorio.read",
   ANIVERSARIOS: "relatorio.read",
+  BANCO_TALENTOS: "talentos.read",
   PONTO: "ponto.self",
   RELATORIO: "relatorio.read",
   CONFIGURACOES: "config.read",

@@ -64,6 +64,19 @@ export interface Birthday {
   is_today: boolean;
 }
 
+export interface JobApplication {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  course: string | null;
+  desired_area: string;
+  opportunity_type: "ESTAGIO" | "REMUNERADO" | "BOLSA";
+  resume_path: string;
+  status: "NOVO" | "EM_ANALISE" | "CONTATADO" | "ARQUIVADO";
+  created_at_ms: number;
+}
+
 export interface Employee {
   id: string;
   full_name: string;
@@ -1427,6 +1440,25 @@ export const Api = {
   // Saldo em envelopes pendentes (ainda na loja) por unidade — aba gerencial
   // "Saldo em Envelopes" (ver RPC fa_units_envelope_balance).
   unitsEnvelopeBalance: () => unwrap<UnitEnvelopeBalance[]>(supabase().rpc("fa_units_envelope_balance")),
+  // Candidaturas do Banco de Talentos, mais recentes primeiro — só quem tem
+  // talentos.read enxerga (RLS de fa_kiosk_job_applications).
+  jobApplications: () =>
+    unwrap<JobApplication[]>(
+      supabase()
+        .from("fa_kiosk_job_applications")
+        .select("id, full_name, email, phone, course, desired_area, opportunity_type, resume_path, status, created_at_ms")
+        .order("created_at_ms", { ascending: false }),
+    ),
+  updateJobApplicationStatus: (id: string, status: JobApplication["status"]) =>
+    unwrap<null>(supabase().from("fa_kiosk_job_applications").update({ status }).eq("id", id)),
+  // Bucket privado `curriculos` — link assinado de 60s, gerado sob demanda
+  // no clique (nunca guardado), já que getPublicUrl não funciona em bucket
+  // privado e a policy de select do Storage já exige talentos.read.
+  jobApplicationResumeUrl: async (resumePath: string): Promise<string> => {
+    const { data, error } = await supabase().storage.from("curriculos").createSignedUrl(resumePath, 60);
+    if (error) throw new Error(error.message);
+    return data.signedUrl;
+  },
   // Marca todos os envelopes pendentes da unidade como recolhidos pelo gestor.
   collectEnvelopes: (unitId: string, employeeId: string) =>
     callResilient<{ ok: boolean; collected_count: number; collected_cents: number }>("fa_collect_envelopes", {
