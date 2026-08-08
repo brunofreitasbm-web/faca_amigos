@@ -1,0 +1,103 @@
+FaçaAmigos — Pacote de publicação da Landing Page v2 (/playground)
+====================================================================
+
+O QUE É ISSO
+-------------
+Site institucional: FaçaAmigos — Playground Inclusivo (Parque Shopping Belém)
+URL final: https://institutofacaamigos.com.br/playground/
+Esta é a versão 2 da landing page, com identidade visual oficial da marca
+(Fredoka One + Nunito, cores pink/teal/amarelo), funil reordenado para
+priorizar prova social antes do preço, e imagens/vídeos como arquivos
+externos otimizados (a v1 tinha tudo embutido em base64 dentro do HTML,
+o que deixava o carregamento lento).
+
+O QUE MUDOU EM RELAÇÃO À VERSÃO ANTERIOR
+------------------------------------------
+- Identidade visual alinhada ao design system oficial da marca (era outra
+  paleta/tipografia antes).
+- Ordem das seções: Hero → Inclusão → Teste de Comportamento → Espaço/Galeria
+  (com 2 vídeos) → Como Funciona → Avaliações reais do Google → Preços →
+  Circuito → Grão-Pará (em breve) → Parcerias → FAQ → CTA final.
+- Removido o cupom "avalie com 5 estrelas e ganhe 10%" (viola a política do
+  Google e arrisca o perfil da empresa) e o texto piscando na tabela de
+  preços.
+- Avaliações trocadas por 3 avaliações reais e datadas do Google.
+- Foto de estoque gerada por IA (com marca d'água "Meta AI") removida e
+  substituída por foto real do espaço.
+- index.html caiu de ~1,8 MB para ~54 KB — imagens e vídeos agora são
+  arquivos próprios em img/ e video/, carregados sob demanda (lazy loading).
+- Botão do WhatsApp voltou a aparecer na navbar no celular (sumia na v1).
+- Nova página politica-privacidade.html, linkada no rodapé e no formulário
+  de candidatura (LGPD).
+- CNPJ, localização exata dentro do shopping e logo oficial (fundo
+  transparente) adicionados.
+
+COMO PUBLICAR
+--------------
+1. Faça upload de TODOS os arquivos e pastas deste pacote para a mesma pasta
+   do servidor/host que corresponde a "institutofacaamigos.com.br/playground/".
+   - Mantenha a estrutura de pastas exatamente como está (as pastas "img/"
+     e "video/" têm que ficar dentro da mesma pasta do index.html).
+2. Confirme que os seguintes arquivos ficam acessíveis publicamente
+   (abra cada URL no navegador para testar):
+   - https://institutofacaamigos.com.br/playground/
+   - https://institutofacaamigos.com.br/playground/politica-privacidade.html
+   - https://institutofacaamigos.com.br/playground/robots.txt
+   - https://institutofacaamigos.com.br/playground/sitemap.xml
+   - https://institutofacaamigos.com.br/playground/google877c2b37d3c979fb.html
+     (esse arquivo é de verificação do Google Search Console — não mexer no
+     conteúdo dele, ele precisa ficar exatamente como está)
+3. Se o host tiver algum cache/CDN (Cloudflare, cache do cPanel, etc.),
+   limpe o cache depois do upload para garantir que a versão nova entre no ar.
+
+PENDÊNCIAS ANTES DE PUBLICAR (revisar com atenção)
+-----------------------------------------------------
+[ ] Confirmar que as 3 avaliações do Google usadas (Vanessa Santos, Eledes
+    Failache, Ana Monteiro) têm autorização de uso do texto/nome — são
+    avaliações reais, mas vale checar com quem publica se precisa de
+    consentimento formal.
+[ ] Conferir o texto do Teste de Comportamento com a idealizadora antes de
+    publicar (usei a descrição que você passou; se ela quiser ajustar
+    palavra por palavra, é só pedir).
+[ ] Revisar a Política de Privacidade com um advogado/contador antes de
+    publicar — eu escrevi com base na LGPD e no funcionamento descrito do
+    negócio, mas não substitui revisão jurídica.
+[ ] Os 2 vídeos (video/tour-espaco.mp4 e video/nossa-equipe.mp4) estão no
+    tamanho original enviado (3 MB e 5 MB, ~8 MB juntos). Publicando assim
+    mesmo, por decisão do Bruno — eles usam preload="none" (só baixam quando
+    o visitante clica em play, então não pesam no carregamento inicial da
+    página). Se algum dia quiser reduzir o tamanho dos arquivos em si,
+    comprimir com HandBrake (preset "Fast 1080p30", RF 24–26, largura máx.
+    1080px) e sobrescrever os arquivos com o mesmo nome.
+
+CONTEÚDO DO PACOTE
+--------------------
+- index.html                  → página principal
+- politica-privacidade.html   → política de privacidade (LGPD)
+- robots.txt                  → instrui buscadores a indexar o site
+- sitemap.xml                 → mapa do site para o Google Search Console
+- google877c2b37d3c979fb.html → verificação de propriedade do Google
+- img/                        → fotos do espaço, equipe e logo (otimizadas)
+- video/                      → tour do espaço e vídeo da equipe
+
+RASTREAMENTO JÁ CONFIGURADO NO index.html (não precisa mexer)
+----------------------------------------------------------------
+- Google Analytics 4 (ID G-Q7LHH3C9P8) — origem de tráfego, sessões, páginas
+- Microsoft Clarity (ID xz0butjjbh) — mapa de calor + gravação de sessão
+- Hotjar/Contentsquare — segundo mapa de calor + gravação de sessão
+- SEO: Open Graph, Twitter Card, canonical e dados estruturados (Schema.org
+  LocalBusiness) para aparecer melhor no Google e ao compartilhar o link
+
+CHECKLIST PÓS-PUBLICAÇÃO (quem publica ou o Bruno faz depois)
+------------------------------------------------------------------
+[ ] Verificar a propriedade em https://search.google.com/search-console
+    (usa o arquivo google877c2b37d3c979fb.html já incluído)
+[ ] Enviar o sitemap.xml dentro do Search Console (menu "Sitemaps")
+[ ] Conferir no Google Analytics (Tempo real) se aparecem visitas ao abrir o site
+[ ] Conferir no Microsoft Clarity se novas gravações estão chegando
+[ ] Testar o botão "Venha fazer parte do nosso time" enviando uma candidatura
+    de teste, para confirmar que o webhook do Supabase está recebendo.
+[ ] Testar em um celular real (não só no navegador do computador) para
+    confirmar que os vídeos carregam bem em 4G.
+
+Dúvidas técnicas: falar com Bruno (brunofreitasbm@gmail.com).
