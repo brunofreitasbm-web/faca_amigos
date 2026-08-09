@@ -2185,6 +2185,60 @@ export const Api = {
       nsr: r.nsr as number,
     })) as FolhaPontoRow[];
   },
+  /**
+   * Todo o histórico de sessões de uma criança, em qualquer unidade — o
+   * menu Clientes precisa ver o playground e o circuito juntos, por isso,
+   * ao contrário de `reportSessions`, não filtra por `unit_id` nem por
+   * intervalo de datas.
+   */
+  childSessionHistory: async (childId: string) => {
+    const sessions = await unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_sessions")
+        .select("id, unit_id, access_code, checkin_at_ms, checkout_at_ms, status, activity, child_name_snapshot, guardian_id, plan_id, checkin_by_employee_id")
+        .eq("child_id", childId)
+        .order("checkin_at_ms", { ascending: false }),
+    );
+    if (sessions.length === 0) return [] as SessionAudit[];
+
+    const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
+    const planIds = [...new Set(sessions.map((s) => s.plan_id as string).filter(Boolean))];
+    const employeeIds = [...new Set(sessions.map((s) => s.checkin_by_employee_id as string).filter(Boolean))];
+
+    const [guardians, plans, employees] = await Promise.all([
+      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164, cpf").in("id", guardianIds)),
+      planIds.length > 0
+        ? unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("id, name").in("id", planIds))
+        : Promise.resolve([]),
+      employeeIds.length > 0
+        ? unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_employees").select("id, full_name").in("id", employeeIds))
+        : Promise.resolve([]),
+    ]);
+    const guardianById = new Map(guardians.map((g) => [g.id as string, g]));
+    const planById = new Map(plans.map((p) => [p.id as string, p]));
+    const employeeById = new Map(employees.map((e) => [e.id as string, e]));
+
+    return sessions.map((s) => {
+      const guardian = guardianById.get(s.guardian_id as string);
+      const plan = planById.get(s.plan_id as string);
+      const employee = employeeById.get(s.checkin_by_employee_id as string);
+      return {
+        id: s.id as string,
+        unit_id: s.unit_id as string,
+        access_code: s.access_code as string | null,
+        checkin_at_ms: s.checkin_at_ms as number,
+        checkout_at_ms: s.checkout_at_ms as number | null,
+        status: s.status as string,
+        activity: s.activity as "PLAYGROUND" | "CARRINHO",
+        child_name: s.child_name_snapshot as string,
+        guardian_name: (guardian?.full_name as string | undefined) ?? "—",
+        guardian_phone: (guardian?.phone_e164 as string | undefined) ?? null,
+        guardian_cpf: (guardian?.cpf as string | undefined) ?? null,
+        plan_name: (plan?.name as string | undefined) ?? null,
+        employee_name: (employee?.full_name as string | undefined) ?? null,
+      } satisfies SessionAudit;
+    });
+  },
   reportSessions: async (unitId: string | null, from: string, to: string) => {
     let sessionsQuery = supabase()
       .from("fa_kiosk_sessions")
