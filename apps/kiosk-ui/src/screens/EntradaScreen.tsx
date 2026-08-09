@@ -115,6 +115,15 @@ export function EntradaScreen() {
   const [contractOpen, setContractOpen] = useState(false);
   const [acompanharOpen, setAcompanharOpen] = useState(false);
 
+  // Mesmo endereço público (Vercel) já usado no pareamento de celular/tablet
+  // em ConnectDeviceModal — no Electron local, window.location.origin é
+  // 127.0.0.1, que o celular do responsável não alcança.
+  const envAppUrl = import.meta.env.VITE_PUBLIC_APP_URL as string | undefined;
+  const isLocalOrigin = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+  const publicAppOrigin = envAppUrl ?? (isLocalOrigin ? undefined : window.location.origin);
+  const acompanharUrl =
+    done && publicAppOrigin ? `${publicAppOrigin.replace(/\/$/, "")}/?acompanhar=${done.accessCode}` : null;
+
   // Saldo do banco de horas da criança identificada (planos >2h de visitas
   // anteriores, em qualquer unidade). null = sem saldo ou não consultado.
   const [hourBank, setHourBank] = useState<{ remainingMinutes: number; nextExpiryMs: number } | null>(null);
@@ -383,6 +392,9 @@ export function EntradaScreen() {
             : null,
       });
       setLastGuardianId(res.guardianId);
+      // Assim que a entrada é confirmada, o QR já sobe na tela — o operador
+      // vira o kiosk para o responsável sem precisar tocar em mais nada.
+      setAcompanharOpen(true);
 
       if (quickUpsellAccepted && quickProduct) {
         // Fora do try do check-in de propósito, mesma lógica da foto: a
@@ -978,16 +990,38 @@ export function EntradaScreen() {
           que quebraria se virasse uma URL). Este é só para o responsável
           apontar a câmera do próprio celular, oferecido pela operadora. */}
       {acompanharOpen && done && (
-        <Modal title="Acompanhar pelo celular" onClose={() => setAcompanharOpen(false)}>
+        <Modal title="📱 Apresentar ao Responsável" onClose={() => setAcompanharOpen(false)}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "8px 0" }}>
-            <p style={{ margin: 0, textAlign: "center", fontSize: "14px", color: "var(--text-muted)" }}>
-              Peça para o responsável de {done.childName.split(" ")[0]} apontar a câmera do celular para o QR abaixo — o
-              painel abre na hora, sem precisar de cadastro.
-            </p>
-            <WristbandQRCode
-              value={`${window.location.origin}${window.location.pathname}?acompanhar=${done.accessCode}`}
-              size={220}
-            />
+            {acompanharUrl ? (
+              <>
+                <p
+                  style={{
+                    margin: 0,
+                    textAlign: "center",
+                    fontSize: "15px",
+                    fontWeight: 600,
+                    color: "var(--color-teal-text)",
+                  }}
+                >
+                  Vire a tela e apresente este QR Code ao responsável de {done.childName.split(" ")[0]}
+                </p>
+                <p style={{ margin: 0, textAlign: "center", fontSize: "13px", color: "var(--text-muted)" }}>
+                  Basta apontar a câmera do celular para o QR abaixo — o painel de acompanhamento abre na hora, sem
+                  precisar de cadastro.
+                </p>
+                <WristbandQRCode value={acompanharUrl} size={220} />
+              </>
+            ) : (
+              <div style={{ background: "var(--surface-sunken)", borderRadius: "12px", padding: "14px", fontSize: "13px" }}>
+                <strong>Endereço público ainda não configurado.</strong>
+                <HelpText>
+                  Este computador está rodando no endereço local ({window.location.origin}), que o celular do
+                  responsável não alcança. Defina <code>VITE_PUBLIC_APP_URL</code> (URL do deploy na Vercel) no build
+                  para o QR de acompanhamento funcionar aqui — o mesmo endereço já usado em "Conectar celular ou
+                  tablet".
+                </HelpText>
+              </div>
+            )}
           </div>
         </Modal>
       )}
