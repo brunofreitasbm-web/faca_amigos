@@ -4,7 +4,8 @@ import type { SessionTiming } from "@facaamigos/domain";
 import { Button, Card, BrandLockup, HelpText } from "@facaamigos/ui";
 import { useAcompanhar } from "../api/useAcompanhar.js";
 import { formatElapsed } from "../format.js";
-import { logAcompanharEvento } from "../api/acompanhar.js";
+import { logAcompanharEvento, registrarAcompanharPush } from "../api/acompanhar.js";
+import { isPushSupported, subscribeToPush, pushSubscriptionToKeys } from "../lib/push.js";
 import {
   statusHeadline,
   renewalIntro,
@@ -29,6 +30,10 @@ import {
 export function AcompanharScreen({ code }: { code: string }) {
   const { status, sessao, timing, errorMessage } = useAcompanhar(code);
   const [lembreteAtivo, setLembreteAtivo] = useState(false);
+  // true quando o alerta foi delegado ao servidor (Web Push) — o
+  // responsável pode fechar o app; false = fallback antigo, que só
+  // funciona com a aba aberta.
+  const [pushAtivo, setPushAtivo] = useState(false);
   const [lembreteErro, setLembreteErro] = useState<string | null>(null);
   const [renovacaoPedida, setRenovacaoPedida] = useState<number | null>(null);
   const qrAbertoLogged = useRef(false);
@@ -52,7 +57,10 @@ export function AcompanharScreen({ code }: { code: string }) {
   // toca no botão. Playground avisa nos últimos 5 min; Circuito avisa no
   // minuto definido pela tabela (ver copyCircuito.ts).
   useEffect(() => {
-    if (!lembreteAtivo || !timing || timing.phase === "EXCEDENTE") return;
+    // Com o Web Push ativo, o alerta já foi agendado no servidor — o
+    // setTimeout local viraria uma segunda notificação (e uma que só
+    // dispara se a aba continuar aberta, o problema original).
+    if (!lembreteAtivo || pushAtivo || !timing || timing.phase === "EXCEDENTE") return;
     const msAteAlerta = isCircuito
       ? circuitoConfig
         ? circuitoConfig.alertAtMinutes * 60_000 - timing.elapsedMs
@@ -75,10 +83,36 @@ export function AcompanharScreen({ code }: { code: string }) {
     return () => {
       if (reminderTimeoutRef.current) window.clearTimeout(reminderTimeoutRef.current);
     };
-  }, [lembreteAtivo, timing, isCircuito, circuitoConfig]);
+  }, [lembreteAtivo, pushAtivo, timing, isCircuito, circuitoConfig]);
 
   async function ativarLembrete() {
     setLembreteErro(null);
+
+    // Caminho principal: Web Push — o alerta chega mesmo com o app
+    // fechado/o celular no bolso, porque quem dispara é o servidor
+    // (fa_push_claim_due + cron), não uma aba aberta no navegador.
+    if (isPushSupported()) {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          const subscription = await subscribeToPush();
+          const keys = subscription ? pushSubscriptionToKeys(subscription) : null;
+          if (keys) {
+            await registrarAcompanharPush(code, keys);
+            setPushAtivo(true);
+            setLembreteAtivo(true);
+            await logAcompanharEvento(code, "LEMBRETE_ATIVADO", { via: "PUSH" }).catch(() => {});
+            return;
+          }
+        }
+      } catch {
+        // Cai no fallback abaixo — ex.: subscribe falhou, VAPID ainda não
+        // configurada no servidor, ou permissão negada.
+      }
+    }
+
+    // Fallback: notificação só funciona com a página aberta (Safari fora
+    // do modo instalado, navegador sem suporte a Push, ou falha acima).
     try {
       if (!("Notification" in window)) {
         setLembreteErro("Este navegador não avisa automaticamente — deixe a página aberta para acompanhar por aqui.");
@@ -88,9 +122,13 @@ export function AcompanharScreen({ code }: { code: string }) {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setLembreteErro("Sem permissão de notificação — deixe a página aberta para acompanhar por aqui.");
+      } else {
+        setLembreteErro(
+          "Este navegador não avisa em segundo plano — no iPhone, toque em Compartilhar → Adicionar à Tela de Início para receber o aviso mesmo com o app fechado. Por enquanto, deixe a página aberta.",
+        );
       }
       setLembreteAtivo(true);
-      await logAcompanharEvento(code, "LEMBRETE_ATIVADO").catch(() => {});
+      await logAcompanharEvento(code, "LEMBRETE_ATIVADO", { via: "PAGINA_ABERTA" }).catch(() => {});
     } catch {
       setLembreteErro("Não deu para ativar o lembrete agora — deixe a página aberta para acompanhar por aqui.");
     }
@@ -157,6 +195,7 @@ export function AcompanharScreen({ code }: { code: string }) {
           timing={timing}
           isPausada={sessao.status === "PAUSADA"}
           lembreteAtivo={lembreteAtivo}
+          pushAtivo={pushAtivo}
           lembreteErro={lembreteErro}
           onAtivarLembrete={ativarLembrete}
           renovacaoPedida={renovacaoPedida}
@@ -182,6 +221,7 @@ function AcompanharConteudo({
   timing,
   isPausada,
   lembreteAtivo,
+  pushAtivo,
   lembreteErro,
   onAtivarLembrete,
   renovacaoPedida,
@@ -194,6 +234,7 @@ function AcompanharConteudo({
   timing: SessionTiming;
   isPausada: boolean;
   lembreteAtivo: boolean;
+  pushAtivo: boolean;
   lembreteErro: string | null;
   onAtivarLembrete: () => void;
   renovacaoPedida: number | null;
@@ -233,7 +274,12 @@ function AcompanharConteudo({
           {isCircuito ? "🔔 Avisar quando chegar a hora de renovar" : "🔔 Avisar quando faltarem 5 minutos"}
         </Button>
       )}
-      {lembreteAtivo && <HelpText>Lembrete ativado — deixe esta página aberta para receber o aviso.</HelpText>}
+      {lembreteAtivo && pushAtivo && (
+        <HelpText>Aviso ativado — pode fechar o app e ir fazer suas coisas, a gente te avisa. 💛</HelpText>
+      )}
+      {lembreteAtivo && !pushAtivo && !lembreteErro && (
+        <HelpText>Lembrete ativado — deixe esta página aberta para receber o aviso.</HelpText>
+      )}
       {lembreteErro && <HelpText>{lembreteErro}</HelpText>}
 
       {showRenewal && isCircuito && circuitoConfig && (

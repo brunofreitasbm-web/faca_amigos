@@ -22,3 +22,18 @@ export async function logAcompanharEvento(
   const { error } = await supabase().rpc("fa_acompanhar_evento", { p_code: code, p_kind: kind, p_payload: payload });
   if (error) throw new Error(error.message);
 }
+
+/** Inscreve o navegador do responsável para o alerta em segundo plano (Web Push) — ver src/lib/push.ts. */
+export async function registrarAcompanharPush(
+  code: string,
+  keys: { endpoint: string; p256dh: string; auth: string },
+): Promise<{ alertDueAtMs: number }> {
+  const { data, error } = await supabase().rpc("fa_acompanhar_registrar_push", {
+    p_code: code,
+    p_endpoint: keys.endpoint,
+    p_p256dh: keys.p256dh,
+    p_auth: keys.auth,
+  });
+  if (error) throw new Error(error.message);
+  return { alertDueAtMs: Number((data as { alertDueAtMs: number }).alertDueAtMs) };
+}

@@ -39,6 +39,11 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
+        // Handler de Web Push (alerta em segundo plano do painel do
+        // responsável) — generateSW não permite eventos custom no config,
+        // então isso injeta um importScripts() apontando pro arquivo em
+        // public/push-sw.js dentro do sw.js gerado.
+        importScripts: ["push-sw.js"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/ws/],
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
