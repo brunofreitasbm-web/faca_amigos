@@ -18,6 +18,12 @@ describe("normalizeAccessCode", () => {
     expect(normalizeAccessCode(" #k7m2 p9qx 3b7 ")).toBe(CODE);
   });
 
+  it("extrai o codigo de acesso quando uma URL completa e escaneada pelo operador", () => {
+    expect(normalizeAccessCode("https://facaamigos.com.br/?acompanhar=K7M2P9QX3B7")).toBe(CODE);
+    expect(normalizeAccessCode("https://app.facaamigos.com.br/?acompanhar=k7m2-p9qx-3b7&ref=qr")).toBe(CODE);
+    expect(normalizeAccessCode("http://localhost:3000/acompanhar/K7M2P9QX3B7")).toBe(CODE);
+  });
+
   it("desfaz as confusoes de leitura do Crockford: I e L viram 1, O vira 0", () => {
     expect(normalizeAccessCode("I234567890A")).toBe("1234567890A");
     expect(normalizeAccessCode("L234567890A")).toBe("1234567890A");

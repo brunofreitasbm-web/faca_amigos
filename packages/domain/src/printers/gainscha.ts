@@ -9,6 +9,7 @@ export interface WristbandPrintPayload {
   planName?: string;
   entryTime?: string;
   notes?: string;
+  publicAppOrigin?: string;
 }
 
 /**
@@ -37,12 +38,9 @@ function fit(value: string, max: number): string {
  * Comandos RAW TSPL para a impressora de pulseiras Gainscha GS-2208D
  * (203 DPI ≈ 8 pontos/mm; a etiqueta de 270mm x 20mm tem 2160 x 160 pontos).
  *
- * O QR carrega SÓ o código de acesso de 11 caracteres — nada de URL, prefixo
- * ou assinatura embutida. Com isso ele cabe na versão 1 do QR (21x21 módulos)
- * mesmo no nível Q de correção de erro, o que permite imprimir cada módulo
- * com 6 pontos: um QR grande, de baixa densidade, que a câmera do celular
- * engata de primeira e que sobrevive ao borrão típico da impressão térmica
- * e ao vinco da pulseira dobrada no pulso.
+ * O QR carrega a URL unificada de acompanhamento (?acompanhar=<code_de_acesso>)
+ * permitindo leitura dupla: celular do responsável para acompanhar tempo e
+ * leitor do operador para liberação na saída.
  *
  * O código e o nome da criança aparecem DUAS vezes ao longo da faixa, no
  * início e no fim: a pulseira dá a volta no pulso e nem sempre sobra a mesma
@@ -53,16 +51,17 @@ export function generateGainschaGS2208DTSPL(data: WristbandPrintPayload): string
     data.entryTime || new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
   );
   const raw = data.wristbandCode.replace(/^#/, "").trim();
-  // Códigos novos vão normalizados no QR (sem hífen, maiúsculo) para poderem
-  // usar o modo alfanumérico compacto. Pulseiras antigas em reimpressão
-  // mantêm o payload original, que é o que ainda casa no banco.
-  const qrPayload = looksLikeAccessCode(raw) ? normalizeAccessCode(raw) : raw;
+  const origin = (data.publicAppOrigin || "https://app.facaamigos.com.br").replace(/\/$/, "");
+  const qrPayload = raw.startsWith("http://") || raw.startsWith("https://")
+    ? raw
+    : (looksLikeAccessCode(raw) ? `${origin}/?acompanhar=${normalizeAccessCode(raw)}` : raw);
   const humanCode = tsplSafe(getFriendlyWristbandCode(raw));
   const childUpper = fit(data.childName.toUpperCase(), 26);
   const childShort = fit(data.childName.toUpperCase(), 18);
   const guardianUpper = fit(data.guardianName.toUpperCase(), 26);
   const planUpper = fit((data.planName || "PADRAO").toUpperCase(), 18);
   const phone = tsplSafe(data.phone);
+  const cellWidth = qrPayload.length > 30 ? 4 : 6;
 
   const commands = [
     "SIZE 270 mm, 20 mm",
@@ -77,7 +76,7 @@ export function generateGainschaGS2208DTSPL(data: WristbandPrintPayload): string
     `TEXT 20,90,"2",0,1,1,"ENTRADA ${nowStr} | ${planUpper}"`,
 
     // Zona 2 (330–800) — QR de saída e o mesmo código em texto
-    `QRCODE 330,16,Q,6,A,0,"${qrPayload}"`,
+    `QRCODE 330,16,Q,${cellWidth},A,0,"${qrPayload}"`,
     `TEXT 480,36,"4",0,1,1,"${humanCode}"`,
     'TEXT 480,82,"2",0,1,1,"CODIGO DE SAIDA"',
 

@@ -13,6 +13,8 @@ import { supabase } from "../lib/supabase/client.js";
 export interface PendingRenewal {
   sessionId: string;
   minutes: number;
+  /** Valor a cobrar no balcão, quando o pedido veio com preço da tabela (ex.: Circuito) — ausente nos pedidos antigos do Playground. */
+  cents: number | null;
   requestedAtMs: number;
 }
 
@@ -37,7 +39,9 @@ export async function fetchPendingRenewals(sessionIds: string[]): Promise<Map<st
   for (const [sessionId, last] of lastBySession) {
     if (last.kind !== "RENOVACAO_SOLICITADA") continue;
     const minutes = Number(last.payload_json?.minutes ?? 0);
-    pending.set(sessionId, { sessionId, minutes, requestedAtMs: last.at_ms });
+    const rawCents = last.payload_json?.cents;
+    const cents = typeof rawCents === "number" ? rawCents : null;
+    pending.set(sessionId, { sessionId, minutes, cents, requestedAtMs: last.at_ms });
   }
   return pending;
 }

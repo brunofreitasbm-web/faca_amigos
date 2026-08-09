@@ -40,7 +40,7 @@ export function PainelScreen() {
   const { unit, employee } = useAppState();
   const toast = useToast();
   const confirm = useConfirm();
-  const { entries, status: sessionsStatus, errorMessage: sessionsError } = useActiveSessions(unit?.id ?? null);
+  const { entries, status: sessionsStatus, errorMessage: sessionsError, refetch: refetchActiveSessions } = useActiveSessions(unit?.id ?? null);
   const pendingRenewals = usePendingRenewals(entries.map((e) => e.session.id));
   const [renewalBusy, setRenewalBusy] = useState<Set<string>>(new Set());
 
@@ -514,6 +514,7 @@ export function PainelScreen() {
                 >
                   <Badge variant="solid_pink" title="O responsável pediu mais tempo pelo painel de acompanhamento no celular">
                     📱 Pediu +{pendingRenewals.get(session.id)!.minutes} min
+                    {pendingRenewals.get(session.id)!.cents != null ? ` — ${money(pendingRenewals.get(session.id)!.cents!)} via PIX` : ""}
                   </Badge>
                   <Button
                     variant="secondary"
@@ -855,7 +856,7 @@ export function PainelScreen() {
 
       {entradaOpen && (
         <Modal onClose={() => setEntradaOpen(false)} ariaLabel="Entrada" maxWidth="820px" padding="0" zIndex={150}>
-          <EntradaScreen />
+          <EntradaScreen onSuccess={() => { refetchActiveSessions(); }} />
         </Modal>
       )}
 

@@ -126,10 +126,10 @@ export function fillContractTemplate(template: string, data: ContractData): stri
   const now = new Date();
   const dataExtenso = now.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
   const values: Record<string, string> = {
-    UNIDADE_NOME: data.unitName,
-    UNIDADE_CNPJ: data.unitCnpj,
-    UNIDADE_ENDERECO: data.unitAddress,
-    UNIDADE_TELEFONE: data.unitPhone,
+    UNIDADE_NOME: data.unitName || "FAÇA AMIGOS BRINQUEDOTECA LTDA",
+    UNIDADE_CNPJ: data.unitCnpj || "66.318.630/0001-17",
+    UNIDADE_ENDERECO: data.unitAddress || "Rod. Augusto Montenegro, 4300 - Parque Shopping Belém, Piso PSB01003, Parque Verde, Belém/PA - CEP 66635-110",
+    UNIDADE_TELEFONE: data.unitPhone || "(91) 98250-1215",
     CONTRATANTE_NOME: data.contratanteNome,
     CONTRATANTE_CPF: data.contratanteCpf,
     CONTRATANTE_RG: data.contratanteRg,
@@ -142,7 +142,7 @@ export function fillContractTemplate(template: string, data: ContractData): stri
     PLANO_VALOR: data.planoValor,
     VALIDADE_BANCO_DIAS: data.validadeBancoDias,
     DATA_EXTENSO: dataExtenso,
-    CIDADE_UF: data.cidadeUf,
+    CIDADE_UF: data.cidadeUf || "Belém/PA",
   };
   return template.replace(/\{\{([A-Z_]+)\}\}/g, (whole, key: string) => values[key] ?? whole);
 }

@@ -23,7 +23,7 @@ function planFromSessao(sessao: AcompanharSessao): Plan | null {
   if (sessao.status !== "ATIVA" && sessao.status !== "PAUSADA") return null;
   return {
     id: sessao.sessionId,
-    activity: "PLAYGROUND",
+    activity: sessao.activity,
     name: "",
     valueCents: sessao.plan.valueCents,
     durationValue: sessao.plan.durationValue,

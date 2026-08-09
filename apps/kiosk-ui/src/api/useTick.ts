@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase/client.js";
 import { fetchActiveSessionsRaw, computeActiveSessionEntries } from "./client.js";
 import type { ActiveSessionEntry, ActiveSessionsRaw } from "./client.js";
@@ -16,6 +16,8 @@ export interface ActiveSessionsResult {
   status: ActiveSessionsStatus;
   /** Mensagem da última falha de busca, se `status === "error"`. */
   errorMessage: string | null;
+  /** Força atualização imediata da lista sem esperar o Realtime ou polling. */
+  refetch: () => Promise<void>;
 }
 
 /**
@@ -45,30 +47,25 @@ export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
   rawRef.current = raw;
   const loadedOnce = useRef(false);
 
+  const refetch = useCallback(async () => {
+    if (!unitId) return;
+    try {
+      const data = await fetchActiveSessionsRaw(unitId);
+      setRaw(data);
+      setStatus("ready");
+      setErrorMessage(null);
+      loadedOnce.current = true;
+    } catch (err) {
+      setStatus("error");
+      setErrorMessage(err instanceof Error ? err.message : "Não foi possível atualizar o painel.");
+    }
+  }, [unitId]);
+
   useEffect(() => {
     if (!unitId) return;
-    let cancelled = false;
     loadedOnce.current = false;
     setStatus("loading");
 
-    async function refetch() {
-      try {
-        const data = await fetchActiveSessionsRaw(unitId!);
-        if (cancelled) return;
-        setRaw(data);
-        setStatus("ready");
-        setErrorMessage(null);
-        loadedOnce.current = true;
-      } catch (err) {
-        if (cancelled) return;
-        // Numa falha depois de já ter carregado uma vez (ex: reconsulta
-        // disparada pelo Realtime), mantém o último dado bom na tela em
-        // vez de trocar por um estado vazio — só a mensagem de erro
-        // aparece, pra não fingir que a lista esvaziou sozinha.
-        setStatus("error");
-        setErrorMessage(err instanceof Error ? err.message : "Não foi possível atualizar o painel.");
-      }
-    }
     refetch();
 
     let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
@@ -93,14 +90,13 @@ export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
     }
 
     return () => {
-      cancelled = true;
       if (channel) {
         try {
           supabase().removeChannel(channel);
         } catch (_) {}
       }
     };
-  }, [unitId]);
+  }, [unitId, refetch]);
 
   useEffect(() => {
     setEntries(computeActiveSessionEntries(raw, Date.now()));
@@ -108,5 +104,5 @@ export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
     return () => clearInterval(interval);
   }, [raw]);
 
-  return { entries, status, errorMessage };
+  return { entries, status, errorMessage, refetch };
 }

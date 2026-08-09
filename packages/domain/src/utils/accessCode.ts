@@ -23,8 +23,42 @@ export const ACCESS_CODE_LENGTH = 11;
  * Espelha `fa_kiosk_normalize_access_code` no banco. O `U` não é remapeado:
  * ele não pertence ao alfabeto, então um código com U reprova na verificação.
  */
+export function extractRawAccessCode(raw: string | null | undefined): string {
+  let str = (raw ?? "").trim();
+  if (!str) return "";
+
+  if (str.includes("acompanhar=") || str.includes("://")) {
+    const matchParam = str.match(/acompanhar=([^&?#]+)/i);
+    if (matchParam && matchParam[1]) {
+      str = matchParam[1];
+    } else {
+      const urlParts = str.split(/[/?#&]/);
+      for (let i = urlParts.length - 1; i >= 0; i--) {
+        const item = urlParts[i];
+        if (!item) continue;
+        const part = item.replace(/[^0-9A-Za-z]/g, "");
+        if (part.length === ACCESS_CODE_LENGTH) {
+          str = part;
+          break;
+        }
+      }
+    }
+  }
+
+  return str;
+}
+
+/**
+ * Aceita o que veio da câmera ou da digitação do operador (incluindo URLs completas de QR code)
+ * e devolve a forma canônica: sem hífen, sem espaço, em maiúsculas, com as confusões clássicas
+ * de leitura desfeitas (I e L viram 1, O vira 0 — regra do Crockford).
+ *
+ * Espelha `fa_kiosk_normalize_access_code` no banco. O `U` não é remapeado:
+ * ele não pertence ao alfabeto, então um código com U reprova na verificação.
+ */
 export function normalizeAccessCode(raw: string | null | undefined): string {
-  return (raw ?? "")
+  const extracted = extractRawAccessCode(raw);
+  return extracted
     .toUpperCase()
     .replace(/[^0-9A-Z]/g, "")
     .replace(/[IL]/g, "1")

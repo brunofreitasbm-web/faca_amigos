@@ -12,6 +12,13 @@ import {
   RENEWAL_OPTIONS,
   OVERAGE_RATE_CENTS_PER_MINUTE,
 } from "./acompanhar/copy.js";
+import {
+  getCircuitoAlertConfig,
+  circuitoStatusHeadline,
+  circuitoRenewalIntro,
+  circuitoAnchorMessage,
+  type CircuitoAssetKind,
+} from "./acompanhar/copyCircuito.js";
 
 /**
  * Painel público do responsável — aberto sem login pelo QR mostrado no
@@ -35,30 +42,40 @@ export function AcompanharScreen({ code }: { code: string }) {
     }
   }, [status, sessao, code]);
 
-  // Reagenda o alerta de 5 minutos sempre que a sessão é recarregada (ex:
-  // troca de plano muda o teto) — nunca pede permissão sozinho, só quando
-  // o responsável toca no botão.
+  const isCircuito = sessao?.status === "ATIVA" || sessao?.status === "PAUSADA" ? sessao.activity === "CARRINHO" : false;
+  const circuitoAssetKind = sessao?.status === "ATIVA" || sessao?.status === "PAUSADA" ? sessao.plan.assetKind : null;
+  const circuitoConfig =
+    isCircuito && timing ? getCircuitoAlertConfig(circuitoAssetKind, Math.round(timing.durationMs / 60_000)) : null;
+
+  // Reagenda o alerta sempre que a sessão é recarregada (ex: troca de plano
+  // muda o teto) — nunca pede permissão sozinho, só quando o responsável
+  // toca no botão. Playground avisa nos últimos 5 min; Circuito avisa no
+  // minuto definido pela tabela (ver copyCircuito.ts).
   useEffect(() => {
     if (!lembreteAtivo || !timing || timing.phase === "EXCEDENTE") return;
-    const msAteVermelho = timing.durationMs - timing.elapsedMs - 5 * 60_000;
+    const msAteAlerta = isCircuito
+      ? circuitoConfig
+        ? circuitoConfig.alertAtMinutes * 60_000 - timing.elapsedMs
+        : null
+      : timing.durationMs - timing.elapsedMs - 5 * 60_000;
     if (reminderTimeoutRef.current) window.clearTimeout(reminderTimeoutRef.current);
-    if (msAteVermelho <= 0) return; // já está no aviso ou depois dele
+    if (msAteAlerta == null || msAteAlerta <= 0) return; // já está no aviso ou depois dele
     reminderTimeoutRef.current = window.setTimeout(() => {
       try {
         if (Notification.permission === "granted") {
-          new Notification("Faça Amigos — faltam 5 minutinhos", {
-            body: "Dá uma olhadinha no painel para ver as opções de continuar brincando.",
+          new Notification("Faça Amigos — falta pouco!", {
+            body: "Dá uma olhadinha no painel para ver as opções de continuar aproveitando.",
           });
         }
       } catch {
         // Notification pode não existir (Safari antigo) — o banner na
         // própria página, abaixo, já cobre esse caso.
       }
-    }, msAteVermelho);
+    }, msAteAlerta);
     return () => {
       if (reminderTimeoutRef.current) window.clearTimeout(reminderTimeoutRef.current);
     };
-  }, [lembreteAtivo, timing]);
+  }, [lembreteAtivo, timing, isCircuito, circuitoConfig]);
 
   async function ativarLembrete() {
     setLembreteErro(null);
@@ -79,10 +96,10 @@ export function AcompanharScreen({ code }: { code: string }) {
     }
   }
 
-  async function pedirRenovacao(minutes: number) {
+  async function pedirRenovacao(minutes: number, cents?: number) {
     setRenovacaoPedida(minutes);
     try {
-      await logAcompanharEvento(code, "RENOVACAO_SOLICITADA", { minutes, requestedAtMs: Date.now() });
+      await logAcompanharEvento(code, "RENOVACAO_SOLICITADA", { minutes, cents, requestedAtMs: Date.now() });
     } catch {
       setRenovacaoPedida(null);
     }
@@ -135,6 +152,8 @@ export function AcompanharScreen({ code }: { code: string }) {
         <AcompanharConteudo
           childFirstName={sessao.childFirstName}
           sensoryTags={sessao.sensoryTags}
+          activity={sessao.activity}
+          assetKind={sessao.plan.assetKind}
           timing={timing}
           isPausada={sessao.status === "PAUSADA"}
           lembreteAtivo={lembreteAtivo}
@@ -158,6 +177,8 @@ const PHASE_COLOR: Record<string, string> = {
 function AcompanharConteudo({
   childFirstName,
   sensoryTags,
+  activity,
+  assetKind,
   timing,
   isPausada,
   lembreteAtivo,
@@ -168,42 +189,84 @@ function AcompanharConteudo({
 }: {
   childFirstName: string;
   sensoryTags: string[];
+  activity: "PLAYGROUND" | "CARRINHO";
+  assetKind: CircuitoAssetKind | null;
   timing: SessionTiming;
   isPausada: boolean;
   lembreteAtivo: boolean;
   lembreteErro: string | null;
   onAtivarLembrete: () => void;
   renovacaoPedida: number | null;
-  onPedirRenovacao: (minutes: number) => void;
+  onPedirRenovacao: (minutes: number, cents?: number) => void;
 }) {
   const phase = isPausada ? "PAUSADA" : timing.phase;
   const color = isPausada ? "var(--color-teal)" : PHASE_COLOR[timing.phase];
-  const showRenewal = !isPausada && (timing.phase === "VERMELHO" || timing.phase === "EXCEDENTE");
   const planDurationMinutes = Math.round(timing.durationMs / 60_000);
+  const isCircuito = activity === "CARRINHO";
+  const circuitoConfig = isCircuito ? getCircuitoAlertConfig(assetKind, planDurationMinutes) : null;
+
+  const elapsedMinutes = Math.floor(timing.elapsedMs / 60_000);
+  const showRenewal = isCircuito
+    ? !isPausada && !!circuitoConfig && elapsedMinutes >= circuitoConfig.alertAtMinutes
+    : !isPausada && (timing.phase === "VERMELHO" || timing.phase === "EXCEDENTE");
+
+  const headline = isCircuito
+    ? circuitoStatusHeadline(childFirstName, phase, assetKind ?? "CARRO")
+    : statusHeadline(childFirstName, phase, sensoryTags);
 
   return (
     <div style={{ width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: "16px" }}>
       <Card style={{ textAlign: "center", border: `2px solid ${color}` }}>
-        <p style={{ margin: "0 0 8px", fontSize: "15px", color: "var(--text-muted)" }}>{statusHeadline(childFirstName, phase, sensoryTags)}</p>
+        <p style={{ margin: "0 0 8px", fontSize: "15px", color: "var(--text-muted)" }}>{headline}</p>
         <div style={{ fontFamily: "var(--font-display)", fontSize: "48px", color, lineHeight: 1 }}>
           {formatElapsed(timing.elapsedMs)}
         </div>
         <p style={{ margin: "12px 0 0", fontSize: "14px", color: "var(--text-muted)" }}>
           {timing.overMinutes > 0
-            ? `${Math.round(timing.durationMs / 60_000)} min inclusos no pacote — ${money(timing.overCents)} adicionais até agora`
-            : `${Math.round(timing.durationMs / 60_000)} min inclusos no pacote — ${money(0)} adicionais`}
+            ? `${planDurationMinutes} min inclusos no pacote — ${money(timing.overCents)} adicionais até agora`
+            : `${planDurationMinutes} min inclusos no pacote — ${money(0)} adicionais`}
         </p>
       </Card>
 
-      {!isPausada && !lembreteAtivo && timing.phase !== "EXCEDENTE" && (
+      {!isPausada && !lembreteAtivo && timing.phase !== "EXCEDENTE" && (!isCircuito || circuitoConfig) && (
         <Button variant="secondary" onClick={onAtivarLembrete}>
-          🔔 Avisar quando faltarem 5 minutos
+          {isCircuito ? "🔔 Avisar quando chegar a hora de renovar" : "🔔 Avisar quando faltarem 5 minutos"}
         </Button>
       )}
       {lembreteAtivo && <HelpText>Lembrete ativado — deixe esta página aberta para receber o aviso.</HelpText>}
       {lembreteErro && <HelpText>{lembreteErro}</HelpText>}
 
-      {showRenewal && (
+      {showRenewal && isCircuito && circuitoConfig && (
+        <Card>
+          <p style={{ margin: "0 0 16px", fontSize: "15px" }}>{circuitoRenewalIntro(childFirstName)}</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {circuitoConfig.options.map((opt) => (
+              <div key={opt.minutes}>
+                <Button
+                  variant={opt.highlight ? "primary" : "secondary"}
+                  fullWidth
+                  disabled={renovacaoPedida !== null}
+                  onClick={() => onPedirRenovacao(opt.minutes, opt.cents)}
+                >
+                  {renovacaoPedida === opt.minutes
+                    ? "Renovação via PIX solicitada! 💛"
+                    : `+${opt.minutes} min — ${money(opt.cents)} via PIX`}
+                  {opt.highlight ? " · recomendado" : ""}
+                </Button>
+                {opt.highlightMessage && (
+                  <p style={{ margin: "6px 4px 0", fontSize: "12px", color: "var(--text-muted)" }}>{opt.highlightMessage}</p>
+                )}
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: "16px 0 0", fontSize: "12px", color: "var(--text-muted)" }}>
+            {circuitoAnchorMessage()} O pagamento é confirmado na recepção na retirada — sem cobrança automática pelo
+            celular.
+          </p>
+        </Card>
+      )}
+
+      {showRenewal && !isCircuito && (
         <Card>
           <p style={{ margin: "0 0 16px", fontSize: "15px" }}>{renewalIntro(planDurationMinutes, childFirstName)}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>

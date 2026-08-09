@@ -18,8 +18,9 @@ import { SaldoEnvelopesTab } from "./tabs/SaldoEnvelopesTab.js";
 import { HistoricoTab } from "./tabs/HistoricoTab.js";
 import { ContratoTab } from "./tabs/ContratoTab.js";
 import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
+import { ClientesTab } from "./tabs/ClientesTab.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO" | "TALENTOS";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO" | "TALENTOS";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "PLANOS", label: "Planos de Preços" },
@@ -29,6 +30,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "FIDELIDADE", label: "Fidelidade" },
   { value: "METAS", label: "Metas" },
   { value: "COLABORADORES", label: "Colaboradores" },
+  { value: "CLIENTES", label: "Clientes" },
   { value: "TALENTOS", label: "Banco de Talentos" },
   { value: "FOLHA", label: "Folha de Pagamento" },
   { value: "RELATORIOS", label: "Relatórios" },
@@ -47,6 +49,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
   FIDELIDADE: "Recompensas automáticas para clientes recorrentes.",
   METAS: "Regras de bonificação da equipe quando a meta diária é batida. Meta de faturamento e horário de fechamento continuam por unidade, em Configurações.",
   COLABORADORES: "Cadastro único de toda a equipe — escolha em qual(is) unidade(s) cada colaborador atua.",
+  CLIENTES: "Base de dados unificada de responsáveis e crianças cadastradas em todas as unidades da rede — consulte histórico de visitas, CPF e contatos.",
   TALENTOS: "Candidaturas recebidas pelo formulário \"Venha Fazer Parte do Nosso Time\" da landing page — analise o currículo e atualize o status conforme a triagem avança.",
   FOLHA: "Extrato mensal de salários, dados bancários e fechamento da folha para conferência e exportação/Bradesco.",
   RELATORIOS: "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só.",
@@ -113,6 +116,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "FIDELIDADE" && <FidelidadeTab />}
               {tab === "METAS" && <MetasTab />}
               {tab === "COLABORADORES" && <ColaboradoresTab />}
+              {tab === "CLIENTES" && <ClientesTab />}
               {tab === "TALENTOS" && <BancoTalentosTab />}
               {tab === "FOLHA" && <FolhaPagamentoTab />}
               {tab === "RELATORIOS" && <GerencialRelatorioTab />}

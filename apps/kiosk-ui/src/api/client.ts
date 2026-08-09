@@ -508,6 +508,22 @@ export interface HourBankBalance {
   next_expiry_ms: number;
 }
 
+export interface GerencialCliente {
+  guardian_id: string;
+  guardian_name: string;
+  cpf: string | null;
+  phone_e164: string | null;
+  email: string | null;
+  created_at: string;
+  total_visits: number;
+  children: Array<{
+    id: string;
+    fullName: string;
+    birthDate: string | null;
+    photoPath: string | null;
+  }>;
+}
+
 /** Dados cadastrais do Contratante para o contrato dos planos >2h. */
 export interface GuardianContractInfo {
   id: string;
@@ -1696,6 +1712,14 @@ export const Api = {
   saidaResponsaveis: async (sessionId: string) =>
     (await unwrap<AuthorizedGuardian[] | null>(
       supabase().rpc("fa_saida_responsaveis", { p_session_id: sessionId }),
+    )) ?? [],
+  /** Lista a base de clientes (responsáveis e crianças) consolidada no Gerencial. */
+  gerencialClientes: async (search?: string, unitId?: string) =>
+    (await unwrap<GerencialCliente[] | null>(
+      supabase().rpc("fa_gerencial_clientes", {
+        p_search: search ?? null,
+        p_unit_id: unitId ?? null,
+      }),
     )) ?? [],
   /** Registra a liberação de contingência (recibo perdido / etiqueta danificada) antes de cobrar. */
   saidaManualAuthorize: (body: {

@@ -31,9 +31,8 @@ describe("generateGainschaGS2208DTSPL", () => {
       phone: "+5591982501215",
     });
 
-    // Sem hifen e sem #: e o modo alfanumerico do QR que mantem a etiqueta
-    // na versao 1 (21x21 modulos).
-    expect(tspl).toContain('QRCODE 330,16,Q,6,A,0,"K7M2P9QX3B7"');
+    // A URL unificada de acompanhamento e codificada no QR
+    expect(tspl).toContain('QRCODE 330,16,Q,4,A,0,"https://app.facaamigos.com.br/?acompanhar=K7M2P9QX3B7"');
     // O mesmo codigo em texto, agrupado para leitura humana.
     expect(tspl).toContain('TEXT 480,36,"4",0,1,1,"K7M2-P9QX-3B7"');
   });
@@ -61,7 +60,7 @@ describe("generateGainschaGS2208DTSPL", () => {
 
     // Normalizar destruiria o payload (viraria maiusculo e sem o "|"), e o
     // codigo impresso deixaria de casar com o que esta gravado na sessao.
-    expect(tspl).toContain(`QRCODE 330,16,Q,6,A,0,"${legado}"`);
+    expect(tspl).toContain(`QRCODE 330,16,Q,4,A,0,"${legado}"`);
   });
 
   it("neutraliza acento e aspas, que corrompem a impressao RAW", () => {

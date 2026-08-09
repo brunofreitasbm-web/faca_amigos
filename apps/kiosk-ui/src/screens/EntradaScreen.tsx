@@ -69,7 +69,7 @@ const SENSORY_TAG_OPTIONS = [
  * Esta tela não dispara impressão nenhuma — se o check-in gravou, as duas
  * saíram; se falhou, nenhuma saiu pela metade.
  */
-export function EntradaScreen() {
+export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
   const { unit, employee } = useAppState();
   const toast = useToast();
   const activity = unit?.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
@@ -402,6 +402,7 @@ export function EntradaScreen() {
       // Assim que a entrada é confirmada, o QR já sobe na tela — o operador
       // vira o kiosk para o responsável sem precisar tocar em mais nada.
       setAcompanharOpen(true);
+      onSuccess?.();
 
       if (quickUpsellAccepted && quickProduct) {
         // Fora do try do check-in de propósito, mesma lógica da foto: a
