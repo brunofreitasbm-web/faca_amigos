@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal } from "@facaamigos/ui";
+import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan, Product, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
@@ -9,6 +9,7 @@ import { WristbandQRCode } from "../components/WristbandQRCode.js";
 import { formatPlanoHoras } from "../contract/contractTemplate.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
+import { useAcompanhar } from "../api/useAcompanhar.js";
 import {
   normalizePhoneE164,
   formatPhoneBr,
@@ -21,7 +22,7 @@ import {
   minutesUntilClosing,
   formatAccessCode,
 } from "@facaamigos/domain";
-import { money } from "../format.js";
+import { money, formatElapsed } from "../format.js";
 
 // Lista padrão e assertiva — o operador marca em vez de descrever do zero
 // na hora do balcão, com a família esperando. Os cinco primeiros itens são
@@ -123,6 +124,12 @@ export function EntradaScreen() {
   const publicAppOrigin = envAppUrl ?? (isLocalOrigin ? undefined : window.location.origin);
   const acompanharUrl =
     done && publicAppOrigin ? `${publicAppOrigin.replace(/\/$/, "")}/?acompanhar=${done.accessCode}` : null;
+
+  // Mesmo hook do painel do responsável (AcompanharScreen): busca a sessão
+  // pela mesma RPC anônima e recalcula o cronômetro a 1Hz localmente. Ao
+  // reusar o hook em vez de duplicar a lógica, o tempo mostrado aqui no
+  // balcão nunca diverge do que aparece no celular de quem escaneou o QR.
+  const { timing: acompanharTiming } = useAcompanhar(acompanharOpen && done ? done.accessCode : null);
 
   // Saldo do banco de horas da criança identificada (planos >2h de visitas
   // anteriores, em qualquer unidade). null = sem saldo ou não consultado.
@@ -1009,6 +1016,18 @@ export function EntradaScreen() {
                   Basta apontar a câmera do celular para o QR abaixo — o painel de acompanhamento abre na hora, sem
                   precisar de cadastro.
                 </p>
+                {/* Mesmo cronômetro que o responsável vê no celular assim que
+                    escaneia o QR — roda aqui no balcão em paralelo, pela
+                    mesma sessão, para o operador confirmar de relance que o
+                    tempo já está contando antes de liberar a criança. */}
+                {acompanharTiming && (
+                  <StatusBadge
+                    phase={acompanharTiming.phase}
+                    detail={formatElapsed(acompanharTiming.elapsedMs)}
+                    size="lg"
+                    style={{ width: "100%", alignItems: "center", textAlign: "center" }}
+                  />
+                )}
                 <WristbandQRCode value={acompanharUrl} size={220} />
               </>
             ) : (

@@ -4,9 +4,10 @@ export function money(cents: number): string {
 
 export function formatElapsed(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
-  const m = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const h = Math.floor(totalSeconds / 3600);
+  const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
   const s = String(totalSeconds % 60).padStart(2, "0");
-  return `${m}:${s}`;
+  return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
 }
 
 /** Idade legível a partir da data de nascimento (ISO "YYYY-MM-DD") — em meses para bebês com menos de 2 anos. */

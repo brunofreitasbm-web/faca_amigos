@@ -3,6 +3,7 @@ import { money } from "@facaamigos/domain";
 import type { SessionTiming } from "@facaamigos/domain";
 import { Button, Card, BrandLockup, HelpText } from "@facaamigos/ui";
 import { useAcompanhar } from "../api/useAcompanhar.js";
+import { formatElapsed } from "../format.js";
 import { logAcompanharEvento } from "../api/acompanhar.js";
 import {
   statusHeadline,
@@ -145,15 +146,6 @@ export function AcompanharScreen({ code }: { code: string }) {
       )}
     </div>
   );
-}
-
-function formatElapsed(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
 const PHASE_COLOR: Record<string, string> = {
