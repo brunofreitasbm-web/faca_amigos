@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@facaamigos/contracts": "workspace:*",
     "@facaamigos/domain": "workspace:*",
     "@facaamigos/ui": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",

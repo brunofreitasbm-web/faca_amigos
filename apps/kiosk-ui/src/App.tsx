@@ -26,6 +26,7 @@ import { ROLE_LABEL } from "./auth/capabilities.js";
 import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { OnboardingInviteScreen } from "./screens/OnboardingInviteScreen.js";
+import { AcompanharScreen } from "./screens/AcompanharScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
 import { SaidaScreen } from "./screens/SaidaScreen.js";
 import { PainelScreen } from "./screens/PainelScreen.js";
@@ -144,6 +145,15 @@ export function App() {
   if (inviteParam) {
     const [inviteId, token] = inviteParam.split(".");
     if (inviteId && token) return <OnboardingInviteScreen inviteId={inviteId} token={token} />;
+  }
+
+  // Painel do responsável (?acompanhar=<access_code>): quem abre é o pai/mãe
+  // que escaneou o QR mostrado no check-in, sem NENHUMA conta no sistema —
+  // mesmo espírito do branch `?convite=` acima, tem que vir antes de
+  // qualquer checagem de sessão salva.
+  const acompanharParam = new URLSearchParams(window.location.search).get("acompanhar");
+  if (acompanharParam) {
+    return <AcompanharScreen code={acompanharParam} />;
   }
 
   // Enquanto a sessão salva não foi conferida, não decide nada: mostrar a

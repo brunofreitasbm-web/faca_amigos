@@ -24,16 +24,41 @@ describe("computeSessionTiming", () => {
     expect(t.liveTotalCents).toBe(3000);
   });
 
-  it("fica AMARELO entre 80% e o teto", () => {
-    const t = computeSessionTiming(plan, { checkinAtMs, ...notPaused }, 13 * 60_000); // 13 de 15 min = 86.6%
+  it("fica AMARELO entre 80% e os 5 minutos finais (janela só existe em planos mais longos)", () => {
+    // Plano de 15 min: os últimos 5 min (10-15) já são VERMELHO, então a
+    // janela AMARELO real (80% a "faltam 5min") só aparece em planos onde
+    // 80% do prazo é anterior ao início dos 5 min finais. Um plano de 60
+    // min tem AMARELO de 48 a 55 min.
+    const plano60min: Plan = { ...plan, durationValue: 60 };
+    const t = computeSessionTiming(plano60min, { checkinAtMs, ...notPaused }, 50 * 60_000); // 50 de 60 min
     expect(t.phase).toBe("AMARELO");
     expect(t.overMinutes).toBe(0);
   });
 
-  it("no exato teto do plano ainda não cobra excedente", () => {
+  it("fica VERMELHO nos 5 minutos finais antes do teto (aviso do painel do responsável)", () => {
+    const t = computeSessionTiming(plan, { checkinAtMs, ...notPaused }, 13 * 60_000); // 13 de 15 min = faltam 2 min
+    expect(t.phase).toBe("VERMELHO");
+    expect(t.overMinutes).toBe(0);
+  });
+
+  it("no exato teto do plano ainda está VERMELHO e não cobra excedente", () => {
     const t = computeSessionTiming(plan, { checkinAtMs, ...notPaused }, 15 * 60_000);
     expect(t.overMinutes).toBe(0);
-    expect(t.phase).toBe("AMARELO");
+    expect(t.phase).toBe("VERMELHO");
+  });
+
+  it("cenário do dono do negócio: plano de 30 min aos 25 min decorridos fica VERMELHO", () => {
+    const plano30min: Plan = { ...plan, durationValue: 30 };
+    const t = computeSessionTiming(plano30min, { checkinAtMs, ...notPaused }, 25 * 60_000);
+    expect(t.phase).toBe("VERMELHO");
+    expect(t.overMinutes).toBe(0);
+  });
+
+  it("cenário do dono do negócio: plano de 60 min aos 55 min decorridos fica VERMELHO", () => {
+    const plano60min: Plan = { ...plan, durationValue: 60 };
+    const t = computeSessionTiming(plano60min, { checkinAtMs, ...notPaused }, 55 * 60_000);
+    expect(t.phase).toBe("VERMELHO");
+    expect(t.overMinutes).toBe(0);
   });
 
   it("um minuto após o teto já cobra e vira EXCEDENTE", () => {

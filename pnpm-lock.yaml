@@ -129,6 +129,9 @@ importers:
 
   apps/kiosk-ui:
     dependencies:
+      '@facaamigos/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@facaamigos/domain':
         specifier: workspace:*
         version: link:../../packages/domain

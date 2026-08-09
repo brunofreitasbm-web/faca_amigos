@@ -3,6 +3,7 @@ import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, Print
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan, Asset } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
+import { usePendingRenewals, resolveRenewal } from "../api/renewalRequests.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useConfirm } from "../state/ConfirmContext.js";
@@ -36,10 +37,27 @@ const PAUSE_ALERT_MS = 10 * 60_000;
  * uma criança, medidor de capacidade e alertas de expiração.
  */
 export function PainelScreen() {
-  const { unit } = useAppState();
+  const { unit, employee } = useAppState();
   const toast = useToast();
   const confirm = useConfirm();
   const { entries, status: sessionsStatus, errorMessage: sessionsError } = useActiveSessions(unit?.id ?? null);
+  const pendingRenewals = usePendingRenewals(entries.map((e) => e.session.id));
+  const [renewalBusy, setRenewalBusy] = useState<Set<string>>(new Set());
+
+  async function handleRenewalOutcome(sessionId: string, outcome: "APLICADA" | "DISPENSADA") {
+    setRenewalBusy((prev) => new Set(prev).add(sessionId));
+    try {
+      await resolveRenewal(sessionId, outcome, employee?.id ?? null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não deu para atualizar o pedido de renovação.");
+    } finally {
+      setRenewalBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
+  }
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionBusy, setActionBusy] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -473,6 +491,47 @@ export function PainelScreen() {
                 <Badge variant="solid_pink" title="Tempo do plano já foi ultrapassado — minutos e valor extra somados em tempo real">
                   🔴 +{quote.timing.overMinutes} min excedente{overageLine ? ` (+${money(overageLine.cents)})` : ""}
                 </Badge>
+              )}
+
+              {/* Pedido de renovação feito pelo responsável no painel público
+                  (?acompanhar=) — só aparece enquanto ninguém do balcão
+                  aplicar ou dispensar. "Aplicar" só marca o pedido como
+                  atendido; a troca de plano em si continua pelo fluxo normal
+                  (Trocar plano) ou pelo Caixa no fechamento. */}
+              {pendingRenewals.has(session.id) && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                    padding: "8px 10px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(240,25,107,0.25)",
+                    background: "rgba(240,25,107,0.06)",
+                  }}
+                >
+                  <Badge variant="solid_pink" title="O responsável pediu mais tempo pelo painel de acompanhamento no celular">
+                    📱 Pediu +{pendingRenewals.get(session.id)!.minutes} min
+                  </Badge>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={renewalBusy.has(session.id)}
+                    onClick={() => handleRenewalOutcome(session.id, "APLICADA")}
+                  >
+                    Já resolvi no balcão
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={renewalBusy.has(session.id)}
+                    onClick={() => handleRenewalOutcome(session.id, "DISPENSADA")}
+                  >
+                    Dispensar
+                  </Button>
+                </div>
               )}
 
               {/* Saldo de pacote: o fechamento vai abater estes minutos, então

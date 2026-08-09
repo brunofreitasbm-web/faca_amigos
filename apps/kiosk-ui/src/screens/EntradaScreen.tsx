@@ -5,6 +5,7 @@ import type { Asset, ChildMatch, Coupon, Plan, Product, UpsellOffer } from "../a
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { PhotoCapture } from "../components/PhotoCapture.js";
 import { ContractModal } from "../components/ContractModal.js";
+import { WristbandQRCode } from "../components/WristbandQRCode.js";
 import { formatPlanoHoras } from "../contract/contractTemplate.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
@@ -112,6 +113,7 @@ export function EntradaScreen() {
     contractPlan: { name: string; valueCents: number; minutes: number } | null;
   } | null>(null);
   const [contractOpen, setContractOpen] = useState(false);
+  const [acompanharOpen, setAcompanharOpen] = useState(false);
 
   // Saldo do banco de horas da criança identificada (planos >2h de visitas
   // anteriores, em qualquer unidade). null = sem saldo ou não consultado.
@@ -501,6 +503,14 @@ export function EntradaScreen() {
               ＋ Mais uma criança deste responsável
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setAcompanharOpen(true)}
+            title="Mostrar um QR na tela para o responsável acompanhar o tempo pelo próprio celular"
+          >
+            📱 QR de acompanhamento
+          </Button>
           <Button variant="ghost" size="sm" onClick={reprint} title="Reenviar as duas vias para a impressora">
             🖨️ Reimprimir
           </Button>
@@ -960,6 +970,26 @@ export function EntradaScreen() {
           plan={done.contractPlan}
           onClose={() => setContractOpen(false)}
         />
+      )}
+
+      {/* QR de acompanhamento: mostrado na tela, não impresso — evita
+          mexer no QR já impresso na pulseira/recibo (aquele é lido pelo
+          scanner do operador na saída via fa_kiosk_normalize_access_code,
+          que quebraria se virasse uma URL). Este é só para o responsável
+          apontar a câmera do próprio celular, oferecido pela operadora. */}
+      {acompanharOpen && done && (
+        <Modal title="Acompanhar pelo celular" onClose={() => setAcompanharOpen(false)}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "8px 0" }}>
+            <p style={{ margin: 0, textAlign: "center", fontSize: "14px", color: "var(--text-muted)" }}>
+              Peça para o responsável de {done.childName.split(" ")[0]} apontar a câmera do celular para o QR abaixo — o
+              painel abre na hora, sem precisar de cadastro.
+            </p>
+            <WristbandQRCode
+              value={`${window.location.origin}${window.location.pathname}?acompanhar=${done.accessCode}`}
+              size={220}
+            />
+          </div>
+        </Modal>
       )}
 
       {/* Modal de Cross-Selling Automático para pacotes >= 1h */}

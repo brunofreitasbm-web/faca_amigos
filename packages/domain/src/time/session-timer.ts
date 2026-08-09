@@ -4,16 +4,16 @@ export function planDurationMinutes(plan: Plan): number {
   return plan.durationUnit === "HORA" ? plan.durationValue * 60 : plan.durationValue;
 }
 
+/** Janela do aviso VERMELHO: últimos 5 minutos antes do teto do plano. */
+export const VERMELHO_WINDOW_MS = 5 * 60_000;
+
 /**
  * Motor de tempo (seção 6 do plano). Fase segue o contrato validado no
- * protótipo: VERDE até 80% do prazo, AMARELO até o teto, EXCEDENTE a
- * partir do minuto seguinte ao teto — e nesse instante o valor total já
- * embute o excedente (D6: nunca aplicado "depois", sempre ao vivo).
- *
- * VERMELHO existe no contrato de fases (packages/contracts) para uso
- * futuro de um aviso intermediário, mas nunca é produzido aqui: entre
- * "no prazo" e "cobrando excedente" não há uma janela de tempo real —
- * o primeiro minuto após o teto já é EXCEDENTE.
+ * protótipo: VERDE até 80% do prazo, AMARELO até os últimos 5 minutos,
+ * VERMELHO nos 5 minutos finais (aviso do painel do responsável, ver
+ * packages/contracts), EXCEDENTE a partir do minuto seguinte ao teto —
+ * e nesse instante o valor total já embute o excedente (D6: nunca
+ * aplicado "depois", sempre ao vivo).
  */
 export function computeSessionTiming(
   plan: Plan,
@@ -36,6 +36,7 @@ export function computeSessionTiming(
   let phase: SessionTiming["phase"];
   if (overMinutes > 0) phase = "EXCEDENTE";
   else if (elapsedMs < durationMs * 0.8) phase = "VERDE";
+  else if (elapsedMs >= durationMs - VERMELHO_WINDOW_MS) phase = "VERMELHO";
   else phase = "AMARELO";
 
   return { elapsedMs, durationMs, overMinutes, overCents, liveTotalCents, phase, isPaused, pausedForMs };
