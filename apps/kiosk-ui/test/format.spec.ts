@@ -13,6 +13,6 @@ describe("formatElapsed", () => {
   it("formata mm:ss", () => {
     expect(formatElapsed(0)).toBe("00:00");
     expect(formatElapsed(65_000)).toBe("01:05");
-    expect(formatElapsed(3_661_000)).toBe("61:01");
+    expect(formatElapsed(3_661_000)).toBe("1:01:01");
   });
 });

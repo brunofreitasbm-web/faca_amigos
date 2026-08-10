@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import {
   Button,
@@ -17,6 +17,7 @@ import {
 } from "@facaamigos/ui";
 import { unitBrandFor } from "./branding/unitBrand.js";
 import { useSwipeNavigation } from "./hooks/useSwipeNavigation.js";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts.js";
 import { useAppState } from "./state/AppState.js";
 import { useConfirm } from "./state/ConfirmContext.js";
 import { useAuth } from "./auth/AuthContext.js";
@@ -75,12 +76,22 @@ export function App() {
   const { can, loading: loadingCapabilities } = useAuth();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
+  const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
+  function navigateToScreen(newScreen: Screen) {
+    if (newScreen === screen) return;
+    setScreenHistory((prev) => [...prev, screen].slice(-20));
+    setScreen(newScreen);
+  }
+
   // Cada módulo/unidade selecionado sempre abre direto no Painel (tela principal do sistema).
   useEffect(() => {
-    if (unit) setScreen("PAINEL");
+    if (unit) {
+      setScreen("PAINEL");
+      setScreenHistory([]);
+    }
   }, [unit?.id]);
 
   // Se o colaborador atual não pode ver a tela em que está — porque trocou de
@@ -99,18 +110,61 @@ export function App() {
   // podem vir depois de um `return` condicional.
   const visibleScreens = SCREENS.filter((s) => can(SCREEN_CAPABILITY[s.value]));
 
+  const handleGoBack = useCallback(() => {
+    if (showConnectModal) {
+      setShowConnectModal(false);
+      return;
+    }
+    if (navOpen) {
+      setNavOpen(false);
+      return;
+    }
+    setScreenHistory((prev) => {
+      if (prev.length === 0) {
+        const index = visibleScreens.findIndex((s) => s.value === screen);
+        const prevScreen = visibleScreens[index - 1];
+        if (prevScreen) {
+          setScreen(prevScreen.value);
+        }
+        return prev;
+      }
+      const lastScreen = prev[prev.length - 1];
+      if (lastScreen) {
+        setScreen(lastScreen);
+      }
+      return prev.slice(0, -1);
+    });
+  }, [showConnectModal, navOpen, visibleScreens, screen]);
+
+  const handleSave = useCallback(() => {
+    const submitButton = document.querySelector<HTMLButtonElement>(
+      "main form button[type='submit'], main button[data-save-button], main .kiosk-save-btn"
+    );
+    if (submitButton && !submitButton.disabled) {
+      submitButton.click();
+    }
+  }, []);
+
+  useKeyboardShortcuts({
+    onGoBack: handleGoBack,
+    onEscape: () => {
+      if (showConnectModal) setShowConnectModal(false);
+      if (navOpen) setNavOpen(false);
+    },
+    onSave: handleSave,
+    enabled: !!employee && !gerencial && !!unit,
+  });
+
   const swipeHandlers = useSwipeNavigation(
     () => {
       // Arrastar para a esquerda: próximo módulo, como virar a página.
       const index = visibleScreens.findIndex((s) => s.value === screen);
       const next = index !== -1 ? visibleScreens[index + 1] : undefined;
-      if (next) setScreen(next.value);
+      if (next) navigateToScreen(next.value);
     },
     () => {
-      // Arrastar para a direita: módulo anterior.
-      const index = visibleScreens.findIndex((s) => s.value === screen);
-      const prev = index > 0 ? visibleScreens[index - 1] : undefined;
-      if (prev) setScreen(prev.value);
+      // Arrastar para a direita: voltar no histórico / módulo anterior.
+      handleGoBack();
     },
   );
 
@@ -247,7 +301,7 @@ export function App() {
               size="sm"
               title={s.help}
               onClick={() => {
-                setScreen(s.value);
+                navigateToScreen(s.value);
                 setNavOpen(false);
               }}
               style={{ border: screen === s.value ? "1px solid transparent" : "1px solid var(--border-subtle)" }}
