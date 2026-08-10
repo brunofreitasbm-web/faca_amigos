@@ -354,12 +354,12 @@ begin
   select self_hash into last_hash from fa_kiosk_audit_log order by at_ms desc, id desc limit 1;
   new.prev_hash := last_hash;
   new.self_hash := encode(
-    digest(coalesce(last_hash, '') || new.id::text || new.at_ms::text || new.action || coalesce(new.details_json::text, ''), 'sha256'),
+    digest((coalesce(last_hash, '') || new.id::text || new.at_ms::text || new.action || coalesce(new.details_json::text, ''))::bytea, 'sha256'),
     'hex'
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public, extensions, pg_temp;
 
 drop trigger if exists trg_fa_kiosk_audit_log_hash_chain on fa_kiosk_audit_log;
 create trigger trg_fa_kiosk_audit_log_hash_chain
