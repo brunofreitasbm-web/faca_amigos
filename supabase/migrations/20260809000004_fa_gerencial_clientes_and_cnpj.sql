@@ -64,3 +64,6 @@ begin
   return v_res;
 end;
 $$ language plpgsql stable security definer;
+
+grant execute on function fa_gerencial_clientes(text, uuid) to anon, authenticated, service_role;
+
