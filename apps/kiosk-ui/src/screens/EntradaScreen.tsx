@@ -69,6 +69,42 @@ const SENSORY_TAG_OPTIONS = [
  * Esta tela não dispara impressão nenhuma — se o check-in gravou, as duas
  * saíram; se falhou, nenhuma saiu pela metade.
  */
+function getPlanDiscountedCents(
+  valueCents: number,
+  code: string,
+  couponsList: Coupon[],
+): { finalCents: number; originalCents: number; discountText: string | null } {
+  if (!code) return { finalCents: valueCents, originalCents: valueCents, discountText: null };
+
+  const couponObj = couponsList.find((c) => c.code.toLowerCase() === code.toLowerCase());
+  let discountPct: number | null = null;
+  let discountCents: number | null = null;
+
+  if (couponObj) {
+    if (couponObj.kind === "DESCONTO_PCT") discountPct = couponObj.value;
+    else if (couponObj.kind === "DESCONTO_VALOR") discountCents = couponObj.value;
+  }
+
+  if (discountPct === null && discountCents === null) {
+    if (code.includes("50%")) discountPct = 50;
+    else if (code.includes("40%")) discountPct = 40;
+  }
+
+  let finalCents = valueCents;
+  let discountText: string | null = null;
+
+  if (discountPct !== null && discountPct > 0) {
+    const cut = Math.round((valueCents * discountPct) / 100);
+    finalCents = Math.max(0, valueCents - cut);
+    discountText = `-${discountPct}%`;
+  } else if (discountCents !== null && discountCents > 0) {
+    finalCents = Math.max(0, valueCents - discountCents);
+    discountText = `-${money(discountCents)}`;
+  }
+
+  return { finalCents, originalCents: valueCents, discountText };
+}
+
 export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
   const { unit, employee } = useAppState();
   const toast = useToast();
@@ -200,6 +236,34 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
     Api.coupons(unit.id).then(setCoupons);
     if (activity === "CARRINHO") Api.assets(unit.id).then(setAssets);
   }, [unit, activity]);
+
+  // Aplicação automática de cupons no Playground:
+  // - Criança neurodivergente marcada -> "50% MEIA - Inclusivo"
+  // - Não marcada -> "40% PROMOCIONAL" em todos os planos
+  useEffect(() => {
+    if (activity !== "PLAYGROUND") return;
+
+    if (isNeurodivergent) {
+      const match50 = coupons.find(
+        (c) =>
+          c.active !== false &&
+          (c.code.toLowerCase().includes("50%") ||
+            c.code.toLowerCase().includes("inclusivo") ||
+            c.code.toLowerCase().includes("meia") ||
+            c.description?.toLowerCase().includes("inclusivo")),
+      );
+      setCouponCode(match50 ? match50.code : "50% MEIA - Inclusivo");
+    } else {
+      const match40 = coupons.find(
+        (c) =>
+          c.active !== false &&
+          (c.code.toLowerCase().includes("40%") ||
+            c.code.toLowerCase().includes("promocional") ||
+            c.description?.toLowerCase().includes("promocional")),
+      );
+      setCouponCode(match40 ? match40.code : "40% PROMOCIONAL");
+    }
+  }, [activity, isNeurodivergent, coupons]);
 
   // Busca única com debounce. Só dígitos quando o operador digitou um número:
   // a coluna de telefone é E.164 ("+5591982501215") e o texto mascarado
@@ -756,6 +820,7 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
               remainingMinutes === null ||
               minutes <= remainingMinutes ||
               (minutes > threshold && remainingMinutes > 0);
+            const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons);
             return (
               <Card
                 key={plan.id}
@@ -778,10 +843,28 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
                 }}
               >
                 <strong style={{ fontSize: "16px", display: "block" }}>{plan.name}</strong>
-                <div style={{ fontSize: "18px", color: "var(--color-primary-hover)", fontWeight: "bold", marginTop: "2px" }}>
-                  {money(plan.valueCents)}
+                <div style={{ marginTop: "4px" }}>
+                  {discountInfo.discountText ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "line-through" }}>
+                        {money(discountInfo.originalCents)}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "18px", color: "var(--color-primary-hover)", fontWeight: "bold" }}>
+                          {money(discountInfo.finalCents)}
+                        </span>
+                        <Badge variant="pink" style={{ background: "rgba(240, 25, 107, 0.12)", color: "var(--color-primary-hover)", fontSize: "11px" }}>
+                          {discountInfo.discountText}
+                        </Badge>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "18px", color: "var(--color-primary-hover)", fontWeight: "bold" }}>
+                      {money(plan.valueCents)}
+                    </div>
+                  )}
                 </div>
-                {!fits && <div style={{ fontSize: "11px", color: "var(--color-error-text)", fontWeight: "bold" }}>Não cabe até o fechamento</div>}
+                {!fits && <div style={{ fontSize: "11px", color: "var(--color-error-text)", fontWeight: "bold", marginTop: "4px" }}>Não cabe até o fechamento</div>}
               </Card>
             );
           })}
@@ -868,16 +951,16 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
                       src={asset.photo_url}
                       alt={asset.name}
                       style={{
-                        width: "64px",
-                        height: "64px",
+                        width: "96px",
+                        height: "96px",
                         objectFit: "cover",
-                        borderRadius: "12px",
+                        borderRadius: "14px",
                         border: "1px solid var(--border-subtle)",
                         flexShrink: 0,
                       }}
                     />
                   ) : (
-                    <span style={{ fontSize: "42px", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "64px", height: "64px" }}>{asset.emoji}</span>
+                    <span style={{ fontSize: "60px", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "96px", height: "96px" }}>{asset.emoji}</span>
                   )}
                   <span style={{ fontWeight: "var(--weight-bold)" as unknown as number, fontSize: "15px" }}>{asset.name}</span>
                 </div>
@@ -953,11 +1036,18 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
         </div>
       </section>
 
-      {/* Cupom fica atrás de um toque: é exceção, não rotina. */}
-      <section>
+      {/* Cupom fica atrás de um toque ou visualizado automaticamente */}
+      <section style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {couponCode && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Tag color="var(--color-teal)" style={{ fontSize: "13px", padding: "6px 12px" }}>
+              🎟️ Cupom de desconto ativo: <strong>{couponCode}</strong>
+            </Tag>
+          </div>
+        )}
         {!showExtras ? (
-          <Button variant="ghost" size="sm" onClick={() => setShowExtras(true)}>
-            ＋ Aplicar cupom de desconto
+          <Button variant="ghost" size="sm" onClick={() => setShowExtras(true)} style={{ alignSelf: "flex-start" }}>
+            {couponCode ? "Alterar cupom de desconto" : "＋ Aplicar cupom de desconto"}
           </Button>
         ) : (
           <Select label="Cupom de desconto / parceria" value={couponCode} onChange={(e) => setCouponCode(e.target.value)}>
@@ -1002,7 +1092,10 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
           {usingHourBank
             ? " — Banco de horas (R$ 0,00)"
             : selectedPlan
-              ? ` — ${money(selectedPlan.valueCents + (quickUpsellAccepted && quickProduct ? quickProduct.price_cents : 0))}`
+              ? ` — ${money(
+                  getPlanDiscountedCents(selectedPlan.valueCents, couponCode, coupons).finalCents +
+                    (quickUpsellAccepted && quickProduct ? quickProduct.price_cents : 0),
+                )}`
               : ""}
         </Button>
       </div>
