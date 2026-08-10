@@ -255,6 +255,12 @@ function AcompanharConteudo({
     ? circuitoStatusHeadline(childFirstName, phase, assetKind ?? "CARRO")
     : statusHeadline(childFirstName, phase, sensoryTags);
 
+  // Seleção sem envio imediato: o toque escolhe a opção, um segundo botão
+  // ("Confirmar") de fato dispara onPedirRenovacao — evita clique acidental
+  // vindo de um responsável distraído/celular no bolso, já que aqui não há
+  // cobrança automática nenhuma envolvida, só um aviso pro balcão.
+  const [selecionada, setSelecionada] = useState<{ minutes: number; cents: number } | null>(null);
+
   return (
     <div style={{ width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: "16px" }}>
       <Card style={{ textAlign: "center", border: `2px solid ${color}` }}>
@@ -286,28 +292,42 @@ function AcompanharConteudo({
         <Card>
           <p style={{ margin: "0 0 16px", fontSize: "15px" }}>{circuitoRenewalIntro(childFirstName)}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {circuitoConfig.options.map((opt) => (
-              <div key={opt.minutes}>
-                <Button
-                  variant={opt.highlight ? "primary" : "secondary"}
-                  fullWidth
-                  disabled={renovacaoPedida !== null}
-                  onClick={() => onPedirRenovacao(opt.minutes, opt.cents)}
-                >
-                  {renovacaoPedida === opt.minutes
-                    ? "Renovação via PIX solicitada! 💛"
-                    : `+${opt.minutes} min — ${money(opt.cents)} via PIX`}
-                  {opt.highlight ? " · recomendado" : ""}
-                </Button>
-                {opt.highlightMessage && (
-                  <p style={{ margin: "6px 4px 0", fontSize: "12px", color: "var(--text-muted)" }}>{opt.highlightMessage}</p>
-                )}
-              </div>
-            ))}
+            {circuitoConfig.options.map((opt) => {
+              const isSelected = selecionada?.minutes === opt.minutes;
+              return (
+                <div key={opt.minutes}>
+                  <Button
+                    variant={opt.highlight ? "primary" : "secondary"}
+                    fullWidth
+                    disabled={renovacaoPedida !== null}
+                    style={isSelected ? { outline: "3px solid var(--color-teal)", outlineOffset: "2px" } : undefined}
+                    onClick={() => setSelecionada(isSelected ? null : { minutes: opt.minutes, cents: opt.cents })}
+                  >
+                    {renovacaoPedida === opt.minutes
+                      ? "Renovação solicitada! 💛"
+                      : `${isSelected ? "✓ " : ""}+${opt.minutes} min — ${money(opt.cents)}`}
+                    {opt.highlight ? " · recomendado" : ""}
+                  </Button>
+                  {opt.highlightMessage && (
+                    <p style={{ margin: "6px 4px 0", fontSize: "12px", color: "var(--text-muted)" }}>{opt.highlightMessage}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          {selecionada && renovacaoPedida === null && (
+            <Button
+              variant="teal"
+              fullWidth
+              style={{ marginTop: "10px" }}
+              onClick={() => onPedirRenovacao(selecionada.minutes, selecionada.cents)}
+            >
+              Confirmar +{selecionada.minutes} min — {money(selecionada.cents)}
+            </Button>
+          )}
           <p style={{ margin: "16px 0 0", fontSize: "12px", color: "var(--text-muted)" }}>
-            {circuitoAnchorMessage()} O pagamento é confirmado na recepção na retirada — sem cobrança automática pelo
-            celular.
+            {circuitoAnchorMessage()} O valor é acertado com a equipe na retirada, no balcão — sem cobrança automática
+            pelo celular.
           </p>
         </Card>
       )}
@@ -316,28 +336,44 @@ function AcompanharConteudo({
         <Card>
           <p style={{ margin: "0 0 16px", fontSize: "15px" }}>{renewalIntro(planDurationMinutes, childFirstName)}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {RENEWAL_OPTIONS.map((opt) => (
-              <div key={opt.minutes}>
-                <Button
-                  variant={opt.highlight ? "primary" : "secondary"}
-                  fullWidth
-                  disabled={renovacaoPedida !== null}
-                  onClick={() => onPedirRenovacao(opt.minutes)}
-                >
-                  {renovacaoPedida === opt.minutes ? "Avisamos a recepção! 💛" : `+${opt.minutes} min — ${money(opt.cents)}`}
-                  {opt.highlight ? " · recomendado" : ""}
-                </Button>
-                {opt.highlight && (
-                  <p style={{ margin: "6px 4px 0", fontSize: "12px", color: "var(--text-muted)" }}>
-                    {renewalHighlightAnchor(planDurationMinutes)}
-                  </p>
-                )}
-              </div>
-            ))}
+            {RENEWAL_OPTIONS.map((opt) => {
+              const isSelected = selecionada?.minutes === opt.minutes;
+              return (
+                <div key={opt.minutes}>
+                  <Button
+                    variant={opt.highlight ? "primary" : "secondary"}
+                    fullWidth
+                    disabled={renovacaoPedida !== null}
+                    style={isSelected ? { outline: "3px solid var(--color-teal)", outlineOffset: "2px" } : undefined}
+                    onClick={() => setSelecionada(isSelected ? null : { minutes: opt.minutes, cents: opt.cents })}
+                  >
+                    {renovacaoPedida === opt.minutes
+                      ? "Avisamos a recepção! 💛"
+                      : `${isSelected ? "✓ " : ""}+${opt.minutes} min — ${money(opt.cents)}`}
+                    {opt.highlight ? " · recomendado" : ""}
+                  </Button>
+                  {opt.highlight && (
+                    <p style={{ margin: "6px 4px 0", fontSize: "12px", color: "var(--text-muted)" }}>
+                      {renewalHighlightAnchor(planDurationMinutes)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          {selecionada && renovacaoPedida === null && (
+            <Button
+              variant="teal"
+              fullWidth
+              style={{ marginTop: "10px" }}
+              onClick={() => onPedirRenovacao(selecionada.minutes, selecionada.cents)}
+            >
+              Confirmar +{selecionada.minutes} min — {money(selecionada.cents)}
+            </Button>
+          )}
           <p style={{ margin: "16px 0 0", fontSize: "12px", color: "var(--text-muted)" }}>
             Sem pressa: no balcão, o minuto avulso sai a {money(OVERAGE_RATE_CENTS_PER_MINUTE)} — renovar agora garante o
-            valor combinado. O pagamento é confirmado na recepção, sem cobrança automática pelo celular.
+            valor combinado. O valor é acertado com a equipe no balcão, sem cobrança automática pelo celular.
           </p>
         </Card>
       )}

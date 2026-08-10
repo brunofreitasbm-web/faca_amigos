@@ -514,7 +514,7 @@ export function PainelScreen() {
                 >
                   <Badge variant="solid_pink" title="O responsável pediu mais tempo pelo painel de acompanhamento no celular">
                     📱 Pediu +{pendingRenewals.get(session.id)!.minutes} min
-                    {pendingRenewals.get(session.id)!.cents != null ? ` — ${money(pendingRenewals.get(session.id)!.cents!)} via PIX` : ""}
+                    {pendingRenewals.get(session.id)!.cents != null ? ` — ${money(pendingRenewals.get(session.id)!.cents!)}` : ""}
                   </Badge>
                   <Button
                     variant="secondary"
