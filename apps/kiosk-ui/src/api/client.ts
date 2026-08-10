@@ -956,6 +956,15 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
 }
 
 export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: number): ActiveSessionEntry[] {
+  let clockOffsetMs = 0;
+  for (const s of raw.sessions) {
+    const checkinMs = s.checkin_at_ms as number;
+    if (checkinMs && checkinMs > nowMs + clockOffsetMs) {
+      clockOffsetMs = checkinMs - nowMs;
+    }
+  }
+  const effectiveNowMs = nowMs + clockOffsetMs;
+
   return raw.sessions.map((row) => {
     const usesHourBank = Boolean(row.uses_hour_bank);
     // Sessão de banco de horas: não existe plano vendido. O pseudo-plano
@@ -988,7 +997,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         pausedAtMs: (row.paused_at_ms as number | null) ?? null,
         pausedMsTotal: (row.paused_ms_total as number) ?? 0,
       },
-      nowMs,
+      effectiveNowMs,
     );
     return {
       session: {
