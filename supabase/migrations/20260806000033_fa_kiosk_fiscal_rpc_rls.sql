@@ -181,7 +181,10 @@ end;
 $$ language plpgsql security definer;
 
 -- fa_fiscal_request_cancel: única escrita de cliente na fila. Valida papel e
--- a janela legal de 30 minutos da NFC-e. Quem transmite o evento é o worker.
+-- a janela legal de cancelamento da NFC-e (confirmada com o contador em
+-- 24h — a reconfirmar tecnicamente contra o manual da SVRS na Fase 5, já
+-- que quem de fato aceita ou rejeita o evento é o webservice). Quem
+-- transmite o evento é o worker.
 create or replace function fa_fiscal_request_cancel(
   p_fiscal_doc_id uuid,
   p_employee_id uuid,
@@ -206,8 +209,8 @@ begin
     raise exception 'JUSTIFICATIVA_CURTA';
   end if;
 
-  if v_now_ms - coalesce(v_doc.authorized_at_ms, v_doc.created_at_ms) > 30 * 60 * 1000 then
-    raise exception 'FORA_DA_JANELA_DE_30_MIN';
+  if v_now_ms - coalesce(v_doc.authorized_at_ms, v_doc.created_at_ms) > 24 * 60 * 60 * 1000 then
+    raise exception 'FORA_DA_JANELA_DE_24H';
   end if;
 
   update fa_kiosk_fiscal_docs

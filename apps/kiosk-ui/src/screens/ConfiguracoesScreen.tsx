@@ -1958,6 +1958,8 @@ function ProdutoFiscalRow({ product, onSaved }: { product: ProductFiscal; onSave
   const [origem, setOrigem] = useState(String(product.origem ?? 0));
   const [unidadeComercial, setUnidadeComercial] = useState(product.unidade_comercial ?? "UN");
   const [gtin, setGtin] = useState(product.gtin ?? "SEM GTIN");
+  const [pisCst, setPisCst] = useState(product.pis_cst ?? "49");
+  const [cofinsCst, setCofinsCst] = useState(product.cofins_cst ?? "49");
 
   async function save() {
     setSaving(true);
@@ -1970,6 +1972,8 @@ function ProdutoFiscalRow({ product, onSaved }: { product: ProductFiscal; onSave
         origem: Number(origem),
         unidadeComercial,
         gtin,
+        pisCst,
+        cofinsCst,
       });
       toast.success(`Tributação de ${product.name} salva.`);
       setOpen(false);
@@ -2011,6 +2015,12 @@ function ProdutoFiscalRow({ product, onSaved }: { product: ProductFiscal; onSave
           </Select>
           <Input label="Unidade comercial" value={unidadeComercial} onChange={(e) => setUnidadeComercial(e.target.value)} />
           <Input label="GTIN / código de barras" value={gtin} onChange={(e) => setGtin(e.target.value)} />
+          <Input label="CST PIS" value={pisCst} onChange={(e) => setPisCst(e.target.value)} />
+          <Input label="CST COFINS" value={cofinsCst} onChange={(e) => setCofinsCst(e.target.value)} />
+          <HelpText style={{ margin: 0 }}>
+            04 = monofásico, revenda a alíquota zero (bebidas frias). 49 = outras operações — o padrão para itens que
+            não são monofásicos. Confirme com o contador antes de mudar.
+          </HelpText>
           <Button variant="primary" disabled={saving} onClick={save}>
             Salvar tributação
           </Button>

@@ -56,7 +56,7 @@ export interface NfceTransport {
   /** NfeConsulta, por chave de acesso — usado no catch-up após queda de rede. */
   consultarPorChave(chaveAcesso: string, ambiente: FiscalAmbiente): Promise<AutorizacaoResultado>;
 
-  /** RecepcaoEvento de cancelamento, dentro da janela legal de 30 minutos. */
+  /** RecepcaoEvento de cancelamento, dentro da janela legal de 24h (confirmada com o contador — reconfirmar contra o manual da SVRS na Fase 5). */
   cancelar(
     chaveAcesso: string,
     protocolo: string,
