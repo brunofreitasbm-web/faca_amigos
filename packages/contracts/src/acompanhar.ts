@@ -35,6 +35,8 @@ export const acompanharSessaoSchema = z.discriminatedUnion("status", [
     checkinAtMs: z.number().int().nonnegative(),
     pausedAtMs: z.number().int().nonnegative().nullable(),
     pausedMsTotal: z.number().int().nonnegative(),
+    /** Instante do servidor no momento da resposta — usado pelo cliente para corrigir o relógio local do celular. */
+    serverNowMs: z.number().int().nonnegative(),
     sensoryTags: z.array(z.string()),
     plan: acompanharPlanoSchema,
   }),

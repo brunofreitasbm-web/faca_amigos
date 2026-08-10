@@ -39,6 +39,13 @@ export function useAcompanhar(code: string | null): AcompanharResult {
   const [status, setStatus] = useState<AcompanharStatus>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const sessaoRef = useRef<AcompanharSessao | null>(null);
+  // serverNowMs (na resposta) - Date.now() (no instante em que a resposta
+  // chegou) — somado a todo Date.now() local do cronômetro para não
+  // depender do relógio do celular do responsável estar certo. Sem isso,
+  // um relógio de celular atrasado em relação ao servidor faz o elapsed
+  // (Date.now() - checkinAtMs) ficar negativo — travado em zero pelo
+  // Math.max(0, ...) — até o relógio do aparelho "alcançar" o checkin.
+  const clockOffsetMsRef = useRef(0);
 
   useEffect(() => {
     if (!code) return;
@@ -49,6 +56,9 @@ export function useAcompanhar(code: string | null): AcompanharResult {
       try {
         const data = await fetchAcompanharSessao(code!);
         if (cancelled) return;
+        if (data.status === "ATIVA" || data.status === "PAUSADA") {
+          clockOffsetMsRef.current = data.serverNowMs - Date.now();
+        }
         sessaoRef.current = data;
         setSessao(data);
         setStatus("ready");
@@ -79,7 +89,7 @@ export function useAcompanhar(code: string | null): AcompanharResult {
         computeSessionTiming(
           plan,
           { checkinAtMs: current.checkinAtMs, pausedAtMs: current.pausedAtMs, pausedMsTotal: current.pausedMsTotal },
-          Date.now(),
+          Date.now() + clockOffsetMsRef.current,
         ),
       );
     }
