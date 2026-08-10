@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, Input, Button, Tag, AsyncState, Badge } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
 import type { GerencialCliente, Unit } from "../../../api/client.js";
-import { formatPhoneBr } from "@facaamigos/domain";
+import { formatPhoneBr, dateBrFromIso } from "@facaamigos/domain";
 
 export function ClientesTab() {
   const [search, setSearch] = useState("");
@@ -161,7 +161,14 @@ export function ClientesTab() {
                       </Badge>
                     </td>
                     <td style={{ padding: "14px 8px", textAlign: "right" }}>
-                      <Button size="sm" variant="secondary" onClick={() => setSelectedCliente(c)}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCliente(c);
+                        }}
+                      >
                         Ver detalhes
                       </Button>
                     </td>
@@ -248,7 +255,7 @@ export function ClientesTab() {
                         <strong>🧒 {ch.fullName}</strong>
                         {ch.birthDate && (
                           <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-                            Nascido em: {new Date(ch.birthDate).toLocaleDateString("pt-BR")}
+                            Nascido em: {dateBrFromIso(ch.birthDate)}
                           </div>
                         )}
                       </div>
@@ -265,3 +272,4 @@ export function ClientesTab() {
     </div>
   );
 }
+

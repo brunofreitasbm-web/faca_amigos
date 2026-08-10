@@ -8,6 +8,7 @@ import { useAuth } from "../../../auth/AuthContext.js";
 import { ROLE_LABEL, ROLE_DESCRIPTION, FUNCTION_OPTIONS } from "../../../auth/capabilities.js";
 import { EspelhoPontoModal } from "../../../components/EspelhoPontoModal.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
+import { dateBrFromIso } from "@facaamigos/domain";
 
 export function ColaboradoresTab() {
   const toast = useToast();
@@ -481,7 +482,7 @@ export function ColaboradoresTab() {
                       {e.position || ROLE_LABEL[e.role]}
                       {e.cpf ? ` · CPF: ${e.cpf}` : ""}
                       {e.phone ? ` · Tel: ${e.phone}` : ""}
-                      {e.admission_date ? ` · Admitido: ${new Date(e.admission_date).toLocaleDateString("pt-BR")}` : ""}
+                      {e.admission_date ? ` · Admitido: ${dateBrFromIso(e.admission_date)}` : ""}
                     </div>
                     <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginTop: "2px" }}>
                       🗂️ {employeeUnitNames.length > 0 ? employeeUnitNames.join(", ") : "sem unidade atribuída"}
