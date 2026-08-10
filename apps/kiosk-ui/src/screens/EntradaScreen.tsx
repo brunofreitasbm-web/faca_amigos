@@ -852,12 +852,30 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
                 style={{
                   cursor: asset.status === "DISPONIVEL" ? "pointer" : "not-allowed",
                   opacity: asset.status === "DISPONIVEL" ? 1 : 0.4,
-                  padding: "14px",
+                  padding: "12px 14px",
                   borderRadius: "16px",
                   border: assetId === asset.id ? "2px solid var(--color-primary)" : "1px solid var(--border-subtle)",
                 }}
               >
-                <span style={{ fontSize: "26px" }}>{asset.emoji}</span> {asset.name}
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {asset.photo_url ? (
+                    <img
+                      src={asset.photo_url}
+                      alt={asset.name}
+                      style={{
+                        width: "36px",
+                        height: "36px",
+                        objectFit: "cover",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border-subtle)",
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: "26px" }}>{asset.emoji}</span>
+                  )}
+                  <span>{asset.name}</span>
+                </div>
               </Card>
             ))}
           </div>
