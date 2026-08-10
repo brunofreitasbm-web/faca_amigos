@@ -856,29 +856,30 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
                 style={{
                   cursor: asset.status === "DISPONIVEL" ? "pointer" : "not-allowed",
                   opacity: asset.status === "DISPONIVEL" ? 1 : 0.4,
-                  padding: "12px 14px",
+                  padding: "14px 18px",
                   borderRadius: "16px",
                   border: assetId === asset.id ? "2px solid var(--color-primary)" : "1px solid var(--border-subtle)",
+                  background: assetId === asset.id ? "rgba(240, 25, 107, 0.06)" : "var(--surface-card)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                   {asset.photo_url ? (
                     <img
                       src={asset.photo_url}
                       alt={asset.name}
                       style={{
-                        width: "36px",
-                        height: "36px",
+                        width: "64px",
+                        height: "64px",
                         objectFit: "cover",
-                        borderRadius: "8px",
+                        borderRadius: "12px",
                         border: "1px solid var(--border-subtle)",
                         flexShrink: 0,
                       }}
                     />
                   ) : (
-                    <span style={{ fontSize: "26px" }}>{asset.emoji}</span>
+                    <span style={{ fontSize: "42px", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "64px", height: "64px" }}>{asset.emoji}</span>
                   )}
-                  <span>{asset.name}</span>
+                  <span style={{ fontWeight: "var(--weight-bold)" as unknown as number, fontSize: "15px" }}>{asset.name}</span>
                 </div>
               </Card>
             ))}
