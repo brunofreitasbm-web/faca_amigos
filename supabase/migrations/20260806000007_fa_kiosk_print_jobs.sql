@@ -13,4 +13,8 @@ create table if not exists fa_kiosk_print_jobs (
 );
 create index if not exists idx_fa_kiosk_print_jobs_unit_status on fa_kiosk_print_jobs (unit_id, status);
 
-alter publication supabase_realtime add table fa_kiosk_print_jobs;
+do $$ begin
+  alter publication supabase_realtime add table fa_kiosk_print_jobs;
+exception when duplicate_object then null;
+          when undefined_object then null;
+end $$;

@@ -93,7 +93,11 @@ create index if not exists idx_fa_kiosk_fiscal_docs_queue
 create index if not exists idx_fa_kiosk_fiscal_docs_unit_status
   on fa_kiosk_fiscal_docs (unit_id, status);
 
-alter publication supabase_realtime add table fa_kiosk_fiscal_docs;
+do $$ begin
+  alter publication supabase_realtime add table fa_kiosk_fiscal_docs;
+exception when duplicate_object then null;
+          when undefined_object then null;
+end $$;
 
 -- Log append-only de cada requisição/resposta. Sem isto não se depura
 -- rejeição da SEFAZ nem se prova nada depois.
@@ -157,4 +161,8 @@ create table if not exists fa_kiosk_fiscal_terminal_status (
   last_error text
 );
 
-alter publication supabase_realtime add table fa_kiosk_fiscal_terminal_status;
+do $$ begin
+  alter publication supabase_realtime add table fa_kiosk_fiscal_terminal_status;
+exception when duplicate_object then null;
+          when undefined_object then null;
+end $$;

@@ -219,7 +219,11 @@ create table if not exists fa_kiosk_session_events (
 );
 create index if not exists idx_fa_kiosk_session_events_session on fa_kiosk_session_events (session_id, at_ms);
 
-alter publication supabase_realtime add table fa_kiosk_sessions;
+do $$ begin
+  alter publication supabase_realtime add table fa_kiosk_sessions;
+exception when duplicate_object then null;
+          when undefined_object then null;
+end $$;
 create table if not exists fa_kiosk_stock_movements (
   id uuid primary key default gen_random_uuid(),
   product_id uuid not null references fa_kiosk_products (id),
@@ -380,7 +384,11 @@ create table if not exists fa_kiosk_print_jobs (
 );
 create index if not exists idx_fa_kiosk_print_jobs_unit_status on fa_kiosk_print_jobs (unit_id, status);
 
-alter publication supabase_realtime add table fa_kiosk_print_jobs;
+do $$ begin
+  alter publication supabase_realtime add table fa_kiosk_print_jobs;
+exception when duplicate_object then null;
+          when undefined_object then null;
+end $$;
 -- Fase 3: suporte a reenvio idempotente quando o totem enfileira uma
 -- chamada localmente (IndexedDB) por causa de uma queda breve de rede e
 -- reenvia depois. Cada RPC transacional (fa_checkin, fa_checkout,
