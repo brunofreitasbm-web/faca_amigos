@@ -1421,5 +1421,9 @@ $$ language plpgsql security definer set search_path = public, extensions, pg_te
 
 revoke execute on function fa_kiosk_audit_log_hash_chain() from public, anon, authenticated;
 
+-- Exclusão de veículos descontinuados: Fusca Amarelo e Jipe Rosa
+delete from fa_kiosk_assets where name in ('Fusca Amarelo', 'Jipe Rosa');
+
+
 
 

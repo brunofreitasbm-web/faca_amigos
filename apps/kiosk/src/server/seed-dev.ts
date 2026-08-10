@@ -63,8 +63,8 @@ export function seedDevData(db: Db, nowMs: number): void {
   insertProduct(db, { id: uuidv7(nowMs), unit_id: graoParaId, name: "Suco de Fruta", description: "Caixinha 200ml", emoji: "🧃", price_cents: 700, stock: 30 }, nowMs);
 
   // Frota Carrinhos (Circuito)
-  insertAsset(db, { id: uuidv7(nowMs), unit_id: circuitoId, name: "Jipe Rosa", emoji: "🚙", color: "#F0196B", maintenance_threshold_hours: 200 }, nowMs);
-  insertAsset(db, { id: uuidv7(nowMs), unit_id: circuitoId, name: "Fusca Amarelo", emoji: "🚗", color: "#FFE234", maintenance_threshold_hours: 200 }, nowMs);
+  insertAsset(db, { id: uuidv7(nowMs), unit_id: circuitoId, name: "Buggy Azul", emoji: "🏎️", color: "#2ECFB5", maintenance_threshold_hours: 200 }, nowMs);
+  insertAsset(db, { id: uuidv7(nowMs), unit_id: circuitoId, name: "Moto Verde", emoji: "🏍️", color: "#1A3F35", maintenance_threshold_hours: 200 }, nowMs);
 
   // Cupons & Fidelidade
   insertCoupon(db, { id: uuidv7(nowMs), unit_id: playgroundId, code: "AMIGO10", kind: "MINUTOS_EXTRA", value: 10, max_uses: 0, description: "10 minutos extras — avaliação no Google" }, nowMs);

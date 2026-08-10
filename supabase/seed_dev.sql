@@ -88,9 +88,9 @@ with
   ),
   assets_seed as (
     insert into fa_kiosk_assets (unit_id, name, emoji, color, maintenance_threshold_hours)
-    select id, 'Jipe Rosa', '🚙', '#F0196B', 200 from circuito
+    select id, 'Buggy Azul', '🏎️', '#2ECFB5', 200 from circuito
     union all
-    select id, 'Fusca Amarelo', '🚗', '#FFE234', 200 from circuito
+    select id, 'Moto Verde', '🏍️', '#1A3F35', 200 from circuito
     returning 1
   ),
   coupons_seed as (

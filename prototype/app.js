@@ -145,8 +145,6 @@ const CART_EMOJI_OPTIONS = ["🚙", "🚗", "🏎️", "🏍️", "🏁", "🚜"
 const CART_COLOR_OPTIONS = ["#F0196B", "#2ECFB5", "#FFE234", "#C99020", "#1A3F35", "#3A4149", "#A020EE", "#FF7A00"];
 const PRODUCT_EMOJI_OPTIONS = ["💧", "🧦", "🧃", "🥐", "🍫", "🎈", "🧢", "🍭"];
 const DEFAULT_CARRINHOS = [
-  { name: "Jipe Rosa", emoji: "🚙", color: "#F0196B" },
-  { name: "Fusca Amarelo", emoji: "🚗", color: "#FFE234" },
   { name: "Buggy Azul", emoji: "🏎️", color: "#2ECFB5" },
   { name: "Moto Verde", emoji: "🏍️", color: "#1A3F35" },
   { name: "Kart Laranja", emoji: "🏁", color: "#FF7A00" },
