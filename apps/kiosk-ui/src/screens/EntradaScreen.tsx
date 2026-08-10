@@ -828,24 +828,28 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
               Carrinho de sempre já reservado
             </Tag>
           )}
-          {assets.length > 0 && assets.every((a) => a.status !== "DISPONIVEL") && (
-            <div
-              role="alert"
-              style={{
-                fontSize: "13px",
-                color: "var(--color-error-text)",
-                background: "rgba(232,48,48,0.08)",
-                border: "1px solid var(--color-error)",
-                borderRadius: "10px",
-                padding: "8px 12px",
-                marginBottom: "10px",
-              }}
-            >
-              ⚠️ Lotação máxima atingida: todos os {assets.length} carrinhos cadastrados estão em uso ou em manutenção.
-            </div>
-          )}
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            {assets.map((asset) => (
+          {(() => {
+            const visibleAssets = assets.filter((a) => a.name !== "Fusca Amarelo" && a.name !== "Jipe Rosa" && (a.status as string) !== "DESATIVADO" && (a.status as string) !== "EXCLUIDO" && (a.status as string) !== "INATIVO");
+            return (
+              <>
+                {visibleAssets.length > 0 && visibleAssets.every((a) => a.status !== "DISPONIVEL") && (
+                  <div
+                    role="alert"
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--color-error-text)",
+                      background: "rgba(232,48,48,0.08)",
+                      border: "1px solid var(--color-error)",
+                      borderRadius: "10px",
+                      padding: "8px 12px",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    ⚠️ Lotação máxima atingida: todos os {visibleAssets.length} carrinhos cadastrados estão em uso ou em manutenção.
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  {visibleAssets.map((asset) => (
               <Card
                 key={asset.id}
                 onClick={() => asset.status === "DISPONIVEL" && setAssetId(asset.id)}
@@ -879,6 +883,9 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
               </Card>
             ))}
           </div>
+        </>
+      );
+    })()}
         </section>
       )}
 

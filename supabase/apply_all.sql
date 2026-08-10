@@ -570,7 +570,7 @@ begin
   if total_visits = 0 then return null; end if;
 
   select count(*) into recent_visits from fa_kiosk_visit_log
-    where child_id = p_child_id and (p_now_ms - at_ms) <= 60 * 24 * 60 * 60000;
+    where child_id = p_child_id and (p_now_ms - at_ms) <= 5184000000;
 
   if recent_visits > 8 then
     return jsonb_build_object('tier', 'VIP', 'totalVisits', total_visits, 'recentVisits', recent_visits,
