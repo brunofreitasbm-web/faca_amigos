@@ -14,10 +14,6 @@ abaixo fecham isso; o front novo exige login por PIN. Um sem o outro não anda.
 
 ## 0. Antes de tudo (pode ir sozinho, hoje)
 
-- [ ] **Backoffice**: o guard de autenticação em
-      `apps/backoffice/src/lib/supabase/middleware.ts` foi reativado — estava
-      comentado, o que deixava o painel administrativo **público na internet**.
-      Publique esta correção imediatamente, mesmo que o resto espere.
 - [ ] Confirme que existe **pelo menos um colaborador com `role = 'ADMIN'` e
       `active = true`**, com PIN cadastrado em `fa_kiosk_local_credentials`:
 
