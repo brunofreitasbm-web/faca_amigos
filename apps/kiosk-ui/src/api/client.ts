@@ -2,7 +2,7 @@ import { quoteForSession } from "@facaamigos/domain";
 import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
-import { compressImageForUpload } from "../lib/imageCompression.js";
+import { assertValidImageUpload, compressImageForUpload } from "../lib/imageCompression.js";
 
 export interface ApiError {
   error: string;
@@ -1415,6 +1415,7 @@ export const Api = {
   // mas comprimida antes: foto de câmera sem redimensionar chegava a vários
   // MB por envelope e inflava o Storage sem necessidade (ver imageCompression.ts).
   uploadEnvelopePhoto: async (unitId: string, file: File): Promise<string> => {
+    assertValidImageUpload(file);
     const optimized = await compressImageForUpload(file);
     const ext = optimized.type === "image/png" ? "png" : "jpg";
     const path = `${unitId}/${Date.now()}.${ext}`;
@@ -1927,6 +1928,7 @@ export const Api = {
   // fa_kiosk_temp_anon_read). Exibir a foto de volta exigiria uma signed URL,
   // fora do escopo deste formulário.
   uploadChildPhoto: async (childId: string, photo: Blob): Promise<void> => {
+    assertValidImageUpload(photo);
     const path = `${childId}/${Date.now()}.jpg`;
     const { error: uploadError } = await supabase().storage.from("crianca-fotos").upload(path, photo, {
       contentType: "image/jpeg",
@@ -1939,6 +1941,7 @@ export const Api = {
   // fa_kiosk_asset_photos) — aceita apenas JPG/PNG, nome do arquivo prefixado
   // com timestamp para evitar colisão ao trocar a foto de um mesmo carrinho.
   uploadAssetPhoto: async (unitId: string, file: File): Promise<string> => {
+    assertValidImageUpload(file);
     const ext = file.type === "image/png" ? "png" : "jpg";
     const path = `${unitId}/${Date.now()}.${ext}`;
     const { error } = await supabase().storage.from("carrinho-fotos").upload(path, file, {

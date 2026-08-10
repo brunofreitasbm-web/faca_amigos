@@ -44,3 +44,25 @@ export function preflight(req: Request): Response | null {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
   return null;
 }
+
+/**
+ * Trava webhooks públicos (google-review, etc.) atrás de um segredo
+ * compartilhado configurado via `supabase secrets set <envVarName>=...` e
+ * enviado pelo chamador (Zapier/Make/n8n) no header `x-webhook-secret`.
+ * Sem essa checagem, qualquer um com a URL da function (que é pública por
+ * natureza) podia disparar o efeito colateral do webhook diretamente.
+ * Falha fechado: se o secret não estiver configurado no projeto, toda
+ * chamada é recusada em vez de aceitar sem verificação.
+ */
+export function requireWebhookSecret(req: Request, envVarName: string): Response | null {
+  const expected = Deno.env.get(envVarName);
+  if (!expected) {
+    console.error(`${envVarName} não configurado — recusando chamada por padrão seguro`);
+    return jsonResponse(req, { error: "webhook não configurado" }, 503);
+  }
+  const provided = req.headers.get("x-webhook-secret");
+  if (provided !== expected) {
+    return jsonResponse(req, { error: "não autorizado" }, 401);
+  }
+  return null;
+}

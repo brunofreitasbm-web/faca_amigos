@@ -6,6 +6,26 @@
 const MAX_DIMENSION = 1280;
 const JPEG_QUALITY = 0.72;
 
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // acompanha o file_size_limit dos buckets no Supabase
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/**
+ * `file.type` vem do navegador (a partir da extensão/sniffing do cliente),
+ * não é prova de conteúdo — mas barrar aqui evita o caso comum de anexar
+ * algo que não é imagem por engano, e principalmente evita gravar esse
+ * `file.type` sem checagem como content-type servido pelo bucket público
+ * (ver correção da auditoria de 2026-08-10, item 7: sem essa validação, um
+ * upload com file.type "text/html" era aceito e servido de volta como tal).
+ */
+export function assertValidImageUpload(file: Blob): void {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error("Selecione uma imagem JPG, PNG ou WEBP.");
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error("A imagem deve ter no máximo 8MB.");
+  }
+}
+
 export async function compressImageForUpload(file: File): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
 

@@ -46,7 +46,21 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
     opts.tls ? Fastify({ logger: true, https: { key: opts.tls.key, cert: opts.tls.cert } }) : Fastify({ logger: true })
   ) as FastifyInstance;
 
-  await app.register(cors, { origin: true });
+  // Servidor local: o Electron carrega 127.0.0.1 e os tablets da LAN se
+  // conectam pelo IP da máquina numa rede sem DHCP fixo, então uma
+  // allowlist de origens exatas não dá — mas `origin: true` (correção da
+  // auditoria de 2026-08-10, item 8) ecoava QUALQUER origem, inclusive um
+  // site malicioso aberto no navegador de alguém na mesma rede, que podia
+  // então falar com este servidor via CORS. Restringe a localhost e às
+  // faixas de IP privado (RFC 1918) onde a LAN do quiosque de fato vive.
+  const LAN_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+  await app.register(cors, {
+    origin: (origin, cb) => {
+      // Sem header Origin (chamada nativa do Electron, curl, etc.) ou LAN privada: permite.
+      if (!origin || LAN_ORIGIN_RE.test(origin)) return cb(null, true);
+      cb(new Error("Origem não permitida"), false);
+    },
+  });
   await app.register(websocket);
 
   app.setErrorHandler((err, _req, reply) => {

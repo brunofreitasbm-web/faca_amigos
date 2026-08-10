@@ -1,5 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { jsonResponse, preflight } from "../_shared/http.ts";
+import { jsonResponse, preflight, requireWebhookSecret } from "../_shared/http.ts";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface WebhookBody {
   guardian_id: string;
@@ -10,6 +12,9 @@ Deno.serve(async (req) => {
   if (pre) return pre;
   if (req.method !== "POST") return jsonResponse(req, { error: "method_not_allowed" }, 405);
 
+  const secretRejection = requireWebhookSecret(req, "GOOGLE_REVIEW_WEBHOOK_SECRET");
+  if (secretRejection) return secretRejection;
+
   let body: WebhookBody;
   try {
     body = await req.json();
@@ -17,13 +22,26 @@ Deno.serve(async (req) => {
     return jsonResponse(req, { error: "corpo inválido" }, 400);
   }
 
-  if (!body.guardian_id) {
-    return jsonResponse(req, { error: "guardian_id não fornecido" }, 400);
+  if (!body.guardian_id || !UUID_RE.test(body.guardian_id)) {
+    return jsonResponse(req, { error: "guardian_id inválido" }, 400);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+  const { data: guardianData, error: guardianError } = await adminClient
+    .from("fa_kiosk_guardians")
+    .select("id")
+    .eq("id", body.guardian_id)
+    .maybeSingle();
+
+  if (guardianError) {
+    return jsonResponse(req, { error: "erro ao verificar responsável" }, 500);
+  }
+  if (!guardianData) {
+    return jsonResponse(req, { error: "responsável não encontrado" }, 404);
+  }
 
   const { data: unitData, error: unitError } = await adminClient
     .from("fa_kiosk_units")
