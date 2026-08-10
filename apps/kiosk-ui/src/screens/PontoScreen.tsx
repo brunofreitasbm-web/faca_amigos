@@ -52,7 +52,13 @@ export function PontoScreen() {
   }, [authedAs, message]);
 
   async function bater(kind: (typeof KINDS)[number]["value"]) {
-    if (!authedAs || !unit) return;
+    // Guarda extra contra duplo clique/double-tap: `disabled={busy}` no
+    // botão já cobre o caso normal, mas dois eventos de clique disparados
+    // antes do primeiro re-render (comum em touch) chamariam bater() duas
+    // vezes. A garantia real está no servidor (fa_register_ponto recusa
+    // marcação repetida em <5s); isto aqui só evita a segunda chamada de
+    // rede desnecessária.
+    if (busy || !authedAs || !unit) return;
     setBusy(true);
     try {
       const res = await Api.ponto({ unitId: unit.id, employeeId: authedAs.id, kind, registeredByEmployeeId: authedAs.id });

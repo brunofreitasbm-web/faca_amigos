@@ -173,7 +173,8 @@ export function FolhaPagamentoTab() {
     setLoading(true);
     setError(null);
     try {
-      const res = await Api.getFolhaPagamentoData(selectedUnitId, year, month);
+      const timezone = units.find((u) => u.id === selectedUnitId)?.timezone ?? undefined;
+      const res = await Api.getFolhaPagamentoData(selectedUnitId, year, month, timezone);
       setEmployees(res.employees);
       setRuns(res.runs);
       setClosedRun(res.closedRun);
@@ -184,7 +185,7 @@ export function FolhaPagamentoTab() {
     } finally {
       setLoading(false);
     }
-  }, [selectedUnitId, year, month]);
+  }, [selectedUnitId, year, month, units]);
 
 
   useEffect(() => {

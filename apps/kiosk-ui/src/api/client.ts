@@ -51,6 +51,7 @@ export interface Unit {
   address?: string | null;
   phone?: string | null;
   cnpj?: string | null;
+  timezone?: string | null;
 }
 
 export interface Birthday {
@@ -1036,7 +1037,7 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
 export const Api = {
   units: () =>
     unwrap<Unit[]>(
-      supabase().from("fa_kiosk_units").select("id, kind, name, business_day_cutoff_hour, address, phone, cnpj"),
+      supabase().from("fa_kiosk_units").select("id, kind, name, business_day_cutoff_hour, address, phone, cnpj, timezone"),
     ),
   employees: () =>
     unwrap<Employee[]>(
@@ -2261,8 +2262,8 @@ export const Api = {
       } satisfies SessionAudit;
     });
   },
-  getFolhaPagamentoData: async (unitId: string, year: number, month: number) => {
-    const { fromMs, toMs } = monthRangeMs(year, month);
+  getFolhaPagamentoData: async (unitId: string, year: number, month: number, timezone?: string) => {
+    const { fromMs, toMs } = monthRangeMs(year, month, timezone);
     let tablesMissing = false;
     const [employees, payrollInfos, pontoRecords, runs] = await Promise.all([
       unwrap<Record<string, unknown>[]>(

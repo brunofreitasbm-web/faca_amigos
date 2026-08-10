@@ -130,7 +130,7 @@ export function ConfiguracoesScreen() {
           {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
           {tab === "META" && <MetaTab unitId={unit.id} />}
           {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
-          {tab === "PONTO" && <EspelhoPontoTab />}
+          {tab === "PONTO" && <EspelhoPontoTab unitId={unit.id} />}
           {tab === "UNIDADE" && <UnidadeTab unitId={unit.id} />}
           {tab === "FISCAL" && <FiscalTab unitId={unit.id} />}
           {tab === "TERMOS" && <TermosTab unitId={unit.id} />}
@@ -1341,13 +1341,17 @@ const CONTRACT_TYPE_LABEL: Record<NonNullable<Employee["contract_type"]>, string
  * desligar colaborador não é — misturar as duas na mesma aba abriria a
  * segunda para quem só deveria ter a primeira.
  */
-function EspelhoPontoTab() {
+function EspelhoPontoTab({ unitId }: { unitId: string }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [espelhoTarget, setEspelhoTarget] = useState<Employee | null>(null);
 
   useEffect(() => {
-    Api.allEmployees().then(setEmployees);
-  }, []);
+    // Escopo por unidade: esta tela é a versão de Configurações (por
+    // unidade) do espelho de ponto, usada pelo Líder — que só deve ver
+    // colaboradores da própria unidade. A visão cross-unit já existe
+    // separadamente em Gerencial > Colaboradores > 📄 Ponto (Owner).
+    Api.allEmployees().then((all) => setEmployees(all.filter((e) => e.unitIds?.includes(unitId))));
+  }, [unitId]);
 
   return (
     <div>

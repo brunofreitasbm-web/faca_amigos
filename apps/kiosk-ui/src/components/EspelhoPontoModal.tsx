@@ -113,14 +113,38 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Mês/ano selecionado ainda não ocorreu — nem vale chamar a API (que
+  // devolveria uma tabela vazia, parecendo um bug em vez de "mês futuro").
+  const isFutureMonth = year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1);
+
   useEffect(() => {
+    if (isFutureMonth) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    // Troca rápida de mês/ano (vários cliques seguidos) não pode deixar a
+    // resposta de uma seleção antiga sobrescrever a da seleção atual —
+    // ignora qualquer resultado que chegue depois de `year`/`month` já
+    // terem mudado de novo.
+    let cancelled = false;
     setLoading(true);
     setError(null);
     Api.espelhoPonto(employee.id, year, month)
-      .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Não foi possível gerar o espelho de ponto"))
-      .finally(() => setLoading(false));
-  }, [employee.id, year, month]);
+      .then((res) => {
+        if (!cancelled) setData(res);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Não foi possível gerar o espelho de ponto");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [employee.id, year, month, isFutureMonth]);
 
   const rows = useMemo(() => (data ? buildDayRows(data) : []), [data]);
 
@@ -216,6 +240,7 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
         </Button>
       </div>
 
+      {isFutureMonth && <p style={{ color: "var(--text-muted)" }}>Este mês ainda não decorreu — escolha um mês já passado ou o atual.</p>}
       {loading && <p style={{ color: "var(--text-muted)" }}>Carregando…</p>}
       {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
 
