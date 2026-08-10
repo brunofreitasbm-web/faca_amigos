@@ -34,6 +34,7 @@ export function useConnectionStatus(): ConnectionState {
         return;
       }
       const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
       if (!base) {
         setStatus("online");
         return;
@@ -41,7 +42,15 @@ export function useConnectionStatus(): ConnectionState {
       try {
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), PING_TIMEOUT_MS);
-        const res = await fetch(`${base}/auth/v1/health`, { cache: "no-store", signal: ctrl.signal });
+        const headers: Record<string, string> = {};
+        if (key) {
+          headers["apikey"] = key;
+        }
+        const res = await fetch(`${base}/auth/v1/health`, {
+          cache: "no-store",
+          signal: ctrl.signal,
+          headers,
+        });
         clearTimeout(timeout);
         if (!cancelled) setStatus(res.ok ? "online" : "degraded");
       } catch {
