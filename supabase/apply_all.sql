@@ -354,7 +354,7 @@ begin
   select self_hash into last_hash from fa_kiosk_audit_log order by at_ms desc, id desc limit 1;
   new.prev_hash := last_hash;
   new.self_hash := encode(
-    digest((coalesce(last_hash, '') || new.id::text || new.at_ms::text || new.action || coalesce(new.details_json::text, ''))::bytea, 'sha256'),
+    digest(convert_to(coalesce(last_hash, '') || new.id::text || new.at_ms::text || new.action || coalesce(new.details_json::text, ''), 'UTF8'), 'sha256'),
     'hex'
   );
   return new;

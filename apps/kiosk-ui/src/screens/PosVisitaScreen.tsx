@@ -36,7 +36,10 @@ export function PosVisitaScreen() {
 
   useEffect(() => {
     fetch(`/api/pos-visita?unitId=${unit?.id || ""}`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
       .then((data) => {
         if (data.items) setItems(data.items);
       })
@@ -49,7 +52,10 @@ export function PosVisitaScreen() {
       });
 
     fetch("/api/pos-visita/templates")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
       .then((data) => {
         if (data.templates) setTemplates(data.templates);
       })
@@ -145,10 +151,14 @@ export function PosVisitaScreen() {
             onClick={() => {
               const randomSeed = Math.floor(Math.random() * 3000);
               fetch(`/api/pos-visita/templates?seed=${randomSeed}`)
-                .then((res) => res.json())
+                .then((res) => {
+                  if (!res.ok) throw new Error("HTTP " + res.status);
+                  return res.json();
+                })
                 .then((data) => {
                   if (data.templates) setTemplates(data.templates);
-                });
+                })
+                .catch(() => {});
             }}
             style={{ fontSize: "13px", fontWeight: "600" }}
           >
