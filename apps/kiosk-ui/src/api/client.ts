@@ -903,6 +903,16 @@ export interface ActiveSessionsRaw {
   childById: Map<string, Record<string, unknown>>;
   /** Saldo de pacote ainda válido, por responsável (minutos). */
   packageBalanceByGuardian: Map<string, number>;
+  /**
+   * serverNowMs (no momento da busca) - Date.now() (no instante em que a
+   * resposta chegou). Somado a todo Date.now() local do cronômetro do
+   * painel para não depender do relógio do tablet do kiosk estar certo —
+   * mesma correção de useAcompanhar.ts (ver 20260810000011). Sem isso, um
+   * relógio de tablet atrasado em relação ao servidor faz elapsedMs
+   * (Date.now() - checkinAtMs) ficar negativo — travado em zero pelo
+   * Math.max(0, ...) — até o relógio do aparelho "alcançar" o checkin.
+   */
+  clockOffsetMs: number;
 }
 
 /**
@@ -912,9 +922,12 @@ export interface ActiveSessionsRaw {
  * substitui o antigo canal WS de 1Hz) sem refazer a consulta ao banco.
  */
 export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSessionsRaw> {
-  const sessions = await unwrap<Record<string, unknown>[]>(
-    supabase().from("fa_kiosk_sessions").select("*").eq("unit_id", unitId).eq("status", "ATIVA"),
-  );
+  const [sessions, clockOffsetMs] = await Promise.all([
+    unwrap<Record<string, unknown>[]>(
+      supabase().from("fa_kiosk_sessions").select("*").eq("unit_id", unitId).eq("status", "ATIVA"),
+    ),
+    fetchClockOffsetMs(),
+  ]);
   if (sessions.length === 0)
     return {
       sessions: [],
@@ -923,6 +936,7 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
       assetById: new Map(),
       childById: new Map(),
       packageBalanceByGuardian: new Map(),
+      clockOffsetMs,
     };
 
   // Sessões de banco de horas não têm plano (plan_id nulo) — não entram
@@ -952,18 +966,27 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
     assetById: new Map(assets.map((a) => [a.id as string, a])),
     childById: new Map(children.map((c) => [c.id as string, c])),
     packageBalanceByGuardian: new Map(balances.map((b) => [b.guardian_id, b.remaining_minutes])),
+    clockOffsetMs,
   };
 }
 
-export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: number): ActiveSessionEntry[] {
-  let clockOffsetMs = 0;
-  for (const s of raw.sessions) {
-    const checkinMs = s.checkin_at_ms as number;
-    if (checkinMs && checkinMs > nowMs + clockOffsetMs) {
-      clockOffsetMs = checkinMs - nowMs;
-    }
+/**
+ * Offset entre o relógio do servidor e o do tablet do kiosk, medido uma
+ * vez por busca. Se a RPC falhar por qualquer motivo, cai para offset 0
+ * (comportamento antigo) em vez de quebrar o painel inteiro.
+ */
+async function fetchClockOffsetMs(): Promise<number> {
+  try {
+    const deviceNowMs = Date.now();
+    const serverNowMs = await unwrap<number>(supabase().rpc("fa_now_ms"));
+    return serverNowMs - deviceNowMs;
+  } catch {
+    return 0;
   }
-  const effectiveNowMs = nowMs + clockOffsetMs;
+}
+
+export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: number): ActiveSessionEntry[] {
+  const effectiveNowMs = nowMs + (raw.clockOffsetMs ?? 0);
 
   return raw.sessions.map((row) => {
     const usesHourBank = Boolean(row.uses_hour_bank);
