@@ -128,13 +128,13 @@ body {
 }
 
 .painel-card-thumb-img {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
 }
 
 .painel-card-thumb-emoji {
-  font-size: 32px;
-  line-height: 44px;
+  font-size: 38px;
+  line-height: 56px;
 }
 
 /* Abaixo de ~210px de card, foto e texto lado a lado não cabem sem picotar
