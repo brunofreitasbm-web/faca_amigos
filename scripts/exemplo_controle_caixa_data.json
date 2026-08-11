@@ -1,0 +1,68 @@
+[
+  {
+    "guardian": {
+      "legacy_id": "RESP-001",
+      "full_name": "Mariana Silva Santos",
+      "cpf": "12345678901",
+      "phone_e164": "+5591988887777",
+      "notes": "Cliente frequente do quiosque de Belém"
+    },
+    "child": {
+      "legacy_id": "CRIA-001",
+      "full_name": "Lucas Silva Santos",
+      "birth_date": "2019-05-14",
+      "inclusive_eligible": true,
+      "notes": "Sensibilidade auditiva (TEA) — preferência por abafador"
+    },
+    "session": {
+      "legacy_id": "SESS-20260701-01",
+      "activity": "PLAYGROUND",
+      "wristband_code": "P-101",
+      "ticket_code": "T-101",
+      "checkin_at_ms": 1782820000000,
+      "checkout_at_ms": 1782823600000,
+      "business_date": "2026-07-01",
+      "operator": "Ana Clara (Operador PDV)",
+      "duration_minutes": 60,
+      "overtime_minutes": 0
+    },
+    "payment": {
+      "legacy_id": "PAG-20260701-01",
+      "method": "PIX",
+      "amount_cents": 5000
+    }
+  },
+  {
+    "guardian": {
+      "legacy_id": "RESP-002",
+      "full_name": "Carlos Eduardo Oliveira",
+      "cpf": "98765432100",
+      "phone_e164": "+5591999991111",
+      "notes": "Preferência por pagamento em cartão"
+    },
+    "child": {
+      "legacy_id": "CRIA-002",
+      "full_name": "Sofia Oliveira",
+      "birth_date": "2021-11-20",
+      "inclusive_eligible": false,
+      "notes": "Sem restrições declaradas"
+    },
+    "session": {
+      "legacy_id": "SESS-20260702-05",
+      "activity": "CARRINHO",
+      "wristband_code": "C-205",
+      "ticket_code": "T-205",
+      "checkin_at_ms": 1782906400000,
+      "checkout_at_ms": 1782908200000,
+      "business_date": "2026-07-02",
+      "operator": "Bruno Freitas (Gerente)",
+      "duration_minutes": 30,
+      "overtime_minutes": 5
+    },
+    "payment": {
+      "legacy_id": "PAG-20260702-05",
+      "method": "CREDITO",
+      "amount_cents": 3500
+    }
+  }
+]
