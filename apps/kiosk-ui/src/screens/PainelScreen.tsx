@@ -31,6 +31,14 @@ const PAUSE_REASONS: Array<{ value: string; label: string }> = [
 // pisca depois desse limite, igual ao alerta de excedente.
 const PAUSE_ALERT_MS = 10 * 60_000;
 
+// Gradiente do infinito colorido — símbolo da neurodiversidade preferido
+// pela comunidade autista hoje (ao contrário da peça de quebra-cabeça azul
+// da Autism Speaks). Opacidade baixa de propósito: o fundo é o sinal
+// visual de apoio, o texto do card (nome, pulseira, plano) continua sendo
+// a informação principal e precisa ler exatamente igual em cima dele.
+const NEURODIVERGENT_GRADIENT =
+  "linear-gradient(135deg, rgba(237,28,36,0.12) 0%, rgba(255,140,0,0.12) 20%, rgba(255,222,0,0.12) 40%, rgba(0,166,81,0.12) 60%, rgba(0,120,215,0.12) 80%, rgba(146,39,204,0.12) 100%)";
+
 /**
  * Painel do parque (seção 1.3/6 do plano): contagem ascendente,
  * cor por fase, seleção de mais de 1 card para famílias com mais de
@@ -340,6 +348,21 @@ export function PainelScreen() {
           // circulam no pulso de quem entrou naquele dia.
           const wristbandCode = session.access_code || session.wristband_code || session.id.slice(0, 6).toUpperCase();
           const careSummary = [...(session.sensory_tags ?? []), session.notes].filter(Boolean).join(" · ");
+          // Mesmo critério do checkbox "Criança neurodivergente" na Entrada
+          // (ver EntradaScreen.tsx) — aqui não há um campo próprio, o sinal
+          // é ter alguma tag sensorial ou observação de cuidado registrada.
+          const isNeurodivergent = (session.sensory_tags?.length ?? 0) > 0 || !!session.notes;
+          // background aceita múltiplas camadas separadas por vírgula, pintadas
+          // de cima para baixo; o overlay de pausa/seleção (uma cor sólida
+          // "achatada" em gradiente) fica por cima do arco-íris, que fica por
+          // cima da cor base do card — assim os dois sinais convivem.
+          const cardBackground = [
+            isPaused ? "linear-gradient(rgba(201, 144, 32, 0.06), rgba(201, 144, 32, 0.06))" : isSelected ? "linear-gradient(rgba(240, 25, 107, 0.04), rgba(240, 25, 107, 0.04))" : null,
+            isNeurodivergent ? NEURODIVERGENT_GRADIENT : null,
+            "var(--surface-card)",
+          ]
+            .filter(Boolean)
+            .join(", ");
 
           return (
             <Card
@@ -383,7 +406,7 @@ export function PainelScreen() {
                   ? "3px solid var(--color-error)"
                   : "1px solid var(--border-subtle)",
                 borderLeft: `6px solid ${plan?.color ?? "var(--border-subtle)"}`,
-                background: isPaused ? "rgba(201, 144, 32, 0.06)" : isSelected ? "rgba(240, 25, 107, 0.04)" : "var(--surface-card)",
+                background: cardBackground,
                 opacity: isPaused ? 0.85 : 1,
               }}
             >
