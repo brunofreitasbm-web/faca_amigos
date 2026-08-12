@@ -18,23 +18,33 @@ setInterval(() => void flushOfflineQueue(), 30_000);
 void flushOfflineQueue();
 
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
+import { SecretVaultReader } from "./screens/SecretVaultReader.js";
 
 const container = document.getElementById("root");
 if (!container) throw new Error("#root não encontrado");
+
+const pathname = window.location.pathname;
+const isSecretRoute = pathname.startsWith("/segredo/");
+const secretId = isSecretRoute ? pathname.split("/segredo/")[1]?.split("?")[0] : null;
 
 createRoot(container).render(
   <StrictMode>
     <ErrorBoundary>
       <ToastProvider>
         <ConfirmProvider>
-          <AuthProvider>
-            <AppStateProvider>
-              <App />
-            </AppStateProvider>
-          </AuthProvider>
+          {isSecretRoute && secretId ? (
+            <SecretVaultReader secretId={secretId} />
+          ) : (
+            <AuthProvider>
+              <AppStateProvider>
+                <App />
+              </AppStateProvider>
+            </AuthProvider>
+          )}
           <SystemStatusOverlay />
         </ConfirmProvider>
       </ToastProvider>
     </ErrorBoundary>
   </StrictMode>,
 );
+

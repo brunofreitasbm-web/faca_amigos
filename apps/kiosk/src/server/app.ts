@@ -15,6 +15,8 @@ import { registerReportRoutes } from "./routes/reports.js";
 import { registerPosVisitaRoutes } from "./routes/pos-visita.js";
 import { registerAniversariosRoutes } from "./routes/aniversarios.js";
 import { registerCaixaFaRoutes } from "./routes/caixa-fa.js";
+import { registerShoppingRoutes } from "./routes/shopping.js";
+import { registerSecretVaultRoutes } from "./routes/secret-vault.js";
 import { registerTickChannel } from "./ws-tick.js";
 import { registerStaticSpa } from "./staticSpa.js";
 import { ValidationError, ConflictError } from "./validate.js";
@@ -88,9 +90,13 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
   registerPosVisitaRoutes(app, ctx);
   registerAniversariosRoutes(app, ctx);
   registerCaixaFaRoutes(app, ctx);
+  registerShoppingRoutes(app, ctx);
+  registerSecretVaultRoutes(app, ctx);
   registerTickChannel(app, ctx);
 
   if (opts.uiDist) await registerStaticSpa(app, opts.uiDist);
 
   return app;
 }
+
+

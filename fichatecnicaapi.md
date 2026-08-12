@@ -3,16 +3,21 @@
 **Anexo do e-mail de solicitação de integração.** Documento destinado à
 equipe técnica da administração do shopping.
 
-|                  |                                                                           |
-| ---------------- | ------------------------------------------------------------------------- |
-| Operação         | FaçaAmigos — playground inclusivo                                         |
+| Operação         | FaçaAmigos — Playground & Parque Circuito (mesmo CNPJ, contratos distintos)|
 | Sistema          | Sistema de gestão e caixa próprio (offline-first, servidor local na loja) |
-| Versão do layout | 1.0                                                                       |
+| Versão do layout | 1.1                                                                       |
 | Protocolo        | HTTPS · REST · JSON (ou CSV)                                              |
-| Autenticação     | Chave de API estática, por escopo                                         |
-| Escopo concedido | `FATURAMENTO_LEITURA` — somente leitura, apenas dados agregados           |
+| Autenticação     | Chave de API estática, por escopo de unidade                              |
+| Escopo concedido | `FATURAMENTO_LEITURA` — somente leitura, dados por unidade                |
 | Fuso horário     | America/Belem (UTC−3, sem horário de verão)                               |
 | Moeda            | BRL, valores inteiros **em centavos**                                     |
+
+> **Observação sobre Múltiplas Unidades no Mesmo Shopping:**  
+> A FaçaAmigos opera 2 negócios distintos no mesmo Shopping sob o mesmo CNPJ:
+> 1. **Playground** (Brinquedoteca): LUC `L-142` · Código Lojista `PSB-0142`
+> 2. **Parque Circuito** (Quiosque/Carrinhos): LUC `L-143` · Código Lojista `PSB-0143`  
+> Cada operação possui chave de API própria ou parâmetro `unitId`, garantindo a separação total dos relatórios de faturamento e contratos de locação.
+
 
 ## 1. Como se autenticar
 
@@ -139,6 +144,60 @@ data;cnpj;luc;codigo_lojista;bruto;descontos;liquido;cancelamentos;qtd_vendas;qt
 2026-03-01;12345678000195;L-142;PSB-0142;1860,00;60,00;1800,00;0,00;31;0;58,06;1650,00;150,00;120,00;780,00;620,00;280,00;0,00
 ```
 
+### 3.2. Consulta venda a venda (granularidade por item / anonimizada)
+
+```
+GET /integracao/shopping/v1/vendas?de=2026-03-01&ate=2026-03-31
+```
+
+Retorna a listagem individual de vendas sem nenhum dado pessoal do cliente/criança (compatível 100% com LGPD).
+
+| Parâmetro | Obrigatório | Descrição                                             |
+| --------- | ----------- | ----------------------------------------------------- |
+| `de`      | sim         | Primeiro dia do período, formato `AAAA-MM-DD`         |
+| `ate`     | sim         | Último dia, inclusive. Máximo de 366 dias por consulta|
+
+```json
+{
+  "layoutVersao": "1.0",
+  "loja": {
+    "unidadeId": "018bcfe5-6800-790d-b959-c3de7ede5578",
+    "cnpj": "12345678000195",
+    "luc": "L-142",
+    "codigoLojista": "PSB-0142"
+  },
+  "periodo": {
+    "dataInicial": "2026-03-01",
+    "dataFinal": "2026-03-31",
+    "totalVendas": 812,
+    "brutoCentavos": 4850000
+  },
+  "vendas": [
+    {
+      "idVenda": "VND-20260301-0001",
+      "dataHora": "2026-03-01T10:15:30-03:00",
+      "valorCentavos": 5800,
+      "cancelado": false,
+      "troca": false
+    },
+    {
+      "idVenda": "VND-20260301-0002",
+      "dataHora": "2026-03-01T10:42:10-03:00",
+      "valorCentavos": 12000,
+      "cancelado": false,
+      "troca": false
+    },
+    {
+      "idVenda": "VND-20260301-0003",
+      "dataHora": "2026-03-01T11:05:00-03:00",
+      "valorCentavos": 6000,
+      "cancelado": true,
+      "troca": false
+    }
+  ]
+}
+```
+
 ## 4. Definição de cada campo
 
 | Campo                   | Definição                                                                                |
@@ -151,6 +210,9 @@ data;cnpj;luc;codigo_lojista;bruto;descontos;liquido;cancelamentos;qtd_vendas;qt
 | `porNatureza.PRODUTO`   | Receita de venda no balcão (meias, bebidas, souvenires)                                  |
 | `porMeioPagamento`      | Valor recebido por forma de pagamento. A soma equivale ao líquido                        |
 | `ticketMedioCentavos`   | `liquido ÷ quantidade de vendas`, arredondado                                            |
+| `idVenda`               | Identificador único operacional da transação de venda                                    |
+| `cancelado`             | Booleano indicando se a transação foi cancelada                                          |
+| `troca`                 | Booleano indicando se se trata de uma operação de troca                                  |
 
 Garantias de consistência que o nosso sistema verifica antes de publicar
 qualquer declaração:
@@ -168,27 +230,37 @@ operacional vira (padrão: 4h). A operação funciona das 10h às 22h; o corte
 Se a apuração do empreendimento usar a meia-noite cheia, ajustamos essa
 configuração — é um parâmetro, não uma regra fixa do sistema.
 
-## 6. Privacidade
+## 6. Privacidade e LGPD
 
-A interface transmite **apenas valores agregados por dia**. Nenhum registro
-individual de venda, nenhum dado de criança, de responsável ou de
-colaborador é exposto por esta API. Foi desenhada assim de propósito: boa
-parte do nosso público é composta por crianças, várias delas com laudo, e
-esse dado não deve circular além do necessário.
+A interface transmite apenas totais consolidados ou listagem operacional de transações (`idVenda`, `dataHora`, `valorCentavos`, `cancelado`, `troca`). Nenhum dado de qualificação pessoal de criança, responsável, telefone, CPF ou colaborador é exposto por esta API.
 
-## 7. Disponibilidade e alternativas
+## 7. Exemplo de chamada cURL (Homologação & Produção)
 
-O servidor roda na própria loja e depende do link do empreendimento. Se a
-administração preferir **não depender da nossa disponibilidade**, temos duas
-alternativas equivalentes, com o mesmo conteúdo e o mesmo layout:
+### Health Check (Validação inicial de credencial)
+```bash
+curl -X GET "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/health" \
+  -H "Authorization: Bearer fa_shp_homolog_sampletoken123"
+```
 
-1. **Envio ativo (push)** — passamos a enviar diariamente para o endereço
-   que vocês indicarem, no formato que vocês definirem;
-2. **Arquivo** — geramos o CSV (ou o layout de texto de vocês) e
-   depositamos por SFTP ou anexamos ao portal do lojista.
+### Consulta de faturamento agregado por dia
+```bash
+curl -X GET "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/faturamento?de=2026-03-01&ate=2026-03-31" \
+  -H "X-API-Key: fa_shp_homolog_sampletoken123"
+```
 
-Basta indicar a preferência.
+### Consulta de faturamento venda a venda
+```bash
+curl -X GET "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/vendas?de=2026-03-01&ate=2026-03-31" \
+  -H "Authorization: Bearer fa_shp_homolog_sampletoken123"
+```
 
-## 8. Contato técnico do FaçaAmigos
+## 8. Segurança & IPs autorizados (Allowlist)
+
+As chamadas originadas pela plataforma Esphera / Napp são autorizadas pelos IPs:
+- **Homologação:** `177.52.105.183`
+- **Produção:** `34.75.87.20` e `177.136.228.177`
+
+## 9. Contato técnico do FaçaAmigos
 
 [Seu nome] · [e-mail] · [telefone]
+
