@@ -80,6 +80,7 @@ alter default privileges for role postgres in schema public revoke execute on fu
 -- =====================================================================
 drop policy if exists fa_kiosk_carrinho_fotos_write_anon_temp on storage.objects;
 drop policy if exists fa_kiosk_envelope_fotos_write_anon_temp on storage.objects;
+drop policy if exists fa_kiosk_envelope_fotos_write_authenticated on storage.objects;
 
 create policy fa_kiosk_envelope_fotos_write_authenticated on storage.objects
   for insert to authenticated
@@ -107,6 +108,7 @@ update storage.buckets
 --    ainda assim bem mais restrito que o "for all to anon" anterior.
 -- =====================================================================
 drop policy if exists fa_kiosk_assets_write_anon_temp on fa_kiosk_assets;
+drop policy if exists fa_kiosk_assets_update_authenticated on fa_kiosk_assets;
 
 create policy fa_kiosk_assets_update_authenticated on fa_kiosk_assets
   for update to authenticated

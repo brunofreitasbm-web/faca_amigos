@@ -30,6 +30,7 @@
 --   - Api.getFolhaPagamentoData(...) — Gerencial > Folha de Pagamento, só
 --     ADMIN (`folha_pagamento.read`).
 drop policy if exists fa_kiosk_read_authenticated on fa_kiosk_ponto_records;
+drop policy if exists fa_kiosk_ponto_records_read on fa_kiosk_ponto_records;
 create policy fa_kiosk_ponto_records_read on fa_kiosk_ponto_records
   for select to authenticated
   using (

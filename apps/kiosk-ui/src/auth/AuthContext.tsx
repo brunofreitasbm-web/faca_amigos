@@ -25,10 +25,14 @@ interface AuthValue {
 const AuthContext = createContext<AuthValue | null>(null);
 
 async function fetchCapabilities(): Promise<Set<Capability>> {
-  const { data, error } = await supabase().from("fa_kiosk_my_capabilities").select("capability");
-  // Falha de rede não pode liberar nada: conjunto vazio = nenhum acesso.
-  if (error || !data) return new Set();
-  return new Set(data.map((row: { capability: string }) => row.capability as Capability));
+  try {
+    const { data, error } = await supabase().from("fa_kiosk_my_capabilities").select("capability");
+    // Falha de permissão (403) ou rede não pode liberar nada: conjunto vazio = nenhum acesso.
+    if (error || !data) return new Set();
+    return new Set(data.map((row: { capability: string }) => row.capability as Capability));
+  } catch {
+    return new Set();
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

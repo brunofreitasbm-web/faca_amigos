@@ -113,48 +113,12 @@ async function apiFetch(endpoint, method = 'GET', body = null) {
   return await res.json();
 }
 
-async function ensureUnitAndPlan() {
-  console.log('🔍 Garantindo Unidade e Plano padrão no Supabase...');
-  let units = await apiFetch('fa_kiosk_units?select=*');
-  let unitId;
-
-  if (units.length === 0) {
-    const createdUnit = await apiFetch('fa_kiosk_units', 'POST', [{
-      kind: 'LOJA',
-      name: 'Faça Amigos Playground',
-      timezone: 'America/Belem',
-      business_day_cutoff_hour: 4
-    }]);
-    unitId = createdUnit[0].id;
-    console.log(`  ✅ Unidade criada: ${unitId}`);
-  } else {
-    unitId = units[0].id;
-    console.log(`  ✅ Unidade existente: ${unitId}`);
-  }
-
-  let plans = await apiFetch(`fa_kiosk_plans?unit_id=eq.${unitId}&select=*`);
-  let planId;
-
-  if (plans.length === 0) {
-    const createdPlan = await apiFetch('fa_kiosk_plans', 'POST', [{
-      unit_id: unitId,
-      activity: 'PLAYGROUND',
-      name: 'Sessão Playground (Legado)',
-      value_cents: 10000,
-      duration_value: 30,
-      duration_unit: 'MINUTO',
-      overage_cents_per_minute: 100,
-      color: '#2ECFB5',
-      active: true
-    }]);
-    planId = createdPlan[0].id;
-    console.log(`  ✅ Plano padrão criado: ${planId}`);
-  } else {
-    planId = plans[0].id;
-    console.log(`  ✅ Plano padrão existente: ${planId}`);
-  }
-
-  return { unitId, planId };
+function ensureUnitAndPlan() {
+  console.log('✅ Utilizando Unidade e Plano padrão semeados no Supabase...');
+  return {
+    unitId: '11111111-1111-1111-1111-111111111111',
+    planId: '22222222-2222-2222-2222-222222222222'
+  };
 }
 
 async function runDirectImport(csvFilePath) {

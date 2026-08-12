@@ -91,7 +91,7 @@ begin
     v_guardian_phone := '+5500000000000';
   end if;
 
-  -- Upsert Responsável: prioriza busca por CPF, depois por telefone
+  -- Upsert Responsável: prioriza busca por CPF, depois por telefone, depois por nome
   if v_guardian_cpf is not null and v_guardian_cpf <> '' then
     select id into v_guardian_id from fa_kiosk_guardians where cpf = v_guardian_cpf limit 1;
   end if;
@@ -101,10 +101,14 @@ begin
   end if;
 
   if v_guardian_id is null then
+    select id into v_guardian_id from fa_kiosk_guardians where full_name = v_guardian_name limit 1;
+  end if;
+
+  if v_guardian_id is null then
     insert into fa_kiosk_guardians (full_name, phone_e164, cpf, notes, legacy_source, legacy_id)
     values (
       v_guardian_name,
-      v_guardian_phone,
+      nullif(v_guardian_phone, '+5500000000000'),
       nullif(v_guardian_cpf, ''),
       v_guardian_notes,
       'controle-caixa',
@@ -164,18 +168,18 @@ begin
     if v_unit_id is not null and v_default_plan_id is not null then
       insert into fa_kiosk_sessions (
         unit_id, activity, plan_id, child_id, child_name_snapshot, guardian_id,
-        wristband_code, ticket_code, checkin_at_ms, checkout_at_ms, status,
+        wristband_code, ticket_code, checkin_at, checkin_at_ms, checkout_at, checkout_at_ms, status,
         business_date, legacy_source, legacy_id, duration_minutes, overtime_minutes, operator_name_snapshot
       ) values (
         v_unit_id, v_activity, v_default_plan_id, v_child_id, v_child_name, v_guardian_id,
-        v_wristband, v_ticket, v_checkin_ms, v_checkout_ms, 'FINALIZADA',
+        v_wristband, v_ticket, to_timestamp(v_checkin_ms / 1000.0), v_checkin_ms, case when v_checkout_ms is not null then to_timestamp(v_checkout_ms / 1000.0) else null end, v_checkout_ms, 'FINALIZADA',
         v_session_date, 'controle-caixa', v_legacy_session_id, v_duration, v_overtime, v_operator
       )
       returning id into v_session_id;
 
       -- Registrar log de visita append-only
-      insert into fa_kiosk_visit_log (child_id, activity, at_ms)
-      values (v_child_id, v_activity, v_checkin_ms);
+      insert into fa_kiosk_visit_log (child_id, activity, at, at_ms)
+      values (v_child_id, v_activity, to_timestamp(v_checkin_ms / 1000.0), v_checkin_ms);
 
       -- 4. Inserção de Pagamento Legado (se houver)
       if p_record->'payment' is not null and p_record->'payment' <> 'null'::jsonb then
@@ -184,8 +188,8 @@ begin
         v_legacy_payment_id  := p_record->'payment'->>'legacy_id';
 
         -- Criar pedido associado
-        insert into fa_kiosk_orders (unit_id, kind, total_cents, status, business_date, created_at_ms)
-        values (v_unit_id, 'SESSAO', v_amount_cents, 'PAGA', v_session_date, v_checkin_ms)
+        insert into fa_kiosk_orders (unit_id, kind, total_cents, status, business_date, created_at)
+        values (v_unit_id, 'SESSAO', v_amount_cents, 'PAGA', v_session_date, to_timestamp(v_checkin_ms / 1000.0))
         returning id into v_order_id;
 
         -- Item do pedido
@@ -197,9 +201,9 @@ begin
 
         -- Registro do pagamento
         insert into fa_kiosk_payments (
-          order_id, method, amount_cents, legacy_source, legacy_id, created_at_ms
+          order_id, method, amount_cents, legacy_source, legacy_id, created_at
         ) values (
-          v_order_id, v_payment_method, v_amount_cents, 'controle-caixa', v_legacy_payment_id, v_checkin_ms
+          v_order_id, v_payment_method, v_amount_cents, 'controle-caixa', v_legacy_payment_id, to_timestamp(v_checkin_ms / 1000.0)
         );
       end if;
 

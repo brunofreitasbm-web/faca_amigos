@@ -42,12 +42,11 @@ function parseCSV(text) {
  * Sanitiza telefone para E.164 (+55...)
  */
 function formatE164(phoneRaw) {
-  if (!phoneRaw) return '+5500000000000';
+  if (!phoneRaw) return undefined;
   const digits = String(phoneRaw).replace(/\D/g, '');
-  if (!digits) return '+5500000000000';
+  if (!digits || digits.length < 10 || /^0+$/.test(digits)) return undefined;
   if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`;
-  if (digits.length >= 10) return `+55${digits}`;
-  return `+${digits}`;
+  return `+55${digits}`;
 }
 
 /**
@@ -155,8 +154,11 @@ async function sendToSupabase(record) {
  * Processamento principal do CSV
  */
 async function importSalesCSV(csvFilePath) {
-  console.log(`\n🚀 Lendo arquivo CSV: ${csvFilePath}`);
-  console.log(`📡 Supabase Endpoint Target: ${SUPABASE_URL}\n`);
+  console.log(`\n==================================================`);
+  console.log(`🚀 IMPORTAÇÃO SALES.CSV PARA FAÇA AMIGOS PLAYGROUND`);
+  console.log(`==================================================`);
+  console.log(`📄 Arquivo: ${csvFilePath}`);
+  console.log(`📡 Supabase: ${SUPABASE_URL}\n`);
 
   const fileContent = fs.readFileSync(csvFilePath, 'utf-8');
   const rows = parseCSV(fileContent);
@@ -166,132 +168,131 @@ async function importSalesCSV(csvFilePath) {
     return;
   }
 
-  // Ignorar o cabeçalho
   const dataRows = rows.slice(1);
-  console.log(`📊 Total de linhas encontradas no CSV: ${dataRows.length}`);
+  console.log(`📊 Total de registros no CSV: ${dataRows.length}`);
 
   let totalProcessed = 0;
   let totalSuccess = 0;
   let totalError = 0;
 
-  for (let i = 0; i < dataRows.length; i++) {
-    const row = dataRows[i];
-    if (row.length < 15) continue; // Linha inválida
+  const BATCH_SIZE = 15;
+  console.log(`📦 Processando em lotes de ${BATCH_SIZE} requisições simultâneas...\n`);
 
-    totalProcessed++;
+  for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
+    const chunk = dataRows.slice(i, i + BATCH_SIZE);
+    await Promise.all(chunk.map(async (row) => {
+      totalProcessed++;
+      const currentIdx = totalProcessed;
 
-    const legacyId = row[0] || `row-${totalProcessed}`;
-    const rowType = (row[4] || 'SESSION').toUpperCase();
-    const dateTimeStr = row[5];
-    const planCode = row[6] || 'PLAYGROUND';
-    const cpfRaw = row[9];
-    const guardianName = row[10] || 'Responsável Não Informado';
-    const phoneRaw = row[11];
-    const periodStr = row[12]; // ex: "12:05 - 12:48"
-    const totalTimeStr = row[13];
-    const chargeableTimeStr = row[14];
-    const childName = row[15] || 'Criança';
-    const ageStr = row[16];
+      const legacyId = row[0] || `row-${currentIdx}`;
+      const rowType = (row[4] || 'SESSION').toUpperCase();
+      const dateTimeStr = row[5] || '01/01/2026 00:00';
+      const planCode = row[6] || 'PLAYGROUND';
+      const cpfRaw = row[9];
+      const guardianName = row[10] || 'Responsável Não Informado';
+      const phoneRaw = row[11];
+      const periodStr = row[12];
+      const totalTimeStr = row[13];
+      const chargeableTimeStr = row[14];
+      const childName = row[15] || 'Criança';
+      const ageStr = row[16];
 
-    const credCents = parseMoneyToCents(row[18]);
-    const debCents = parseMoneyToCents(row[19]);
-    const dinCents = parseMoneyToCents(row[20]);
-    const cartCents = parseMoneyToCents(row[21]);
-    const valesCents = parseMoneyToCents(row[22]);
-    const transfCents = parseMoneyToCents(row[23]);
-    const outrosCents = parseMoneyToCents(row[24]);
-    const totalPayCents = parseMoneyToCents(row[25]);
+      const credCents = parseMoneyToCents(row[18]);
+      const debCents = parseMoneyToCents(row[19]);
+      const dinCents = parseMoneyToCents(row[20]);
+      const cartCents = parseMoneyToCents(row[21]);
+      const valesCents = parseMoneyToCents(row[22]);
+      const transfCents = parseMoneyToCents(row[23]);
+      const outrosCents = parseMoneyToCents(row[24]);
+      const totalPayCents = parseMoneyToCents(row[25]);
 
-    const justificativa = row[26] || '';
-    const autorizador = row[27] || '';
-    const colaborador = row[28] || '';
+      const justificativa = row[26] || '';
+      const autorizador = row[27] || '';
+      const colaborador = row[28] || '';
 
-    // Determinar Método de Pagamento
-    let paymentMethod = 'DINHEIRO';
-    let paidAmountCents = totalPayCents;
+      let paymentMethod = 'DINHEIRO';
+      let paidAmountCents = totalPayCents;
 
-    if (credCents > 0) paymentMethod = 'CREDITO';
-    else if (debCents > 0) paymentMethod = 'DEBITO';
-    else if (dinCents > 0) paymentMethod = 'DINHEIRO';
-    else if (transfCents > 0) paymentMethod = 'PIX';
-    else if (cartCents > 0) paymentMethod = 'CARTEIRA';
-    else if (valesCents > 0) paymentMethod = 'OUTROS';
-    else if (outrosCents > 0) paymentMethod = 'OUTROS';
+      if (credCents > 0) paymentMethod = 'CREDITO';
+      else if (debCents > 0) paymentMethod = 'DEBITO';
+      else if (dinCents > 0) paymentMethod = 'DINHEIRO';
+      else if (transfCents > 0) paymentMethod = 'PIX';
+      else if (cartCents > 0) paymentMethod = 'PIX';
+      else if (valesCents > 0) paymentMethod = 'VOUCHER';
+      else if (outrosCents > 0) paymentMethod = 'VOUCHER';
 
-    if (paidAmountCents === 0 && (credCents || debCents || dinCents || transfCents)) {
-      paidAmountCents = credCents + debCents + dinCents + transfCents;
-    }
+      if (paidAmountCents === 0 && (credCents || debCents || dinCents || transfCents)) {
+        paidAmountCents = credCents + debCents + dinCents + transfCents;
+      }
 
-    // Processamento de datas de checkin / checkout
-    const baseDate = parseDateTime(dateTimeStr);
-    let checkinMs = baseDate.getTime();
-    let checkoutMs = baseDate.getTime();
+      const baseDate = parseDateTime(dateTimeStr);
+      let checkinMs = baseDate.getTime();
+      let checkoutMs = baseDate.getTime();
 
-    if (periodStr && periodStr.includes('-')) {
-      const [startT, endT] = periodStr.split('-').map(s => s.trim());
-      const checkinDate = parseDateTime(dateTimeStr, startT);
-      const checkoutDate = parseDateTime(dateTimeStr, endT);
-      checkinMs = checkinDate.getTime();
-      checkoutMs = checkoutDate.getTime();
-    }
+      if (periodStr && periodStr.includes('-')) {
+        const [startT, endT] = periodStr.split('-').map(s => s.trim());
+        const checkinDate = parseDateTime(dateTimeStr, startT);
+        const checkoutDate = parseDateTime(dateTimeStr, endT);
+        checkinMs = checkinDate.getTime();
+        checkoutMs = checkoutDate.getTime();
+      }
 
-    // Business date (YYYY-MM-DD)
-    const [datePart] = dateTimeStr.split(' ');
-    const [d, m, y] = datePart.split('/');
-    const businessDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      const [datePart] = (dateTimeStr || '01/01/2026').split(' ');
+      const dateBits = datePart.split('/');
+      const d = dateBits[0] || '01';
+      const m = dateBits[1] || '01';
+      const y = dateBits[2] || '2026';
+      const businessDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      const birthDate = calculateBirthDate(baseDate, ageStr);
 
-    // Estimar Data de Nascimento
-    const birthDate = calculateBirthDate(baseDate, ageStr);
+      const notesParts = [];
+      if (justificativa) notesParts.push(`Justificativa: ${justificativa}`);
+      if (autorizador) notesParts.push(`Autorizado por: ${autorizador}`);
+      const combinedNotes = notesParts.join(' | ');
 
-    // Notas agrupadas
-    const notesParts = [];
-    if (justificativa) notesParts.push(`Justificativa: ${justificativa}`);
-    if (autorizador) notesParts.push(`Autorizado por: ${autorizador}`);
-    const combinedNotes = notesParts.join(' | ');
+      const payload = {
+        guardian: {
+          legacy_id: `g-${legacyId}`,
+          full_name: guardianName,
+          phone_e164: formatE164(phoneRaw),
+          cpf: sanitizeCpf(cpfRaw),
+          notes: combinedNotes
+        },
+        child: {
+          legacy_id: `c-${legacyId}`,
+          full_name: childName,
+          birth_date: birthDate,
+          inclusive_eligible: false,
+          notes: ageStr ? `Idade na época: ${ageStr}` : undefined
+        },
+        session: {
+          legacy_id: `s-${legacyId}`,
+          activity: 'PLAYGROUND',
+          business_date: businessDate,
+          checkin_at_ms: checkinMs,
+          checkout_at_ms: checkoutMs > checkinMs ? checkoutMs : checkinMs + (30 * 60 * 1000),
+          duration_minutes: parseDurationMinutes(totalTimeStr),
+          overtime_minutes: parseDurationMinutes(chargeableTimeStr),
+          operator: colaborador || 'SISTEMA'
+        },
+        payment: paidAmountCents > 0 ? {
+          legacy_id: `p-${legacyId}`,
+          amount_cents: paidAmountCents,
+          method: paymentMethod
+        } : null
+      };
 
-    // Estrutura do Payload esperado pela RPC fa_kiosk_import_legacy_record
-    const payload = {
-      guardian: {
-        legacy_id: `g-${legacyId}`,
-        full_name: guardianName,
-        phone_e164: formatE164(phoneRaw),
-        cpf: sanitizeCpf(cpfRaw),
-        notes: combinedNotes
-      },
-      child: {
-        legacy_id: `c-${legacyId}`,
-        full_name: childName,
-        birth_date: birthDate,
-        inclusive_eligible: false,
-        notes: ageStr ? `Idade na época: ${ageStr}` : undefined
-      },
-      session: {
-        legacy_id: `s-${legacyId}`,
-        activity: rowType === 'PRODUCT' || rowType === 'PRODUCT_ITEM' ? 'PRODUTO' : 'PLAYGROUND',
-        business_date: businessDate,
-        checkin_at_ms: checkinMs,
-        checkout_at_ms: checkoutMs > checkinMs ? checkoutMs : checkinMs + (30 * 60 * 1000),
-        duration_minutes: parseDurationMinutes(totalTimeStr),
-        overtime_minutes: parseDurationMinutes(chargeableTimeStr),
-        operator: colaborador || 'SISTEMA'
-      },
-      payment: paidAmountCents > 0 ? {
-        legacy_id: `p-${legacyId}`,
-        amount_cents: paidAmountCents,
-        method: paymentMethod
-      } : null
-    };
-
-    console.log(`[${totalProcessed}/${dataRows.length}] Processando ID #${legacyId} | Resp: "${guardianName}" | Criança: "${childName}" | Valor: R$ ${(paidAmountCents / 100).toFixed(2)}`);
-
-    const rpcResult = await sendToSupabase(payload);
-    if (rpcResult && rpcResult.status === 'success') {
-      console.log(`   ⚡ Importado com sucesso no Supabase (Session ID: ${rpcResult.session_id || 'N/A'})`);
-      totalSuccess++;
-    } else {
-      console.error(`   ❌ Falha/Aviso no envio ao Supabase:`, rpcResult ? (rpcResult.message || rpcResult.status) : 'Sem resposta');
-      totalError++;
-    }
+      const rpcResult = await sendToSupabase(payload);
+      if (rpcResult && rpcResult.status === 'success') {
+        totalSuccess++;
+        if (currentIdx % 100 === 0 || currentIdx === dataRows.length) {
+          console.log(`⚡ [${currentIdx}/${dataRows.length}] Importados com sucesso no Supabase!`);
+        }
+      } else {
+        totalError++;
+        console.error(` ❌ [${currentIdx}/${dataRows.length}] ID #${legacyId} Resp: "${guardianName}" Erro:`, rpcResult ? (rpcResult.message || rpcResult.status) : 'Sem resposta');
+      }
+    }));
   }
 
   console.log('\n========================================');

@@ -8,17 +8,19 @@
 -- efêmera por processo (apps/kiosk/src/server/security/codes.ts), o que
 -- não funciona mais com múltiplos dispositivos/reinícios. Gerada uma vez
 -- aqui; nenhuma policy de SELECT libera esta tabela para "authenticated".
+create extension if not exists pgcrypto;
+
 create table if not exists fa_kiosk_secrets (
   key text primary key,
   value text not null
 );
 insert into fa_kiosk_secrets (key, value)
-values ('wristband_hmac_key', encode(gen_random_bytes(32), 'hex'))
+values ('wristband_hmac_key', md5(random()::text || clock_timestamp()::text) || md5(random()::text || gen_random_uuid()::text))
 on conflict (key) do nothing;
 alter table fa_kiosk_secrets enable row level security;
 
 create or replace function fa_kiosk_hmac8(p_value text) returns text as $$
-  select encode(hmac(p_value, (select value from fa_kiosk_secrets where key = 'wristband_hmac_key'), 'sha256'), 'hex')
+  select encode(extensions.hmac(p_value::bytea, (select value from fa_kiosk_secrets where key = 'wristband_hmac_key')::bytea, 'sha256'::text), 'hex')
 $$ language sql stable security definer;
 
 -- Retorna `date` (não `text`): fa_kiosk_sessions.business_date/fa_kiosk_orders.business_date

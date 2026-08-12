@@ -32,8 +32,9 @@
 -- código), então encurtar aqui não invalida sessão nenhuma.
 create or replace function fa_kiosk_hmac8(p_value text) returns text as $$
   select substring(
-    encode(hmac(p_value, (select value from fa_kiosk_secrets where key = 'wristband_hmac_key'), 'sha256'), 'hex')
-    from 1 for 8)
+    encode(extensions.hmac(p_value::bytea, (select value from fa_kiosk_secrets where key = 'wristband_hmac_key')::bytea, 'sha256'::text), 'hex')
+    from 1 for 8
+  );
 $$ language sql stable security definer;
 
 
@@ -60,7 +61,7 @@ $$ language sql stable security definer;
 -- ainda assim o gerador confere unicidade no banco antes de devolver.
 
 insert into fa_kiosk_secrets (key, value)
-values ('access_code_hmac_key', encode(gen_random_bytes(32), 'hex'))
+values ('access_code_hmac_key', md5(random()::text || clock_timestamp()::text) || md5(random()::text || gen_random_uuid()::text))
 on conflict (key) do nothing;
 
 create or replace function fa_kiosk_code_alphabet() returns text as $$
@@ -72,7 +73,7 @@ $$ language sql immutable;
 create or replace function fa_kiosk_random_code(p_length integer) returns text as $$
 declare
   v_alphabet text := fa_kiosk_code_alphabet();
-  v_bytes bytea := gen_random_bytes(p_length);
+  v_bytes bytea := extensions.gen_random_bytes(p_length);
   v_out text := '';
   i integer;
 begin
@@ -86,7 +87,7 @@ $$ language plpgsql volatile;
 create or replace function fa_kiosk_code_checksum(p_body text, p_length integer default 3) returns text as $$
 declare
   v_alphabet text := fa_kiosk_code_alphabet();
-  v_digest bytea := hmac(p_body, (select value from fa_kiosk_secrets where key = 'access_code_hmac_key'), 'sha256');
+  v_digest bytea := extensions.hmac(p_body::bytea, (select value from fa_kiosk_secrets where key = 'access_code_hmac_key')::bytea, 'sha256'::text);
   v_out text := '';
   i integer;
 begin

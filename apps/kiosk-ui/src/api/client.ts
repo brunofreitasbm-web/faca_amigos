@@ -758,6 +758,8 @@ export interface BirthdayChild {
   id: string;
   full_name: string;
   birth_date: string;
+  guardian_name?: string | null;
+  guardian_phone?: string | null;
 }
 export interface AssetUsage {
   id: string;
@@ -811,6 +813,8 @@ export interface SessionAudit {
   guardian_cpf: string | null;
   plan_name: string | null;
   employee_name: string | null;
+  legacy_source?: string | null;
+  operator_name_snapshot?: string | null;
 }
 
 /**
@@ -2071,8 +2075,11 @@ export const Api = {
   },
 
   /** Capacidades do colaborador logado (view fa_kiosk_my_capabilities). */
-  myCapabilities: () =>
-    unwrap<{ capability: string }[]>(supabase().from("fa_kiosk_my_capabilities").select("capability")),
+  myCapabilities: async () => {
+    const { data } = await supabase().auth.getSession();
+    if (!data?.session) return [];
+    return unwrap<{ capability: string }[]>(supabase().from("fa_kiosk_my_capabilities").select("capability")).catch(() => []);
+  },
 
   // --- Configurações: unidade, fiscal e termos de uso -----------------------
   // Todas passam por RPC `fa_config_*`, que checa fa_kiosk_can() no servidor
@@ -2182,12 +2189,42 @@ export const Api = {
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([business_date, sessions_count]) => ({ business_date, sessions_count }));
   },
-  reportBirthdays: async (month: number) => {
+  reportBirthdays: async (month?: number, day?: number) => {
     let query = supabase().from("fa_kiosk_children").select("id, full_name, birth_date");
     const children = await unwrap<Record<string, unknown>[]>(query);
-    return children
-      .filter((c) => c.birth_date && new Date(c.birth_date as string).getUTCMonth() + 1 === month)
-      .map((c) => ({ id: c.id as string, full_name: c.full_name as string, birth_date: c.birth_date as string }));
+    const filtered = children.filter((c) => {
+      if (!c.birth_date) return false;
+      const dt = new Date(c.birth_date as string);
+      const mMatch = month === undefined || dt.getUTCMonth() + 1 === month;
+      const dMatch = day === undefined || dt.getUTCDate() === day;
+      return mMatch && dMatch;
+    });
+
+    const childIds = filtered.map((c) => c.id as string);
+    if (childIds.length === 0) return [] as BirthdayChild[];
+
+    const childGuardians = await unwrap<Record<string, unknown>[]>(
+      supabase().from("fa_kiosk_child_guardians").select("child_id, guardian_id").in("child_id", childIds)
+    );
+    const guardianIds = [...new Set(childGuardians.map((cg) => cg.guardian_id as string))];
+    const guardians = guardianIds.length > 0
+      ? await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164").in("id", guardianIds))
+      : [];
+
+    const guardianById = new Map(guardians.map((g) => [g.id as string, g]));
+    const guardianIdByChildId = new Map(childGuardians.map((cg) => [cg.child_id as string, cg.guardian_id as string]));
+
+    return filtered.map((c) => {
+      const gId = guardianIdByChildId.get(c.id as string);
+      const g = gId ? guardianById.get(gId) : null;
+      return {
+        id: c.id as string,
+        full_name: c.full_name as string,
+        birth_date: c.birth_date as string,
+        guardian_name: (g?.full_name as string | undefined) ?? null,
+        guardian_phone: (g?.phone_e164 as string | undefined) ?? null,
+      } satisfies BirthdayChild;
+    });
   },
   reportShifts: (unitId: string) =>
     unwrap<ShiftSummary[]>(
@@ -2248,7 +2285,7 @@ export const Api = {
   reportSessions: async (unitId: string | null, from: string, to: string) => {
     let sessionsQuery = supabase()
       .from("fa_kiosk_sessions")
-      .select("id, unit_id, access_code, checkin_at_ms, checkout_at_ms, status, activity, child_name_snapshot, guardian_id, plan_id, checkin_by_employee_id")
+      .select("id, unit_id, access_code, checkin_at_ms, checkout_at_ms, status, activity, child_name_snapshot, guardian_id, plan_id, checkin_by_employee_id, legacy_source, operator_name_snapshot")
       .gte("business_date", from)
       .lte("business_date", to)
       .order("checkin_at_ms", { ascending: false });
@@ -2290,7 +2327,9 @@ export const Api = {
         guardian_phone: (guardian?.phone_e164 as string | undefined) ?? null,
         guardian_cpf: (guardian?.cpf as string | undefined) ?? null,
         plan_name: (plan?.name as string | undefined) ?? null,
-        employee_name: (employee?.full_name as string | undefined) ?? null,
+        employee_name: (employee?.full_name as string | undefined) ?? (s.operator_name_snapshot as string | undefined) ?? (s.legacy_source ? "Legado" : null),
+        legacy_source: s.legacy_source as string | null,
+        operator_name_snapshot: s.operator_name_snapshot as string | null,
       } satisfies SessionAudit;
     });
   },

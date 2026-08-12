@@ -415,7 +415,26 @@ export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: 
                 </td>
                 <td>{new Date(s.checkin_at_ms).toLocaleString("pt-BR")}</td>
                 <td>{s.checkout_at_ms ? new Date(s.checkout_at_ms).toLocaleString("pt-BR") : "—"}</td>
-                <td>{SESSION_STATUS_LABEL[s.status] ?? s.status}</td>
+                <td>
+                  {SESSION_STATUS_LABEL[s.status] ?? s.status}
+                  {s.legacy_source && (
+                    <span
+                      style={{
+                        marginLeft: "6px",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        backgroundColor: "rgba(99, 102, 241, 0.12)",
+                        color: "#6366F1",
+                        border: "1px solid rgba(99, 102, 241, 0.25)"
+                      }}
+                      title="Sessão importada do histórico de vendas legacy (sales.csv)"
+                    >
+                      Legado
+                    </span>
+                  )}
+                </td>
                 <td>{s.employee_name ?? "—"}</td>
               </tr>
             ))}
@@ -436,42 +455,155 @@ export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: 
 }
 
 function AniversariantesTab() {
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const today = new Date();
+  const currentDay = today.getUTCDate();
+  const currentMonth = today.getUTCMonth() + 1;
+
+  const [mode, setMode] = useState<"today" | "month">("today");
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [children, setChildren] = useState<BirthdayChild[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Api.reportBirthdays(month).then(setChildren);
-  }, [month]);
+    setLoading(true);
+    if (mode === "today") {
+      Api.reportBirthdays(currentMonth, currentDay)
+        .then(setChildren)
+        .finally(() => setLoading(false));
+    } else {
+      Api.reportBirthdays(selectedMonth)
+        .then(setChildren)
+        .finally(() => setLoading(false));
+    }
+  }, [mode, selectedMonth, currentMonth, currentDay]);
 
   const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
+  const formattedTodayDate = `${String(currentDay).padStart(2, "0")}/${String(currentMonth).padStart(2, "0")}/${today.getFullYear()}`;
+
   return (
     <div style={{ marginTop: "16px" }}>
-      <div style={{ width: "220px", marginBottom: "16px" }}>
-        <Select label="Mês" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-          {MONTHS.map((m, i) => (
-            <option key={m} value={i + 1}>
-              {m}
-            </option>
-          ))}
-        </Select>
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "16px", marginBottom: "20px" }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: "18px", display: "flex", alignItems: "center", gap: "8px" }}>
+            🎂 Aniversariantes do Dia
+            {mode === "today" && (
+              <span style={{ fontSize: "12px", fontWeight: "normal", padding: "2px 8px", borderRadius: "12px", background: "rgba(245, 158, 11, 0.15)", color: "#D97706", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
+                Hoje ({formattedTodayDate})
+              </span>
+            )}
+          </h3>
+          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "var(--text-secondary)" }}>
+            {mode === "today"
+              ? `Crianças registradas que fazem aniversário hoje (${formattedTodayDate})`
+              : `Crianças cadastradas que fazem aniversário no mês de ${MONTHS[selectedMonth - 1]}`}
+          </p>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", background: "var(--bg-card)", padding: "4px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+            <button
+              type="button"
+              onClick={() => setMode("today")}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+                background: mode === "today" ? "var(--primary-color, #4F46E5)" : "transparent",
+                color: mode === "today" ? "#FFFFFF" : "var(--text-secondary)",
+                transition: "all 0.2s"
+              }}
+            >
+              🎂 Hoje ({currentDay}/{currentMonth})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("month")}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+                background: mode === "month" ? "var(--primary-color, #4F46E5)" : "transparent",
+                color: mode === "month" ? "#FFFFFF" : "var(--text-secondary)",
+                transition: "all 0.2s"
+              }}
+            >
+              📅 Ver Mês
+            </button>
+          </div>
+
+          {mode === "month" && (
+            <div style={{ width: "160px" }}>
+              <Select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}>
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
 
-      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
-        {children.map((c) => (
-          <Card key={c.id} style={{ padding: "12px 16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong>{c.full_name}</strong>
-              <span style={{ color: "var(--text-secondary)", fontSize: "14px" }}>{c.birth_date}</span>
-            </div>
-          </Card>
-        ))}
-        {children.length === 0 && (
-          <li style={{ color: "var(--text-muted)", textAlign: "center", padding: "24px" }}>
-            Nenhum aniversariante encontrado neste mês.
-          </li>
-        )}
-      </ul>
+      {loading ? (
+        <Card style={{ padding: "24px", textAlign: "center", color: "var(--text-muted)" }}>
+          Carregando aniversariantes...
+        </Card>
+      ) : (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+          {children.map((c) => {
+            const birthDt = new Date(c.birth_date);
+            const age = today.getFullYear() - birthDt.getFullYear();
+
+            return (
+              <Card key={c.id} style={{ padding: "14px 18px", borderLeft: "4px solid #F59E0B" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <strong style={{ fontSize: "16px", color: "var(--text-main)" }}>{c.full_name}</strong>
+                      <span style={{ fontSize: "12px", background: "#FEF3C7", color: "#B45309", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>
+                        {age > 0 ? `Completando ${age} ano${age > 1 ? "s" : ""} 🎉` : "Novo Bebê 🎈"}
+                      </span>
+                    </div>
+
+                    <div style={{ marginTop: "4px", fontSize: "13px", color: "var(--text-secondary)", display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                      {c.guardian_name && <span>Responsável: <strong>{c.guardian_name}</strong></span>}
+                      {c.guardian_phone && <span>Telefone: <strong>{formatPhoneBr(c.guardian_phone)}</strong></span>}
+                    </div>
+                  </div>
+
+                  <div style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "right" }}>
+                    <span>Data: {birthDt.getUTCDate().toString().padStart(2, "0")}/{(birthDt.getUTCMonth() + 1).toString().padStart(2, "0")}/{birthDt.getFullYear()}</span>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+
+          {children.length === 0 && (
+            <Card style={{ padding: "36px", textAlign: "center" }}>
+              <div style={{ fontSize: "32px", marginBottom: "8px" }}>🎈</div>
+              <h4 style={{ margin: 0, fontSize: "16px", color: "var(--text-main)" }}>
+                {mode === "today"
+                  ? `Nenhum aniversariante hoje (${formattedTodayDate})`
+                  : `Nenhum aniversariante encontrado em ${MONTHS[selectedMonth - 1]}`}
+              </h4>
+              <p style={{ margin: "6px 0 0 0", fontSize: "13px", color: "var(--text-muted)" }}>
+                {mode === "today"
+                  ? "Não há crianças cadastradas fazendo aniversário no dia de hoje."
+                  : "Não há registros de aniversário para o mês selecionado."}
+              </p>
+            </Card>
+          )}
+        </ul>
+      )}
     </div>
   );
 }
