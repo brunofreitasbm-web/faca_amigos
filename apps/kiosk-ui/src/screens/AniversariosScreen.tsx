@@ -1,14 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, Button, Badge } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Birthday } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
-
-const MONTH_NAMES = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-];
 
 /** Hash simples e estável (mesmo id -> sempre o mesmo índice) para a mensagem inicial de cada card. */
 function stableIndex(id: string, mod: number): number {
@@ -37,11 +32,13 @@ function formatMessage(template: string, item: Birthday): string {
  * card some da lista (fa_kiosk_mark_birthday_sent) e só volta a aparecer
  * no aniversário do ano seguinte. A partir dos 11 anos a criança some do
  * módulo para sempre — corte de idade aplicado no próprio RPC.
+ *
+ * Só exibe os aniversariantes de HOJE — a tela é para o operador mandar a
+ * felicitação no dia certo, não para planejar o mês inteiro.
  */
 export function AniversariosScreen() {
   const { unit, employee } = useAppState();
   const toast = useToast();
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [items, setItems] = useState<Birthday[]>([]);
   const [messagePool, setMessagePool] = useState<string[]>([]);
   const [messageIndexById, setMessageIndexById] = useState<Record<string, number>>({});
@@ -56,9 +53,10 @@ export function AniversariosScreen() {
   useEffect(() => {
     if (!unit) return;
     setLoading(true);
-    Api.birthdaysByUnit(unit.id, month)
+    const currentMonth = new Date().getMonth() + 1;
+    Api.birthdaysByUnit(unit.id, currentMonth)
       .then((rows) => {
-        setItems(rows);
+        setItems(rows.filter((item) => item.is_today));
         setMessageIndexById({});
       })
       .catch(() => {
@@ -66,17 +64,7 @@ export function AniversariosScreen() {
         toast.error("Não foi possível carregar os aniversariantes desta unidade.");
       })
       .finally(() => setLoading(false));
-  }, [unit, month]);
-
-  const groups = useMemo(() => {
-    const byDay = new Map<number, Birthday[]>();
-    for (const item of items) {
-      const list = byDay.get(item.day_of_month) ?? [];
-      list.push(item);
-      byDay.set(item.day_of_month, list);
-    }
-    return [...byDay.entries()].sort(([a], [b]) => a - b);
-  }, [items]);
+  }, [unit]);
 
   function messageFor(item: Birthday): string {
     if (messagePool.length === 0) return "";
@@ -127,31 +115,8 @@ export function AniversariosScreen() {
             🎂 Módulo de Aniversariantes
           </h1>
           <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "14px" }}>
-            Aniversariantes de {unit?.name ?? "sua unidade"} — envie uma mensagem acolhedora para o responsável.
+            Aniversariantes de hoje em {unit?.name ?? "sua unidade"} — envie uma mensagem acolhedora para o responsável.
           </p>
-        </div>
-
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--text-secondary)" }}>Mês:</span>
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "12px",
-              border: "1px solid var(--border-subtle)",
-              background: "var(--surface-card)",
-              color: "var(--text-primary)",
-              fontSize: "14px",
-              fontWeight: "bold",
-            }}
-          >
-            {MONTH_NAMES.map((m, idx) => (
-              <option key={m} value={idx + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
@@ -162,80 +127,69 @@ export function AniversariosScreen() {
       {!loading && items.length === 0 && (
         <Card style={{ padding: "24px", borderRadius: "16px", textAlign: "center" }}>
           <p style={{ color: "var(--text-muted)", margin: 0 }}>
-            Nenhum aniversariante encontrado para {MONTH_NAMES[month - 1]} nesta unidade.
+            Nenhum aniversariante hoje nesta unidade.
           </p>
         </Card>
       )}
 
-      {groups.map(([day, dayItems]) => (
-        <div key={day} style={{ marginBottom: "24px" }}>
-          <h2 style={{ fontSize: "15px", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>
-            Dia {day}
-          </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
-            {dayItems.map((item) => (
-              <Card
-                key={item.id}
-                style={{
-                  padding: "20px",
-                  borderRadius: "16px",
-                  border: item.is_today ? "2px solid #EAB308" : "1px solid var(--border-subtle)",
-                  boxShadow: item.is_today ? "0 0 12px rgba(234, 179, 8, 0.25)" : "none",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                  <div>
-                    <h3 style={{ fontSize: "20px", margin: "0 0 4px 0", color: "var(--text-primary)" }}>
-                      {item.full_name} {item.is_today ? "🎉" : ""}
-                    </h3>
-                    <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
-                      Completa <strong>{item.age_turning} anos</strong> — Responsável: <strong>{item.guardian_name}</strong>
-                    </p>
-                  </div>
-                  {item.is_today ? (
-                    <Badge variant="amber">HOJE! 🎂</Badge>
-                  ) : (
-                    <Badge variant="teal">Dia {item.day_of_month}</Badge>
-                  )}
-                </div>
-
-                <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>
-                  📞 Contato: {item.phone_e164 || "Não cadastrado"}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+        {items.map((item) => (
+          <Card
+            key={item.id}
+            style={{
+              padding: "20px",
+              borderRadius: "16px",
+              border: "2px solid #EAB308",
+              boxShadow: "0 0 12px rgba(234, 179, 8, 0.25)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+              <div>
+                <h3 style={{ fontSize: "20px", margin: "0 0 4px 0", color: "var(--text-primary)" }}>
+                  {item.full_name} 🎉
+                </h3>
+                <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
+                  Completa <strong>{item.age_turning} anos</strong> — Responsável: <strong>{item.guardian_name}</strong>
                 </p>
+              </div>
+              <Badge variant="amber">HOJE! 🎂</Badge>
+            </div>
 
-                <div
-                  style={{
-                    background: "var(--surface-sunken)",
-                    padding: "12px 16px",
-                    borderRadius: "12px",
-                    fontSize: "13px",
-                    color: "var(--text-secondary)",
-                    borderLeft: "4px solid var(--color-primary)",
-                    marginBottom: "12px",
-                    minHeight: "48px",
-                  }}
-                >
-                  {messageFor(item) || "Carregando mensagem…"}
-                </div>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>
+              📞 Contato: {item.phone_e164 || "Não cadastrado"}
+            </p>
 
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <Button variant="ghost" size="sm" onClick={() => shuffleMessage(item)} style={{ flexShrink: 0 }}>
-                    🔀 Trocar
-                  </Button>
-                  <Button
-                    variant={item.is_today ? "amber" : "teal"}
-                    size="sm"
-                    onClick={() => handleSendWhatsApp(item)}
-                    style={{ flex: 1, fontWeight: "bold" }}
-                  >
-                    📱 Enviar Felicitação WhatsApp
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      ))}
+            <div
+              style={{
+                background: "var(--surface-sunken)",
+                padding: "12px 16px",
+                borderRadius: "12px",
+                fontSize: "13px",
+                color: "var(--text-secondary)",
+                borderLeft: "4px solid var(--color-primary)",
+                marginBottom: "12px",
+                minHeight: "48px",
+              }}
+            >
+              {messageFor(item) || "Carregando mensagem…"}
+            </div>
+
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Button variant="ghost" size="sm" onClick={() => shuffleMessage(item)} style={{ flexShrink: 0 }}>
+                🔀 Trocar
+              </Button>
+              <Button
+                variant="amber"
+                size="sm"
+                onClick={() => handleSendWhatsApp(item)}
+                style={{ flex: 1, fontWeight: "bold" }}
+              >
+                📱 Enviar Felicitação WhatsApp
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
