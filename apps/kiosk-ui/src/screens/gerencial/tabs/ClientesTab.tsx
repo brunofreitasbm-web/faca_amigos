@@ -3,8 +3,12 @@ import { Card, Input, Button, Tag, AsyncState, Badge } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
 import type { GerencialCliente, Unit } from "../../../api/client.js";
 import { formatPhoneBr, dateBrFromIso } from "@facaamigos/domain";
+import { useConfirm } from "../../../state/ConfirmContext.js";
+import { useToast } from "../../../state/ToastContext.js";
 
 export function ClientesTab() {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [search, setSearch] = useState("");
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
   const [units, setUnits] = useState<Unit[]>([]);
@@ -12,6 +16,7 @@ export function ClientesTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCliente, setSelectedCliente] = useState<GerencialCliente | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     Api.units().then(setUnits).catch(() => setUnits([]));
@@ -34,6 +39,28 @@ export function ClientesTab() {
     const timer = setTimeout(loadData, 300);
     return () => clearTimeout(timer);
   }, [search, selectedUnitId]);
+
+  async function handleResetVisitCounter() {
+    const ok = await confirm({
+      title: "Reiniciar contador de visitas?",
+      message:
+        "O número de visitas de todos os clientes volta a contar do zero a partir de agora. O histórico de check-ins não é apagado — só deixa de entrar nessa contagem.",
+      confirmLabel: "Reiniciar contador",
+      cancelLabel: "Cancelar",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setResetting(true);
+    try {
+      await Api.resetVisitCounter();
+      toast.success("Contador de visitas reiniciado.");
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível reiniciar o contador.");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   const totalGuardians = clientes.length;
   const totalChildren = clientes.reduce((acc, c) => acc + (c.children?.length || 0), 0);
@@ -96,6 +123,15 @@ export function ClientesTab() {
             </select>
             <Button variant="secondary" onClick={loadData} title="Recarregar lista">
               🔄 Atualizar
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleResetVisitCounter}
+              disabled={resetting}
+              title="Zera a contagem de visitas exibida aqui, sem apagar o histórico real de check-ins"
+              style={{ border: "1px solid var(--color-border)" }}
+            >
+              ↺ Reiniciar contador de visitas
             </Button>
           </div>
         </div>

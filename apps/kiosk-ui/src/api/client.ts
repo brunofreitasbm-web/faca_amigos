@@ -1759,6 +1759,12 @@ export const Api = {
         p_unit_id: unitId ?? null,
       }),
     )) ?? [],
+  /**
+   * Reinicia o contador de visitas exibido no Gerencial > Clientes sem
+   * apagar o histórico real de check-ins: fa_gerencial_clientes passa a
+   * contar só sessões a partir de agora (ver fa_kiosk_visit_counter_reset).
+   */
+  resetVisitCounter: () => unwrap(supabase().rpc("fa_config_reset_visit_counter")),
   /** Registra a liberação de contingência (recibo perdido / etiqueta danificada) antes de cobrar. */
   saidaManualAuthorize: (body: {
     sessionId: string;
