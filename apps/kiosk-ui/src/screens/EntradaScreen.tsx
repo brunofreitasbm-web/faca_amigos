@@ -73,10 +73,14 @@ function getPlanDiscountedCents(
   valueCents: number,
   code: string,
   couponsList: Coupon[],
+  planId?: string | null,
 ): { finalCents: number; originalCents: number; discountText: string | null } {
   if (!code) return { finalCents: valueCents, originalCents: valueCents, discountText: null };
 
   const couponObj = couponsList.find((c) => c.code.toLowerCase() === code.toLowerCase());
+  if (couponObj?.allowedPlanId && couponObj.allowedPlanId !== planId) {
+    return { finalCents: valueCents, originalCents: valueCents, discountText: null };
+  }
   let discountPct: number | null = null;
   let discountCents: number | null = null;
 
@@ -412,6 +416,16 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
   const usingHourBank = planId === HOUR_BANK;
   const selectedPlan = plans.find((p) => p.id === planId);
   const threshold = 120;
+
+  // Cupons restritos a um plano (ex.: "N ESTRELAS", só no plano de 30min)
+  // só aparecem quando esse plano está selecionado — evita o operador
+  // escolher um cupom que o servidor vai recusar no check-in.
+  const eligibleCoupons = coupons.filter((c) => !c.allowedPlanId || c.allowedPlanId === planId);
+
+  useEffect(() => {
+    if (couponCode && !eligibleCoupons.some((c) => c.code === couponCode)) setCouponCode("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planId]);
 
   const readiness = useMemo(() => {
     if (!identified) return "Identifique a criança para continuar";
@@ -820,7 +834,7 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
               remainingMinutes === null ||
               minutes <= remainingMinutes ||
               (minutes > threshold && remainingMinutes > 0);
-            const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons);
+            const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
             return (
               <Card
                 key={plan.id}
@@ -1052,7 +1066,7 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
         ) : (
           <Select label="Cupom de desconto / parceria" value={couponCode} onChange={(e) => setCouponCode(e.target.value)}>
             <option value="">Nenhum</option>
-            {coupons.map((c) => (
+            {eligibleCoupons.map((c) => (
               <option key={c.id} value={c.code}>
                 {c.code}
                 {c.description ? ` — ${c.description}` : ""}
@@ -1093,7 +1107,7 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
             ? " — Banco de horas (R$ 0,00)"
             : selectedPlan
               ? ` — ${money(
-                  getPlanDiscountedCents(selectedPlan.valueCents, couponCode, coupons).finalCents +
+                  getPlanDiscountedCents(selectedPlan.valueCents, couponCode, coupons, selectedPlan.id).finalCents +
                     (quickUpsellAccepted && quickProduct ? quickProduct.price_cents : 0),
                 )}`
               : ""}

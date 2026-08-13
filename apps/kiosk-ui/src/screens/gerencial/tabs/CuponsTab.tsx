@@ -1,16 +1,22 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input, Select } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
-import type { Coupon } from "../../../api/client.js";
+import type { Coupon, Plan } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
+
+function planLabel(p: Plan): string {
+  const duration = p.durationUnit === "HORA" ? `${p.durationValue}h` : `${p.durationValue}min`;
+  return `${p.name} (${duration})`;
+}
 
 export function CuponsTab() {
   const toast = useToast();
   const { units } = useAppState();
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [code, setCode] = useState("");
@@ -18,13 +24,25 @@ export function CuponsTab() {
   const [value, setValue] = useState("10");
   const [description, setDescription] = useState("");
   const [unitIds, setUnitIds] = useState<string[]>(units.map((u) => u.id));
+  const [allowedPlanId, setAllowedPlanId] = useState("");
   const [busy, setBusy] = useState(false);
 
   function load() {
     Api.couponsAllUnits().then(setCoupons);
+    Api.plansAllUnits().then(setPlans);
   }
   useEffect(load, []);
   useEffect(() => setUnitIds(units.map((u) => u.id)), [units]);
+
+  // Restringir a um plano só faz sentido quando dá para saber a que unidade
+  // o cupom pertence — na edição (uma unidade só) ou na criação quando o
+  // operador restringiu a seleção a uma única unidade.
+  const planRestrictionUnitId = editingId
+    ? coupons.find((c) => c.id === editingId)?.unitId
+    : unitIds.length === 1
+      ? unitIds[0]
+      : undefined;
+  const plansForRestriction = plans.filter((p) => p.unitId === planRestrictionUnitId);
 
   function startEdit(c: Coupon) {
     setEditingId(c.id);
@@ -32,6 +50,7 @@ export function CuponsTab() {
     setKind(c.kind);
     setValue(String(c.value));
     setDescription(c.description ?? "");
+    setAllowedPlanId(c.allowedPlanId ?? "");
   }
 
   function cancelEdit() {
@@ -41,12 +60,19 @@ export function CuponsTab() {
     setValue("10");
     setDescription("");
     setUnitIds(units.map((u) => u.id));
+    setAllowedPlanId("");
   }
 
   async function save() {
     setBusy(true);
     try {
-      const payload = { code, kind, value: Number(value), description: description || undefined };
+      const payload = {
+        code,
+        kind,
+        value: Number(value),
+        description: description || undefined,
+        allowedPlanId: planRestrictionUnitId ? allowedPlanId || null : null,
+      };
 
       if (editingId) {
         await Api.updateCoupon(editingId, payload);
@@ -109,6 +135,22 @@ export function CuponsTab() {
         <Input label="Valor" type="number" value={value} onChange={(e) => setValue(e.target.value)} />
         <Input label="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} />
         {!editingId && <UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} />}
+        {planRestrictionUnitId ? (
+          <Select label="Restringir a um plano" value={allowedPlanId} onChange={(e) => setAllowedPlanId(e.target.value)}>
+            <option value="">Vale para todos os planos da unidade</option>
+            {plansForRestriction.map((p) => (
+              <option key={p.id} value={p.id}>
+                {planLabel(p)}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          !editingId && unitIds.length > 1 && (
+            <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
+              Restrição de plano só pode ser definida ao criar o cupom em uma única unidade.
+            </p>
+          )
+        )}
         <Button variant="primary" disabled={busy || !code || (!editingId && unitIds.length === 0)} onClick={save}>
           {editingId ? "Salvar cupom" : `Criar cupom em ${unitIds.length} unidade(s)`}
         </Button>
@@ -118,6 +160,12 @@ export function CuponsTab() {
           <span>
             <strong>{c.code}</strong> — {c.kind} ({c.value}) — usado {c.used_count}× {c.description ? `— ${c.description}` : ""}
             <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · {units.find((u) => u.id === c.unitId)?.name ?? "—"}</span>
+            {c.allowedPlanId && (
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                {" "}
+                · só no plano {planLabel(plans.find((p) => p.id === c.allowedPlanId) ?? ({ name: "?", durationValue: 0, durationUnit: "MINUTO" } as Plan))}
+              </span>
+            )}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <Button variant="secondary" onClick={() => startEdit(c)} disabled={busy}>

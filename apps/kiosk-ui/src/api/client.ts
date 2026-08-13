@@ -705,6 +705,8 @@ export interface Coupon {
   used_count: number;
   active: boolean | number;
   description: string | null;
+  /** Plano ao qual o cupom fica restrito; null = vale para qualquer plano da unidade. */
+  allowedPlanId: string | null;
   /** Só preenchido por `Api.couponsAllUnits()` (Gerencial). */
   unitId?: string;
 }
@@ -878,6 +880,7 @@ function couponFromRow(row: Record<string, unknown>): Coupon {
     used_count: row.used_count as number,
     active: row.active ? 1 : 0,
     description: (row.description as string | null) ?? null,
+    allowedPlanId: (row.allowed_plan_id as string | null) ?? null,
     unitId: row.unit_id as string | undefined,
   };
 }
@@ -1851,17 +1854,35 @@ export const Api = {
   /** Todos os cupons de todas as unidades — Gerencial. */
   couponsAllUnits: () =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_coupons").select("*")).then((rows) => rows.map(couponFromRow)),
-  createCoupon: (body: { unitId: string; code: string; kind: Coupon["kind"]; value: number; description?: string }) =>
+  createCoupon: (body: { unitId: string; code: string; kind: Coupon["kind"]; value: number; description?: string; allowedPlanId?: string | null }) =>
     unwrap<{ id: string }>(
       supabase()
         .from("fa_kiosk_coupons")
-        .insert({ unit_id: body.unitId, code: body.code, kind: body.kind, value: body.value, description: body.description ?? null })
+        .insert({
+          unit_id: body.unitId,
+          code: body.code,
+          kind: body.kind,
+          value: body.value,
+          description: body.description ?? null,
+          allowed_plan_id: body.allowedPlanId ?? null,
+        })
         .select("id")
         .single(),
     ),
   setCouponActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_coupons").update({ active }).eq("id", id)),
-  updateCoupon: (id: string, body: { code: string; kind: Coupon["kind"]; value: number; description?: string }) =>
-    unwrap(supabase().from("fa_kiosk_coupons").update({ code: body.code, kind: body.kind, value: body.value, description: body.description ?? null }).eq("id", id)),
+  updateCoupon: (id: string, body: { code: string; kind: Coupon["kind"]; value: number; description?: string; allowedPlanId?: string | null }) =>
+    unwrap(
+      supabase()
+        .from("fa_kiosk_coupons")
+        .update({
+          code: body.code,
+          kind: body.kind,
+          value: body.value,
+          description: body.description ?? null,
+          allowed_plan_id: body.allowedPlanId ?? null,
+        })
+        .eq("id", id),
+    ),
   loyaltyRules: (unitId: string) =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_loyalty_rules").select("*").eq("unit_id", unitId)).then((rows) =>
       rows.map(loyaltyRuleFromRow),
