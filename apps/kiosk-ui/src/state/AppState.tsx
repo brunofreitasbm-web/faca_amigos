@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Api } from "../api/client.js";
 import type { Unit } from "../api/client.js";
@@ -46,6 +46,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
     Api.units().then(setUnits).catch(() => setUnits([]));
   }, [employee]);
+
+  // Se o colaborador está vinculado a uma única unidade, pular a tela de
+  // seleção de módulo é só atrito a menos: não existe escolha de verdade
+  // ali. Dispara uma vez por login (ref abaixo) para não brigar com
+  // "Trocar Módulo", que zera unitId de propósito para deixar escolher —
+  // inclusive entrar no Gerencial, que só aparece nessa tela.
+  const autoSelectedForEmployeeId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!employee || unitId) return;
+    if (autoSelectedForEmployeeId.current === employee.id) return;
+    Api.myUnitIds(employee.id)
+      .then((ids) => {
+        autoSelectedForEmployeeId.current = employee.id;
+        if (ids.length === 1) setUnitId(ids[0]!);
+      })
+      .catch(() => {
+        autoSelectedForEmployeeId.current = employee.id;
+      });
+  }, [employee, unitId]);
 
   // Restaura a sessão do Supabase Auth que o navegador já tinha (o terminal
   // do balcão não deve pedir PIN a cada refresh da página) e reflete
@@ -115,6 +134,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setEmployee(null);
         setUnitId(null);
         setGerencial(false);
+        autoSelectedForEmployeeId.current = null;
       },
     }),
     [units, unitId, gerencial, employee, terminalEmployees, restoring],

@@ -2074,6 +2074,12 @@ export const Api = {
     return data.employees;
   },
 
+  /** Unidades às quais o colaborador logado está vinculado (fa_kiosk_employee_units). */
+  myUnitIds: (employeeId: string) =>
+    unwrap<{ unit_id: string }[]>(
+      supabase().from("fa_kiosk_employee_units").select("unit_id").eq("employee_id", employeeId),
+    ).then((rows) => rows.map((r) => r.unit_id)),
+
   /** Capacidades do colaborador logado (view fa_kiosk_my_capabilities). */
   myCapabilities: async () => {
     const { data } = await supabase().auth.getSession();
