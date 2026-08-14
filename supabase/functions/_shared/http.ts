@@ -12,6 +12,7 @@ const FALLBACK_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:4173",
   "https://kiosk-ui.vercel.app",
+  "https://app.institutofacaamigos.com.br",
 ];
 
 function allowedOrigins(): string[] {
