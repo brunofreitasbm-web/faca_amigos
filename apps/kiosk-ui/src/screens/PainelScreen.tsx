@@ -119,16 +119,20 @@ export function PainelScreen() {
   }
 
   async function cancelPreCheckin(item: PreCheckinPrefill) {
-    setPreCheckinBusy((prev) => new Set(prev).add(item.id));
+    const key = `${item.id}:${item.childIndex}`;
+    setPreCheckinBusy((prev) => new Set(prev).add(key));
     try {
       await Api.preCheckinCancel(item.id, employee?.id);
+      // Cancela o pré-cadastro inteiro (todas as crianças ainda pendentes
+      // dele) — quem já ganhou pulseira não é afetado, só já não aparece
+      // mais nesta lista de pendentes.
       setPendingPreCheckins((prev) => prev.filter((p) => p.id !== item.id));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível descartar o pré-cadastro.");
     } finally {
       setPreCheckinBusy((prev) => {
         const next = new Set(prev);
-        next.delete(item.id);
+        next.delete(key);
         return next;
       });
     }
@@ -391,7 +395,7 @@ export function PainelScreen() {
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             {pendingPreCheckins.map((item) => (
               <div
-                key={item.id}
+                key={`${item.id}:${item.childIndex}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -417,7 +421,12 @@ export function PainelScreen() {
                   {item.pin}
                 </span>
                 <div>
-                  <strong style={{ fontSize: "13px", display: "block" }}>{item.childName}</strong>
+                  <strong style={{ fontSize: "13px", display: "block" }}>
+                    {item.childName}
+                    {item.totalChildren > 1 && (
+                      <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> ({item.childIndex + 1}/{item.totalChildren})</span>
+                    )}
+                  </strong>
                   <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                     {item.guardianName} · {item.planName}
                   </span>
@@ -425,7 +434,7 @@ export function PainelScreen() {
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={preCheckinBusy.has(item.id)}
+                  disabled={preCheckinBusy.has(`${item.id}:${item.childIndex}`)}
                   onClick={() => openPreCheckin(item)}
                   title="Abrir Entrada já preenchida com os dados enviados pelo responsável"
                 >
@@ -434,9 +443,9 @@ export function PainelScreen() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  disabled={preCheckinBusy.has(item.id)}
+                  disabled={preCheckinBusy.has(`${item.id}:${item.childIndex}`)}
                   onClick={() => cancelPreCheckin(item)}
-                  title="Descartar este pré-cadastro (duplicado, desistência)"
+                  title={item.totalChildren > 1 ? "Descartar todo o pré-cadastro (todas as crianças ainda pendentes desta família)" : "Descartar este pré-cadastro (duplicado, desistência)"}
                   aria-label="Descartar pré-cadastro"
                 >
                   ✕

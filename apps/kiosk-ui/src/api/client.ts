@@ -1350,6 +1350,8 @@ export const Api = {
     sensoryTags?: string[];
     /** Confirma um pré-cadastro feito pelo QR de Acesso Rápido — marca a origem como CONVERTIDO na mesma transação. */
     preCheckinId?: string;
+    /** Qual criança da lista do pré-cadastro (0-based) está sendo confirmada — um pré-cadastro pode trazer vários irmãos. */
+    preCheckinChildIndex?: number;
   }) =>
     // fa_checkin também enfileira, na mesma transação, a pulseira e o recibo
     // de guarda. Nenhuma tela precisa disparar impressão no check-in: se a
@@ -1386,6 +1388,7 @@ export const Api = {
         p_notes: body.notes ?? null,
         p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
         p_pre_checkin_id: body.preCheckinId ?? null,
+        p_pre_checkin_child_index: body.preCheckinChildIndex ?? null,
       },
     ),
 
@@ -1404,8 +1407,9 @@ export const Api = {
       termsText: string;
     }>(supabase().rpc("fa_pre_checkin_form_options", { p_unit_id: unitId })),
   /**
-   * Envia o pré-cadastro preenchido pelo responsável. Retorna o `id`
-   * (usado no poll de Api.preCheckinStatus) e um PIN de 4 dígitos — o
+   * Envia o pré-cadastro preenchido pelo responsável — pode trazer mais de
+   * uma criança (irmãos), um responsável/CPF/telefone/plano só. Retorna o
+   * `id` (usado no poll de Api.preCheckinStatus) e um PIN de 4 dígitos — o
    * responsável fala/mostra esse número no balcão, e é assim que o
    * operador casa a família certa com o card certo na lista de pendentes
    * do Painel, sem precisar adivinhar por nome parecido. Chamável sem login.
@@ -1414,42 +1418,51 @@ export const Api = {
     unitId: string;
     activity: "PLAYGROUND" | "CARRINHO";
     planId: string;
-    childName: string;
-    birthDate: string;
+    children: Array<{
+      childName: string;
+      birthDate: string;
+      inclusiveEligible?: boolean;
+      sensoryTags?: string[];
+      notes?: string;
+    }>;
     guardianName: string;
-    cpf?: string;
+    cpf: string;
     phoneE164: string;
     termsAccepted: boolean;
-    inclusiveEligible?: boolean;
-    sensoryTags?: string[];
-    notes?: string;
   }) =>
     unwrap<{ id: string; pin: string }>(
       supabase().rpc("fa_pre_checkin_submit", {
         p_unit_id: body.unitId,
         p_activity: body.activity,
         p_plan_id: body.planId,
-        p_child_name: body.childName,
-        p_birth_date: body.birthDate,
+        p_children: body.children.map((c) => ({
+          childName: c.childName,
+          birthDate: c.birthDate,
+          inclusiveEligible: c.inclusiveEligible ?? false,
+          sensoryTags: c.sensoryTags && c.sensoryTags.length > 0 ? c.sensoryTags : [],
+          notes: c.notes ?? null,
+        })),
         p_guardian_name: body.guardianName,
-        p_cpf: body.cpf ?? null,
+        p_cpf: body.cpf,
         p_phone_e164: body.phoneE164,
         p_terms_accepted: body.termsAccepted,
-        p_inclusive_eligible: body.inclusiveEligible ?? false,
-        p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
-        p_notes: body.notes ?? null,
       }),
     ),
   /** Poll da tela pública: status do pré-cadastro só por quem já tem o `id` — não é uma listagem. Chamável sem login. */
   preCheckinStatus: (preCheckinId: string) =>
-    unwrap<{ status: "PENDENTE" | "CONVERTIDO" | "CANCELADO"; accessCode: string | null; pin: string }>(
-      supabase().rpc("fa_pre_checkin_status", { p_id: preCheckinId }),
-    ),
-  /** Pré-cadastros pendentes da unidade, para o balcão revisar e confirmar em EntradaScreen (prefill). */
+    unwrap<{
+      status: "PENDENTE" | "CONVERTIDO" | "CANCELADO";
+      pin: string;
+      totalChildren: number;
+      sessions: Array<{ childIndex: number; childName: string; accessCode: string }>;
+    }>(supabase().rpc("fa_pre_checkin_status", { p_id: preCheckinId })),
+  /** Pré-cadastros pendentes da unidade, uma linha por CRIANÇA ainda não confirmada — para o balcão revisar e confirmar em EntradaScreen (prefill). */
   preCheckinList: (unitId: string) =>
     unwrap<
       Array<{
         id: string;
+        childIndex: number;
+        totalChildren: number;
         activity: "PLAYGROUND" | "CARRINHO";
         planId: string;
         planName: string;

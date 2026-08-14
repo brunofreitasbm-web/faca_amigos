@@ -131,6 +131,7 @@ export function EntradaScreen({
   const [planId, setPlanId] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
   const [preCheckinId, setPreCheckinId] = useState<string | null>(null);
+  const [preCheckinChildIndex, setPreCheckinChildIndex] = useState<number | null>(null);
 
   // Busca única: nome da criança, nome do responsável, CPF ou telefone.
   // Antes eram quatro campos separados disputando a mesma consulta.
@@ -262,6 +263,7 @@ export function EntradaScreen({
   useEffect(() => {
     if (!prefill) return;
     setPreCheckinId(prefill.id);
+    setPreCheckinChildIndex(prefill.childIndex);
     setMatchedChild(null);
     setMatches([]);
     setShowNewForm(true);
@@ -500,10 +502,12 @@ export function EntradaScreen({
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
         preCheckinId: preCheckinId ?? undefined,
+        preCheckinChildIndex: preCheckinId ? (preCheckinChildIndex ?? undefined) : undefined,
       });
 
       if (preCheckinId) {
         setPreCheckinId(null);
+        setPreCheckinChildIndex(null);
         onPrefillConsumed?.();
       }
 
