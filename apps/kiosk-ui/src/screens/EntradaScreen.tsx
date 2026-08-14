@@ -29,7 +29,7 @@ import { money, formatElapsed } from "../format.js";
 // os originais do fluxo (não renomear: o texto é gravado por visita e
 // prefila o cadastro seguinte da mesma criança); os demais foram
 // adicionados para cobrir os quadros sensoriais mais comuns fora desses.
-const SENSORY_TAG_OPTIONS = [
+export const SENSORY_TAG_OPTIONS = [
   "Sensível a Ruído Alto",
   "Usa Abafador",
   "Acompanhante / Mediador 1:1",
@@ -109,7 +109,19 @@ function getPlanDiscountedCents(
   return { finalCents, originalCents: valueCents, discountText };
 }
 
-export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
+export type PreCheckinPrefill = Awaited<ReturnType<typeof Api.preCheckinList>>[number];
+
+export function EntradaScreen({
+  onSuccess,
+  prefill,
+  onPrefillConsumed,
+}: {
+  onSuccess?: () => void;
+  /** Pré-cadastro feito pelo responsável no QR de Acesso Rápido (ver PainelScreen) — preenche o formulário para o operador só conferir e confirmar. */
+  prefill?: PreCheckinPrefill | null;
+  /** Avisa quem abriu a tela (PainelScreen) que o prefill já foi consumido, para fechar o card da lista de pendentes. */
+  onPrefillConsumed?: () => void;
+} = {}) {
   const { unit, employee } = useAppState();
   const toast = useToast();
   const activity = unit?.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
@@ -118,6 +130,7 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [planId, setPlanId] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
+  const [preCheckinId, setPreCheckinId] = useState<string | null>(null);
 
   // Busca única: nome da criança, nome do responsável, CPF ou telefone.
   // Antes eram quatro campos separados disputando a mesma consulta.
@@ -240,6 +253,29 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
     Api.coupons(unit.id).then(setCoupons);
     if (activity === "CARRINHO") Api.assets(unit.id).then(setAssets);
   }, [unit, activity]);
+
+  // Pré-cadastro do QR de Acesso Rápido: preenche o formulário exatamente
+  // como se o operador tivesse digitado tudo — ele só confere identidade
+  // e toca em "Confirmar entrada". `submit()` manda o `preCheckinId`
+  // junto no fa_checkin, que marca a origem como CONVERTIDO na mesma
+  // transação (ver client.ts `checkin`).
+  useEffect(() => {
+    if (!prefill) return;
+    setPreCheckinId(prefill.id);
+    setMatchedChild(null);
+    setMatches([]);
+    setShowNewForm(true);
+    setChildName(prefill.childName);
+    setBirthDate(prefill.birthDate);
+    setGuardianName(prefill.guardianName);
+    setCpf(prefill.cpf ? formatCpf(prefill.cpf) : "");
+    setPhone(formatPhoneBr(prefill.phoneE164));
+    setPlanId(prefill.planId);
+    setIsNeurodivergent(prefill.inclusiveEligible || (prefill.sensoryTags?.length ?? 0) > 0);
+    setSelectedSensoryTags(prefill.sensoryTags ?? []);
+    setCustomNotes(prefill.notes ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.id]);
 
   // Aplicação automática de cupons no Playground:
   // - Criança neurodivergente marcada -> "50% MEIA - Inclusivo"
@@ -376,6 +412,7 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
     setMatchedChild(null);
     setMatches([]);
     setOffer(null);
+    setPreCheckinId(null);
   }
 
   function toggleSensoryTag(tag: string) {
@@ -400,6 +437,7 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
     setShowExtras(false);
     setFavoriteAssetId(null);
     setQuickUpsellAccepted(false);
+    setPreCheckinId(null);
     if (!keepGuardian) {
       setCpf("");
       setGuardianName("");
@@ -461,7 +499,13 @@ export function EntradaScreen({ onSuccess }: { onSuccess?: () => void } = {}) {
         couponCode: usingHourBank ? undefined : couponCode || undefined,
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
+        preCheckinId: preCheckinId ?? undefined,
       });
+
+      if (preCheckinId) {
+        setPreCheckinId(null);
+        onPrefillConsumed?.();
+      }
 
       setDone({
         sessionId: res.sessionId,

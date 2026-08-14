@@ -28,6 +28,7 @@ import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { OnboardingInviteScreen } from "./screens/OnboardingInviteScreen.js";
 import { AcompanharScreen } from "./screens/AcompanharScreen.js";
+import { AcessoRapidoScreen } from "./screens/AcessoRapidoScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
 import { SaidaScreen } from "./screens/SaidaScreen.js";
 import { PainelScreen } from "./screens/PainelScreen.js";
@@ -205,6 +206,15 @@ export function App() {
   const acompanharParam = new URLSearchParams(window.location.search).get("acompanhar");
   if (acompanharParam) {
     return <AcompanharScreen code={acompanharParam} />;
+  }
+
+  // QR Code de Acesso Rápido (?acesso-rapido=<unit_id>): cartaz fixo na
+  // entrada da unidade. Mesmo espírito dos branches acima — o responsável
+  // não tem NENHUMA conta, então isto também precisa vir antes de qualquer
+  // checagem de sessão salva.
+  const acessoRapidoParam = new URLSearchParams(window.location.search).get("acesso-rapido");
+  if (acessoRapidoParam) {
+    return <AcessoRapidoScreen unitId={acessoRapidoParam} />;
   }
 
   // Enquanto a sessão salva não foi conferida, não decide nada: mostrar a

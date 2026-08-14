@@ -1348,6 +1348,8 @@ export const Api = {
     couponCode?: string;
     notes?: string;
     sensoryTags?: string[];
+    /** Confirma um pré-cadastro feito pelo QR de Acesso Rápido — marca a origem como CONVERTIDO na mesma transação. */
+    preCheckinId?: string;
   }) =>
     // fa_checkin também enfileira, na mesma transação, a pulseira e o recibo
     // de guarda. Nenhuma tela precisa disparar impressão no check-in: se a
@@ -1383,8 +1385,90 @@ export const Api = {
         p_employee_id: body.employeeId,
         p_notes: body.notes ?? null,
         p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
+        p_pre_checkin_id: body.preCheckinId ?? null,
       },
     ),
+
+  // --- QR Code de Acesso Rápido (pré-cadastro pelo responsável, sem login) --
+  // Cartaz fixo na entrada de cada unidade: o responsável preenche os
+  // mesmos dados que o operador digitaria na Entrada e aceita os Termos de
+  // Uso pelo próprio celular. Vira só um PRÉ-cadastro (fa_kiosk_pre_checkins)
+  // — o check-in de verdade continua sendo o operador confirmando no
+  // balcão via `Api.checkin` (acima), passando `preCheckinId`.
+  /** Nome/atividade da unidade, planos ativos e o texto de Termos de Uso — para montar o formulário público. Chamável sem login. */
+  preCheckinFormOptions: (unitId: string) =>
+    unwrap<{
+      unitName: string;
+      activity: "PLAYGROUND" | "CARRINHO";
+      plans: Array<Pick<Plan, "id" | "name" | "valueCents" | "durationValue" | "durationUnit" | "color">>;
+      termsText: string;
+    }>(supabase().rpc("fa_pre_checkin_form_options", { p_unit_id: unitId })),
+  /**
+   * Envia o pré-cadastro preenchido pelo responsável. Retorna o `id`
+   * (usado no poll de Api.preCheckinStatus) e um PIN de 4 dígitos — o
+   * responsável fala/mostra esse número no balcão, e é assim que o
+   * operador casa a família certa com o card certo na lista de pendentes
+   * do Painel, sem precisar adivinhar por nome parecido. Chamável sem login.
+   */
+  preCheckinSubmit: (body: {
+    unitId: string;
+    activity: "PLAYGROUND" | "CARRINHO";
+    planId: string;
+    childName: string;
+    birthDate: string;
+    guardianName: string;
+    cpf?: string;
+    phoneE164: string;
+    termsAccepted: boolean;
+    inclusiveEligible?: boolean;
+    sensoryTags?: string[];
+    notes?: string;
+  }) =>
+    unwrap<{ id: string; pin: string }>(
+      supabase().rpc("fa_pre_checkin_submit", {
+        p_unit_id: body.unitId,
+        p_activity: body.activity,
+        p_plan_id: body.planId,
+        p_child_name: body.childName,
+        p_birth_date: body.birthDate,
+        p_guardian_name: body.guardianName,
+        p_cpf: body.cpf ?? null,
+        p_phone_e164: body.phoneE164,
+        p_terms_accepted: body.termsAccepted,
+        p_inclusive_eligible: body.inclusiveEligible ?? false,
+        p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
+        p_notes: body.notes ?? null,
+      }),
+    ),
+  /** Poll da tela pública: status do pré-cadastro só por quem já tem o `id` — não é uma listagem. Chamável sem login. */
+  preCheckinStatus: (preCheckinId: string) =>
+    unwrap<{ status: "PENDENTE" | "CONVERTIDO" | "CANCELADO"; accessCode: string | null; pin: string }>(
+      supabase().rpc("fa_pre_checkin_status", { p_id: preCheckinId }),
+    ),
+  /** Pré-cadastros pendentes da unidade, para o balcão revisar e confirmar em EntradaScreen (prefill). */
+  preCheckinList: (unitId: string) =>
+    unwrap<
+      Array<{
+        id: string;
+        activity: "PLAYGROUND" | "CARRINHO";
+        planId: string;
+        planName: string;
+        childName: string;
+        birthDate: string;
+        guardianName: string;
+        cpf: string | null;
+        phoneE164: string;
+        inclusiveEligible: boolean;
+        sensoryTags: string[] | null;
+        notes: string | null;
+        pin: string;
+        createdAtMs: number;
+      }>
+    >(supabase().rpc("fa_pre_checkin_list", { p_unit_id: unitId })),
+  /** Descarta um pré-cadastro pendente (duplicado, desistência). */
+  preCheckinCancel: (preCheckinId: string, employeeId?: string) =>
+    unwrap(supabase().rpc("fa_pre_checkin_cancel", { p_id: preCheckinId, p_employee_id: employeeId ?? null })),
+
   /**
    * Fechamento do atendimento.
    *

@@ -202,6 +202,59 @@ export function buildContractHtml(contractText: string, data: ContractData): str
 </html>`;
 }
 
+/**
+ * Cartaz A4 do QR Code de Acesso Rápido — fixado na entrada da unidade.
+ * `qrDataUrl` já vem pronto (ver generateWristbandQRCodeDataUrl em
+ * WristbandQRCode.tsx); esta função só monta a página impressa, reusando
+ * o mesmo timbre/paleta do contrato para os dois saírem consistentes.
+ */
+export function buildAcessoRapidoPosterHtml(data: { unitName: string; qrDataUrl: string; url: string }): string {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <title>QR Code de Acesso Rápido — FaçaAmigos</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800&display=swap');
+      @page { size: A4; margin: 16mm; }
+      html, body { margin: 0; padding: 0; background: #fff; color: #1a1a1a; font-family: "Nunito", "Segoe UI", Arial, sans-serif; }
+      .brand-bar { height: 8px; border-radius: 9999px; background: linear-gradient(90deg, #F0196B 0%, #F0196B 45%, #2ECFB5 45%, #2ECFB5 78%, #FFE234 78%, #FFE234 100%); margin-bottom: 28px; }
+      .lockup { font-family: "Fredoka One", "Nunito", sans-serif; font-size: 44px; line-height: 1; text-align: center; }
+      .lockup .faca { color: #1A3F35; }
+      .lockup .amigos { color: #F0196B; }
+      .tagline { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 13px; letter-spacing: 0.35em; color: #1A3F35; text-transform: uppercase; text-align: center; margin-top: 6px; }
+      .title { text-align: center; font-family: "Fredoka One", sans-serif; font-size: 30px; color: #1A3F35; margin: 40px 0 8px; }
+      .subtitle { text-align: center; font-size: 16px; color: #333; margin: 0 0 32px; }
+      .qr-frame { display: flex; justify-content: center; margin: 0 0 32px; }
+      .qr-frame img { width: 260px; height: 260px; border: 6px solid #2ECFB5; border-radius: 24px; padding: 16px; }
+      .steps { max-width: 480px; margin: 0 auto; font-size: 15px; line-height: 1.7; color: #1a1a1a; }
+      .steps li { margin-bottom: 6px; }
+      .unit-name { text-align: center; margin-top: 40px; font-size: 13px; color: #777; }
+    </style>
+  </head>
+  <body>
+    <div class="brand-bar"></div>
+    <div class="lockup"><span class="faca">Faça</span><span class="amigos">Amigos</span></div>
+    <div class="tagline">Playground Inclusivo</div>
+
+    <div class="title">📱 Acesso Rápido</div>
+    <p class="subtitle">Aponte a câmera do celular para o QR Code abaixo</p>
+
+    <div class="qr-frame"><img src="${data.qrDataUrl}" alt="QR Code de Acesso Rápido"></div>
+    <p style="text-align:center; font-size:11px; color:#999; margin:-24px 0 32px; word-break:break-all;">${escapeHtml(data.url)}</p>
+
+    <ol class="steps">
+      <li>Preencha os dados da criança e do responsável;</li>
+      <li>Escolha o plano desejado;</li>
+      <li>Leia e aceite os Termos de Uso;</li>
+      <li>Dirija-se ao balcão — os dados já estarão prontos para o educador confirmar a entrada.</li>
+    </ol>
+
+    <div class="unit-name">${data.unitName}</div>
+  </body>
+</html>`;
+}
+
 /** Abre o diálogo de impressão do navegador com o contrato em A4 (iframe oculto). */
 export function printContract(html: string): void {
   let iframe = document.getElementById("fa-contract-print-iframe") as HTMLIFrameElement | null;

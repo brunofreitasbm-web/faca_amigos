@@ -16,6 +16,7 @@ import { SessionTimelineModal } from "../components/SessionTimelineModal.js";
 import { getFriendlyWristbandCode } from "@facaamigos/domain";
 import { formatAge, formatElapsed, money } from "../format.js";
 import { EntradaScreen } from "./EntradaScreen.js";
+import type { PreCheckinPrefill } from "./EntradaScreen.js";
 import { SaidaScreen } from "./SaidaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
 import { WristbandQRCode } from "../components/WristbandQRCode.js";
@@ -71,6 +72,9 @@ export function PainelScreen() {
   const [dailyGoalCents, setDailyGoalCents] = useState(0);
   const [todayRevenueCents, setTodayRevenueCents] = useState(0);
   const [entradaOpen, setEntradaOpen] = useState(false);
+  const [preCheckinPrefill, setPreCheckinPrefill] = useState<PreCheckinPrefill | null>(null);
+  const [pendingPreCheckins, setPendingPreCheckins] = useState<PreCheckinPrefill[]>([]);
+  const [preCheckinBusy, setPreCheckinBusy] = useState<Set<string>>(new Set());
   const [saidaOpen, setSaidaOpen] = useState(false);
   const [pdvOpen, setPdvOpen] = useState(false);
   const [qrModalSession, setQrModalSession] = useState<{ code: string; childName: string; guardianName?: string } | null>(null);
@@ -90,6 +94,45 @@ export function PainelScreen() {
     const activity = unit.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
     Api.plans(unit.id, activity).then(setPlanOptions);
   }, [unit]);
+
+  // Pré-cadastros enviados pelo QR de Acesso Rápido (?acesso-rapido=,
+  // AcessoRapidoScreen), aguardando o balcão confirmar. Poll simples —
+  // igual a usePendingRenewals — não é um dado que precisa de Realtime
+  // para ficar "ao vivo", só reaparecer em alguns segundos já basta.
+  function refetchPendingPreCheckins() {
+    if (!unit) return;
+    Api.preCheckinList(unit.id)
+      .then(setPendingPreCheckins)
+      .catch(() => {});
+  }
+  useEffect(() => {
+    if (!unit) return;
+    refetchPendingPreCheckins();
+    const interval = setInterval(refetchPendingPreCheckins, 8000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unit?.id]);
+
+  function openPreCheckin(item: PreCheckinPrefill) {
+    setPreCheckinPrefill(item);
+    setEntradaOpen(true);
+  }
+
+  async function cancelPreCheckin(item: PreCheckinPrefill) {
+    setPreCheckinBusy((prev) => new Set(prev).add(item.id));
+    try {
+      await Api.preCheckinCancel(item.id, employee?.id);
+      setPendingPreCheckins((prev) => prev.filter((p) => p.id !== item.id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível descartar o pré-cadastro.");
+    } finally {
+      setPreCheckinBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }
 
   // Selo VIP dos cards. Uma chamada para a lista inteira, refeita só quando
   // o conjunto de crianças no salão muda — o `useActiveSessions` recalcula
@@ -320,6 +363,87 @@ export function PainelScreen() {
           style={{ flexShrink: 0, fontSize: "13px", color: "var(--color-error-text)", background: "rgba(232,48,48,0.08)", border: "1px solid var(--color-error)", borderRadius: "10px", padding: "8px 12px" }}
         >
           ⚠️ Não foi possível atualizar o painel — os dados abaixo podem estar desatualizados.
+        </div>
+      )}
+
+      {/* Pré-cadastros do QR de Acesso Rápido: o responsável já preencheu
+          tudo pelo próprio celular na entrada da unidade — o operador só
+          confere e toca em "Confirmar entrada" (abre EntradaScreen já
+          preenchida). Fica antes da grade normal, de propósito: é fila de
+          espera, não uma sessão em andamento. */}
+      {pendingPreCheckins.length > 0 && (
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            padding: "10px 12px",
+            borderRadius: "14px",
+            border: "1px dashed var(--color-teal)",
+            background: "rgba(29, 155, 132, 0.06)",
+          }}
+        >
+          <strong style={{ fontSize: "13px", color: "var(--color-teal-text)" }}>
+            🕓 {pendingPreCheckins.length} pré-cadastro{pendingPreCheckins.length > 1 ? "s" : ""} aguardando pelo QR de
+            Acesso Rápido
+          </strong>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            {pendingPreCheckins.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 10px",
+                  borderRadius: "12px",
+                  border: "1px solid var(--border-subtle)",
+                  background: "var(--surface-card)",
+                }}
+              >
+                <span
+                  title="PIN que o responsável fala no balcão — confira antes de confirmar"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "18px",
+                    letterSpacing: "0.06em",
+                    color: "var(--color-primary-hover)",
+                    background: "rgba(240, 25, 107, 0.08)",
+                    borderRadius: "10px",
+                    padding: "4px 8px",
+                  }}
+                >
+                  {item.pin}
+                </span>
+                <div>
+                  <strong style={{ fontSize: "13px", display: "block" }}>{item.childName}</strong>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                    {item.guardianName} · {item.planName}
+                  </span>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={preCheckinBusy.has(item.id)}
+                  onClick={() => openPreCheckin(item)}
+                  title="Abrir Entrada já preenchida com os dados enviados pelo responsável"
+                >
+                  Confirmar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={preCheckinBusy.has(item.id)}
+                  onClick={() => cancelPreCheckin(item)}
+                  title="Descartar este pré-cadastro (duplicado, desistência)"
+                  aria-label="Descartar pré-cadastro"
+                >
+                  ✕
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -845,7 +969,10 @@ export function PainelScreen() {
         <Button
           variant="primary"
           size="lg"
-          onClick={() => setEntradaOpen(true)}
+          onClick={() => {
+            setPreCheckinPrefill(null);
+            setEntradaOpen(true);
+          }}
           title="Fazer nova entrada sem sair do Painel"
           aria-label="Fazer nova entrada"
           style={{ borderRadius: "9999px", width: "64px", height: "64px", fontSize: "26px", boxShadow: "var(--shadow-lg)", padding: 0 }}
@@ -855,8 +982,24 @@ export function PainelScreen() {
       </div>
 
       {entradaOpen && (
-        <Modal onClose={() => setEntradaOpen(false)} ariaLabel="Entrada" maxWidth="820px" padding="0" zIndex={150}>
-          <EntradaScreen onSuccess={() => { refetchActiveSessions(); }} />
+        <Modal
+          onClose={() => {
+            setEntradaOpen(false);
+            setPreCheckinPrefill(null);
+          }}
+          ariaLabel="Entrada"
+          maxWidth="820px"
+          padding="0"
+          zIndex={150}
+        >
+          <EntradaScreen
+            onSuccess={() => { refetchActiveSessions(); }}
+            prefill={preCheckinPrefill}
+            onPrefillConsumed={() => {
+              setPreCheckinPrefill(null);
+              refetchPendingPreCheckins();
+            }}
+          />
         </Modal>
       )}
 

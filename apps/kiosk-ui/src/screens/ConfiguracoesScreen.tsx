@@ -25,6 +25,8 @@ import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import { EspelhoPontoModal } from "../components/EspelhoPontoModal.js";
+import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/WristbandQRCode.js";
+import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
 import { money } from "../format.js";
 
 type Tab =
@@ -1671,6 +1673,27 @@ function UnidadeTab({ unitId }: { unitId: string }) {
     }
   }
 
+  // Mesmo endereço público usado no QR de acompanhamento (EntradaScreen) e
+  // no pareamento de celular/tablet (ConnectDeviceModal) — no Electron
+  // local, window.location.origin é 127.0.0.1, que o celular de quem
+  // escaneia o cartaz na entrada não alcança.
+  const envAppUrl = import.meta.env.VITE_PUBLIC_APP_URL as string | undefined;
+  const isLocalOrigin = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+  const publicAppOrigin = envAppUrl ?? (isLocalOrigin ? undefined : window.location.origin);
+  const acessoRapidoUrl = publicAppOrigin ? `${publicAppOrigin.replace(/\/$/, "")}/?acesso-rapido=${unitId}` : null;
+  const [printingPoster, setPrintingPoster] = useState(false);
+
+  async function printPoster() {
+    if (!acessoRapidoUrl || !unit) return;
+    setPrintingPoster(true);
+    try {
+      const qrDataUrl = await generateWristbandQRCodeDataUrl(acessoRapidoUrl, 480);
+      printContract(buildAcessoRapidoPosterHtml({ unitName: unit.name, qrDataUrl, url: acessoRapidoUrl }));
+    } finally {
+      setPrintingPoster(false);
+    }
+  }
+
   if (!unit) return <HelpText>Unidade não encontrada.</HelpText>;
 
   return (
@@ -1711,6 +1734,32 @@ function UnidadeTab({ unitId }: { unitId: string }) {
           O CNPJ do cupom vem da aba Dados Fiscais — é o mesmo do emitente da nota, e ter dois campos para digitá-lo
           é o caminho mais curto para eles divergirem.
         </HelpText>
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>QR Code de Acesso Rápido</h2>
+        <HelpText>
+          Cartaz para fixar na entrada da unidade: o responsável escaneia, preenche os dados da criança e do
+          responsável pelo próprio celular, escolhe o plano e aceita os Termos de Uso — os dados já chegam prontos
+          para o educador só confirmar a entrada no Painel.
+        </HelpText>
+        {acessoRapidoUrl ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+            <WristbandQRCode value={acessoRapidoUrl} size={120} />
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <HelpText style={{ margin: 0, wordBreak: "break-all" }}>{acessoRapidoUrl}</HelpText>
+              <Button variant="secondary" loading={printingPoster} disabled={printingPoster} onClick={printPoster} style={{ alignSelf: "flex-start" }}>
+                🖨️ Imprimir cartaz (A4)
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <HelpText>
+            Este computador está rodando no endereço local ({window.location.origin}), que o celular do responsável
+            não alcança. Defina <code>VITE_PUBLIC_APP_URL</code> (URL do deploy na Vercel) no build para o QR
+            funcionar aqui — o mesmo endereço já usado em "Conectar celular ou tablet" e no QR de acompanhamento.
+          </HelpText>
+        )}
       </Card>
 
       <Button variant="primary" disabled={saving || !name} onClick={save}>
