@@ -83,6 +83,17 @@ If `kiosk-ui` is deployed standalone (e.g. Vercel) without also migrating those 
 
 `LandingPage/` and `facaamigos-landing-publicar-v2/` are standalone static HTML/CSS/JS marketing sites (no build step, no `package.json`) — unrelated to the `apps/*`/`packages/*` pnpm workspace and deployed separately.
 
+## Sales-oriented content (cross-sell / upsell)
+
+Whenever creating, writing, or presenting anything customer- or operator-facing — screens, receipts, notifications, marketing copy, reports, presentations — always build in a cross-sell/upsell angle. Prefer suggestions the operator or customer clearly sees and can act on or ignore, surfaced at the moment they're relevant to the journey, never disguised as something else and never blocking the primary task:
+
+- Check-in / PDV: suggest relevant add-ons (e.g. meia antiderrapante, bebida) alongside the main purchase.
+- End of session / near time limit: offer a time or plan upgrade before checkout.
+- Recurring visits (3rd+ visit, birthdays, etc.): highlight VIP packages, coupons, or loyalty rewards.
+- Reports/dashboards for staff: surface upsell opportunities as data (e.g. "clientes elegíveis para upgrade hoje"), not as copy aimed at the child/guardian.
+
+Do not implement dark patterns: no hidden/pre-checked upsells, no manipulating cognitive biases to obscure price or consent, no pressure tactics — this business serves children (including neurodivergent children) and their guardians, so offers must stay transparent and easy to decline. When a request implies something manipulative or deceptive, flag it and propose the transparent alternative instead of implementing it as asked.
+
 ## Project-specific working agreement (DEV_LEIGO)
 
 Per `.agents/AGENTS.md` / `DEV_LEIGO.md`: the user driving this repo is non-technical. When given loose feedback or ideas ("quero isso", "notei aquilo"), the expected response is a structured technical brief (Contexto / Objetivo / Requisitos de UI-UX / Requisitos técnicos-funcionais / Critérios de aceite) — not a direct implementation — unless they explicitly ask to implement. Every generated brief ends with the note that implementation decisions are left to the dev/AI, since the user only judges the final UX/behavior. This applies to feature requests; it does not override explicit direct implementation requests.
