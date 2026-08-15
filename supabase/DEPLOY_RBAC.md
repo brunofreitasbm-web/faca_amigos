@@ -60,7 +60,7 @@ Variável de ambiente nova (senão o CORS cai no fallback de localhost e o
 terminal em produção não consegue logar):
 
 ```bash
-supabase secrets set FUNCTIONS_ALLOWED_ORIGINS="https://<dominio-do-kiosk>,http://localhost:5173"
+supabase secrets set FUNCTIONS_ALLOWED_ORIGINS="https://app.institutofacaamigos.com.br,http://localhost:5173"
 ```
 
 ## 3. Front
