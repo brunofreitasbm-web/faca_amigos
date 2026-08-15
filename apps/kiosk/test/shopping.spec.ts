@@ -52,7 +52,7 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     expect(playgroundRes.statusCode).toBe(200);
     const pgData = playgroundRes.json();
     expect(pgData.loja.luc).toBe("L-142");
-    expect(pgData.loja.codigoLojista).toBe("PSB-0142");
+    expect(pgData.loja.codigoLojista).toBe("PSB-1316");
 
     const circuitoRes = await app.inject({
       method: "GET",
@@ -62,7 +62,7 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     expect(circuitoRes.statusCode).toBe(200);
     const circData = circuitoRes.json();
     expect(circData.loja.luc).toBe("L-143");
-    expect(circData.loja.codigoLojista).toBe("PSB-0143");
+    expect(circData.loja.codigoLojista).toBe("PSB-1346");
     // Mesmo CNPJ para ambas as operações no mesmo shopping
     expect(pgData.loja.cnpj).toBe(circData.loja.cnpj);
   });

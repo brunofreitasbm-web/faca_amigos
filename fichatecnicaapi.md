@@ -14,8 +14,8 @@ equipe técnica da administração do shopping.
 
 > **Observação sobre Múltiplas Unidades no Mesmo Shopping:**  
 > A FaçaAmigos opera 2 negócios distintos no mesmo Shopping sob o mesmo CNPJ:
-> 1. **Playground** (Brinquedoteca): LUC `L-142` · Código Lojista `PSB-0142`
-> 2. **Parque Circuito** (Quiosque/Carrinhos): LUC `L-143` · Código Lojista `PSB-0143`  
+> 1. **Playground** (Brinquedoteca): LUC `L-142` · Código Lojista `PSB-1316`
+> 2. **Parque Circuito** (Quiosque/Carrinhos): LUC `L-143` · Código Lojista `PSB-1346`  
 > Cada operação possui chave de API própria ou parâmetro `unitId`, garantindo a separação total dos relatórios de faturamento e contratos de locação.
 
 
@@ -84,7 +84,7 @@ Se a chave for emitida vinculada a uma loja, o parâmetro `unitId` é ignorado
     "cnpj": "12345678000195",
     "razaoSocial": "FaçaAmigos Entretenimento Infantil LTDA",
     "luc": "L-142",
-    "codigoLojista": "PSB-0142",
+    "codigoLojista": "PSB-1316",
     "timezone": "America/Belem",
     "cutoffHoraDiaOperacional": 4
   },
@@ -141,7 +141,7 @@ português.
 
 ```
 data;cnpj;luc;codigo_lojista;bruto;descontos;liquido;cancelamentos;qtd_vendas;qtd_cancelamentos;ticket_medio;servico;produto;dinheiro;pix;credito;debito;voucher
-2026-03-01;12345678000195;L-142;PSB-0142;1860,00;60,00;1800,00;0,00;31;0;58,06;1650,00;150,00;120,00;780,00;620,00;280,00;0,00
+2026-03-01;12345678000195;L-142;PSB-1316;1860,00;60,00;1800,00;0,00;31;0;58,06;1650,00;150,00;120,00;780,00;620,00;280,00;0,00
 ```
 
 ### 3.2. Consulta venda a venda (granularidade por item / anonimizada)
@@ -164,7 +164,7 @@ Retorna a listagem individual de vendas sem nenhum dado pessoal do cliente/crian
     "unidadeId": "018bcfe5-6800-790d-b959-c3de7ede5578",
     "cnpj": "12345678000195",
     "luc": "L-142",
-    "codigoLojista": "PSB-0142"
+    "codigoLojista": "PSB-1316"
   },
   "periodo": {
     "dataInicial": "2026-03-01",

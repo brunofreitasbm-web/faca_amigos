@@ -15,7 +15,7 @@ export interface ShoppingUnitInfo {
 
 /**
   Retorna as informações da unidade com suporte a multi-unidade no mesmo CNPJ.
-  Playground (LUC L-142 / PSB-0142) vs Parque Circuito (LUC L-143 / PSB-0143).
+  Playground (LUC L-142 / PSB-1316) vs Parque Circuito (LUC L-143 / PSB-1346).
  */
 export function getShoppingUnitMetadata(ctx: AppContext, unitId: string): ShoppingUnitInfo {
   const unit = getUnit(ctx.db, unitId);
@@ -26,7 +26,7 @@ export function getShoppingUnitMetadata(ctx: AppContext, unitId: string): Shoppi
   
   // Distinção de LUC e Código de Lojista para negócios distintos no mesmo Shopping (mesmo CNPJ, contratos diferentes)
   const defaultLuc = isCircuito ? "L-143" : "L-142";
-  const defaultCodigo = isCircuito ? "PSB-0143" : "PSB-0142";
+  const defaultCodigo = isCircuito ? "PSB-1346" : "PSB-1316";
 
   const luc = getAppSetting(ctx.db, unitId, "luc") || defaultLuc;
   const codigoLojista = getAppSetting(ctx.db, unitId, "codigo_lojista") || defaultCodigo;

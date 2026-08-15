@@ -23,8 +23,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         payload: JSON.stringify({
           ambiente: "HOMOLOGAÇÃO",
           unidades: [
-            { nome: "Playground (L-142 / PSB-0142)", apiKey: "fa_shp_playground_homolog_99a8b7c6d5" },
-            { nome: "Parque Circuito (L-143 / PSB-0143)", apiKey: "fa_shp_circuito_homolog_11e2f3g4h5" }
+            { nome: "Playground (L-142 / PSB-1316)", apiKey: "fa_shp_playground_homolog_99a8b7c6d5" },
+            { nome: "Parque Circuito (L-143 / PSB-1346)", apiKey: "fa_shp_circuito_homolog_11e2f3g4h5" }
           ],
           endpoints: {
             health: "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/health",
