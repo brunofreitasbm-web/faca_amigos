@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
-import { app, BrowserWindow, Menu } from "electron";
+import { app, BrowserWindow, Menu, ipcMain } from "electron";
 import { openDatabase, migrate } from "@facaamigos/db-local";
 import { buildApp } from "../server/app.js";
 import { seedDevData } from "../server/seed-dev.js";
@@ -115,8 +115,21 @@ app.whenReady().then(async () => {
     });
   }
 
-  createWindow(protocol, splash);
+  const mainWindow = createWindow(protocol, splash);
   startPrintBridge();
+
+  // Fonte da verdade para a tela Configurações > Impressoras validar o
+  // nome digitado: o print bridge usa esse mesmo nome literal em
+  // OpenPrinterA/webContents.print, então um typo aqui é impressão
+  // silenciosamente falhando sem nada na fila do Windows.
+  ipcMain.handle("list-printers", async () => {
+    try {
+      return await mainWindow.webContents.getPrintersAsync();
+    } catch (err) {
+      console.error("[main] falha ao listar impressoras instaladas:", err);
+      return [];
+    }
+  });
 
   // Emissão fiscal (Fase 3 do plano): try/catch explícito e captura de
   // rejeições não tratadas — um erro aqui NUNCA pode derrubar a impressão
