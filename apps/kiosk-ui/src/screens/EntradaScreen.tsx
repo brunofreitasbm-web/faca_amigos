@@ -465,12 +465,21 @@ export function EntradaScreen({
   // Cupons restritos a um plano (ex.: "N ESTRELAS", só no plano de 30min)
   // só aparecem quando esse plano está selecionado — evita o operador
   // escolher um cupom que o servidor vai recusar no check-in.
-  const eligibleCoupons = coupons.filter((c) => !c.allowedPlanId || c.allowedPlanId === planId);
+  const eligibleCoupons = useMemo(
+    () => coupons.filter((c) => !c.allowedPlanId || c.allowedPlanId === planId),
+    [coupons, planId],
+  );
 
   useEffect(() => {
     if (!unit) return;
-    const currentName = childName;
-    if (currentName || selectedPlan) {
+    const currentName = childName.trim();
+    if (!currentName && !selectedPlan) {
+      setGeminiOffers([]);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(() => {
       setLoadingGemini(true);
       generateCheckinSuggestions({
         childName: currentName,
@@ -490,10 +499,19 @@ export function EntradaScreen({
           discountText: c.kind === "DESCONTO_PCT" ? `${c.value}% OFF` : `R$ ${(c.value / 100).toFixed(2)} OFF`,
         })),
       })
-        .then(setGeminiOffers)
-        .finally(() => setLoadingGemini(false));
-    }
-  }, [matchedChild, childName, selectedPlan, guardianName, unit, plans, eligibleCoupons]);
+        .then((offers) => {
+          if (active) setGeminiOffers(offers);
+        })
+        .finally(() => {
+          if (active) setLoadingGemini(false);
+        });
+    }, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [matchedChild?.id, childName, selectedPlan?.id, guardianName, unit?.id, plans, eligibleCoupons]);
 
   function handleApplyGeminiOffer(offer: CheckinOffer) {
     if (offer.actionType === "UPGRADE_PLAN") {

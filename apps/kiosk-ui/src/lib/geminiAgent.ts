@@ -118,6 +118,8 @@ export async function testGeminiApiKey(apiKey: string, model: GeminiModel = "gem
   }
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
     const res = await fetch(url, {
       method: "POST",
@@ -128,7 +130,9 @@ export async function testGeminiApiKey(apiKey: string, model: GeminiModel = "gem
       body: JSON.stringify({
         contents: [{ parts: [{ text: "Responda apenas: OK" }] }],
       }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -515,6 +519,8 @@ Seja direta, calorosa, prática e utilize dados e estratégias de varejo e entre
   const settings = getGeminiSettings();
   if (settings.enabled && settings.apiKey.trim()) {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${settings.model || "gemini-1.5-flash"}:generateContent?key=${settings.apiKey.trim()}`;
       const res = await fetch(url, {
         method: "POST",
@@ -525,7 +531,9 @@ Seja direta, calorosa, prática e utilize dados e estratégias de varejo e entre
         body: JSON.stringify({
           contents: [{ parts: [{ text: `${systemInstruction}\n\n${prompt}` }] }],
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (res.ok) {
         const data = await res.json();

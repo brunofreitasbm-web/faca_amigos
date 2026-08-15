@@ -111,20 +111,31 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
   const [loadingCheckoutOffers, setLoadingCheckoutOffers] = useState(false);
 
   useEffect(() => {
-    if (resolved && entry && unit) {
-      setLoadingCheckoutOffers(true);
-      const elapsedMin = Math.round((entry.quote.timing.elapsedMs || 0) / 60_000);
-      generateCheckoutSuggestions({
-        childName: entry.session.child_name_snapshot,
-        durationMinutes: elapsedMin,
-        extraMinutes: entry.quote.timing.overMinutes,
-        totalPaidCents: entry.quote.totalCents,
-        unitName: unit.name,
-      })
-        .then(setCheckoutOffers)
-        .finally(() => setLoadingCheckoutOffers(false));
+    if (!resolved?.sessionId || !entry || !unit) {
+      setCheckoutOffers([]);
+      return;
     }
-  }, [resolved, entry, unit]);
+    let active = true;
+    setLoadingCheckoutOffers(true);
+    const elapsedMin = Math.round((entry.quote.timing.elapsedMs || 0) / 60_000);
+    generateCheckoutSuggestions({
+      childName: entry.session.child_name_snapshot,
+      durationMinutes: elapsedMin,
+      extraMinutes: entry.quote.timing.overMinutes,
+      totalPaidCents: entry.quote.totalCents,
+      unitName: unit.name,
+    })
+      .then((offers) => {
+        if (active) setCheckoutOffers(offers);
+      })
+      .finally(() => {
+        if (active) setLoadingCheckoutOffers(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [resolved?.sessionId, entry?.session.id, unit?.id]);
 
   function handleApplyCheckoutOffer(offer: CheckoutOffer) {
     toast.success(`Oferta "${offer.title}" recomendada ao responsável!`);
