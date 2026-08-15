@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, Button, Input, Select, HelpText, Badge } from "@facaamigos/ui";
+import { useAppState } from "../state/AppState.js";
 import {
   generateGerencialInsights,
   chatGerencialCopilot,
@@ -16,6 +17,7 @@ interface GeminiGerencialCopilotProps {
 }
 
 export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilotProps) {
+  const { unit } = useAppState();
   const [insights, setInsights] = useState<GerencialInsight[]>([]);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -38,12 +40,12 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
 
   const defaultMetricsContext =
     metricsSummary ||
-    "Faturamento Hoje: R$ 3.850,00 | Ticket Médio: R$ 48,00 | Ocupação Média: 65% | Total Visitas: 80 crianças | Meias Vendidas: 14 unidades.";
+    `Unidade: ${unit?.name || "Geral"} | Faturamento Hoje: R$ 3.850,00 | Ticket Médio: R$ 48,00 | Ocupação Média: 65% | Total Visitas: 80 crianças | Meias Vendidas: 14 unidades.`;
 
   useEffect(() => {
     let active = true;
     setLoadingInsights(true);
-    generateGerencialInsights(defaultMetricsContext)
+    generateGerencialInsights(defaultMetricsContext, unit?.name)
       .then((res) => {
         if (active) setInsights(res);
       })
@@ -53,7 +55,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
     return () => {
       active = false;
     };
-  }, [defaultMetricsContext]);
+  }, [defaultMetricsContext, unit?.name]);
 
   async function handleSendMessage(e?: React.FormEvent) {
     if (e) e.preventDefault();

@@ -479,11 +479,21 @@ export function EntradaScreen({
         selectedPlanMinutes: selectedPlan ? planDurationMinutes(selectedPlan) : 30,
         selectedPlanPriceCents: selectedPlan?.valueCents,
         unitName: unit.name,
+        availablePlans: plans.map((p) => ({
+          id: p.id,
+          name: p.name,
+          valueCents: p.valueCents,
+          minutes: planDurationMinutes(p),
+        })),
+        availableCoupons: eligibleCoupons.map((c) => ({
+          code: c.code,
+          discountText: c.kind === "DESCONTO_PCT" ? `${c.value}% OFF` : `R$ ${(c.value / 100).toFixed(2)} OFF`,
+        })),
       })
         .then(setGeminiOffers)
         .finally(() => setLoadingGemini(false));
     }
-  }, [matchedChild, childName, selectedPlan, guardianName, unit]);
+  }, [matchedChild, childName, selectedPlan, guardianName, unit, plans, eligibleCoupons]);
 
   function handleApplyGeminiOffer(offer: CheckinOffer) {
     if (offer.actionType === "UPGRADE_PLAN") {

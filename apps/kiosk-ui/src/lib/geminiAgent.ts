@@ -71,6 +71,9 @@ export interface CheckinContext {
   visitCount?: number;
   productsInCart?: string[];
   unitName?: string;
+  availablePlans?: Array<{ id: string; name: string; valueCents: number; minutes: number }>;
+  availableProducts?: Array<{ id: string; name: string; priceCents: number }>;
+  availableCoupons?: Array<{ code: string; discountText?: string }>;
 }
 
 export interface CheckoutOffer {
@@ -208,32 +211,49 @@ async function callGemini(prompt: string, systemInstruction?: string): Promise<s
  */
 export async function generateCheckinSuggestions(ctx: CheckinContext): Promise<CheckinOffer[]> {
   const systemInstruction = `Você é a ZoeIA, a especialista humana de acolhimento e vendas do FaçaAmigos.
-Sua missão é sugerir a melhor oferta de upsell/cross-sell no momento do check-in com tom caloroso, empático e focado no bem-estar da família.
+REGRA ABSOLUTA E INEGOCIÁVEL:
+1. NUNCA invente planos de tempo, preços fictícios, cupons inexistentes ou valores que não estejam cadastrados no sistema.
+2. Suas recomendações DEVEM ser baseadas estritamente nos Planos, Produtos e Cupons REAIS cadastrados na unidade informada.
+3. Apresente os meios de oferecimento com forte argumento de vendas, destacando as VANTAGENS de compra, economia proporcional (ex: custo por hora menor) e o CUSTO-BENEFÍCIO real para a família.
+
 Responda EXCLUSIVAMENTE em formato JSON com o seguinte esquema:
 {
   "offers": [
     {
       "id": "string",
-      "title": "string curto chamativo (ex: Upgrade para 1 Hora)",
-      "description": "string explicativo curto com toque humano",
-      "badge": "string opcional (ex: Dica da ZoeIA, Mais Recomendado, 20% OFF)",
+      "title": "string curto chamativo de oferecimento",
+      "description": "argumento de venda humanizado destacando o custo-benefício e vantagem real",
+      "badge": "string opcional (ex: Dica da ZoeIA, Melhor Custo-Benefício, Mais Vantajoso)",
       "actionType": "UPGRADE_PLAN" | "ADD_PRODUCT" | "APPLY_COUPON",
-      "targetName": "string com o nome do produto/plano recomendado (ex: Meia Antiderrapante)",
+      "targetName": "nome EXATO do plano, produto ou cupom cadastrado no sistema",
       "priceCents": number_opcional,
-      "reason": "motivo resumido sob a perspectiva humana de acolhimento"
+      "reason": "motivo focado na vantagem comercial e acolhimento para o operador falar em voz alta"
     }
   ]
 }`;
 
-  const prompt = `Contexto da Entrada:
+  const plansText = ctx.availablePlans?.map((p) => `- ${p.name}: ${p.minutes}min por R$ ${(p.valueCents / 100).toFixed(2)}`).join("\n") || "Planos Padrão do Sistema";
+  const productsText = ctx.availableProducts?.map((p) => `- ${p.name}: R$ ${(p.priceCents / 100).toFixed(2)}`).join("\n") || "Meias Antiderrapantes e Bebidas";
+  const couponsText = ctx.availableCoupons?.map((c) => `- Código: ${c.code} (${c.discountText || "Desconto"})`).join("\n") || "Sem cupons adicionais";
+
+  const prompt = `Contexto da Entrada na Unidade (${ctx.unitName || "Playground"}):
 - Criança: ${ctx.childName || "Criança"} (${ctx.childAge ? ctx.childAge + " anos" : "idade não inf."})
 - Responsável: ${ctx.responsibleName || "Acompanhante"}
-- Plano selecionado: ${ctx.selectedPlanName || "Nenhum selecionado"} (${ctx.selectedPlanMinutes || 30} min)
-- Número de visitas anteriores: ${ctx.visitCount || 1}
-- Produtos no carrinho: ${ctx.productsInCart?.join(", ") || "Nenhum produto"}
-- Unidade: ${ctx.unitName || "Playground"}
+- Plano selecionado agora: ${ctx.selectedPlanName || "Nenhum selecionado"} (${ctx.selectedPlanMinutes || 30} min)
+- Visitas anteriores desta família: ${ctx.visitCount || 1}
+- Itens no carrinho: ${ctx.productsInCart?.join(", ") || "Nenhum produto"}
 
-Gere até 2 ofertas perspicazes para o operador oferecer à família agora.`;
+CATÁLOGO REAL CADASTRADO NA UNIDADE:
+[PLANOS DISPONÍVEIS]
+${plansText}
+
+[PRODUTOS DISPONÍVEIS]
+${productsText}
+
+[CUPONS DISPONÍVEIS]
+${couponsText}
+
+Com base SOMENTE neste catálogo real cadastrado, gere até 2 ofertas perspicazes com excelente argumento de vendas e custo-benefício.`;
 
   const rawJson = await callGemini(prompt, systemInstruction);
   if (rawJson) {
@@ -365,24 +385,28 @@ Responda EXCLUSIVAMENTE no formato JSON:
 /**
  * Gera Insights para a tela Gerencial
  */
-export async function generateGerencialInsights(metricsSummary: string): Promise<GerencialInsight[]> {
+export async function generateGerencialInsights(metricsSummary: string, unitName?: string): Promise<GerencialInsight[]> {
+  const targetUnit = unitName || "Unidade Atual";
   const systemInstruction = `Você é a ZoeIA, a Diretora Comercial Virtual de IA do FaçaAmigos.
-Analise as métricas gerenciais e sugira 3 ações práticas e humanas de vendas para a unidade.
+REGRAS OBRIGATÓRIAS DE ANÁLISE GERENCIAL:
+1. Todos os insights DEVEM fazer alusão explícita à unidade atual sob análise ("${targetUnit}").
+2. Os insights DEVEM trazer análises individualizadas e segmentadas por perfil de responsável e/ou crianças atendidas na unidade (ex: identificar frequência de responsáveis sem Pacote VIP, padrões de estouro de tolerância por faixa etária da criança, consumo de adicionais por horário de entrada).
+
 Responda EXCLUSIVAMENTE no formato JSON:
 {
   "insights": [
     {
       "id": "string",
-      "title": "string",
+      "title": "string chamativo citando a unidade",
       "category": "FATURAMENTO" | "HOJE" | "PRODUTOS" | "METAS",
-      "description": "análise curta com números",
-      "recommendation": "ação clara e humana a ser tomada",
+      "description": "análise detalhada com números e perfil dos responsáveis/crianças",
+      "recommendation": "ação humana de vendas focada na conversão dos clientes",
       "impact": "ALTO" | "MEDIO" | "BAIXO"
     }
   ]
 }`;
 
-  const prompt = `Métricas Atuais da Unidade:\n${metricsSummary}`;
+  const prompt = `Métricas da Unidade (${targetUnit}):\n${metricsSummary}`;
 
   const rawJson = await callGemini(prompt, systemInstruction);
   if (rawJson) {
