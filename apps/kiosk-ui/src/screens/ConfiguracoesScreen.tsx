@@ -1411,27 +1411,6 @@ const SAMPLE_RECEIPT = generateEscPosReceipt({
   payments: [{ method: "Cartão de Crédito", amountCents: 7500 }],
 });
 
-const COMMON_WRISTBAND_PRINTERS = [
-  "Apptech T271U",
-  "Gainscha GS-2208D",
-  "Zebra ZD220",
-  "Zebra GC420t",
-  "Argox OS-214plus",
-  "Elgin L42 Pro",
-];
-
-const COMMON_RECEIPT_PRINTERS = [
-  "Apptech Q851L USB",
-  "APPTECH Q851L USB",
-  "Apptech T271U",
-  "Elgin i9",
-  "Elgin i8",
-  "Bematech MP-4200 TH",
-  "Epson TM-T20",
-  "Daruma DR800",
-  "POS-80",
-];
-
 function ImpressorasTab({ unitId }: { unitId: string }) {
   const toast = useToast();
   const [wristbandPrinter, setWristbandPrinter] = useState("");
@@ -1441,36 +1420,39 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   const [testingWristband, setTestingWristband] = useState(false);
   const [showWristbandTestModal, setShowWristbandTestModal] = useState(false);
   // Nomes instalados no Windows deste terminal (via preload do Electron —
-  // undefined enquanto não sabemos, [] se a API não existe neste ambiente,
-  // ou não veio nenhuma impressora). O print bridge usa o nome salvo aqui
-  // literalmente em OpenPrinterA/webContents.print: um caractere diferente
-  // já faz a impressão falhar antes de qualquer coisa chegar na fila.
+  // undefined enquanto não sabemos, [] se a API não existe neste ambiente
+  // (ex.: tablet comum da LAN) ou o Windows não retornou nenhuma). O print
+  // bridge usa o nome escolhido aqui literalmente em OpenPrinterA/
+  // webContents.print: digitar de cabeça já foi o motivo da impressão
+  // falhar sem nada na fila — por isso a escolha é sempre por lista, nunca
+  // texto livre.
   const [installedPrinters, setInstalledPrinters] = useState<string[] | undefined>(undefined);
+  const [loadingPrinters, setLoadingPrinters] = useState(false);
 
   useEffect(() => {
     Api.unitSetting(unitId, "printer_wristband").then((r) => setWristbandPrinter(r.value ?? ""));
     Api.unitSetting(unitId, "printer_receipt").then((r) => setReceiptPrinter(r.value ?? ""));
   }, [unitId]);
 
-  useEffect(() => {
+  function refreshPrinters() {
     const list = window.facaamigos?.listPrinters;
     if (!list) {
       setInstalledPrinters([]);
       return;
     }
+    setLoadingPrinters(true);
     list()
       .then((printers) => setInstalledPrinters(printers.map((p) => p.name)))
       .catch((err) => {
         console.warn("Não foi possível listar impressoras instaladas:", err);
         setInstalledPrinters([]);
-      });
-  }, []);
-
-  function printerMismatchWarning(name: string): string | null {
-    if (!name || !installedPrinters || installedPrinters.length === 0) return null;
-    if (installedPrinters.includes(name)) return null;
-    return `Nenhuma impressora instalada neste terminal chama-se exatamente "${name}" — a impressão vai falhar antes de chegar na fila do Windows. Instaladas: ${installedPrinters.join(", ")}`;
+      })
+      .finally(() => setLoadingPrinters(false));
   }
+
+  useEffect(refreshPrinters, []);
+
+  const printerApiAvailable = typeof window.facaamigos?.listPrinters === "function";
 
   async function save(kind: "WRISTBAND" | "RECEIPT") {
     setSaving(kind);
@@ -1533,42 +1515,36 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
-        Digite ou selecione o nome exato da impressora como ela aparece instalada no Windows deste terminal (Painel de Controle &gt; Dispositivos e Impressoras). O print bridge local usa esse nome para
-        imprimir direto, sem abrir diálogo nenhum na tela.
+        Escolha a impressora pela lista das que estão instaladas neste terminal — o print bridge local usa exatamente esse nome para imprimir direto, sem abrir diálogo nenhum na tela.
       </p>
+      {!printerApiAvailable && (
+        <HelpText icon="⚠️" style={{ color: "var(--danger, #d9534f)" }}>
+          Este ecrã não tem acesso à lista de impressoras do Windows — abra Configurações dentro do aplicativo desktop FaçaAmigos (não num tablet/navegador) para escolher a impressora instalada.
+        </HelpText>
+      )}
+      {printerApiAvailable && installedPrinters && installedPrinters.length === 0 && (
+        <HelpText icon="⚠️" style={{ color: "var(--danger, #d9534f)" }}>
+          Nenhuma impressora instalada foi encontrada neste terminal. Instale a impressora no Windows (Painel de Controle &gt; Dispositivos e Impressoras) e clique em "Buscar novamente".
+        </HelpText>
+      )}
 
       {/* IMPRESSORA DE PULSEIRAS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Impressora de Pulseiras</h2>
-        <Input placeholder="Ex: Gainscha GS-2208D, Zebra ZD220" value={wristbandPrinter} onChange={(e) => setWristbandPrinter(e.target.value)} />
-        {installedPrinters && installedPrinters.length > 0 && (
-          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 600 }}>Instaladas neste terminal:</span>
-            {installedPrinters.map((name) => (
-              <Button key={name} variant={wristbandPrinter === name ? "primary" : "ghost"} size="sm" onClick={() => setWristbandPrinter(name)}>
-                🖨️ {name}
-              </Button>
-            ))}
+        <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <Select value={wristbandPrinter} onChange={(e) => setWristbandPrinter(e.target.value)} disabled={!installedPrinters || installedPrinters.length === 0}>
+              <option value="">{loadingPrinters ? "Buscando impressoras…" : "Selecione uma impressora instalada"}</option>
+              {installedPrinters?.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </Select>
           </div>
-        )}
-        {printerMismatchWarning(wristbandPrinter) && (
-          <HelpText icon="⚠️" style={{ color: "var(--danger, #d9534f)" }}>
-            {printerMismatchWarning(wristbandPrinter)}
-          </HelpText>
-        )}
-
-        <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 600 }}>Clique para escolher:</span>
-          {COMMON_WRISTBAND_PRINTERS.map((model) => (
-            <Button
-              key={model}
-              variant={wristbandPrinter === model ? "primary" : "ghost"}
-              size="sm"
-              onClick={() => setWristbandPrinter(model)}
-            >
-              + {model}
-            </Button>
-          ))}
+          <Button variant="ghost" size="sm" loading={loadingPrinters} onClick={refreshPrinters}>
+            🔄 Buscar novamente
+          </Button>
         </div>
 
         <div style={{ display: "flex", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
@@ -1594,35 +1570,20 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Impressora de Cupons Não Fiscais (80mm / Apptech T271U)</h2>
-        <Input placeholder="Ex: Apptech T271U, Elgin i9, POS-80" value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} />
-        {installedPrinters && installedPrinters.length > 0 && (
-          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 600 }}>Instaladas neste terminal:</span>
-            {installedPrinters.map((name) => (
-              <Button key={name} variant={receiptPrinter === name ? "primary" : "ghost"} size="sm" onClick={() => setReceiptPrinter(name)}>
-                🖨️ {name}
-              </Button>
-            ))}
+        <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <Select value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} disabled={!installedPrinters || installedPrinters.length === 0}>
+              <option value="">{loadingPrinters ? "Buscando impressoras…" : "Selecione uma impressora instalada"}</option>
+              {installedPrinters?.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </Select>
           </div>
-        )}
-        {printerMismatchWarning(receiptPrinter) && (
-          <HelpText icon="⚠️" style={{ color: "var(--danger, #d9534f)" }}>
-            {printerMismatchWarning(receiptPrinter)}
-          </HelpText>
-        )}
-
-        <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 600 }}>Clique para escolher:</span>
-          {COMMON_RECEIPT_PRINTERS.map((model) => (
-            <Button
-              key={model}
-              variant={receiptPrinter === model ? "primary" : "ghost"}
-              size="sm"
-              onClick={() => setReceiptPrinter(model)}
-            >
-              + {model}
-            </Button>
-          ))}
+          <Button variant="ghost" size="sm" loading={loadingPrinters} onClick={refreshPrinters}>
+            🔄 Buscar novamente
+          </Button>
         </div>
 
         <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
