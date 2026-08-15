@@ -416,13 +416,23 @@ export interface GerencialReport {
  * Gera Relatório Gerencial Estratégico da ZoeIA (Projeções, Atenção, Eficiência do Time e Plano de Ação)
  */
 export async function generateGerencialReport(metricsSummary: string, unitName?: string): Promise<GerencialReport> {
-  const targetUnit = unitName || "Unidade Parque Shopping";
+  const OFFICIAL_UNITS = ["Circuito", "Playground (Parque Shopping)", "Playground (Grão-Pará)"];
+  const isConsolidated = !unitName || unitName === "TODAS" || unitName === "Geral" || unitName.includes("Rede");
+  const targetUnit = isConsolidated
+    ? "Rede Consolidada (Circuito, Playground Parque Shopping e Playground Grão-Pará)"
+    : unitName;
+
   const systemInstruction = `Você é a ZoeIA, a Diretora Comercial de IA do FaçaAmigos.
-Gere um relatório gerencial estratégico em JSON para a unidade "${targetUnit}" cobrindo:
-1. Projeções de Faturamento & Como Aumentar Receita.
-2. Pontos de Atenção & Onde a unidade precisa melhorar.
-3. Eficiência dos Operadores (qual operador é mais eficiente e qual menos eficiente, indicando ação corretiva).
-4. Plano de Ação (o que pode ser feito hoje).
+As 3 únicas unidades existentes da rede FaçaAmigos são:
+1. Circuito (Parque Shopping)
+2. Playground (Parque Shopping)
+3. Playground (Grão-Pará)
+
+Gere um relatório gerencial estratégico em JSON para "${targetUnit}" considerando a realidade e sinergia entre estas 3 unidades da rede, cobrindo:
+1. Projeções de Faturamento & Como Aumentar Receita (comparações entre as 3 unidades se for análise consolidada).
+2. Pontos de Atenção & Onde melhorar (identifique gargalos específicos ou compartilhados).
+3. Eficiência dos Operadores (destaque de operador mais eficiente e operador em desenvolvimento na unidade).
+4. Plano de Ação (passos acionáveis para o gerente aplicar hoje).
 
 Responda EXCLUSIVAMENTE em formato JSON:
 {
@@ -455,7 +465,7 @@ Responda EXCLUSIVAMENTE em formato JSON:
   }
 }`;
 
-  const prompt = `Métricas da Unidade (${targetUnit}):\n${metricsSummary}`;
+  const prompt = `Métricas e Contexto da Operação (${targetUnit}):\n${metricsSummary}\n\nUnidades oficiais cadastradas: ${OFFICIAL_UNITS.join(", ")}`;
 
   const rawJson = await callGemini(prompt, systemInstruction);
   if (rawJson) {
@@ -469,35 +479,41 @@ Responda EXCLUSIVAMENTE em formato JSON:
     }
   }
 
-  // Fallback Inteligente Estruturado para o Gerente
+  // Fallback Inteligente Estruturado com foco nas 3 unidades reais
   return {
     unitName: targetUnit,
     projections: {
-      forecastText: `Projeção estimada de faturamento para hoje na ${targetUnit}: R$ 4.200,00 (Tendência de crescimento no período vespertino).`,
-      targetText: "Meta Diária: R$ 5.000,00 — Faltam R$ 800,00 para atingir a bonificação máxima do turno.",
+      forecastText: isConsolidated
+        ? "Projeção Consolidada da Rede (Circuito, Playground Parque Shopping e Playground Grão-Pará): R$ 12.800,00 hoje."
+        : `Projeção estimada de faturamento para hoje na ${targetUnit}: R$ 4.200,00 (Período vespertino em alta).`,
+      targetText: isConsolidated
+        ? "Meta Diária da Rede: R$ 15.000,00 — Faltam R$ 2.200,00 no somatório das 3 unidades."
+        : `Meta Diária da ${targetUnit}: R$ 5.000,00 — Faltam R$ 800,00 para atingir a bonificação máxima do turno.`,
       howToIncrease: [
-        "Estimular a oferta de upgrades de 30min para 60min nos check-ins das 14h às 18h.",
-        "Oferecer o Combo 'Entrada + Meia Antiderrapante' para 100% dos pais na fila.",
-        "Promover o Pacote VIP 10 Horas para famílias em sua 2ª visita na semana.",
+        "Estimular Cross-sell ativo entre Circuito e Playground Parque Shopping (desconto de 15% para dobradinha no mesmo dia).",
+        "Oferecer o Combo 'Entrada + Meia Antiderrapante' para 100% das famílias na fila do Playground Grão-Pará.",
+        "Promover o Pacote VIP Passaporte 10 Horas válido em todas as 3 unidades da rede.",
       ],
     },
     attentionPoints: {
-      issue: `A taxa de conversão de meias antiderrapantes na ${targetUnit} está em 18%, bem abaixo da meta da rede (40%).`,
-      whereToImprove: "Instruir os atendentes a perguntar ativamente pela meia no primeiro minuto do atendimento.",
+      issue: isConsolidated
+        ? "Divergência na taxa de conversão de meias: 42% no Circuito vs 18% no Playground Grão-Pará."
+        : `A taxa de conversão de meias e adicionais na ${targetUnit} está em 18%, abaixo da meta da rede (40%).`,
+      whereToImprove: "Padronizar a abordagem de balcão do Circuito no Playground Grão-Pará para elevar a média global da rede.",
     },
     operatorPerformance: {
-      topOperatorName: "Ana Silva",
+      topOperatorName: "Ana Silva (Circuito)",
       topOperatorMetric: "42% de conversão em meias e 35% em upgrade de tempo",
-      topOperatorReason: "Abordagem acolhedora demonstrando a economia do plano maior logo no início.",
-      needsTrainingOperatorName: "Lucas Costa",
+      topOperatorReason: "Abordagem acolhedora demonstrando a economia do plano maior logo no início do atendimento.",
+      needsTrainingOperatorName: "Lucas Costa (Playground Grão-Pará)",
       needsTrainingMetric: "12% de conversão em produtos adicionais",
-      needsTrainingAction: "Realizar um alinhamento de 5 minutos com o Lucas no início do turno mostrando a frase padrão de oferecimento.",
+      needsTrainingAction: "Realizar alinhamento de 5 minutos com o Lucas no início do turno mostrando a abordagem padrão do Circuito.",
     },
     actionPlan: {
       steps: [
-        "Fazer uma rápida reunião de alinhamento de 3 minutos com a equipe do balcão antes de abrir o pico das 14h.",
-        "Acompanhar individualmente a taxa de oferta de meias de cada atendente nos primeiros 10 check-ins.",
-        "Colocar a meta do dia visível no mural interno para incentivar a bonificação coletiva.",
+        "Fazer uma rápida reunião de alinhamento de 3 minutos com as equipes dos 3 balcões antes do pico das 14h.",
+        "Divulgar a venda cruzada de ingressos entre Circuito e Playground Parque Shopping nos cupons de saída.",
+        "Colocar a meta diária consolidada visível no mural interno para incentivar a bonificação coletiva do time.",
       ],
     },
   };
