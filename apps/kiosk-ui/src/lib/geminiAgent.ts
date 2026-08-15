@@ -598,21 +598,22 @@ export async function generateMobileAcompanharSuggestions(ctx: {
   const currentUnit = ctx.unitName || "Playground Parque Shopping";
   const crossUnit = currentUnit.toLowerCase().includes("circuito") ? "Playground Parque Shopping" : "Circuito Parque Shopping";
 
-  const systemInstruction = `Você é a ZoeIA na tela de Acompanhamento do celular dos pais enquanto a criança brinca.
-REGRAS ABSOLUTAS:
-1. Gere ofertas reais para extensão de tempo com melhor custo-benefício, aumento do LTV (fidelidade via Pacote VIP) e Venda Cruzada para visitar a atração irmã (${crossUnit}).
+  const systemInstruction = `Você é a ZoeIA na tela de Acompanhamento do celular dos pais.
+REGRAS DE OURO:
+1. Crie EXATAMENTE 1 ÚNICA sugestão sutil, persuasiva e elegante.
+2. NUNCA exija comandos ou botões de ação do pai. Apenas apresente a vantagem de forma envolvente (ex: inspirar o prolongamento de tempo para a felicidade da criança ou indicar a experiência adicional/unidade parceira ${crossUnit} com custo-benefício).
 
 Responda EXCLUSIVAMENTE em formato JSON:
 {
   "offers": [
     {
       "id": "string",
-      "title": "string curto",
-      "description": "string com convite irrecusável",
-      "badge": "string opcional (ex: ZoeIA Indica, Oferta VIP, Vantagem Exclusiva)",
+      "title": "string chamativo e elegante",
+      "description": "mensagem persuasiva subliminar curta convidando ao prolongamento de tempo ou adicional",
+      "badge": "string opcional (ex: Dica da ZoeIA, Momento Especial)",
       "category": "UPSELL_PLAN" | "CROSS_SELL_UNIT" | "ADD_PRODUCT" | "LTV_RENEWAL",
       "targetName": "string",
-      "reason": "string"
+      "reason": "motivo afetivo e de economia"
     }
   ]
 }`;
@@ -624,41 +625,37 @@ Responda EXCLUSIVAMENTE em formato JSON:
     try {
       const parsed = JSON.parse(rawJson);
       if (Array.isArray(parsed?.offers) && parsed.offers.length > 0) {
-        return parsed.offers;
+        return [parsed.offers[0]];
       }
     } catch {
       // ignore
     }
   }
 
-  // Fallback Inteligente Local de Acompanhamento
+  // Fallback Inteligente Local — 1 Único Card Persuasivo
+  if (ctx.remainingMinutes <= 10) {
+    return [
+      {
+        id: "ac_subliminal_time",
+        title: `${ctx.childName} está radiante brincando! 🎈`,
+        description: `Faltam poucos minutos para encerrar. Passe no balcão e prolongue +30min por um valor promocional para garantir que a diversão continue sem pressa.`,
+        badge: "Dica Acolhedora da ZoeIA",
+        category: "UPSELL_PLAN",
+        targetName: "+30 Minutos",
+        reason: "Prolongue com tarifa promocional e continue aproveitando o shopping com tranquilidade.",
+      },
+    ];
+  }
+
   return [
     {
-      id: "ac_renewal",
-      title: "Adicionar +30 Minutos com Desconto",
-      description: `${ctx.childName} está se divertindo muito! Evite cobrança de excedente prolongando o tempo com tarifa promocional.`,
-      badge: "ZoeIA Indica",
-      category: "UPSELL_PLAN",
-      targetName: "+30 Minutos",
-      reason: "Garanta tranquilidade para terminar suas compras enquanto a criança continua brincando.",
-    },
-    {
-      id: "ac_cross",
-      title: `Visita Cruzada no ${crossUnit}`,
-      description: `Gostou da brincadeira? Mostre este cupom no ${crossUnit} e ganhe 15% OFF na entrada hoje!`,
-      badge: "Vantagem Shopping",
+      id: "ac_subliminal_cross",
+      title: `Sabia que o ${crossUnit} também está aberto hoje? ✨`,
+      description: `Ao encerrar a visita do ${ctx.childName}, apresente esta tela na recepção do ${crossUnit} e ganhe 15% OFF para esticar a brincadeira em um ambiente novinho.`,
+      badge: "Vantagem Exclusiva",
       category: "CROSS_SELL_UNIT",
       targetName: crossUnit,
-      reason: "Aproveite a ida ao shopping com atrações complementares para toda a família.",
-    },
-    {
-      id: "ac_ltv",
-      title: "Converter Tempo em Passaporte VIP 10 Horas",
-      description: "Abata o valor pago na entrada de hoje ao aderir ao pacote fidelidade e economize até 35% nas próximas visitas.",
-      badge: "Fidelidade VIP (LTV)",
-      category: "LTV_RENEWAL",
-      targetName: "Pacote VIP 10h",
-      reason: "Transforme visitas avulsas em economia contínua com validade estendida.",
+      reason: "Experiência completa combinando atrações exclusivas do shopping.",
     },
   ];
 }

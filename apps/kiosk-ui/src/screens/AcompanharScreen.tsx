@@ -286,53 +286,55 @@ function AcompanharConteudo({
         </p>
       </Card>
 
-      {/* Card da ZoeIA — Venda Cruzada Parque/Circuito, LTV e Custo-Benefício */}
-      {zoeOffers.length > 0 && (
-        <Card
-          style={{
-            padding: "16px",
-            background: "linear-gradient(135deg, #f5f3ff 0%, #edf2f7 100%)",
-            border: "1.5px solid #a855f7",
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", fontSize: "11px", padding: "2px 8px", borderRadius: "9999px" }}>
-              ✦ ZoeIA
-            </span>
-            <strong style={{ fontSize: "14px", color: "#5b21b6" }}>Oportunidades & Vantagens para Você</strong>
-          </div>
+      {/* CARD ÚNICO ZOEIA — Mensagem Persuasiva & Subliminar para Venda Adicional / Prolongamento */}
+      {zoeOffers.length > 0 && (() => {
+        const topOffer = zoeOffers[0];
+        if (!topOffer) return null;
+        return (
+          <Card
+            style={{
+              padding: "18px 20px",
+              background: "linear-gradient(135deg, #f5f3ff 0%, #faf5ff 100%)",
+              border: "1.5px solid #c084fc",
+              borderRadius: "16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              boxShadow: "0 4px 14px rgba(124, 58, 237, 0.06)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span
+                style={{
+                  background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)",
+                  color: "#ffffff",
+                  fontWeight: "bold",
+                  fontSize: "11px",
+                  padding: "3px 10px",
+                  borderRadius: "9999px",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                ✦ DICA DA ZOEIA
+              </span>
+              {topOffer.badge && (
+                <span style={{ fontSize: "11px", fontWeight: "bold", color: "#6b21a8", background: "#f3e8ff", padding: "2px 8px", borderRadius: "9999px" }}>
+                  {topOffer.badge}
+                </span>
+              )}
+            </div>
 
-          {zoeOffers.map((offer) => (
-            <div
-              key={offer.id}
-              style={{
-                padding: "10px 12px",
-                background: "#ffffff",
-                borderRadius: "10px",
-                border: "1px solid #e9d5ff",
-                display: "flex",
-                flexDirection: "column",
-                gap: "4px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <strong style={{ fontSize: "13px", color: "#4c1d95" }}>{offer.title}</strong>
-                {offer.badge && (
-                  <span style={{ fontSize: "10px", fontWeight: "bold", color: "#7c3aed", background: "#f3e8ff", padding: "2px 6px", borderRadius: "9999px" }}>
-                    {offer.badge}
-                  </span>
-                )}
-              </div>
-              <p style={{ margin: 0, fontSize: "12px", color: "#6b21a8", lineHeight: 1.4 }}>
-                {offer.description}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <strong style={{ fontSize: "15px", color: "#4c1d95", lineHeight: 1.3 }}>
+                {topOffer.title}
+              </strong>
+              <p style={{ margin: 0, fontSize: "13px", color: "#5b21b6", lineHeight: 1.5 }}>
+                {topOffer.description}
               </p>
             </div>
-          ))}
-        </Card>
-      )}
+          </Card>
+        );
+      })()}
 
       {!isPausada && !lembreteAtivo && timing.phase !== "EXCEDENTE" && (!isCircuito || circuitoConfig) && (
         <Button variant="secondary" onClick={onAtivarLembrete}>
