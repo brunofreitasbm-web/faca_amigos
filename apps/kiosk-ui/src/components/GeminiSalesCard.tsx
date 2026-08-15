@@ -56,10 +56,10 @@ export function GeminiSalesCard(props: GeminiSalesCardProps) {
               borderRadius: "9999px",
             }}
           >
-            ✦ AGENTE DE IA GEMINI
+            ✦ ZOEIA
           </Badge>
           <strong style={{ fontSize: "15px", color: "var(--text-primary)" }}>
-            {type === "CHECKIN" ? "Sugestão Comercial para o Balcão" : "Oportunidade de Fidelização no Check-out"}
+            {type === "CHECKIN" ? "Indicação da ZoeIA para o Balcão" : "Sugestão da ZoeIA para Fidelizar no Check-out"}
           </strong>
         </div>
 

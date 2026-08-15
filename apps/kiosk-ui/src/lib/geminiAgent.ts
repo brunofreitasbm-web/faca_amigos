@@ -207,20 +207,20 @@ async function callGemini(prompt: string, systemInstruction?: string): Promise<s
  * Gera ofertas de Check-in (Up-sell / Cross-sell)
  */
 export async function generateCheckinSuggestions(ctx: CheckinContext): Promise<CheckinOffer[]> {
-  const systemInstruction = `Você é o Agente Comercial do playground FaçaAmigos.
-Sua missão é sugerir a melhor oferta de upsell/cross-sell no momento do check-in para aumentar o ticket médio e a satisfação da família.
+  const systemInstruction = `Você é a ZoeIA, a especialista humana de acolhimento e vendas do FaçaAmigos.
+Sua missão é sugerir a melhor oferta de upsell/cross-sell no momento do check-in com tom caloroso, empático e focado no bem-estar da família.
 Responda EXCLUSIVAMENTE em formato JSON com o seguinte esquema:
 {
   "offers": [
     {
       "id": "string",
       "title": "string curto chamativo (ex: Upgrade para 1 Hora)",
-      "description": "string explicativo curto (ex: Garanta 30min a mais por apenas R$ 15 extras)",
-      "badge": "string opcional (ex: Mais Vendido, Recomendado IA, 20% OFF)",
+      "description": "string explicativo curto com toque humano",
+      "badge": "string opcional (ex: Dica da ZoeIA, Mais Recomendado, 20% OFF)",
       "actionType": "UPGRADE_PLAN" | "ADD_PRODUCT" | "APPLY_COUPON",
       "targetName": "string com o nome do produto/plano recomendado (ex: Meia Antiderrapante)",
       "priceCents": number_opcional,
-      "reason": "motivo resumido baseado no contexto"
+      "reason": "motivo resumido sob a perspectiva humana de acolhimento"
     }
   ]
 }`;
@@ -307,15 +307,16 @@ function getLocalCheckinFallback(ctx: CheckinContext): CheckinOffer[] {
  * Gera ofertas de Check-out (Retenção / Conversão)
  */
 export async function generateCheckoutSuggestions(ctx: CheckoutContext): Promise<CheckoutOffer[]> {
-  const systemInstruction = `Você é o Agente Comercial do FaçaAmigos.
-Gere ofertas estratégicas de checkout para fidelizar a família ao sair do parque.
+  const systemInstruction = `Você é a ZoeIA, a especialista em fidelização e retenção do FaçaAmigos.
+Gere ofertas humanas e estratégicas de checkout para acolher e fidelizar a família ao sair do parque.
 Responda EXCLUSIVAMENTE no formato JSON:
 {
   "offers": [
     {
       "id": "string",
-      "title": "string curto",
-      "description": "string",
+      "title": "string curto chamativo",
+      "description": "string com tom humano e convidativo",
+      "badge": "string opcional (ex: Dica da ZoeIA, Fidelidade VIP)",
       "actionType": "CONVERT_VIP_PACKAGE" | "OFFER_RETURN_COUPON" | "BOOK_EVENT",
       "reason": "string"
     }
@@ -346,6 +347,7 @@ Responda EXCLUSIVAMENTE no formato JSON:
       id: "checkout_return",
       title: "Cupom 15% OFF na Próxima Visita",
       description: "Ofereça este desconto para retorno até a próxima quinta-feira em dias de menor movimento.",
+      badge: "Dica da ZoeIA",
       actionType: "OFFER_RETURN_COUPON",
       reason: "Garante retorno rápido da família e estimula o movimento em dias úteis.",
     },
@@ -353,6 +355,7 @@ Responda EXCLUSIVAMENTE no formato JSON:
       id: "checkout_package",
       title: "Converter em Pacote Passaporte VIP",
       description: "Abata parte do valor da sessão de hoje na adesão de um pacote de 10 horas.",
+      badge: "ZoeIA Indica",
       actionType: "CONVERT_VIP_PACKAGE",
       reason: "Família acumulou mais de " + (ctx.durationMinutes || 45) + " minutos nesta visita.",
     },
@@ -363,8 +366,8 @@ Responda EXCLUSIVAMENTE no formato JSON:
  * Gera Insights para a tela Gerencial
  */
 export async function generateGerencialInsights(metricsSummary: string): Promise<GerencialInsight[]> {
-  const systemInstruction = `Você é o Diretor Comercial de IA do FaçaAmigos.
-Analise as métricas gerenciais e sugira 3 ações práticas de vendas.
+  const systemInstruction = `Você é a ZoeIA, a Diretora Comercial Virtual de IA do FaçaAmigos.
+Analise as métricas gerenciais e sugira 3 ações práticas e humanas de vendas para a unidade.
 Responda EXCLUSIVAMENTE no formato JSON:
 {
   "insights": [
@@ -373,7 +376,7 @@ Responda EXCLUSIVAMENTE no formato JSON:
       "title": "string",
       "category": "FATURAMENTO" | "HOJE" | "PRODUTOS" | "METAS",
       "description": "análise curta com números",
-      "recommendation": "ação clara a ser tomada",
+      "recommendation": "ação clara e humana a ser tomada",
       "impact": "ALTO" | "MEDIO" | "BAIXO"
     }
   ]
@@ -400,7 +403,7 @@ Responda EXCLUSIVAMENTE no formato JSON:
       title: "Oportunidade de Upsell no Horário das 14h às 17h",
       category: "FATURAMENTO",
       description: "O ticket médio das entradas entre 14h e 17h está 22% menor que a média noturna.",
-      recommendation: "Criar o cupom 'TARDE_DIVERTIDA' com 15% de desconto no plano de 1 hora para atrair famílias no meio da tarde.",
+      recommendation: "ZoeIA sugere: Criar o cupom 'TARDE_DIVERTIDA' com 15% de desconto no plano de 1 hora para atrair famílias no meio da tarde.",
       impact: "ALTO",
     },
     {
@@ -408,7 +411,7 @@ Responda EXCLUSIVAMENTE no formato JSON:
       title: "Baixa Conversão de Meias Antiderrapantes",
       category: "PRODUTOS",
       description: "Apenas 18% dos check-ins incluem a compra de meias antiderrapantes.",
-      recommendation: "Orientar os mediadores no balcão a oferecer o combo 'Entrada + Meia' durante o check-in com valor promocional.",
+      recommendation: "ZoeIA sugere: Orientar os mediadores no balcão a oferecer o combo 'Entrada + Meia' durante o check-in com carinho e valor promocional.",
       impact: "MEDIO",
     },
     {
@@ -416,7 +419,7 @@ Responda EXCLUSIVAMENTE no formato JSON:
       title: "Desempenho da Meta Semanal",
       category: "METAS",
       description: "A unidade alcançou 68% da meta semanal de faturamento com 70% do tempo transcorrido.",
-      recommendation: "Estimular a equipe com a bonificação adicional nos pacotes de 10 horas comprados até o domingo.",
+      recommendation: "ZoeIA sugere: Estimular a equipe com a bonificação adicional nos pacotes de 10 horas comprados até o domingo.",
       impact: "ALTO",
     },
   ];
@@ -426,15 +429,15 @@ Responda EXCLUSIVAMENTE no formato JSON:
  * Responde a perguntas do gestor no Chat Comercial Copilot
  */
 export async function chatGerencialCopilot(history: ChatMessage[], newMessage: string, metricsContext: string): Promise<string> {
-  const systemInstruction = `Você é o Copilot Comercial de IA do sistema FaçaAmigos.
-Seu objetivo é ajudar o gerente de unidade a aumentar as vendas, ticket médio, otimizar pacotes, cupons e a performance dos colaboradores.
-Seja direto, profissional, caloroso, prático e utilize dados e estratégias de varejo e entretenimento infantil em shoppings.`;
+  const systemInstruction = `Você é a ZoeIA, a assistente comercial humana, perspicaz e parceira do FaçaAmigos.
+Seu objetivo é ajudar o gerente de unidade a aumentar as vendas, ticket médio, otimizar pacotes, cupons e a performance dos colaboradores de forma acolhedora e eficiente.
+Seja direta, calorosa, prática e utilize dados e estratégias de varejo e entretenimento infantil em shoppings.`;
 
   const conversationHistory = history
-    .map((m) => `${m.role === "user" ? "Gerente" : "Copilot Gemini"}: ${m.text}`)
+    .map((m) => `${m.role === "user" ? "Gerente" : "ZoeIA"}: ${m.text}`)
     .join("\n");
 
-  const prompt = `Contexto Gerencial Atual:\n${metricsContext}\n\nHistórico da Conversa:\n${conversationHistory}\nGerente: ${newMessage}\nCopilot Gemini:`;
+  const prompt = `Contexto Gerencial Atual:\n${metricsContext}\n\nHistórico da Conversa:\n${conversationHistory}\nGerente: ${newMessage}\nZoeIA:`;
 
   const settings = getGeminiSettings();
   if (settings.enabled && settings.apiKey.trim()) {

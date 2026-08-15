@@ -21,7 +21,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "model",
-      text: "Olá! Sou seu Copilot Comercial de IA (Gemini). Como posso ajudar a aumentar o faturamento e otimizar as vendas da sua unidade hoje?",
+      text: "Olá! Sou a ZoeIA, sua parceira de inteligência comercial do FaçaAmigos. Como posso ajudar a aumentar o faturamento e otimizar as vendas da sua unidade hoje?",
     },
   ]);
   const [inputMessage, setInputMessage] = useState("");
@@ -110,19 +110,19 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
                 borderRadius: "9999px",
               }}
             >
-              ✦ COPILOT COMERCIAL GEMINI
+              ✦ ZOEIA — COPILOT COMERCIAL
             </span>
             {settings.enabled && settings.apiKey ? (
-              <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: "600" }}>● Conectado (Gemini API)</span>
+              <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: "600" }}>● ZoeIA Conectada (Gemini API)</span>
             ) : (
-              <span style={{ fontSize: "12px", color: "#facc15", fontWeight: "600" }}>● Modo Fallback Inteligente</span>
+              <span style={{ fontSize: "12px", color: "#facc15", fontWeight: "600" }}>● ZoeIA em Modo Fallback</span>
             )}
           </div>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "22px", color: "#ffffff" }}>
-            Assistente Comercial & Insights Estratégicos
+            ZoeIA · Insights Estratégicos & Atendimento
           </h2>
           <p style={{ margin: "6px 0 0 0", color: "#c7d2fe", fontSize: "14px", maxWidth: "600px" }}>
-            Análise automatizada de faturamento, ticket médio, ocupação e estratégias de venda recomendadas para a sua unidade.
+            Análise humanizada e automatizada de faturamento, ticket médio, ocupação e estratégias de venda recomendadas para a sua unidade.
           </p>
         </div>
 
@@ -331,7 +331,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
       {/* Chat Interativo Comercial Copilot */}
       <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
         <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-          💬 Conversar com o Copilot Comercial
+          💬 Conversar com a ZoeIA
         </h3>
 
         {/* Histórico de Mensagens */}
@@ -370,10 +370,9 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
                   fontWeight: "bold",
                   marginBottom: "4px",
                   opacity: 0.8,
-
                 }}
               >
-                {m.role === "user" ? "Você (Gerente)" : "✦ Copilot Gemini"}
+                {m.role === "user" ? "Você (Gerente)" : "✦ ZoeIA"}
               </div>
               {m.text}
             </div>
@@ -388,7 +387,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
                 padding: "8px",
               }}
             >
-              Copilot digitando...
+              ZoeIA digitando...
             </div>
           )}
         </div>
