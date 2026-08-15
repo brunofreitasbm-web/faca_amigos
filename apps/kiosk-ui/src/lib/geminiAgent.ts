@@ -30,7 +30,7 @@ export function getGeminiSettings(): GeminiAgentSettings {
 
   return {
     apiKey: storedKey !== null && storedKey.trim() ? storedKey : envKey,
-    model: (storedModel as GeminiModel) || "gemini-1.5-flash",
+    model: (storedModel as GeminiModel) || "gemini-flash-latest",
     enabled: storedEnabled !== "false",
   };
 }
