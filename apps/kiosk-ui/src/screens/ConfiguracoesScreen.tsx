@@ -28,7 +28,6 @@ import { EspelhoPontoModal } from "../components/EspelhoPontoModal.js";
 import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/WristbandQRCode.js";
 import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
 import { money } from "../format.js";
-import { getGeminiSettings, saveGeminiSettings, testGeminiApiKey, type GeminiModel } from "../lib/geminiAgent.js";
 
 type Tab =
   | "PLANOS"
@@ -42,8 +41,7 @@ type Tab =
   | "UNIDADE"
   | "FISCAL"
   | "TERMOS"
-  | "IMPRESSORAS"
-  | "GEMINI";
+  | "IMPRESSORAS";
 
 /**
  * Capacidade exigida por aba. Assim como em auth/screens.ts, o
@@ -69,7 +67,6 @@ const TAB_CAPABILITY: Record<Tab, Capability> = {
   META: "config.write",
   FROTA: "config.write",
   IMPRESSORAS: "config.write",
-  GEMINI: "config.write",
   PONTO: "relatorio.ponto",
   UNIDADE: "config.unit.write",
   FISCAL: "config.fiscal.write",
@@ -92,7 +89,6 @@ export function ConfiguracoesScreen() {
     { value: "FIDELIDADE", label: "Fidelidade" },
     { value: "META", label: "Meta" },
     ...(isQuiosque ? ([{ value: "FROTA" as const, label: "Frota" }]) : []),
-    { value: "GEMINI", label: "Agente IA (Gemini)" },
     { value: "PONTO", label: "Espelho de Ponto" },
     { value: "UNIDADE", label: "Unidade" },
     { value: "FISCAL", label: "Dados Fiscais" },
@@ -110,7 +106,6 @@ export function ConfiguracoesScreen() {
     FIDELIDADE: "Defina recompensas automáticas para clientes recorrentes — ex.: a cada 10 visitas, uma entrada grátis.",
     META: "Configure a meta de faturamento do dia, o horário de fechamento e as regras de bônus para a equipe.",
     FROTA: "Cadastre os carrinhos do Circuito (nome, cor, emoji e foto) e marque quando um estiver em manutenção.",
-    GEMINI: "Configure a chave de API do Google Gemini para ativar o Agente Comercial no Check-in, Check-out e Módulo Gerencial.",
     PONTO: "Gere e imprima o espelho de ponto mensal de qualquer colaborador, com as marcações do mês e linha para assinatura.",
     UNIDADE: "Dados da unidade: nome, fuso, virada do dia operacional e o que aparece no cabeçalho do cupom.",
     FISCAL: "Dados do emitente para NFC-e (produtos) e o cadastro de NFS-e (serviço). Confira com seu contador antes de ligar a emissão.",
@@ -137,7 +132,6 @@ export function ConfiguracoesScreen() {
           {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
           {tab === "META" && <MetaTab unitId={unit.id} />}
           {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
-          {tab === "GEMINI" && <GeminiTab />}
           {tab === "PONTO" && <EspelhoPontoTab unitId={unit.id} />}
           {tab === "UNIDADE" && <UnidadeTab unitId={unit.id} />}
           {tab === "FISCAL" && <FiscalTab unitId={unit.id} />}
@@ -2145,117 +2139,6 @@ function TermosTab({ unitId }: { unitId: string }) {
         <Button variant="primary" disabled={saving} onClick={save}>
           Salvar termos
         </Button>
-      </div>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Agente de IA Comercial (Gemini API)
-// ---------------------------------------------------------------------------
-function GeminiTab() {
-  const toast = useToast();
-  const settings = getGeminiSettings();
-  const [apiKey, setApiKey] = useState(settings.apiKey);
-  const [model, setModel] = useState<GeminiModel>(settings.model);
-  const [enabled, setEnabled] = useState(settings.enabled);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  async function handleTest() {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const res = await testGeminiApiKey(apiKey, model);
-      setTestResult(res);
-      if (res.success) toast.success(res.message);
-      else toast.error(res.message);
-    } catch {
-      toast.error("Erro inesperado ao testar chave.");
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  function handleSave() {
-    saveGeminiSettings({ apiKey, model, enabled });
-    toast.success("Configurações do Agente Gemini salvas!");
-  }
-
-  return (
-    <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
-      <div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: "0 0 4px 0", color: "var(--text-primary)" }}>
-          ✦ Agente de IA Comercial (Google Gemini API)
-        </h2>
-        <HelpText style={{ margin: 0 }}>
-          Configure a chave de API para ativar sugestões automatizadas de vendas (up-sell e cross-sell) no Check-in, retenção no Check-out e análises comerciais no Módulo Gerencial.
-        </HelpText>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        <div>
-          <label style={{ fontSize: "14px", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
-            Gemini API Key
-          </label>
-          <Input
-            type="password"
-            placeholder="AIzaSy..."
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
-          <HelpText style={{ marginTop: "4px" }}>
-            Obtenha sua chave no Google AI Studio (a chave fica salva localmente de forma segura).
-          </HelpText>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-          <div>
-            <label style={{ fontSize: "14px", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
-              Modelo da IA
-            </label>
-            <Select value={model} onChange={(e) => setModel(e.target.value as GeminiModel)}>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash (Recomendado — Ultra Rápido)</option>
-              <option value="gemini-2.0-flash">Gemini 2.0 Flash (Mais Recente)</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro (Raciocínio Avançado)</option>
-            </Select>
-          </div>
-
-          <div>
-            <label style={{ fontSize: "14px", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
-              Status do Agente
-            </label>
-            <Select value={enabled ? "true" : "false"} onChange={(e) => setEnabled(e.target.value === "true")}>
-              <option value="true">Ativo (Gerar sugestões no PDV e Gerencial)</option>
-              <option value="false">Desativado (Usar apenas fallback estático)</option>
-            </Select>
-          </div>
-        </div>
-
-        {testResult && (
-          <div
-            style={{
-              padding: "10px 14px",
-              borderRadius: "10px",
-              fontSize: "13px",
-              fontWeight: "600",
-              background: testResult.success ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
-              color: testResult.success ? "#16a34a" : "#dc2626",
-              border: `1px solid ${testResult.success ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
-            }}
-          >
-            {testResult.message}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "8px" }}>
-          <Button variant="secondary" onClick={handleTest} disabled={testing || !apiKey.trim()}>
-            {testing ? "Testando..." : "Testar Conexão"}
-          </Button>
-          <Button variant="primary" onClick={handleSave} style={{ background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)" }}>
-            Salvar Configurações
-          </Button>
-        </div>
       </div>
     </Card>
   );

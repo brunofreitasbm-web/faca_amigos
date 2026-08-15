@@ -12,7 +12,9 @@ const LOCAL_STORAGE_KEY_API_KEY = "facaamigos_gemini_api_key";
 const LOCAL_STORAGE_KEY_MODEL = "facaamigos_gemini_model";
 const LOCAL_STORAGE_KEY_ENABLED = "facaamigos_gemini_enabled";
 
-export type GeminiModel = "gemini-1.5-flash" | "gemini-2.0-flash" | "gemini-1.5-pro";
+const DEFAULT_API_KEY = "";
+
+export type GeminiModel = "gemini-flash-latest" | "gemini-1.5-flash" | "gemini-2.0-flash" | "gemini-1.5-pro";
 
 export interface GeminiAgentSettings {
   apiKey: string;
@@ -21,13 +23,13 @@ export interface GeminiAgentSettings {
 }
 
 export function getGeminiSettings(): GeminiAgentSettings {
-  const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined) || "";
+  const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined) || DEFAULT_API_KEY;
   const storedKey = typeof localStorage !== "undefined" ? localStorage.getItem(LOCAL_STORAGE_KEY_API_KEY) : null;
   const storedModel = typeof localStorage !== "undefined" ? localStorage.getItem(LOCAL_STORAGE_KEY_MODEL) : null;
   const storedEnabled = typeof localStorage !== "undefined" ? localStorage.getItem(LOCAL_STORAGE_KEY_ENABLED) : null;
 
   return {
-    apiKey: storedKey !== null ? storedKey : envKey,
+    apiKey: storedKey !== null && storedKey.trim() ? storedKey : envKey,
     model: (storedModel as GeminiModel) || "gemini-1.5-flash",
     enabled: storedEnabled !== "false",
   };
@@ -116,7 +118,10 @@ export async function testGeminiApiKey(apiKey: string, model: GeminiModel = "gem
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-goog-api-key": apiKey.trim(),
+      },
       body: JSON.stringify({
         contents: [{ parts: [{ text: "Responda apenas: OK" }] }],
       }),
@@ -176,7 +181,10 @@ async function callGemini(prompt: string, systemInstruction?: string): Promise<s
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-goog-api-key": settings.apiKey.trim(),
+      },
       body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
@@ -434,7 +442,10 @@ Seja direto, profissional, caloroso, prático e utilize dados e estratégias de 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${settings.model || "gemini-1.5-flash"}:generateContent?key=${settings.apiKey.trim()}`;
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": settings.apiKey.trim(),
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: `${systemInstruction}\n\n${prompt}` }] }],
         }),
