@@ -154,8 +154,14 @@ export function startPrintBridge(): void {
           await printHtml(html, deviceName);
         }
       } else {
-        const html = await receiptHtml(job.payload_json as unknown as ReceiptPrintPayload);
-        await printHtml(html, deviceName);
+        const payload = job.payload_json as unknown as ReceiptPrintPayload;
+        const escpos = generateEscPosReceipt(payload);
+        const rawBuffer = Buffer.from(escpos.commandsHex, "hex");
+        const printedRaw = await printRawWindows(rawBuffer, deviceName);
+        if (!printedRaw) {
+          const html = await receiptHtml(payload);
+          await printHtml(html, deviceName);
+        }
       }
 
       await supabase.from("fa_kiosk_print_jobs").update({ status: "PRINTED", printed_at_ms: Date.now() }).eq("id", job.id);

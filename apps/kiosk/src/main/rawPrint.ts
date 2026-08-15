@@ -75,14 +75,18 @@ if ($result) {
 }
 `;
 
-export async function printRawWindows(rawContent: string, deviceName: string): Promise<boolean> {
+export async function printRawWindows(rawContent: string | Buffer, deviceName: string): Promise<boolean> {
   if (process.platform !== "win32") return false;
 
   const tmpFile = join(tmpdir(), `fa_print_${Date.now()}_${Math.random().toString(36).slice(2)}.raw`);
   const psFile = join(tmpdir(), `fa_print_raw_runner.ps1`);
 
   try {
-    await writeFile(tmpFile, rawContent, "utf8");
+    if (typeof rawContent === "string") {
+      await writeFile(tmpFile, rawContent, "utf8");
+    } else {
+      await writeFile(tmpFile, rawContent);
+    }
     await writeFile(psFile, PS_SCRIPT, "utf8");
 
     return await new Promise<boolean>((resolve) => {
@@ -95,7 +99,7 @@ export async function printRawWindows(rawContent: string, deviceName: string): P
             console.warn("[print-bridge] RAW print falhou, usando fallback gráfico HTML:", err || stdout);
             resolve(false);
           } else {
-            console.log(`[print-bridge] Impressão RAW TSPL enviada com sucesso para "${deviceName}".`);
+            console.log(`[print-bridge] Impressão RAW enviada com sucesso para "${deviceName}".`);
             resolve(true);
           }
         },

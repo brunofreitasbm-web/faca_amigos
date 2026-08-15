@@ -1421,6 +1421,8 @@ const COMMON_WRISTBAND_PRINTERS = [
 ];
 
 const COMMON_RECEIPT_PRINTERS = [
+  "Apptech Q851L USB",
+  "APPTECH Q851L USB",
   "Apptech T271U",
   "Elgin i9",
   "Elgin i8",
