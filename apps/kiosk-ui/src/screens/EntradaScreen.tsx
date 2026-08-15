@@ -3,6 +3,8 @@ import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText,
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Plan, Product, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
+import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
+import { generateCheckinSuggestions, type CheckinOffer } from "../lib/geminiAgent.js";
 import { PhotoCapture } from "../components/PhotoCapture.js";
 import { ContractModal } from "../components/ContractModal.js";
 import { WristbandQRCode } from "../components/WristbandQRCode.js";
@@ -207,6 +209,9 @@ export function EntradaScreen({
   const [closingTime, setClosingTime] = useState<string | undefined>(undefined);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const [geminiOffers, setGeminiOffers] = useState<CheckinOffer[]>([]);
+  const [loadingGemini, setLoadingGemini] = useState(false);
 
   useEffect(() => {
     if (!unit) return;
@@ -463,6 +468,46 @@ export function EntradaScreen({
   const eligibleCoupons = coupons.filter((c) => !c.allowedPlanId || c.allowedPlanId === planId);
 
   useEffect(() => {
+    if (!unit) return;
+    const currentName = childName;
+    if (currentName || selectedPlan) {
+      setLoadingGemini(true);
+      generateCheckinSuggestions({
+        childName: currentName,
+        responsibleName: guardianName,
+        selectedPlanName: selectedPlan?.name,
+        selectedPlanMinutes: selectedPlan ? planDurationMinutes(selectedPlan) : 30,
+        selectedPlanPriceCents: selectedPlan?.valueCents,
+        unitName: unit.name,
+      })
+        .then(setGeminiOffers)
+        .finally(() => setLoadingGemini(false));
+    }
+  }, [matchedChild, childName, selectedPlan, guardianName, unit]);
+
+  function handleApplyGeminiOffer(offer: CheckinOffer) {
+    if (offer.actionType === "UPGRADE_PLAN") {
+      const higherPlan = plans.find(
+        (p) =>
+          (offer.targetName && p.name.toLowerCase().includes(offer.targetName.toLowerCase())) ||
+          planDurationMinutes(p) > (selectedPlan ? planDurationMinutes(selectedPlan) : 30),
+      );
+      if (higherPlan) {
+        setPlanId(higherPlan.id);
+        toast.success(`Plano alterado para ${higherPlan.name}!`);
+      }
+    } else if (offer.actionType === "APPLY_COUPON") {
+      if (offer.targetName) {
+        setCouponCode(offer.targetName);
+        toast.success(`Cupom "${offer.targetName}" aplicado!`);
+      }
+    } else if (offer.actionType === "ADD_PRODUCT") {
+      setShowExtras(true);
+      toast.success(`Item "${offer.targetName || offer.title}" recomendado no balcão!`);
+    }
+  }
+
+  useEffect(() => {
     if (couponCode && !eligibleCoupons.some((c) => c.code === couponCode)) setCouponCode("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);
@@ -670,6 +715,14 @@ export function EntradaScreen({
           É o único elemento laranja do fluxo de Entrada, e some assim que
           o operador registra o aceite ou a recusa. */}
       {offer && <UpsellOfferCard offer={offer} onResolved={() => setOffer(null)} />}
+
+      {/* Sugestões do Agente IA Comercial Gemini */}
+      <GeminiSalesCard
+        type="CHECKIN"
+        offers={geminiOffers}
+        loading={loadingGemini}
+        onApplyOffer={handleApplyGeminiOffer}
+      />
 
       {/* ---------------------------------------------------------------- */}
       {/* 1. Quem é a criança                                              */}

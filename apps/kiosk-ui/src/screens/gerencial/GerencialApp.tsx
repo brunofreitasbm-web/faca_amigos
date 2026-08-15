@@ -19,10 +19,12 @@ import { HistoricoTab } from "./tabs/HistoricoTab.js";
 import { ContratoTab } from "./tabs/ContratoTab.js";
 import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
+import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO" | "TALENTOS";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
 
 const TABS: { value: GerencialTab; label: string }[] = [
+  { value: "COPILOT_IA", label: "✦ Copilot IA (Gemini)" },
   { value: "PLANOS", label: "Planos de Preços" },
   { value: "PACOTES", label: "Pacotes" },
   { value: "PRODUTOS", label: "Produtos" },
@@ -42,6 +44,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
 ];
 
 const TAB_HELP: Record<GerencialTab, string> = {
+  COPILOT_IA: "Assistente Comercial Gemini: sugestões automáticas de vendas, aumento de ticket médio e chat interativo com a IA.",
   PLANOS: "Cadastre um plano e escolha em quais unidades ele vale — cada unidade marcada vira sua própria linha, editável depois de forma independente.",
   PACOTES: "Catálogo de pacotes de horas oferecidos como upgrade VIP. Regras do motor VIP continuam em Configurações, dentro de cada unidade.",
   PRODUTOS: "Itens vendidos avulsos no PDV — cadastre uma vez e escolha em quais unidades o produto e o estoque existem.",
@@ -109,6 +112,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
             <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
 
             <div role="tabpanel">
+              {tab === "COPILOT_IA" && <GeminiGerencialCopilot />}
               {tab === "PLANOS" && <PlanosTab />}
               {tab === "PACOTES" && <PacotesTab />}
               {tab === "PRODUTOS" && <ProdutosTab />}

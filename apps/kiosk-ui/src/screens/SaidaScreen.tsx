@@ -8,6 +8,8 @@ import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { QrScanner } from "../components/QrScanner.js";
 import { CheckoutModal } from "../components/CheckoutModal.js";
+import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
+import { generateCheckoutSuggestions, type CheckoutOffer } from "../lib/geminiAgent.js";
 import { formatElapsed, money } from "../format.js";
 
 /**
@@ -104,6 +106,29 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
       setProblem("Esta sessão foi fechada em outro dispositivo.");
     }
   }, [resolved?.sessionId, sessionsStatus, entry, checkoutOpen]);
+
+  const [checkoutOffers, setCheckoutOffers] = useState<CheckoutOffer[]>([]);
+  const [loadingCheckoutOffers, setLoadingCheckoutOffers] = useState(false);
+
+  useEffect(() => {
+    if (resolved && entry && unit) {
+      setLoadingCheckoutOffers(true);
+      const elapsedMin = Math.round((entry.quote.timing.elapsedMs || 0) / 60_000);
+      generateCheckoutSuggestions({
+        childName: entry.session.child_name_snapshot,
+        durationMinutes: elapsedMin,
+        extraMinutes: entry.quote.timing.overMinutes,
+        totalPaidCents: entry.quote.totalCents,
+        unitName: unit.name,
+      })
+        .then(setCheckoutOffers)
+        .finally(() => setLoadingCheckoutOffers(false));
+    }
+  }, [resolved, entry, unit]);
+
+  function handleApplyCheckoutOffer(offer: CheckoutOffer) {
+    toast.success(`Oferta "${offer.title}" recomendada ao responsável!`);
+  }
 
   function clear() {
     setResolved(null);
@@ -217,11 +242,13 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
 
           {/* Cuidados informados na entrada aparecem na saída de propósito:
               é o último momento em que a equipe fala com o responsável. */}
-          {(entry.session.notes || (entry.session.sensory_tags?.length ?? 0) > 0) && (
-            <div style={{ fontSize: "13px", background: "rgba(201, 144, 32, 0.12)", padding: "8px 12px", borderRadius: "10px" }}>
-              💡 {[...(entry.session.sensory_tags ?? []), entry.session.notes].filter(Boolean).join(" · ")}
-            </div>
-          )}
+          {/* Sugestões de Retenção do Agente IA Gemini */}
+          <GeminiSalesCard
+            type="CHECKOUT"
+            offers={checkoutOffers}
+            loading={loadingCheckoutOffers}
+            onApplyOffer={handleApplyCheckoutOffer}
+          />
 
           <div
             style={{
