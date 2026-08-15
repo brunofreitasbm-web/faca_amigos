@@ -10,19 +10,27 @@ interface GeminiGerencialCopilotProps {
   metricsSummary?: string;
 }
 
+export const OFFICIAL_UNITS = [
+  { id: "TODAS", name: "Rede Consolidada (3 Unidades)", badge: "🌐 Visão Geral" },
+  { id: "Circuito", name: "Circuito", badge: "🏎️ Circuito Parque" },
+  { id: "Playground (Parque Shopping)", name: "Playground (Parque Shopping)", badge: "🎪 Playground Parque" },
+  { id: "Playground (Grão-Pará)", name: "Playground (Grão-Pará)", badge: "🎡 Playground Grão-Pará" },
+] as const;
+
 export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilotProps) {
   const { unit } = useAppState();
+  const [selectedUnit, setSelectedUnit] = useState<string>(unit?.name || "TODAS");
   const [report, setReport] = useState<GerencialReport | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const defaultMetricsContext =
+  const activeMetricsContext =
     metricsSummary ||
-    `Unidade: ${unit?.name || "Geral"} | Faturamento Hoje: R$ 3.850,00 | Ticket Médio: R$ 48,00 | Ocupação Média: 65% | Total Visitas: 80 crianças | Meias Vendidas: 14 unidades.`;
+    `Foco da Análise: ${selectedUnit} | Faturamento Hoje: R$ 3.850,00 | Ticket Médio: R$ 48,00 | Ocupação Média: 65% | Total Visitas: 80 crianças | Meias Vendidas: 14 unidades.`;
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    generateGerencialReport(defaultMetricsContext, unit?.name)
+    generateGerencialReport(activeMetricsContext, selectedUnit)
       .then((res) => {
         if (active) setReport(res);
       })
@@ -32,10 +40,64 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
     return () => {
       active = false;
     };
-  }, [defaultMetricsContext, unit?.name]);
+  }, [activeMetricsContext, selectedUnit]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      {/* Seletor de Unidades Oficiais da Rede */}
+      <section
+        aria-label="Filtro de Unidades para Análise da ZoeIA"
+        style={{
+          background: "var(--surface-card, #ffffff)",
+          border: "1px solid var(--border-subtle, #e2e8f0)",
+          borderRadius: "16px",
+          padding: "14px 18px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+          <strong style={{ fontSize: "14px", color: "var(--text-primary)" }}>
+            🏢 Selecionar Unidade para Análise Estratégica da ZoeIA:
+          </strong>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)", fontStyle: "italic" }}>
+            3 Unidades da Rede FaçaAmigos
+          </span>
+        </div>
+
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {OFFICIAL_UNITS.map((u) => {
+            const isSelected = selectedUnit === u.id || (u.id === "TODAS" && selectedUnit === "TODAS");
+            return (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => setSelectedUnit(u.id)}
+                aria-pressed={isSelected}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "9999px",
+                  border: isSelected ? "2px solid #7c3aed" : "1px solid var(--border-subtle, #cbd5e1)",
+                  background: isSelected ? "linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(37, 99, 235, 0.12) 100%)" : "var(--surface-card, #ffffff)",
+                  color: isSelected ? "#6d28d9" : "var(--text-primary)",
+                  fontWeight: isSelected ? "bold" : "500",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span>{u.badge}</span>
+                {isSelected && <span>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Banner de Cabeçalho Gerencial */}
       <section
         style={{
@@ -66,7 +128,9 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
             >
               ✦ ZOEIA — DIREÇÃO COMERCIAL
             </span>
-            <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: "600" }}>● Análise Ativa ({unit?.name || "Unidade"})</span>
+            <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: "600" }}>
+              ● Análise Ativa ({selectedUnit === "TODAS" ? "Rede Consolidada" : selectedUnit})
+            </span>
           </div>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "24px", color: "#ffffff" }}>
             Painel Estratégico & Desempenho Operacional
