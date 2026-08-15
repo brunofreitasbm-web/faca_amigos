@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { generateMobileAcompanharSuggestions, type MobileOffer } from "../lib/geminiAgent.js";
 import { money } from "@facaamigos/domain";
 import type { SessionTiming } from "@facaamigos/domain";
 import { Button, Card, BrandLockup, HelpText } from "@facaamigos/ui";
@@ -260,6 +261,16 @@ function AcompanharConteudo({
   // vindo de um responsável distraído/celular no bolso, já que aqui não há
   // cobrança automática nenhuma envolvida, só um aviso pro balcão.
   const [selecionada, setSelecionada] = useState<{ minutes: number; cents: number } | null>(null);
+  const [zoeOffers, setZoeOffers] = useState<MobileOffer[]>([]);
+
+  useEffect(() => {
+    generateMobileAcompanharSuggestions({
+      childName: childFirstName,
+      remainingMinutes: Math.max(0, planDurationMinutes - elapsedMinutes),
+      elapsedMinutes,
+      unitName: isCircuito ? "Circuito Parque Shopping" : "Playground Parque Shopping",
+    }).then(setZoeOffers);
+  }, [childFirstName, elapsedMinutes, planDurationMinutes, isCircuito]);
 
   return (
     <div style={{ width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -274,6 +285,54 @@ function AcompanharConteudo({
             : `${planDurationMinutes} min inclusos no pacote — ${money(0)} adicionais`}
         </p>
       </Card>
+
+      {/* Card da ZoeIA — Venda Cruzada Parque/Circuito, LTV e Custo-Benefício */}
+      {zoeOffers.length > 0 && (
+        <Card
+          style={{
+            padding: "16px",
+            background: "linear-gradient(135deg, #f5f3ff 0%, #edf2f7 100%)",
+            border: "1.5px solid #a855f7",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", fontSize: "11px", padding: "2px 8px", borderRadius: "9999px" }}>
+              ✦ ZoeIA
+            </span>
+            <strong style={{ fontSize: "14px", color: "#5b21b6" }}>Oportunidades & Vantagens para Você</strong>
+          </div>
+
+          {zoeOffers.map((offer) => (
+            <div
+              key={offer.id}
+              style={{
+                padding: "10px 12px",
+                background: "#ffffff",
+                borderRadius: "10px",
+                border: "1px solid #e9d5ff",
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <strong style={{ fontSize: "13px", color: "#4c1d95" }}>{offer.title}</strong>
+                {offer.badge && (
+                  <span style={{ fontSize: "10px", fontWeight: "bold", color: "#7c3aed", background: "#f3e8ff", padding: "2px 6px", borderRadius: "9999px" }}>
+                    {offer.badge}
+                  </span>
+                )}
+              </div>
+              <p style={{ margin: 0, fontSize: "12px", color: "#6b21a8", lineHeight: 1.4 }}>
+                {offer.description}
+              </p>
+            </div>
+          ))}
+        </Card>
+      )}
 
       {!isPausada && !lembreteAtivo && timing.phase !== "EXCEDENTE" && (!isCircuito || circuitoConfig) && (
         <Button variant="secondary" onClick={onAtivarLembrete}>

@@ -456,7 +456,6 @@ export async function chatGerencialCopilot(history: ChatMessage[], newMessage: s
   const systemInstruction = `Você é a ZoeIA, a assistente comercial humana, perspicaz e parceira do FaçaAmigos.
 Seu objetivo é ajudar o gerente de unidade a aumentar as vendas, ticket médio, otimizar pacotes, cupons e a performance dos colaboradores de forma acolhedora e eficiente.
 Seja direta, calorosa, prática e utilize dados e estratégias de varejo e entretenimento infantil em shoppings.`;
-
   const conversationHistory = history
     .map((m) => `${m.role === "user" ? "Gerente" : "ZoeIA"}: ${m.text}`)
     .join("\n");
@@ -501,4 +500,165 @@ Seja direta, calorosa, prática e utilize dados e estratégias de varejo e entre
   }
 
   return "Analisando a operação do parque: focar na agilidade do check-in com oferta proativa de adicionais (meias e upgrade de tempo) é a maneira mais rápida de elevar o ticket médio em até 25%. Como posso ajudar com mais estratégias específicas?";
+}
+
+export interface MobileOffer {
+  id: string;
+  title: string;
+  description: string;
+  badge?: string;
+  category: "UPSELL_PLAN" | "CROSS_SELL_UNIT" | "ADD_PRODUCT" | "LTV_RENEWAL";
+  targetName?: string;
+  reason: string;
+}
+
+/**
+ * Gera sugestões da ZoeIA para o QR Code de Acesso Rápido no celular do pai
+ */
+export async function generateMobileAcessoRapidoSuggestions(ctx: {
+  childrenCount: number;
+  selectedPlanName?: string;
+  selectedPlanMinutes?: number;
+  unitName?: string;
+  availablePlans?: Array<{ name: string; minutes: number; valueCents: number }>;
+}): Promise<MobileOffer[]> {
+  const currentUnit = ctx.unitName || "Playground Parque Shopping";
+  const crossUnit = currentUnit.toLowerCase().includes("circuito") ? "Playground Parque Shopping" : "Circuito Parque Shopping";
+
+  const systemInstruction = `Você é a ZoeIA no celular dos pais (QR Code de Acesso Rápido).
+REGRAS ABSOLUTAS:
+1. NUNCA invente planos de tempo ou preços fictícios.
+2. Suas ofertas devem focar em:
+   - Up-sell de Custo-Benefício: mostrar como o plano com mais minutos é proporcionalmente mais econômico por hora.
+   - Venda Cruzada (Cross-sell): propor o aproveitamento combinado entre o ${currentUnit} e a atração parceira ${crossUnit}.
+   - Venda Adicional (Meia Antiderrapante / Proteção).
+
+Responda EXCLUSIVAMENTE em formato JSON:
+{
+  "offers": [
+    {
+      "id": "string",
+      "title": "string curto chamativo",
+      "description": "argumento de venda focado na vantagem e custo-benefício",
+      "badge": "string opcional (ex: Dica da ZoeIA, Melhores Vantagens, Combo Parque)",
+      "category": "UPSELL_PLAN" | "CROSS_SELL_UNIT" | "ADD_PRODUCT" | "LTV_RENEWAL",
+      "targetName": "string",
+      "reason": "motivo de valor para a família"
+    }
+  ]
+}`;
+
+  const plansText = ctx.availablePlans?.map((p) => `- ${p.name}: ${p.minutes}min (R$ ${(p.valueCents / 100).toFixed(2)})`).join("\n") || "Planos cadastrados";
+  const prompt = `Unidade Atual: ${currentUnit}\nAtração Irmã para Cross-sell: ${crossUnit}\nCrianças no cadastro: ${ctx.childrenCount}\nPlano selecionado: ${ctx.selectedPlanName || "30 Minutos"}\nPlanos reais:\n${plansText}`;
+
+  const rawJson = await callGemini(prompt, systemInstruction);
+  if (rawJson) {
+    try {
+      const parsed = JSON.parse(rawJson);
+      if (Array.isArray(parsed?.offers) && parsed.offers.length > 0) {
+        return parsed.offers;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback Inteligente Local para Acesso Rápido
+  return [
+    {
+      id: "ar_upsell",
+      title: "Plano 60 Minutos — Maior Custo-Benefício",
+      description: "Economize até 30% no valor proporcional da hora garantindo 60 minutos de diversão contínua.",
+      badge: "Dica da ZoeIA",
+      category: "UPSELL_PLAN",
+      targetName: "60 Minutos",
+      reason: "O tempo de 60 minutos garante melhor aproveitamento dos brinquedos sem correria.",
+    },
+    {
+      id: "ar_cross",
+      title: `Venda Cruzada: Conheça também o ${crossUnit}`,
+      description: `Apresente a entrada de hoje e ganhe 15% de desconto especial para brincar no ${crossUnit} no mesmo dia!`,
+      badge: "Combo Especial",
+      category: "CROSS_SELL_UNIT",
+      targetName: crossUnit,
+      reason: "Experiência completa combinando brinquedos infláveis e circuito de carrinhos.",
+    },
+  ];
+}
+
+/**
+ * Gera sugestões da ZoeIA para o celular dos pais durante o Acompanhamento em Tempo Real
+ */
+export async function generateMobileAcompanharSuggestions(ctx: {
+  childName: string;
+  remainingMinutes: number;
+  elapsedMinutes: number;
+  unitName?: string;
+}): Promise<MobileOffer[]> {
+  const currentUnit = ctx.unitName || "Playground Parque Shopping";
+  const crossUnit = currentUnit.toLowerCase().includes("circuito") ? "Playground Parque Shopping" : "Circuito Parque Shopping";
+
+  const systemInstruction = `Você é a ZoeIA na tela de Acompanhamento do celular dos pais enquanto a criança brinca.
+REGRAS ABSOLUTAS:
+1. Gere ofertas reais para extensão de tempo com melhor custo-benefício, aumento do LTV (fidelidade via Pacote VIP) e Venda Cruzada para visitar a atração irmã (${crossUnit}).
+
+Responda EXCLUSIVAMENTE em formato JSON:
+{
+  "offers": [
+    {
+      "id": "string",
+      "title": "string curto",
+      "description": "string com convite irrecusável",
+      "badge": "string opcional (ex: ZoeIA Indica, Oferta VIP, Vantagem Exclusiva)",
+      "category": "UPSELL_PLAN" | "CROSS_SELL_UNIT" | "ADD_PRODUCT" | "LTV_RENEWAL",
+      "targetName": "string",
+      "reason": "string"
+    }
+  ]
+}`;
+
+  const prompt = `Criança: ${ctx.childName}\nTempo decorrido: ${ctx.elapsedMinutes} min (Restante: ${ctx.remainingMinutes} min)\nUnidade Atual: ${currentUnit}\nUnidade Parceira Cross-sell: ${crossUnit}`;
+
+  const rawJson = await callGemini(prompt, systemInstruction);
+  if (rawJson) {
+    try {
+      const parsed = JSON.parse(rawJson);
+      if (Array.isArray(parsed?.offers) && parsed.offers.length > 0) {
+        return parsed.offers;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback Inteligente Local de Acompanhamento
+  return [
+    {
+      id: "ac_renewal",
+      title: "Adicionar +30 Minutos com Desconto",
+      description: `${ctx.childName} está se divertindo muito! Evite cobrança de excedente prolongando o tempo com tarifa promocional.`,
+      badge: "ZoeIA Indica",
+      category: "UPSELL_PLAN",
+      targetName: "+30 Minutos",
+      reason: "Garanta tranquilidade para terminar suas compras enquanto a criança continua brincando.",
+    },
+    {
+      id: "ac_cross",
+      title: `Visita Cruzada no ${crossUnit}`,
+      description: `Gostou da brincadeira? Mostre este cupom no ${crossUnit} e ganhe 15% OFF na entrada hoje!`,
+      badge: "Vantagem Shopping",
+      category: "CROSS_SELL_UNIT",
+      targetName: crossUnit,
+      reason: "Aproveite a ida ao shopping com atrações complementares para toda a família.",
+    },
+    {
+      id: "ac_ltv",
+      title: "Converter Tempo em Passaporte VIP 10 Horas",
+      description: "Abata o valor pago na entrada de hoje ao aderir ao pacote fidelidade e economize até 35% nas próximas visitas.",
+      badge: "Fidelidade VIP (LTV)",
+      category: "LTV_RENEWAL",
+      targetName: "Pacote VIP 10h",
+      reason: "Transforme visitas avulsas em economia contínua com validade estendida.",
+    },
+  ];
 }

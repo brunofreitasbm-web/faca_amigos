@@ -12,6 +12,7 @@ import {
   normalizeCpf,
   normalizePhoneE164,
 } from "@facaamigos/domain";
+import { generateMobileAcessoRapidoSuggestions, type MobileOffer } from "../lib/geminiAgent.js";
 import { money } from "../format.js";
 
 function planDurationMinutes(plan: { durationValue: number; durationUnit: "MINUTO" | "HORA" }): number {
@@ -81,11 +82,29 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
     sessions: Array<{ childIndex: number; childName: string; accessCode: string }>;
   } | null>(null);
 
+  const [zoeOffers, setZoeOffers] = useState<MobileOffer[]>([]);
+
   useEffect(() => {
     Api.preCheckinFormOptions(unitId)
       .then(setOptions)
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Não foi possível carregar o formulário."));
   }, [unitId]);
+
+  useEffect(() => {
+    if (!options) return;
+    const selPlan = options.plans.find((p) => p.id === planId);
+    generateMobileAcessoRapidoSuggestions({
+      childrenCount: children.length,
+      selectedPlanName: selPlan?.name,
+      selectedPlanMinutes: selPlan ? planDurationMinutes(selPlan) : 30,
+      unitName: options.unitName,
+      availablePlans: options.plans.map((p) => ({
+        name: p.name,
+        minutes: planDurationMinutes(p),
+        valueCents: p.valueCents,
+      })),
+    }).then(setZoeOffers);
+  }, [options, planId, children.length]);
 
   // Enquanto aguarda o balcão confirmar: consulta pontual pelo `id`
   // devolvido no envio (não é uma listagem — ninguém mais enxerga este
@@ -510,12 +529,59 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
               {discountPct > 0 && (
                 <HelpText>
                   {anyNeurodivergent
-                    ? "Desconto de meia-entrada (-50%) já aplicado para criança neurodivergente — a equipe confirma no balcão."
-                    : "Desconto promocional (-40%) já aplicado — a equipe confirma no balcão."}
+                    ? "✓ Desconto de 50% MEIA - Inclusivo aplicado automaticamente."
+                    : "✓ Desconto de 40% PROMOCIONAL aplicado automaticamente."}
                 </HelpText>
               )}
-              {options.plans.length === 0 && <HelpText>Nenhum plano ativo nesta unidade no momento — procure a recepção.</HelpText>}
             </Card>
+
+            {/* Recomendações de Venda Cruzada e Custo-Benefício da ZoeIA */}
+            {zoeOffers.length > 0 && (
+              <Card
+                style={{
+                  padding: "16px",
+                  background: "linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%)",
+                  border: "1.5px solid #c084fc",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Tag style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold" }}>✦ ZoeIA</Tag>
+                  <strong style={{ fontSize: "14px", color: "#5b21b6" }}>Dica & Vantagens Exclusivas</strong>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {zoeOffers.map((offer) => (
+                    <div
+                      key={offer.id}
+                      style={{
+                        padding: "12px",
+                        background: "#ffffff",
+                        borderRadius: "12px",
+                        border: "1px solid #e9d5ff",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <strong style={{ fontSize: "13px", color: "#4c1d95" }}>{offer.title}</strong>
+                        {offer.badge && (
+                          <span style={{ fontSize: "11px", fontWeight: "bold", color: "#7c3aed", background: "#f3e8ff", padding: "2px 8px", borderRadius: "9999px" }}>
+                            {offer.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ margin: 0, fontSize: "12px", color: "#6b21a8", lineHeight: 1.4 }}>
+                        {offer.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
               <strong style={{ fontSize: "15px" }}>4. Só combinar as regrinhas ✅</strong>
