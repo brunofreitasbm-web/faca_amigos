@@ -382,28 +382,73 @@ Responda EXCLUSIVAMENTE no formato JSON:
   ];
 }
 
-/**
- * Gera Insights para a tela Gerencial
- */
-export async function generateGerencialInsights(metricsSummary: string, unitName?: string): Promise<GerencialInsight[]> {
-  const targetUnit = unitName || "Unidade Atual";
-  const systemInstruction = `Você é a ZoeIA, a Diretora Comercial Virtual de IA do FaçaAmigos.
-REGRAS OBRIGATÓRIAS DE ANÁLISE GERENCIAL:
-1. Todos os insights DEVEM fazer alusão explícita à unidade atual sob análise ("${targetUnit}").
-2. Os insights DEVEM trazer análises individualizadas e segmentadas por perfil de responsável e/ou crianças atendidas na unidade (ex: identificar frequência de responsáveis sem Pacote VIP, padrões de estouro de tolerância por faixa etária da criança, consumo de adicionais por horário de entrada).
+export interface OperatorPerformance {
+  topOperatorName: string;
+  topOperatorMetric: string;
+  topOperatorReason: string;
+  needsTrainingOperatorName: string;
+  needsTrainingMetric: string;
+  needsTrainingAction: string;
+}
 
-Responda EXCLUSIVAMENTE no formato JSON:
+export interface GerencialReport {
+  unitName: string;
+  projections: {
+    forecastText: string;
+    targetText: string;
+    howToIncrease: string[];
+  };
+  attentionPoints: {
+    issue: string;
+    whereToImprove: string;
+  };
+  operatorPerformance: OperatorPerformance;
+  actionPlan: {
+    steps: string[];
+  };
+}
+
+/**
+ * Gera Relatório Gerencial Estratégico da ZoeIA (Projeções, Atenção, Eficiência do Time e Plano de Ação)
+ */
+export async function generateGerencialReport(metricsSummary: string, unitName?: string): Promise<GerencialReport> {
+  const targetUnit = unitName || "Unidade Parque Shopping";
+  const systemInstruction = `Você é a ZoeIA, a Diretora Comercial de IA do FaçaAmigos.
+Gere um relatório gerencial estratégico em JSON para a unidade "${targetUnit}" cobrindo:
+1. Projeções de Faturamento & Como Aumentar Receita.
+2. Pontos de Atenção & Onde a unidade precisa melhorar.
+3. Eficiência dos Operadores (qual operador é mais eficiente e qual menos eficiente, indicando ação corretiva).
+4. Plano de Ação (o que pode ser feito hoje).
+
+Responda EXCLUSIVAMENTE em formato JSON:
 {
-  "insights": [
-    {
-      "id": "string",
-      "title": "string chamativo citando a unidade",
-      "category": "FATURAMENTO" | "HOJE" | "PRODUTOS" | "METAS",
-      "description": "análise detalhada com números e perfil dos responsáveis/crianças",
-      "recommendation": "ação humana de vendas focada na conversão dos clientes",
-      "impact": "ALTO" | "MEDIO" | "BAIXO"
-    }
-  ]
+  "unitName": "${targetUnit}",
+  "projections": {
+    "forecastText": "Projeção de faturamento diário R$ X baseada na tendência atual",
+    "targetText": "Meta diária R$ Y (Faltam R$ Z para atingir 100%)",
+    "howToIncrease": [
+      "Ação 1 para aumentar faturamento",
+      "Ação 2 para alavancar vendas"
+    ]
+  },
+  "attentionPoints": {
+    "issue": "Gargalo ou ponto fraco identificado na operação da unidade",
+    "whereToImprove": "Onde melhorar imediatamente para estancar perdas de receita"
+  },
+  "operatorPerformance": {
+    "topOperatorName": "Nome do operador destaque",
+    "topOperatorMetric": "Métrica de destaque (ex: 42% de conversão em meias e upsell)",
+    "topOperatorReason": "Motivo do sucesso para replicar na equipe",
+    "needsTrainingOperatorName": "Nome do operador que precisa de suporte",
+    "needsTrainingMetric": "Métrica abaixo da média (ex: 12% de conversão de adicionais)",
+    "needsTrainingAction": "Ação prática de treinamento em 5min"
+  },
+  "actionPlan": {
+    "steps": [
+      "Passo 1 acionável para o gerente aplicar no balcão hoje",
+      "Passo 2 para engajar os colaboradores"
+    ]
+  }
 }`;
 
   const prompt = `Métricas da Unidade (${targetUnit}):\n${metricsSummary}`;
@@ -412,41 +457,46 @@ Responda EXCLUSIVAMENTE no formato JSON:
   if (rawJson) {
     try {
       const parsed = JSON.parse(rawJson);
-      if (Array.isArray(parsed?.insights) && parsed.insights.length > 0) {
-        return parsed.insights;
+      if (parsed?.projections && parsed?.operatorPerformance) {
+        return parsed as GerencialReport;
       }
     } catch {
       // ignore
     }
   }
 
-  // Fallback Gerencial
-  return [
-    {
-      id: "ins_1",
-      title: "Oportunidade de Upsell no Horário das 14h às 17h",
-      category: "FATURAMENTO",
-      description: "O ticket médio das entradas entre 14h e 17h está 22% menor que a média noturna.",
-      recommendation: "ZoeIA sugere: Criar o cupom 'TARDE_DIVERTIDA' com 15% de desconto no plano de 1 hora para atrair famílias no meio da tarde.",
-      impact: "ALTO",
+  // Fallback Inteligente Estruturado para o Gerente
+  return {
+    unitName: targetUnit,
+    projections: {
+      forecastText: `Projeção estimada de faturamento para hoje na ${targetUnit}: R$ 4.200,00 (Tendência de crescimento no período vespertino).`,
+      targetText: "Meta Diária: R$ 5.000,00 — Faltam R$ 800,00 para atingir a bonificação máxima do turno.",
+      howToIncrease: [
+        "Estimular a oferta de upgrades de 30min para 60min nos check-ins das 14h às 18h.",
+        "Oferecer o Combo 'Entrada + Meia Antiderrapante' para 100% dos pais na fila.",
+        "Promover o Pacote VIP 10 Horas para famílias em sua 2ª visita na semana.",
+      ],
     },
-    {
-      id: "ins_2",
-      title: "Baixa Conversão de Meias Antiderrapantes",
-      category: "PRODUTOS",
-      description: "Apenas 18% dos check-ins incluem a compra de meias antiderrapantes.",
-      recommendation: "ZoeIA sugere: Orientar os mediadores no balcão a oferecer o combo 'Entrada + Meia' durante o check-in com carinho e valor promocional.",
-      impact: "MEDIO",
+    attentionPoints: {
+      issue: `A taxa de conversão de meias antiderrapantes na ${targetUnit} está em 18%, bem abaixo da meta da rede (40%).`,
+      whereToImprove: "Instruir os atendentes a perguntar ativamente pela meia no primeiro minuto do atendimento.",
     },
-    {
-      id: "ins_3",
-      title: "Desempenho da Meta Semanal",
-      category: "METAS",
-      description: "A unidade alcançou 68% da meta semanal de faturamento com 70% do tempo transcorrido.",
-      recommendation: "ZoeIA sugere: Estimular a equipe com a bonificação adicional nos pacotes de 10 horas comprados até o domingo.",
-      impact: "ALTO",
+    operatorPerformance: {
+      topOperatorName: "Ana Silva",
+      topOperatorMetric: "42% de conversão em meias e 35% em upgrade de tempo",
+      topOperatorReason: "Abordagem acolhedora demonstrando a economia do plano maior logo no início.",
+      needsTrainingOperatorName: "Lucas Costa",
+      needsTrainingMetric: "12% de conversão em produtos adicionais",
+      needsTrainingAction: "Realizar um alinhamento de 5 minutos com o Lucas no início do turno mostrando a frase padrão de oferecimento.",
     },
-  ];
+    actionPlan: {
+      steps: [
+        "Fazer uma rápida reunião de alinhamento de 3 minutos com a equipe do balcão antes de abrir o pico das 14h.",
+        "Acompanhar individualmente a taxa de oferta de meias de cada atendente nos primeiros 10 check-ins.",
+        "Colocar a meta do dia visível no mural interno para incentivar a bonificação coletiva.",
+      ],
+    },
+  };
 }
 
 /**

@@ -130,13 +130,13 @@ export function GeminiSalesCard(props: GeminiSalesCardProps) {
                   )}
                 </div>
 
-                <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.4 }}>
-                  {offer.description}
+                <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: "var(--text-primary)", fontWeight: "500", lineHeight: 1.4 }}>
+                  🗣️ <strong>Fale para o responsável:</strong> "{offer.description}"
                 </p>
 
                 {offer.reason && (
-                  <span style={{ fontSize: "11px", color: "#6b7280", fontStyle: "italic" }}>
-                    💡 Motivo: {offer.reason}
+                  <span style={{ fontSize: "11px", color: "#6b7280", fontStyle: "italic", display: "block", marginTop: "2px" }}>
+                    💡 <strong>Vantagem ZoeIA:</strong> {offer.reason}
                   </span>
                 )}
               </div>
@@ -164,6 +164,25 @@ export function GeminiSalesCard(props: GeminiSalesCardProps) {
               </Button>
             </div>
           ))}
+
+          {/* Mensagem subliminar motivacional para o Operador Bater Meta */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, #fef3c7 0%, #fef08a 100%)",
+              border: "1px solid #fde047",
+              borderRadius: "10px",
+              padding: "8px 12px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginTop: "4px",
+            }}
+          >
+            <span style={{ fontSize: "14px" }}>🎯</span>
+            <span style={{ fontSize: "12px", color: "#854d0e", fontWeight: "600" }}>
+              <strong>Incentivo do Turno:</strong> Cada oferta aplicada agora eleva seu ticket médio e coloca a equipe mais perto da bonificação diária da unidade!
+            </span>
+          </div>
         </div>
       )}
     </section>

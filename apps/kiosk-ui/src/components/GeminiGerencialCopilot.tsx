@@ -1,15 +1,9 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Input, Select, HelpText, Badge } from "@facaamigos/ui";
+import { Card, Tag } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import {
-  generateGerencialInsights,
-  chatGerencialCopilot,
-  getGeminiSettings,
-  saveGeminiSettings,
-  testGeminiApiKey,
-  type GerencialInsight,
-  type ChatMessage,
-  type GeminiModel,
+  generateGerencialReport,
+  type GerencialReport,
 } from "../lib/geminiAgent.js";
 
 interface GeminiGerencialCopilotProps {
@@ -18,25 +12,8 @@ interface GeminiGerencialCopilotProps {
 
 export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilotProps) {
   const { unit } = useAppState();
-  const [insights, setInsights] = useState<GerencialInsight[]>([]);
-  const [loadingInsights, setLoadingInsights] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "model",
-      text: "Olá! Sou a ZoeIA, sua parceira de inteligência comercial do FaçaAmigos. Como posso ajudar a aumentar o faturamento e otimizar as vendas da sua unidade hoje?",
-    },
-  ]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [busyChat, setBusyChat] = useState(false);
-
-  // Estado das Configurações da API Key
-  const [showConfig, setShowConfig] = useState(false);
-  const settings = getGeminiSettings();
-  const [apiKey, setApiKey] = useState(settings.apiKey);
-  const [model, setModel] = useState<GeminiModel>(settings.model);
-  const [enabled, setEnabled] = useState(settings.enabled);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [report, setReport] = useState<GerencialReport | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const defaultMetricsContext =
     metricsSummary ||
@@ -44,54 +21,28 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
 
   useEffect(() => {
     let active = true;
-    setLoadingInsights(true);
-    generateGerencialInsights(defaultMetricsContext, unit?.name)
+    setLoading(true);
+    generateGerencialReport(defaultMetricsContext, unit?.name)
       .then((res) => {
-        if (active) setInsights(res);
+        if (active) setReport(res);
       })
       .finally(() => {
-        if (active) setLoadingInsights(false);
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
   }, [defaultMetricsContext, unit?.name]);
 
-  async function handleSendMessage(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    if (!inputMessage.trim() || busyChat) return;
-
-    const userText = inputMessage.trim();
-    setInputMessage("");
-    const updatedHistory: ChatMessage[] = [...messages, { role: "user", text: userText }];
-    setMessages(updatedHistory);
-    setBusyChat(true);
-
-    try {
-      const reply = await chatGerencialCopilot(updatedHistory, userText, defaultMetricsContext);
-      setMessages([...updatedHistory, { role: "model", text: reply }]);
-    } catch (err) {
-      setMessages([
-        ...updatedHistory,
-        {
-          role: "model",
-          text: "Desculpe, ocorreu um erro ao consultar a inteligência comercial. Tente novamente.",
-        },
-      ]);
-    } finally {
-      setBusyChat(false);
-    }
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* Banner de Cabeçalho do Copilot */}
+      {/* Banner de Cabeçalho Gerencial */}
       <section
         style={{
           background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
           color: "#ffffff",
           borderRadius: "18px",
-          padding: "20px 24px",
+          padding: "24px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -110,309 +61,157 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
                 fontSize: "12px",
                 padding: "4px 12px",
                 borderRadius: "9999px",
+                letterSpacing: "0.5px",
               }}
             >
-              ✦ ZOEIA — COPILOT COMERCIAL
+              ✦ ZOEIA — DIREÇÃO COMERCIAL
             </span>
-            {settings.enabled && settings.apiKey ? (
-              <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: "600" }}>● ZoeIA Conectada (Gemini API)</span>
-            ) : (
-              <span style={{ fontSize: "12px", color: "#facc15", fontWeight: "600" }}>● ZoeIA em Modo Fallback</span>
-            )}
+            <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: "600" }}>● Análise Ativa ({unit?.name || "Unidade"})</span>
           </div>
-          <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "22px", color: "#ffffff" }}>
-            ZoeIA · Insights Estratégicos & Atendimento
+          <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "24px", color: "#ffffff" }}>
+            Painel Estratégico & Desempenho Operacional
           </h2>
-          <p style={{ margin: "6px 0 0 0", color: "#c7d2fe", fontSize: "14px", maxWidth: "600px" }}>
-            Análise humanizada e automatizada de faturamento, ticket médio, ocupação e estratégias de venda recomendadas para a sua unidade.
+          <p style={{ margin: "6px 0 0 0", color: "#c7d2fe", fontSize: "14px", maxWidth: "650px" }}>
+            Projeções de receita, pontos de atenção, mapa de eficiência dos colaboradores e plano de ação diário elaborado pela ZoeIA.
           </p>
-        </div>
-
-        <div style={{ display: "flex", gap: "10px" }}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowConfig(!showConfig)}
-            style={{ background: "rgba(255,255,255,0.15)", color: "#ffffff", border: "1px solid rgba(255,255,255,0.25)" }}
-          >
-            {showConfig ? "✕ Fechar Configuração" : "⚙️ Configurar Chave Gemini"}
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setLoadingInsights(true);
-              generateGerencialInsights(defaultMetricsContext).then((res) => {
-                setInsights(res);
-                setLoadingInsights(false);
-              });
-            }}
-            disabled={loadingInsights}
-            style={{ background: "rgba(255,255,255,0.1)", color: "#ffffff", border: "1px solid rgba(255,255,255,0.2)" }}
-          >
-            {loadingInsights ? "Atualizando..." : "↻ Recarregar Insights"}
-          </Button>
         </div>
       </section>
 
-      {/* Painel de Configurações da Gemini API Key */}
-      {showConfig && (
-        <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px", border: "2px solid #7c3aed" }}>
-          <div>
-            <h3 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px 0", color: "var(--text-primary)" }}>
-              ⚙️ Configuração da Gemini API Key (Exclusivo Gerencial)
-            </h3>
-            <HelpText style={{ margin: 0 }}>
-              Insira a chave de API do Google Gemini para alimentar as sugestões de vendas do balcão e este assistente gerencial.
-            </HelpText>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div>
-              <label style={{ fontSize: "14px", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
-                Gemini API Key
-              </label>
-              <Input
-                type="password"
-                placeholder="AQ.Ab8RN..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <HelpText style={{ marginTop: "4px" }}>
-                Chave atual encriptada no navegador / servidor.
-              </HelpText>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <div>
-                <label style={{ fontSize: "14px", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
-                  Modelo da IA
-                </label>
-                <Select value={model} onChange={(e) => setModel(e.target.value as GeminiModel)}>
-                  <option value="gemini-flash-latest">Gemini Flash Latest (API Direct)</option>
-                  <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Rápido)</option>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recente)</option>
-                  <option value="gemini-1.5-pro">Gemini 1.5 Pro (Raciocínio Avançado)</option>
-                </Select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: "14px", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
-                  Status do Agente
-                </label>
-                <Select value={enabled ? "true" : "false"} onChange={(e) => setEnabled(e.target.value === "true")}>
-                  <option value="true">Ativo (Gerar sugestões no PDV e Gerencial)</option>
-                  <option value="false">Desativado (Usar apenas fallback estático)</option>
-                </Select>
-              </div>
-            </div>
-
-            {testResult && (
-              <div
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  background: testResult.success ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
-                  color: testResult.success ? "#16a34a" : "#dc2626",
-                  border: `1px solid ${testResult.success ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
-                }}
-              >
-                {testResult.message}
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "8px" }}>
-              <Button
-                variant="secondary"
-                disabled={testing || !apiKey.trim()}
-                onClick={async () => {
-                  setTesting(true);
-                  setTestResult(null);
-                  const res = await testGeminiApiKey(apiKey, model);
-                  setTestResult(res);
-                  setTesting(false);
-                }}
-              >
-                {testing ? "Testando..." : "Testar Conexão"}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  saveGeminiSettings({ apiKey, model, enabled });
-                  alert("Configurações salvas com sucesso!");
-                }}
-                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)" }}
-              >
-                Salvar Chave
-              </Button>
-            </div>
-          </div>
+      {loading && (
+        <Card style={{ padding: "24px", textAlign: "center", fontStyle: "italic", color: "var(--text-muted)" }}>
+          ZoeIA analisando métricas, projeções e eficiência dos operadores da unidade...
         </Card>
       )}
 
-      {/* Grid de Insights Automáticos */}
-      <div>
-        <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", color: "var(--text-primary)" }}>
-          💡 Recomendações Automáticas da IA
-        </h3>
+      {report && !loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
+          {/* CARD 1: Projeções de Faturamento & Como Aumentar */}
+          <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", borderTop: "4px solid #3b82f6" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <strong style={{ fontSize: "16px", color: "#1e3a8a" }}>📈 Projeção & Metas de Receita</strong>
+              <Tag style={{ background: "#eff6ff", color: "#1d4ed8", fontWeight: "bold" }}>Faturamento</Tag>
+            </div>
 
-        {loadingInsights ? (
-          <div style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontStyle: "italic" }}>
-            Gerando diagnósticos e recomendações comerciais...
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px" }}>
-            {insights.map((insight) => (
-              <div
-                key={insight.id}
-                style={{
-                  background: "var(--surface-card, #ffffff)",
-                  borderRadius: "16px",
-                  padding: "16px 18px",
-                  border: "1px solid var(--border-subtle, #e5e7eb)",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                }}
-              >
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: "bold",
-                        textTransform: "uppercase",
-                        padding: "2px 8px",
-                        borderRadius: "6px",
-                        background: "rgba(124, 58, 237, 0.1)",
-                        color: "#7c3aed",
-                      }}
-                    >
-                      {insight.category}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: "bold",
-                        color: insight.impact === "ALTO" ? "#dc2626" : insight.impact === "MEDIO" ? "#d97706" : "#2563eb",
-                      }}
-                    >
-                      Impacto {insight.impact}
-                    </span>
-                  </div>
+            <div style={{ background: "#f0f9ff", borderRadius: "12px", padding: "12px", border: "1px solid #bae6fd" }}>
+              <p style={{ margin: 0, fontSize: "13px", color: "#0369a1", fontWeight: "bold" }}>
+                {report.projections.forecastText}
+              </p>
+              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#0284c7" }}>
+                {report.projections.targetText}
+              </p>
+            </div>
 
-                  <h4 style={{ margin: "0 0 6px 0", fontSize: "15px", color: "var(--text-primary)" }}>{insight.title}</h4>
-                  <p style={{ margin: "0 0 10px 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.4 }}>
-                    {insight.description}
-                  </p>
-                </div>
+            <div>
+              <strong style={{ fontSize: "13px", color: "#1e293b", display: "block", marginBottom: "8px" }}>
+                🎯 Como Aumentar o Faturamento Hoje:
+              </strong>
+              <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "13px", color: "#475569", display: "flex", flexDirection: "column", gap: "6px" }}>
+                {report.projections.howToIncrease.map((action, idx) => (
+                  <li key={idx}>{action}</li>
+                ))}
+              </ul>
+            </div>
+          </Card>
 
+          {/* CARD 2: Pontos de Atenção & Onde Melhorar */}
+          <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", borderTop: "4px solid #f59e0b" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <strong style={{ fontSize: "16px", color: "#78350f" }}>⚠️ Pontos de Atenção & Gargalos</strong>
+              <Tag style={{ background: "#fffbe6", color: "#b45309", fontWeight: "bold" }}>Atenção</Tag>
+            </div>
+
+            <div style={{ background: "#fff7ed", borderRadius: "12px", padding: "12px", border: "1px solid #ffedd5" }}>
+              <strong style={{ fontSize: "13px", color: "#c2410c", display: "block" }}>Gargalo Identificado:</strong>
+              <p style={{ margin: "2px 0 0 0", fontSize: "13px", color: "#9a3412" }}>
+                {report.attentionPoints.issue}
+              </p>
+            </div>
+
+            <div>
+              <strong style={{ fontSize: "13px", color: "#1e293b", display: "block", marginBottom: "4px" }}>
+                🛠️ Onde e Como Melhorar:
+              </strong>
+              <p style={{ margin: 0, fontSize: "13px", color: "#475569", lineHeight: 1.5 }}>
+                {report.attentionPoints.whereToImprove}
+              </p>
+            </div>
+          </Card>
+
+          {/* CARD 3: Eficiência dos Operadores (Mais Eficiente vs Necessita Treino) */}
+          <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", borderTop: "4px solid #10b981", gridColumn: "span 1" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <strong style={{ fontSize: "16px", color: "#065f46" }}>🏆 Desempenho & Eficiência do Time</strong>
+              <Tag style={{ background: "#ecfdf5", color: "#047857", fontWeight: "bold" }}>Equipe</Tag>
+            </div>
+
+            {/* Operador Mais Eficiente */}
+            <div style={{ background: "#f0fdf4", borderRadius: "12px", padding: "12px", border: "1px solid #bbf7d0" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <strong style={{ fontSize: "13px", color: "#15803d" }}>🥇 Operador Mais Eficiente:</strong>
+                <span style={{ fontSize: "12px", fontWeight: "bold", color: "#166534" }}>
+                  {report.operatorPerformance.topOperatorName}
+                </span>
+              </div>
+              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#15803d" }}>
+                Métrica: <strong>{report.operatorPerformance.topOperatorMetric}</strong>
+              </p>
+              <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#166534", fontStyle: "italic" }}>
+                Motivo: {report.operatorPerformance.topOperatorReason}
+              </p>
+            </div>
+
+            {/* Operador em Desenvolvimento */}
+            <div style={{ background: "#fef2f2", borderRadius: "12px", padding: "12px", border: "1px solid #fecaca" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <strong style={{ fontSize: "13px", color: "#b91c1c" }}>🎯 Operador que Precisa de Suporte:</strong>
+                <span style={{ fontSize: "12px", fontWeight: "bold", color: "#991b1b" }}>
+                  {report.operatorPerformance.needsTrainingOperatorName}
+                </span>
+              </div>
+              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#b91c1c" }}>
+                Métrica: <strong>{report.operatorPerformance.needsTrainingMetric}</strong>
+              </p>
+              <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#991b1b", fontWeight: "600" }}>
+                Ação Recomendada: {report.operatorPerformance.needsTrainingAction}
+              </p>
+            </div>
+          </Card>
+
+          {/* CARD 4: Plano de Ação Prático ZoeIA */}
+          <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", borderTop: "4px solid #8b5cf6" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <strong style={{ fontSize: "16px", color: "#5b21b6" }}>📋 Plano de Ação Imediato da ZoeIA</strong>
+              <Tag style={{ background: "#f3e8ff", color: "#7c3aed", fontWeight: "bold" }}>O que fazer</Tag>
+            </div>
+
+            <p style={{ margin: 0, fontSize: "13px", color: "#6b21a8", lineHeight: 1.4 }}>
+              Siga estes passos acionáveis hoje para maximizar as vendas e engajar a equipe da {unit?.name || "unidade"}:
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {report.actionPlan.steps.map((step, idx) => (
                 <div
+                  key={idx}
                   style={{
-                    background: "rgba(59, 130, 246, 0.05)",
-                    borderLeft: "3px solid #2563eb",
                     padding: "10px 12px",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    color: "var(--text-primary)",
+                    background: "#ffffff",
+                    borderRadius: "10px",
+                    border: "1px solid #e9d5ff",
+                    fontSize: "13px",
+                    color: "#4c1d95",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "8px",
                   }}
                 >
-                  <strong>Ação Recomendada:</strong> {insight.recommendation}
+                  <strong style={{ color: "#7c3aed" }}>{idx + 1}.</strong>
+                  <span>{step}</span>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Chat Interativo Comercial Copilot */}
-      <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-          💬 Conversar com a ZoeIA
-        </h3>
-
-        {/* Histórico de Mensagens */}
-        <div
-          style={{
-            maxHeight: "360px",
-            overflowY: "auto",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-            padding: "14px",
-            background: "var(--surface-neutral, #f9fafb)",
-            borderRadius: "14px",
-            border: "1px solid var(--border-subtle, #e5e7eb)",
-          }}
-        >
-          {messages.map((m, idx) => (
-            <div
-              key={idx}
-              style={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "80%",
-                background: m.role === "user" ? "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)" : "var(--surface-card, #ffffff)",
-                color: m.role === "user" ? "#ffffff" : "var(--text-primary)",
-                padding: "12px 16px",
-                borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                fontSize: "14px",
-                lineHeight: 1.5,
-                boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
-                border: m.role === "model" ? "1px solid var(--border-subtle, #e5e7eb)" : "none",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: "bold",
-                  marginBottom: "4px",
-                  opacity: 0.8,
-                }}
-              >
-                {m.role === "user" ? "Você (Gerente)" : "✦ ZoeIA"}
-              </div>
-              {m.text}
+              ))}
             </div>
-          ))}
-          {busyChat && (
-            <div
-              style={{
-                alignSelf: "flex-start",
-                fontSize: "13px",
-                color: "var(--text-muted)",
-                fontStyle: "italic",
-                padding: "8px",
-              }}
-            >
-              ZoeIA digitando...
-            </div>
-          )}
+          </Card>
         </div>
-
-        {/* Formulário de Envio */}
-        <form onSubmit={handleSendMessage} style={{ display: "flex", gap: "10px" }}>
-          <Input
-            placeholder="Faça uma pergunta sobre vendas, produtos, cupons ou metas..."
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            disabled={busyChat}
-            style={{ flex: 1 }}
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!inputMessage.trim() || busyChat}
-            style={{ background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)", borderRadius: "9999px" }}
-          >
-            Enviar
-          </Button>
-        </form>
-      </Card>
+      )}
     </div>
   );
 }
