@@ -258,8 +258,16 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   }
 
   lines.push(divider);
-  const showFooterNote = payload.footerNote && (!isGuardReceipt || payload.activity !== "PLAYGROUND");
-  if (showFooterNote) {
+  const isTermsFooter = Boolean(payload.footerNote && /termo/i.test(payload.footerNote));
+  // Termos de Uso nunca são impressos no recibo de guarda (cupom de entrada)
+  const showFooterNote = Boolean(
+    payload.footerNote &&
+      (!isGuardReceipt || !isTermsFooter) &&
+      (!isTermsFooter || payload.activity === "CARRINHO")
+  );
+  if (showFooterNote && !isTermsFooter) {
+    for (const line of wrap(payload.footerNote!)) lines.push(centerText(line));
+  } else if (showFooterNote && isTermsFooter && payload.activity === "CARRINHO" && !isGuardReceipt) {
     for (const line of wrap(payload.footerNote!)) lines.push(centerText(line));
   } else if (!isGuardReceipt) {
     lines.push(centerText("Obrigado por brincar com a gente!"));

@@ -78,6 +78,15 @@ describe("recibo de guarda / Check-in (via dos pais, impressa no check-in)", () 
     const { commandsHex } = generateEscPosReceipt(RECIBO_DE_GUARDA);
     expect(commandsHex.endsWith("1b64031d564200")).toBe(true);
   });
+
+  it("oculta os termos de uso no recibo de guarda mesmo se footerNote vier preenchido com o texto dos termos", () => {
+    const { text: textComTermos } = generateEscPosReceipt({
+      ...RECIBO_DE_GUARDA,
+      activity: "PLAYGROUND",
+      footerNote: "TERMOS DE USO — FAÇA AMIGOS PLAYGROUND INCLUSIVO Ao aceitar este termo, o responsável legal confirma que leu...",
+    });
+    expect(textComTermos).not.toContain("TERMOS DE USO");
+  });
 });
 
 describe("cupom de venda (sem accessCode) segue igual", () => {

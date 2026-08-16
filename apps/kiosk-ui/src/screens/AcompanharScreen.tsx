@@ -6,7 +6,7 @@ import { Button, Card, BrandLockup, HelpText } from "@facaamigos/ui";
 import { useAcompanhar } from "../api/useAcompanhar.js";
 import { formatElapsed } from "../format.js";
 import { logAcompanharEvento, registrarAcompanharPush } from "../api/acompanhar.js";
-import { isPushSupported, subscribeToPush, pushSubscriptionToKeys } from "../lib/push.js";
+import { isPushSupported, subscribeToPush, pushSubscriptionToKeys, getExistingPushSubscription } from "../lib/push.js";
 import {
   statusHeadline,
   renewalIntro,
@@ -39,6 +39,42 @@ export function AcompanharScreen({ code }: { code: string }) {
   const [renovacaoPedida, setRenovacaoPedida] = useState<number | null>(null);
   const qrAbertoLogged = useRef(false);
   const reminderTimeoutRef = useRef<number | null>(null);
+
+  const storageKey = `fa_push_active_${code}`;
+
+  // Restaura o estado salvo no localStorage ou verifica se o Push do ServiceWorker já existe
+  useEffect(() => {
+    if (!code) return;
+    try {
+      const isSavedActive = localStorage.getItem(storageKey) === "true";
+      if (isSavedActive) {
+        setLembreteAtivo(true);
+        setPushAtivo(true);
+        return;
+      }
+    } catch {}
+
+    if (isPushSupported() && "Notification" in window && Notification.permission === "granted") {
+      getExistingPushSubscription().then((sub) => {
+        if (sub) {
+          setLembreteAtivo(true);
+          setPushAtivo(true);
+          try {
+            localStorage.setItem(storageKey, "true");
+          } catch {}
+        }
+      });
+    }
+  }, [code, storageKey]);
+
+  // Se a sessão encerrou, limpa a chave local do acompanhamento
+  useEffect(() => {
+    if (sessao?.status === "FINALIZADA" || sessao?.status === "NAO_ENCONTRADO") {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {}
+    }
+  }, [sessao, storageKey]);
 
   useEffect(() => {
     if (qrAbertoLogged.current || status !== "ready" || !sessao) return;
@@ -102,6 +138,9 @@ export function AcompanharScreen({ code }: { code: string }) {
             await registrarAcompanharPush(code, keys);
             setPushAtivo(true);
             setLembreteAtivo(true);
+            try {
+              localStorage.setItem(storageKey, "true");
+            } catch {}
             await logAcompanharEvento(code, "LEMBRETE_ATIVADO", { via: "PUSH" }).catch(() => {});
             return;
           }
@@ -129,6 +168,9 @@ export function AcompanharScreen({ code }: { code: string }) {
         );
       }
       setLembreteAtivo(true);
+      try {
+        localStorage.setItem(storageKey, "true");
+      } catch {}
       await logAcompanharEvento(code, "LEMBRETE_ATIVADO", { via: "PAGINA_ABERTA" }).catch(() => {});
     } catch {
       setLembreteErro("Não deu para ativar o lembrete agora — deixe a página aberta para acompanhar por aqui.");

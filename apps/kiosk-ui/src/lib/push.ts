@@ -25,12 +25,23 @@ export function isPushSupported(): boolean {
   return "serviceWorker" in navigator && "PushManager" in window && window.isSecureContext;
 }
 
+/** Retorna inscrição Web Push existente caso o navegador já possua uma ativa. */
+export async function getExistingPushSubscription(): Promise<PushSubscription | null> {
+  if (!isPushSupported()) return null;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    return await registration.pushManager.getSubscription();
+  } catch {
+    return null;
+  }
+}
+
 /** Reaproveita inscrição existente ou cria uma nova — nunca duplica no navegador. */
 export async function subscribeToPush(): Promise<PushSubscription | null> {
   if (!isPushSupported()) return null;
-  const registration = await navigator.serviceWorker.ready;
-  const existing = await registration.pushManager.getSubscription();
+  const existing = await getExistingPushSubscription();
   if (existing) return existing;
+  const registration = await navigator.serviceWorker.ready;
   return registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
