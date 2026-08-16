@@ -8,7 +8,6 @@ import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useConfirm } from "../state/ConfirmContext.js";
 import { IfCan } from "../auth/RequireCapability.js";
-import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import { CheckoutModal } from "../components/CheckoutModal.js";
 import { SaidaManualModal } from "../components/SaidaManualModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
@@ -82,30 +81,6 @@ export function PainelScreen() {
   // Contingência: recibo perdido E etiqueta ilegível. Passa pela conferência
   // do documento antes de cair no mesmo fechamento financeiro de sempre.
   const [manualExitFor, setManualExitFor] = useState<ActiveSessionEntry | null>(null);
-  // Cancelar sessão é exceção rara e não-rotineira (aceite por engano,
-  // duplicidade) — por isso pede reconfirmação de identidade por PIN
-  // mesmo com o Líder/Owner já logado, com uma janela curta de tolerância
-  // (ver EmployeeAuthGate/ttlMs) para não pedir de novo a cada cancelamento
-  // seguido dentro do mesmo atendimento.
-  const [cancelingFor, setCancelingFor] = useState<ActiveSessionEntry | null>(null);
-  const [cancelBusy, setCancelBusy] = useState(false);
-  const STEP_UP_TTL_MS = 5 * 60_000;
-
-  async function doCancelSession() {
-    if (!cancelingFor) return;
-    const sessionId = cancelingFor.session.id;
-    setCancelBusy(true);
-    try {
-      await Api.cancelSession(sessionId);
-      toast.success("Sessão cancelada.");
-      setCancelingFor(null);
-      refetchActiveSessions();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível cancelar a sessão.");
-    } finally {
-      setCancelBusy(false);
-    }
-  }
   const [vipChildIds, setVipChildIds] = useState<Set<string>>(new Set());
   const [assets, setAssets] = useState<Asset[]>([]);
 
@@ -752,24 +727,6 @@ export function PainelScreen() {
                     🔄 Mudar Plano
                   </Button>
                 </IfCan>
-                {/* Exceção rara, não check-in/checkout de rotina — trigger
-                    fa_kiosk_guard_session_exception no banco já barra quem
-                    não tem a capacidade; o botão só evita mostrar uma ação
-                    que vai falhar mesmo assim. */}
-                <IfCan capability="sessao.cancel">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={actionBusy.has(session.id)}
-                    title="Cancelar esta sessão sem cobrar (aceite por engano, duplicidade)"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCancelingFor(entry);
-                    }}
-                  >
-                    ❌ Cancelar sessão
-                  </Button>
-                </IfCan>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -978,27 +935,6 @@ export function PainelScreen() {
             toast.success("Conferência registrada. Finalize o pagamento.");
           }}
         />
-      )}
-
-      {cancelingFor && (
-        <Modal onClose={() => !cancelBusy && setCancelingFor(null)} ariaLabel="Cancelar sessão" maxWidth="420px">
-          {cancelBusy ? (
-            <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Cancelando…</p>
-          ) : (
-            <>
-              <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
-                Para cancelar a sessão de <strong>{cancelingFor.session.child_name_snapshot}</strong> sem cobrar,
-                confirme sua identidade com o PIN.
-              </p>
-              <EmployeeAuthGate
-                requireCapability="sessao.cancel"
-                ttlMs={STEP_UP_TTL_MS}
-                onAuthenticated={() => void doCancelSession()}
-                onCancel={() => setCancelingFor(null)}
-              />
-            </>
-          )}
-        </Modal>
       )}
 
       {printData && (

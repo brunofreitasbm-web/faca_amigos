@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, DateInput, Input, Select, Tabs, contrastRatio, HelpText } from "@facaamigos/ui";
+import { Card, DateInput, Input, Select, Tabs, contrastRatio, HelpText, Button, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, SessionAudit, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
+import { useToast } from "../state/ToastContext.js";
+import { IfCan } from "../auth/RequireCapability.js";
+import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import { money } from "../format.js";
 import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { AssetUsageChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
@@ -350,12 +353,41 @@ const SESSION_STATUS_LABEL: Record<string, string> = {
 
 export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
   const { units } = useAppState();
+  const toast = useToast();
   const [sessions, setSessions] = useState<SessionAudit[]>([]);
   const [search, setSearch] = useState("");
+  // Cancelar sessão é exceção rara e não-rotineira (aceite por engano,
+  // duplicidade) — por isso pede reconfirmação de identidade por PIN
+  // mesmo com o Líder/Owner já logado, com uma janela curta de tolerância
+  // (ver EmployeeAuthGate/ttlMs) para não pedir de novo a cada cancelamento
+  // seguido dentro do mesmo atendimento.
+  const [cancelingFor, setCancelingFor] = useState<SessionAudit | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const STEP_UP_TTL_MS = 5 * 60_000;
+
+  function refetchSessions() {
+    Api.reportSessions(unitId, from, to).then(setSessions);
+  }
 
   useEffect(() => {
-    Api.reportSessions(unitId, from, to).then(setSessions);
+    refetchSessions();
   }, [unitId, from, to]);
+
+  async function doCancelSession() {
+    if (!cancelingFor) return;
+    const sessionId = cancelingFor.id;
+    setCancelBusy(true);
+    try {
+      await Api.cancelSession(sessionId);
+      toast.success("Sessão cancelada.");
+      setCancelingFor(null);
+      refetchSessions();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível cancelar a sessão.");
+    } finally {
+      setCancelBusy(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -398,6 +430,7 @@ export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: 
               <th>Saída</th>
               <th>Status</th>
               <th>Atendido por</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -436,11 +469,25 @@ export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: 
                   )}
                 </td>
                 <td>{s.employee_name ?? "—"}</td>
+                <td>
+                  {s.status === "ATIVA" && (
+                    <IfCan capability="sessao.cancel">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Cancelar esta sessão sem cobrar (aceite por engano, duplicidade)"
+                        onClick={() => setCancelingFor(s)}
+                      >
+                        ❌ Cancelar
+                      </Button>
+                    </IfCan>
+                  )}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={unitId === null ? 9 : 8} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                <td colSpan={unitId === null ? 10 : 9} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
                   {sessions.length === 0
                     ? "Nenhuma sessão encontrada no período e origem selecionados."
                     : "Nenhuma sessão corresponde à busca."}
@@ -450,6 +497,27 @@ export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: 
           </tbody>
         </table>
       </Card>
+
+      {cancelingFor && (
+        <Modal onClose={() => !cancelBusy && setCancelingFor(null)} ariaLabel="Cancelar sessão" maxWidth="420px">
+          {cancelBusy ? (
+            <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Cancelando…</p>
+          ) : (
+            <>
+              <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
+                Para cancelar a sessão de <strong>{cancelingFor.child_name}</strong> sem cobrar,
+                confirme sua identidade com o PIN.
+              </p>
+              <EmployeeAuthGate
+                requireCapability="sessao.cancel"
+                ttlMs={STEP_UP_TTL_MS}
+                onAuthenticated={() => void doCancelSession()}
+                onCancel={() => setCancelingFor(null)}
+              />
+            </>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }
