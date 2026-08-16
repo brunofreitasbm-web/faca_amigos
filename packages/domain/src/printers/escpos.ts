@@ -333,8 +333,15 @@ export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { tex
   if (payload.assetName) lines.push(`Veículo/Pelúcia: ${payload.assetName}`);
   lines.push(subDivider);
   lines.push("DECLARAÇÃO E REGRAS DE USO:");
-  for (const line of wrap("Declaro ter recebido orientações sobre o uso dos miniveículos/pelúcias elétricas e assumo integral responsabilidade pela supervisão da criança durante a permanência no circuito.")) {
-    lines.push(line);
+  const declaracaoClausulas = [
+    "1. Declaro ter recebido orientações sobre o uso correto e seguro dos miniveículos/pelúcias elétricas e assumo integral responsabilidade pela supervisão da criança durante toda a permanência no circuito.",
+    "2. Declaro ser maior de idade e responsável legal pela criança acima identificada, e que quaisquer danos físicos causados por ela a terceiros (outras crianças, visitantes, funcionários) ou a mobiliário, estrutura e bens do shopping/estabelecimento durante o uso do circuito são de minha inteira e exclusiva responsabilidade, cabendo a mim o ressarcimento integral dos prejuízos.",
+    "3. Reconheço que o Faça Amigos, seus sócios, funcionários e o shopping/estabelecimento onde a unidade está instalada ficam isentos de qualquer responsabilidade civil ou financeira por danos, acidentes ou prejuízos decorrentes do uso do equipamento pela criança, inclusive os causados a terceiros ou ao patrimônio do local.",
+    "4. Estou ciente de que o descumprimento das orientações da equipe, o uso indevido do equipamento ou a ultrapassagem dos limites de peso/idade recomendados isentam integralmente o Faça Amigos de responsabilidade por quaisquer consequências.",
+  ];
+  for (const clausula of declaracaoClausulas) {
+    for (const line of wrap(clausula)) lines.push(line);
+    lines.push("");
   }
   lines.push(subDivider);
   lines.push("");
