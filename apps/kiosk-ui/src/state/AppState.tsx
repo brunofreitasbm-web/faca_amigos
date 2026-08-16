@@ -9,6 +9,7 @@ import {
   forgetTerminalEmployee,
   type TerminalEmployee,
 } from "../lib/supabase/terminalAuth.js";
+import { clearStepUpCache } from "../auth/stepUpCache.js";
 
 interface AppStateValue {
   units: Unit[];
@@ -119,6 +120,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       restoring,
       switchEmployee: async (employeeId, pin) => {
         const emp = await pinLogin(employeeId, pin);
+        clearStepUpCache();
         setTerminalEmployees(listTerminalEmployees());
         setEmployee(emp);
       },
@@ -131,6 +133,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         // token válido no navegador depois de "sair" mantém o acesso do
         // colaborador anterior a um passo de distância.
         await supabase().auth.signOut();
+        clearStepUpCache();
         setEmployee(null);
         setUnitId(null);
         setGerencial(false);

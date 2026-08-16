@@ -54,10 +54,19 @@ interface LoginPinResponse {
   employee: TerminalEmployee;
 }
 
-/** Único caminho de login: employeeId escolhido na lista + PIN de 6 dígitos. */
-export async function pinLogin(employeeId: string, pin: string): Promise<TerminalEmployee> {
+/**
+ * Único caminho de login: employeeId escolhido na lista + PIN de 6 dígitos.
+ * `context` só existe para o audit_log distinguir login inicial de
+ * reautenticação numa ação sensível (EmployeeAuthGate) — a verificação do
+ * PIN em si é idêntica nos dois casos.
+ */
+export async function pinLogin(
+  employeeId: string,
+  pin: string,
+  context: "LOGIN" | "STEP_UP" = "LOGIN",
+): Promise<TerminalEmployee> {
   const { data, error } = await supabase().functions.invoke<LoginPinResponse>("login-pin", {
-    body: { employeeId, pin },
+    body: { employeeId, pin, context },
   });
   if (error || !data?.tokenHash) throw new Error("PIN incorreto");
 
