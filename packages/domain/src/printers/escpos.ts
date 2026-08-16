@@ -51,6 +51,8 @@ export interface ReceiptPrintPayload {
   planName?: string;
   /** Tags sensoriais e observações registradas na entrada. */
   careNotes?: string;
+  activity?: string;
+  assetName?: string;
 }
 
 const WIDTH = 42;
@@ -289,4 +291,55 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   }
 
   return { text, commandsHex: hexHeader + hexBody + hexFeed + hexCut };
+}
+
+/**
+ * Gerador do Termo de Responsabilidade e Uso exclusivo da Unidade Circuito.
+ * Impresso em via separada retida no balcão para assinatura física do responsável.
+ */
+export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { text: string; commandsHex: string } {
+  const dateTime = payload.dateTime || new Date().toLocaleString("pt-BR");
+  const lines: string[] = [];
+
+  const divider = "==========================================";
+  const subDivider = "------------------------------------------";
+
+  lines.push(divider);
+  lines.push(centerText("FAÇA AMIGOS — CIRCUITO"));
+  lines.push(centerText(payload.unitName.toUpperCase()));
+  lines.push(divider);
+  lines.push(centerText("*** TERMO DE RESPONSABILIDADE ***"));
+  lines.push(centerText("(VIA RETIDA PELA UNIDADE)"));
+  lines.push(subDivider);
+  lines.push(`Data/Hora: ${dateTime}`);
+  if (payload.accessCode) lines.push(`Código de Saída: ${formatAccessCode(payload.accessCode)}`);
+  if (payload.customerInfo) {
+    const c = payload.customerInfo;
+    if (c.childName) lines.push(`Criança: ${c.childName}`);
+    if (c.guardianName) lines.push(`Responsável: ${c.guardianName}`);
+    if (c.guardianCpf) lines.push(`CPF Responsável: ${c.guardianCpf}`);
+    if (c.phone) lines.push(`Telefone: ${c.phone}`);
+  }
+  if (payload.planName) lines.push(`Plano: ${payload.planName}`);
+  if (payload.assetName) lines.push(`Veículo/Pelúcia: ${payload.assetName}`);
+  lines.push(subDivider);
+  lines.push("DECLARAÇÃO E REGRAS DE USO:");
+  for (const line of wrap("Declaro ter recebido orientações sobre o uso dos miniveículos/pelúcias elétricas e assumo integral responsabilidade pela supervisão da criança durante a permanência no circuito.")) {
+    lines.push(line);
+  }
+  lines.push(subDivider);
+  lines.push("");
+  lines.push("__________________________________________");
+  lines.push(centerText("Assinatura do Responsável"));
+  lines.push(divider);
+  lines.push("");
+  lines.push("");
+  lines.push("");
+
+  const text = lines.join("\n");
+  const hexHeader = "1b401b6101"; // ESC @, ESC a 1
+  const hexFeed = "1b6403"; // ESC d 3
+  const hexCut = "1d564200"; // GS V 66 0
+
+  return { text, commandsHex: hexHeader + textToHex(text) + hexFeed + hexCut };
 }

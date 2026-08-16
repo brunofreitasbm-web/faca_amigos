@@ -1,7 +1,7 @@
 import { BrowserWindow } from "electron";
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
-import { generateEscPosReceipt, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
+import { generateEscPosReceipt, generateEscPosCircuitoTermo, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import type { ReceiptPrintPayload, WristbandPrintPayload } from "@facaamigos/domain";
 import { printRawWindows } from "./rawPrint.js";
 
@@ -94,6 +94,17 @@ async function receiptHtml(payload: ReceiptPrintPayload): Promise<string> {
       .qr svg { width: 34mm; height: 34mm; }
       .qr-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 1mm; }
     </style></head><body>${trackingQrBlock}<pre>${esc}</pre></body></html>`;
+}
+
+async function circuitoTermoHtml(payload: ReceiptPrintPayload): Promise<string> {
+  const { text } = generateEscPosCircuitoTermo(payload);
+  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <style>
+      @page { size: 80mm auto; margin: 0; }
+      html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
+      pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
+    </style></head><body><pre>${esc}</pre></body></html>`;
 }
 
 // Mesma URL pública usada pelo kiosk-ui em VITE_PUBLIC_APP_URL (ver
@@ -197,10 +208,19 @@ function isVirtualOrPdfPrinter(deviceName: string): boolean {
         const rawPayload = job.payload_json as unknown as ReceiptPrintPayload;
         const trackingUrl = trackingUrlFor(rawPayload.accessCode);
         const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
+        const isCircuito =
+          Boolean(payload.accessCode) &&
+          (payload.activity === "CARRINHO" ||
+            /circuito/i.test(payload.unitName) ||
+            Boolean(payload.assetName));
 
         if (isVirtualOrPdf) {
           const html = await receiptHtml(payload);
           await printHtml(html, deviceName);
+          if (isCircuito) {
+            const termoHtml = await circuitoTermoHtml(payload);
+            await printHtml(termoHtml, deviceName);
+          }
         } else {
           const escpos = generateEscPosReceipt(payload);
           const rawBuffer = Buffer.from(escpos.commandsHex, "hex");
@@ -208,6 +228,15 @@ function isVirtualOrPdfPrinter(deviceName: string): boolean {
           if (!printedRaw) {
             const html = await receiptHtml(payload);
             await printHtml(html, deviceName);
+          }
+          if (isCircuito) {
+            const termoEscpos = generateEscPosCircuitoTermo(payload);
+            const termoRawBuffer = Buffer.from(termoEscpos.commandsHex, "hex");
+            const printedTermoRaw = await printRawWindows(termoRawBuffer, deviceName);
+            if (!printedTermoRaw) {
+              const termoHtml = await circuitoTermoHtml(payload);
+              await printHtml(termoHtml, deviceName);
+            }
           }
         }
       }
