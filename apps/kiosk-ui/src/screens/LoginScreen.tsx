@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, Button, HelpText } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import { Api } from "../api/client.js";
@@ -20,22 +20,27 @@ type Mode = { kind: "PICK" } | { kind: "PIN"; employee: LoginCandidate } | { kin
 
 export function LoginScreen() {
   const { terminalEmployees, switchEmployee, forgetEmployee } = useAppState();
-  const [mode, setMode] = useState<Mode>({ kind: "PICK" });
+  // Terminal recém-instalado (ou "esqueceu" todo mundo): não há atalho nenhum
+  // pra mostrar, então já abre direto na lista completa em vez de uma tela
+  // vazia com só um botão pequeno "outro colaborador" pra achar.
+  const [mode, setMode] = useState<Mode>(terminalEmployees.length === 0 ? { kind: "ALL" } : { kind: "PICK" });
   const [allEmployees, setAllEmployees] = useState<LoginCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (mode.kind !== "ALL" || allEmployees) return;
+    Api.employeesForLogin()
+      .then(setAllEmployees)
+      .catch(() => {
+        setAllEmployees([]);
+        setError("Não foi possível carregar a lista. Verifique a conexão.");
+      });
+  }, [mode.kind, allEmployees]);
+
   function openAllEmployees() {
     setError(null);
     setMode({ kind: "ALL" });
-    if (!allEmployees) {
-      Api.employeesForLogin()
-        .then(setAllEmployees)
-        .catch(() => {
-          setAllEmployees([]);
-          setError("Não foi possível carregar a lista. Verifique a conexão.");
-        });
-    }
   }
 
   if (mode.kind === "ALL") {
@@ -49,9 +54,11 @@ export function LoginScreen() {
             <strong>{emp.full_name}</strong>
           </Card>
         ))}
-        <Button variant="ghost" onClick={() => setMode({ kind: "PICK" })}>
-          voltar
-        </Button>
+        {terminalEmployees.length > 0 && (
+          <Button variant="ghost" onClick={() => setMode({ kind: "PICK" })}>
+            voltar
+          </Button>
+        )}
       </div>
     );
   }
@@ -64,7 +71,7 @@ export function LoginScreen() {
         error={error}
         onBack={() => {
           setError(null);
-          setMode({ kind: "PICK" });
+          setMode(terminalEmployees.length === 0 ? { kind: "ALL" } : { kind: "PICK" });
         }}
         onSubmit={async (pin) => {
           setBusy(true);
