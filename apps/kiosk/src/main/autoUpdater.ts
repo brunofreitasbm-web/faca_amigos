@@ -9,6 +9,19 @@ export function initAutoUpdater(): void {
     return;
   }
 
+  const customFeedUrl = process.env.FACAAMIGOS_UPDATE_URL;
+  if (customFeedUrl) {
+    try {
+      autoUpdater.setFeedURL({
+        provider: "generic",
+        url: customFeedUrl,
+      });
+      console.log(`[auto-updater] Feed de atualização configurado para: ${customFeedUrl}`);
+    } catch (err) {
+      console.warn("[auto-updater] Falha ao definir custom feed URL:", err);
+    }
+  }
+
   autoUpdater.logger = console;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -23,6 +36,10 @@ export function initAutoUpdater(): void {
 
   autoUpdater.on("update-not-available", () => {
     console.log("[auto-updater] O aplicativo já está na versão mais recente.");
+  });
+
+  autoUpdater.on("download-progress", (progressObj) => {
+    console.log(`[auto-updater] Download em andamento: ${Math.round(progressObj.percent)}% (${progressObj.bytesPerSecond} B/s)`);
   });
 
   autoUpdater.on("error", (err) => {
