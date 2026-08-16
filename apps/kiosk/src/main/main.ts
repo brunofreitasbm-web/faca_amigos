@@ -50,18 +50,29 @@ if (!isPrimaryInstance) {
   app.quit();
 }
 
-/** Build da SPA: extraResources no app empacotado; dist do workspace em dev. */
+/**
+ * Build da SPA: extraResources no app empacotado; dist do workspace em dev.
+ *
+ * `import.meta.dirname` aqui é sempre a pasta do bundle (`apps/kiosk/bundle`)
+ * — main.ts só roda via `bundle/main.mjs`, empacotado ou não, nunca direto
+ * da fonte TS. O caminho relativo tinha um "../" a mais e apontava para
+ * `Faça Amigos/kiosk-ui/dist` (fora do repo) em vez de `apps/kiosk-ui/dist`.
+ */
 function resolveUiDist(): string {
   if (process.env.FACAAMIGOS_UI_DIST) return process.env.FACAAMIGOS_UI_DIST;
   if (app.isPackaged) return join(process.resourcesPath, "kiosk-ui");
-  return join(import.meta.dirname, "../../../kiosk-ui/dist");
+  return join(import.meta.dirname, "../../kiosk-ui/dist");
 }
 
 async function startLocalServer() {
-  // Os .sql de migração viajam como extraResources no app empacotado —
-  // ver electron-builder.yml e packages/db-local/src/migrate.ts.
-  if (app.isPackaged && !process.env.FACAAMIGOS_MIGRATIONS_DIR) {
-    process.env.FACAAMIGOS_MIGRATIONS_DIR = join(process.resourcesPath, "migrations");
+  // Os .sql de migração viajam como extraResources no app empacotado (ver
+  // electron-builder.yml) — em dev não existe extraResources nenhum, então
+  // aponta direto para o dist do pacote db-local (mesmo raciocínio de
+  // resolveUiDist logo acima).
+  if (!process.env.FACAAMIGOS_MIGRATIONS_DIR) {
+    process.env.FACAAMIGOS_MIGRATIONS_DIR = app.isPackaged
+      ? join(process.resourcesPath, "migrations")
+      : join(import.meta.dirname, "../../../packages/db-local/dist/migrations");
   }
 
   const dbPath = process.env.FACAAMIGOS_DB_PATH ?? `${app.getPath("userData")}/facaamigos.db`;

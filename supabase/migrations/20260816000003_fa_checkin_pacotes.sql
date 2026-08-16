@@ -117,6 +117,9 @@ declare
   v_bank_allocated integer := null;
   v_bank_overage integer := null;
   v_pkg_allocated integer := null;
+  v_pkg_name text := null;
+  v_pkg_price_cents integer := null;
+  v_pkg_overage integer := null;
   v_conversion_key text;
 begin
   v_cached := fa_kiosk_check_idempotency(p_idempotency_key);
@@ -165,6 +168,9 @@ begin
       raise exception 'FORA_DO_HORARIO: %', 'O shopping já está fechando — não é possível iniciar novas entradas';
     end if;
     v_pkg_allocated := case when v_remaining is not null then least(v_pkg.included_minutes, v_remaining) else v_pkg.included_minutes end;
+    v_pkg_name := v_pkg.name;
+    v_pkg_price_cents := v_pkg.price_cents;
+    v_pkg_overage := v_pkg.overage_cents_per_minute;
   else
     select * into v_plan from fa_kiosk_plans where id = p_plan_id and activity = p_activity;
     if not found then raise exception 'PLANO_INVALIDO'; end if;
@@ -273,8 +279,8 @@ begin
     to_timestamp(v_now_ms / 1000.0), v_now_ms, p_employee_id,
     v_coupon_id, v_coupon_discount_cents, false, v_business_date,
     p_use_hour_bank, v_bank_allocated, v_bank_overage,
-    p_package_id is not null, p_package_id, v_pkg.name, v_pkg.price_cents,
-    v_pkg_allocated, v_pkg.overage_cents_per_minute
+    p_package_id is not null, p_package_id, v_pkg_name, v_pkg_price_cents,
+    v_pkg_allocated, v_pkg_overage
   );
 
   insert into fa_kiosk_visit_log (child_id, activity, at, at_ms) values (v_child_id, p_activity, to_timestamp(v_now_ms / 1000.0), v_now_ms);
