@@ -173,12 +173,9 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
       <div>
         <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 5vw, 26px)" }}>Saída</h1>
         <HelpText>
-          Aponte a câmera para o QR Code da pulseira da criança ou do recibo de guarda dos pais. A criança aparece na
-          tela com o valor a pagar — confirme e ela está liberada.
+          Digite o código de saída ou o PIN de 4 dígitos impressos no recibo de guarda para consultar o atendimento. A criança aparece na tela com o valor a pagar — confirme e ela está liberada.
         </HelpText>
       </div>
-
-      <QrScanner onScan={handleCode} paused={busy || Boolean(resolved) || checkoutOpen} />
 
       {busy && <Tag color="var(--color-teal)">Consultando código…</Tag>}
 
