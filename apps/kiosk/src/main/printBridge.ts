@@ -72,22 +72,9 @@ async function receiptHtml(payload: ReceiptPrintPayload): Promise<string> {
   const { text } = generateEscPosReceipt(payload);
   const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
-  // O recibo de guarda leva QR: é a via que os pais apresentam na saída, e o
-  // caminho normal do check-out é a câmera do celular lendo justamente este
-  // código. Sem imagem, sobraria só digitar o código à mão.
-  let qrBlock = "";
-  if (payload.qrValue) {
-    try {
-      const qrSvg = await QRCode.toString(payload.qrValue, { type: "svg", margin: 0, errorCorrectionLevel: "Q" });
-      qrBlock = `<div class="qr">${qrSvg}</div>`;
-    } catch (err) {
-      console.error("[print-bridge] Erro ao gerar QR Code do recibo:", err);
-    }
-  }
-
-  // QR de acompanhamento — separado do QR de saída acima: este abre, no
-  // celular dos pais, o painel de tempo em tempo real da criança (ver
-  // AcompanharScreen); aquele é lido pelo operador na hora da retirada.
+  // O recibo de guarda exibe apenas o QR de acompanhamento pelo celular dos pais
+  // (AcompanharScreen). O código de saída e o PIN para retirada no balcão
+  // são mantidos no texto do recibo.
   let trackingQrBlock = "";
   if (payload.trackingUrl) {
     try {
@@ -106,7 +93,7 @@ async function receiptHtml(payload: ReceiptPrintPayload): Promise<string> {
       .qr { display: flex; flex-direction: column; align-items: center; margin: 2mm 0 3mm 0; }
       .qr svg { width: 34mm; height: 34mm; }
       .qr-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 1mm; }
-    </style></head><body>${qrBlock}${trackingQrBlock}<pre>${esc}</pre></body></html>`;
+    </style></head><body>${trackingQrBlock}<pre>${esc}</pre></body></html>`;
 }
 
 // Mesma URL pública usada pelo kiosk-ui em VITE_PUBLIC_APP_URL (ver
