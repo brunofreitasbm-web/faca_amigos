@@ -9,6 +9,7 @@ import { loadOrCreateTls } from "../server/tls.js";
 import { startPrintBridge } from "./printBridge.js";
 import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
+import { initAutoUpdater } from "./autoUpdater.js";
 
 /**
  * O bundle é puro esbuild sem `dotenv` — sem isto, `apps/kiosk/.env`
@@ -173,6 +174,7 @@ if (isPrimaryInstance) {
     // em dev isso registraria o binário do node_modules).
     if (app.isPackaged) {
       app.setLoginItemSettings({ openAtLogin: true });
+      initAutoUpdater();
     }
 
     // Sem isso, qualquer falha em startLocalServer/createWindow (porta
