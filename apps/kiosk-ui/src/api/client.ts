@@ -2194,7 +2194,23 @@ export const Api = {
     const { data, error } = await supabase().functions.invoke<{
       employees: { id: string; full_name: string }[];
     }>("list-employees", { body: {} });
-    if (error || !data) throw new Error("Não foi possível carregar a lista de colaboradores");
+    if (error) {
+      console.error("[api] list-employees falhou:", error, error?.context);
+      let detail = error instanceof Error ? error.message : String(error);
+      // FunctionsHttpError carrega a Response da edge function em .context —
+      // o corpo tem o motivo real (ex.: erro de RLS/DB), que error.message
+      // sozinho não mostra (vem só "Edge Function returned a non-2xx status code").
+      if (error?.context instanceof Response) {
+        try {
+          const body = await error.context.clone().text();
+          detail = `HTTP ${error.context.status} — ${body || detail}`;
+        } catch {
+          // corpo já consumido ou ilegível: mantém a mensagem original
+        }
+      }
+      throw new Error(`Não foi possível carregar a lista de colaboradores (${detail})`);
+    }
+    if (!data) throw new Error("Não foi possível carregar a lista de colaboradores (resposta vazia)");
     return data.employees;
   },
 

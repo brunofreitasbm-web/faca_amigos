@@ -31,9 +31,10 @@ export function LoginScreen() {
     if (!allEmployees) {
       Api.employeesForLogin()
         .then(setAllEmployees)
-        .catch(() => {
+        .catch((err) => {
+          console.error("[login] falha ao carregar lista de colaboradores:", err);
           setAllEmployees([]);
-          setError("Não foi possível carregar a lista. Verifique a conexão.");
+          setError(`Não foi possível carregar a lista: ${err instanceof Error ? err.message : String(err)}`);
         });
     }
   }

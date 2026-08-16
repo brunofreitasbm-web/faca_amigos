@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
-import { app, BrowserWindow, Menu, ipcMain } from "electron";
+import { app, BrowserWindow, Menu, ipcMain, dialog } from "electron";
 import { openDatabase, migrate } from "@facaamigos/db-local";
 import { buildApp } from "../server/app.js";
 import { seedDevData } from "../server/seed-dev.js";
@@ -18,8 +18,11 @@ import { startFiscalWorker } from "../fiscal/index.js";
 const PORT = 7317;
 
 // Uma única instância: reabrir o app deve focar a janela existente, não
-// tentar subir um segundo servidor na mesma porta.
-if (!app.requestSingleInstanceLock()) {
+// tentar subir um segundo servidor na mesma porta. app.quit() não interrompe
+// a execução do resto deste módulo, então o guard abaixo evita que uma
+// segunda instância tente registrar handlers e ouvir a mesma porta.
+const isPrimaryInstance = app.requestSingleInstanceLock();
+if (!isPrimaryInstance) {
   app.quit();
 }
 
@@ -70,86 +73,104 @@ function createWindow(protocol: "http" | "https", splash?: BrowserWindow) {
   return win;
 }
 
-app.on("second-instance", () => {
-  const [win] = BrowserWindow.getAllWindows();
-  if (win) {
-    if (win.isMinimized()) win.restore();
-    win.focus();
-  }
-});
-
-app.whenReady().then(async () => {
-  Menu.setApplicationMenu(null);
-
-  // Splash imediata: migrate + TLS + fiscal levam alguns segundos e a
-  // janela principal só aparece no ready-to-show da SPA.
-  const splash = new BrowserWindow({
-    width: 420,
-    height: 280,
-    frame: false,
-    resizable: false,
-    alwaysOnTop: true,
-    backgroundColor: "#F0196B",
-  });
-  splash.loadURL(splashDataUrl);
-
-  // Inicia junto com o Windows no terminal de loja (só no app instalado —
-  // em dev isso registraria o binário do node_modules).
-  if (app.isPackaged) {
-    app.setLoginItemSettings({ openAtLogin: true });
-  }
-
-  const tls = await startLocalServer();
-  const protocol = tls ? "https" : "http";
-
-  // O certificado é o mesmo que acabamos de gerar/carregar em disco —
-  // confiar nele aqui é aceitável porque a origem é local, não terceira.
-  if (tls) {
-    app.on("certificate-error", (event, _webContents, url, _error, _certificate, callback) => {
-      if (url.startsWith(`https://127.0.0.1:${PORT}`)) {
-        event.preventDefault();
-        callback(true);
-      } else {
-        callback(false);
-      }
-    });
-  }
-
-  const mainWindow = createWindow(protocol, splash);
-  startPrintBridge();
-
-  // Fonte da verdade para a tela Configurações > Impressoras validar o
-  // nome digitado: o print bridge usa esse mesmo nome literal em
-  // OpenPrinterA/webContents.print, então um typo aqui é impressão
-  // silenciosamente falhando sem nada na fila do Windows.
-  ipcMain.handle("list-printers", async () => {
-    try {
-      return await mainWindow.webContents.getPrintersAsync();
-    } catch (err) {
-      console.error("[main] falha ao listar impressoras instaladas:", err);
-      return [];
+if (isPrimaryInstance) {
+  app.on("second-instance", () => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
     }
   });
 
-  // Emissão fiscal (Fase 3 do plano): try/catch explícito e captura de
-  // rejeições não tratadas — um erro aqui NUNCA pode derrubar a impressão
-  // de pulseira/cupom, que é o que trava o balcão na hora. O print bridge
-  // acima não tem essa proteção porque foi escrito antes; o worker fiscal
-  // não repete essa lacuna.
-  try {
-    startFiscalWorker(app.getPath("userData"));
-  } catch (err) {
-    console.error("[fiscal] falha ao iniciar o worker fiscal — emissão de NFC-e desligada neste terminal:", err);
-  }
-  process.on("unhandledRejection", (reason) => {
-    console.error("[fiscal] rejeição não tratada no worker fiscal:", reason);
+  app.whenReady().then(async () => {
+    Menu.setApplicationMenu(null);
+
+    // Splash imediata: migrate + TLS + fiscal levam alguns segundos e a
+    // janela principal só aparece no ready-to-show da SPA.
+    const splash = new BrowserWindow({
+      width: 420,
+      height: 280,
+      frame: false,
+      resizable: false,
+      alwaysOnTop: true,
+      backgroundColor: "#F0196B",
+    });
+    splash.loadURL(splashDataUrl);
+
+    // Inicia junto com o Windows no terminal de loja (só no app instalado —
+    // em dev isso registraria o binário do node_modules).
+    if (app.isPackaged) {
+      app.setLoginItemSettings({ openAtLogin: true });
+    }
+
+    // Sem isso, qualquer falha em startLocalServer/createWindow (porta
+    // ocupada, migração quebrada, TLS sem permissão de escrita) virava uma
+    // unhandledRejection silenciosa e a splash "Iniciando o sistema..."
+    // ficava travada para sempre, sem nenhum aviso pro usuário.
+    let tls: Awaited<ReturnType<typeof startLocalServer>>;
+    try {
+      tls = await startLocalServer();
+    } catch (err) {
+      console.error("[main] falha ao iniciar o servidor local:", err);
+      dialog.showErrorBox(
+        "Falha ao iniciar o sistema",
+        `Não foi possível iniciar o FaçaAmigos.\n\n${err instanceof Error ? err.message : String(err)}`,
+      );
+      splash.close();
+      app.quit();
+      return;
+    }
+    const protocol = tls ? "https" : "http";
+
+    // O certificado é o mesmo que acabamos de gerar/carregar em disco —
+    // confiar nele aqui é aceitável porque a origem é local, não terceira.
+    if (tls) {
+      app.on("certificate-error", (event, _webContents, url, _error, _certificate, callback) => {
+        if (url.startsWith(`https://127.0.0.1:${PORT}`)) {
+          event.preventDefault();
+          callback(true);
+        } else {
+          callback(false);
+        }
+      });
+    }
+
+    const mainWindow = createWindow(protocol, splash);
+    startPrintBridge();
+
+    // Fonte da verdade para a tela Configurações > Impressoras validar o
+    // nome digitado: o print bridge usa esse mesmo nome literal em
+    // OpenPrinterA/webContents.print, então um typo aqui é impressão
+    // silenciosamente falhando sem nada na fila do Windows.
+    ipcMain.handle("list-printers", async () => {
+      try {
+        return await mainWindow.webContents.getPrintersAsync();
+      } catch (err) {
+        console.error("[main] falha ao listar impressoras instaladas:", err);
+        return [];
+      }
+    });
+
+    // Emissão fiscal (Fase 3 do plano): try/catch explícito e captura de
+    // rejeições não tratadas — um erro aqui NUNCA pode derrubar a impressão
+    // de pulseira/cupom, que é o que trava o balcão na hora. O print bridge
+    // acima não tem essa proteção porque foi escrito antes; o worker fiscal
+    // não repete essa lacuna.
+    try {
+      startFiscalWorker(app.getPath("userData"));
+    } catch (err) {
+      console.error("[fiscal] falha ao iniciar o worker fiscal — emissão de NFC-e desligada neste terminal:", err);
+    }
+    process.on("unhandledRejection", (reason) => {
+      console.error("[fiscal] rejeição não tratada no worker fiscal:", reason);
+    });
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow(protocol);
+    });
   });
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow(protocol);
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
   });
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
+}

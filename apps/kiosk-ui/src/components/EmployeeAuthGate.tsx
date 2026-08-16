@@ -87,9 +87,10 @@ export function EmployeeAuthGate({
     if (!allEmployees) {
       Api.employeesForLogin()
         .then(setAllEmployees)
-        .catch(() => {
+        .catch((err) => {
+          console.error("[auth-gate] falha ao carregar lista de colaboradores:", err);
           setAllEmployees([]);
-          setError("Não foi possível carregar a lista. Verifique a conexão.");
+          setError(`Não foi possível carregar a lista: ${err instanceof Error ? err.message : String(err)}`);
         });
     }
   }
