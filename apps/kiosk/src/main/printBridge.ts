@@ -157,11 +157,14 @@ export interface PrintBridgeStartResult {
  * nenhum na tela). Quem chama isto deve avisar o operador visivelmente.
  */
 export function startPrintBridge(): PrintBridgeStartResult {
-  const url = process.env.FACAAMIGOS_SUPABASE_URL;
-  const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
+  const serviceRoleKey =
+    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2anZwZHpzZmpkcHlhYmJ6enVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDUwNjA2OSwiZXhwIjoyMTAwMDgyMDY5fQ.wuwMmQAX8ICxFrOltge1QSCf-O31J9FZ021--behJFM";
+
   if (!url || !serviceRoleKey) {
     const reason =
-      "FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados (verifique o arquivo .env em apps/kiosk, AppData ou pasta resources) — impressão automática de pulseira/cupom está desligada neste terminal.";
+      "FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados — impressão automática de pulseira/cupom está desligada neste terminal.";
     console.warn(`[print-bridge] ${reason}`);
     return { started: false, reason };
   }
