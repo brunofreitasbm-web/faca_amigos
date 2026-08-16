@@ -1986,6 +1986,9 @@ export const Api = {
     unwrap(supabase().rpc("fa_kiosk_pause_session", { p_session_id: sessionId, p_reason: reason })),
   resumeSession: (sessionId: string) =>
     unwrap(supabase().rpc("fa_kiosk_resume_session", { p_session_id: sessionId })),
+  /** Cancela uma sessão ativa sem checkout (aceite por engano, duplicidade). Exige a capacidade `sessao.cancel` — reforçada no servidor pelo trigger fa_kiosk_guard_session_exception. */
+  cancelSession: (sessionId: string, reason?: string) =>
+    unwrap(supabase().rpc("fa_kiosk_cancel_session", { p_session_id: sessionId, p_reason: reason ?? null })),
 
   coupons: (unitId: string) =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_coupons").select("*").eq("unit_id", unitId)).then((rows) =>

@@ -5,6 +5,7 @@ import { Api } from "../api/client.js";
 import { listTerminalEmployees, pinLogin, forgetTerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { ROLE_LABEL, type Capability } from "../auth/capabilities.js";
+import { recordStepUpVerified, isStepUpFresh } from "../auth/stepUpCache.js";
 
 /** Só id + nome — o papel não é exposto antes do login. Ver LoginScreen. */
 interface LoginCandidate {
@@ -27,6 +28,14 @@ export interface EmployeeAuthGateProps {
    */
   requireCapability?: Capability;
   onCancel?: () => void;
+  /**
+   * Dispensa pedir o PIN de novo se este MESMO colaborador já confirmou a
+   * identidade há menos de `ttlMs`. Omitido (ou 0) preserva o comportamento
+   * de sempre pedir PIN. A checagem de `requireCapability`, se houver,
+   * continua sendo refeita contra o servidor mesmo quando o PIN é
+   * dispensado — só a digitação é pulada.
+   */
+  ttlMs?: number;
 }
 
 /**
@@ -40,9 +49,11 @@ export function EmployeeAuthGate({
   restrictToEmployeeId,
   requireCapability,
   onCancel,
+  ttlMs = 0,
 }: EmployeeAuthGateProps) {
   const cachedEmployees = listTerminalEmployees();
   const restrictedCached = restrictToEmployeeId ? cachedEmployees.find((e) => e.id === restrictToEmployeeId) : undefined;
+  const skipEligible = Boolean(restrictedCached && isStepUpFresh(restrictedCached.id, ttlMs));
 
   const [mode, setMode] = useState<Mode>(
     restrictToEmployeeId
@@ -57,6 +68,15 @@ export function EmployeeAuthGate({
   const [allEmployees, setAllEmployees] = useState<LoginCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [skipChecked, setSkipChecked] = useState(!skipEligible);
+
+  // Colaborador restrito já confirmou o PIN há pouco: reconfere só a
+  // capacidade (se houver) contra o servidor e libera sem mostrar o teclado.
+  useEffect(() => {
+    if (!skipEligible || !restrictedCached) return;
+    void checkAndAccept(restrictedCached).finally(() => setSkipChecked(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (mode.kind !== "ALL" || allEmployees) return;
@@ -88,7 +108,8 @@ export function EmployeeAuthGate({
     setBusy(true);
     setError(null);
     try {
-      const employee = await pinLogin(employeeId, pin);
+      const employee = await pinLogin(employeeId, pin, "STEP_UP");
+      recordStepUpVerified(employee.id);
       setTerminalEmployees(listTerminalEmployees());
       await checkAndAccept(employee);
     } catch (err) {
@@ -102,6 +123,10 @@ export function EmployeeAuthGate({
     setError(null);
     setMode({ kind: "ALL" });
   }
+
+  // Enquanto a confirmação automática (skipEligible) ainda não resolveu,
+  // não mostra o teclado por um instante — evita o "flash" do PIN.
+  if (skipEligible && !skipChecked) return null;
 
   if (mode.kind === "ALL") {
     return (
@@ -149,7 +174,17 @@ export function EmployeeAuthGate({
       {error && <p style={{ color: "var(--color-error-text)", textAlign: "center" }}>{error}</p>}
       {terminalEmployees.map((emp) => (
         <Card key={emp.id} style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ cursor: "pointer" }} onClick={() => { setError(null); setMode({ kind: "PIN", employee: emp }); }}>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              setError(null);
+              if (isStepUpFresh(emp.id, ttlMs)) {
+                void checkAndAccept(emp);
+              } else {
+                setMode({ kind: "PIN", employee: emp });
+              }
+            }}
+          >
             <strong>{emp.full_name}</strong> — {ROLE_LABEL[emp.role]}
           </span>
           <Button variant="ghost" onClick={() => { forgetTerminalEmployee(emp.id); setTerminalEmployees(listTerminalEmployees()); }}>

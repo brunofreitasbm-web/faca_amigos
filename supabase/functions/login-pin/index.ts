@@ -24,6 +24,8 @@ import { jsonResponse, preflight } from "../_shared/http.ts";
 interface LoginPinBody {
   employeeId: string;
   pin: string;
+  /** Só para o audit_log distinguir login inicial de reautenticação (EmployeeAuthGate). */
+  context?: "LOGIN" | "STEP_UP";
 }
 
 // Mensagem genérica em qualquer falha (colaborador inexistente, inativo,
@@ -138,6 +140,12 @@ Deno.serve(async (req) => {
 
   // Só zera depois da sessão ter sido efetivamente emitida.
   await adminClient.from("fa_kiosk_pin_attempts").delete().eq("employee_id", employee.id);
+
+  await adminClient.from("fa_kiosk_audit_log").insert({
+    employee_id: employee.id,
+    action: body.context === "STEP_UP" ? "AUTH_STEP_UP_PIN_OK" : "AUTH_LOGIN_PIN_OK",
+    severity: "INFO",
+  });
 
   return jsonResponse(req, {
     tokenHash: link.properties.hashed_token,
