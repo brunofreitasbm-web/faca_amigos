@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, HelpText } from "@facaamigos/ui";
+import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan, Asset } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
@@ -448,7 +448,7 @@ export function PainelScreen() {
                   title={item.totalChildren > 1 ? "Descartar todo o pré-cadastro (todas as crianças ainda pendentes desta família)" : "Descartar este pré-cadastro (duplicado, desistência)"}
                   aria-label="Descartar pré-cadastro"
                 >
-                  ✕
+                  <XIcon />
                 </Button>
               </div>
             ))}
@@ -683,10 +683,10 @@ export function PainelScreen() {
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="md"
                   title="Ver linha do tempo completa desta sessão: chegada, plano, pausas e retomadas"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -697,7 +697,7 @@ export function PainelScreen() {
                 </Button>
                 <Button
                   variant="primary"
-                  size="sm"
+                  size="md"
                   loading={actionBusy.has(session.id)}
                   disabled={actionBusy.has(session.id)}
                   title="Chamado de retorno urgente — o responsável precisa vir buscar/atender a criança agora (banheiro, quer ir embora)"
@@ -715,7 +715,7 @@ export function PainelScreen() {
                 <IfCan capability="sessao.change_plan">
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="md"
                     disabled={actionBusy.has(session.id)}
                     title="Trocar o plano de permanência desta sessão"
                     onClick={(e) => {
@@ -729,7 +729,7 @@ export function PainelScreen() {
                 </IfCan>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="md"
                   title="Imprimir Pulseira Térmica"
                   aria-label="Imprimir Pulseira Térmica"
                   onClick={(e) => {
@@ -751,7 +751,7 @@ export function PainelScreen() {
                     e o operador está sob pressão com a família na frente. */}
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="md"
                   disabled={isPaused || actionBusy.has(session.id)}
                   title={
                     isPaused
@@ -768,7 +768,7 @@ export function PainelScreen() {
                 {isPaused ? (
                   <Button
                     variant="teal"
-                    size="sm"
+                    size="md"
                     loading={actionBusy.has(session.id)}
                     disabled={actionBusy.has(session.id)}
                     title="Retomar a contagem do tempo desta sessão"
@@ -782,7 +782,7 @@ export function PainelScreen() {
                 ) : (
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="md"
                     disabled={actionBusy.has(session.id)}
                     title="Pausar a contagem do tempo — banheiro, saiu do espaço, etc."
                     onClick={(e) => {
