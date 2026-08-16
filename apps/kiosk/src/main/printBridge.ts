@@ -85,14 +85,41 @@ async function receiptHtml(payload: ReceiptPrintPayload): Promise<string> {
     }
   }
 
+  // QR de acompanhamento — separado do QR de saída acima: este abre, no
+  // celular dos pais, o painel de tempo em tempo real da criança (ver
+  // AcompanharScreen); aquele é lido pelo operador na hora da retirada.
+  let trackingQrBlock = "";
+  if (payload.trackingUrl) {
+    try {
+      const trackingSvg = await QRCode.toString(payload.trackingUrl, { type: "svg", margin: 0, errorCorrectionLevel: "M" });
+      trackingQrBlock = `<div class="qr"><div class="qr-label">ACOMPANHE PELO CELULAR</div>${trackingSvg}</div>`;
+    } catch (err) {
+      console.error("[print-bridge] Erro ao gerar QR Code de acompanhamento:", err);
+    }
+  }
+
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 80mm auto; margin: 0; }
       html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
       pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
-      .qr { display: flex; justify-content: center; margin: 2mm 0 3mm 0; }
+      .qr { display: flex; flex-direction: column; align-items: center; margin: 2mm 0 3mm 0; }
       .qr svg { width: 34mm; height: 34mm; }
-    </style></head><body>${qrBlock}<pre>${esc}</pre></body></html>`;
+      .qr-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 1mm; }
+    </style></head><body>${qrBlock}${trackingQrBlock}<pre>${esc}</pre></body></html>`;
+}
+
+// Mesma URL pública usada pelo kiosk-ui em VITE_PUBLIC_APP_URL (ver
+// EntradaScreen/ConnectDeviceModal) — precisa da própria variável aqui
+// porque o processo main do Electron não enxerga env vars de build do Vite.
+function trackingUrlFor(accessCode: string | undefined): string | undefined {
+  const raw = process.env.FACAAMIGOS_PUBLIC_APP_URL;
+  if (!raw || !accessCode) return undefined;
+  // Aceita a variável preenchida sem esquema (ex.: "kiosk-ui.vercel.app") —
+  // sem "https://" na frente, a câmera do celular lê a URL só como texto
+  // solto, não como link clicável.
+  const base = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  return `${base.replace(/\/$/, "")}/?acompanhar=${accessCode}`;
 }
 
 function printHtml(html: string, deviceName: string): Promise<void> {
@@ -165,7 +192,9 @@ export function startPrintBridge(): PrintBridgeStartResult {
           await printHtml(html, deviceName);
         }
       } else {
-        const payload = job.payload_json as unknown as ReceiptPrintPayload;
+        const rawPayload = job.payload_json as unknown as ReceiptPrintPayload;
+        const trackingUrl = trackingUrlFor(rawPayload.accessCode);
+        const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
         const escpos = generateEscPosReceipt(payload);
         const rawBuffer = Buffer.from(escpos.commandsHex, "hex");
         const printedRaw = await printRawWindows(rawBuffer, deviceName);

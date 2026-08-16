@@ -1,9 +1,14 @@
 import { formatAccessCode } from "../utils/accessCode.js";
 
 export interface ReceiptPrintPayload {
-  title: string; // Ex: "COMPROVANTE DE CHECK-IN", "RECIBO DE GUARDA", "COMPROVANTE PDV"
+  title: string; // Ex: "Check-in", "Comprovante de Saída", "Comprovante PDV"
   unitName: string;
-  /** Dados cadastrais da unidade (endereço/telefone/CNPJ), geridos no backoffice. Opcionais — nem toda unidade tem tudo preenchido. */
+  /**
+   * Dados cadastrais da unidade (endereço/telefone/CNPJ). Aceitos mas não
+   * impressos — o cupom já é "sem valor fiscal", então a via ficou só com
+   * o nome da unidade; quem precisa do endereço/CNPJ completo pega por
+   * outro canal. Mantidos no payload para não quebrar quem ainda os envia.
+   */
   unitAddress?: string;
   unitPhone?: string;
   unitCnpj?: string;
@@ -30,6 +35,17 @@ export interface ReceiptPrintPayload {
   exitPin?: string;
   /** Conteúdo do QR Code. Igual ao accessCode; separado porque só o caminho HTML do print bridge sabe desenhar imagem. */
   qrValue?: string;
+  /**
+   * Link do painel de acompanhamento (`/?acompanhar=<accessCode>`) que os pais
+   * escaneiam com o próprio celular para ver o tempo da criança à distância.
+   * Propositalmente separado de `qrValue`: aquele é o código cru lido pela
+   * câmera do operador na Saída (fa_resolve_access_code) — imprimir a URL
+   * completa ali quebraria a leitura, já que a normalização do código
+   * (fa_kiosk_normalize_access_code) misturaria as letras do domínio com o
+   * código. Por isso os dois QRs coexistem no mesmo recibo com finalidades
+   * diferentes.
+   */
+  trackingUrl?: string;
   entryTime?: string;
   expectedExitTime?: string;
   planName?: string;
@@ -58,6 +74,43 @@ function moneyLine(label: string, cents: number): string {
   return label.padEnd(Math.max(0, WIDTH - right.length), " ").slice(0, WIDTH - right.length) + right;
 }
 
+function bytesToHex(bytes: number[]): string {
+  return bytes.map((b) => (b & 0xff).toString(16).padStart(2, "0")).join("");
+}
+
+function textToHex(str: string): string {
+  return bytesToHex(Array.from(new TextEncoder().encode(str)));
+}
+
+/**
+ * Comandos ESC/POS padrão (GS ( k, "2D barcode") para a impressora desenhar
+ * o QR Code sozinha a partir dos dados crus — suportado nativamente pelas
+ * térmicas de 80mm usadas aqui (Epson, Elgin, Bematech, Apptech, Daruma),
+ * sem precisar gerar bitmap no app. É o que faz o QR sair mesmo no caminho
+ * RAW (o mais comum — ver print bridge), que só manda bytes, nunca imagem.
+ */
+function qrCommandHex(data: string, moduleSize = 6): string {
+  const dataBytes = Array.from(new TextEncoder().encode(data));
+  const storeLen = dataBytes.length + 3;
+  const pL = storeLen & 0xff;
+  const pH = (storeLen >> 8) & 0xff;
+
+  const selectModel = [0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00];
+  const setModuleSize = [0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, moduleSize];
+  const setErrorCorrection = [0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31]; // 'M'
+  const storeData = [0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30, ...dataBytes];
+  const printQr = [0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30];
+
+  return bytesToHex([...selectModel, ...setModuleSize, ...setErrorCorrection, ...storeData, ...printQr]);
+}
+
+/** Quebra uma string sem espaços (URL, código) em pedaços de até `width` colunas. */
+function chunkString(str: string, width = WIDTH): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < str.length; i += width) out.push(str.slice(i, i + width));
+  return out;
+}
+
 /** Quebra um texto longo em linhas de 42 colunas sem cortar palavra no meio. */
 function wrap(str: string, width = WIDTH): string[] {
   const words = str.split(/\s+/).filter(Boolean);
@@ -83,11 +136,9 @@ function wrap(str: string, width = WIDTH): string[] {
  *
  * Duas variantes saem daqui:
  *   - cupom de venda (checkout, PDV) — itens, total e pagamento;
- *   - RECIBO DE GUARDA (`accessCode` preenchido) — a via que fica com os
- *     pais no check-in, com o código de saída, os dados de quem entregou a
- *     criança e as regras de retirada. Esse é o documento que o parque
- *     apresenta se a retirada for questionada, por isso ele imprime a
- *     identificação completa e uma linha de assinatura.
+ *   - recibo de guarda / Check-in (`accessCode` preenchido) — a via que
+ *     fica com os pais no check-in, com o código de saída, os dados de
+ *     quem entregou a criança e a regra de retirada.
  */
 export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: string; commandsHex: string } {
   const dateTime = payload.dateTime || new Date().toLocaleString("pt-BR");
@@ -99,42 +150,47 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
 
   lines.push(divider);
   lines.push(centerText("FAÇA AMIGOS"));
-  lines.push(centerText("PLAYGROUND INCLUSIVO"));
   lines.push(centerText(payload.unitName.toUpperCase()));
-  if (payload.unitAddress) lines.push(centerText(payload.unitAddress));
-  if (payload.unitPhone) lines.push(centerText(payload.unitPhone));
-  if (payload.unitCnpj) lines.push(centerText(`CNPJ: ${payload.unitCnpj}`));
   lines.push(divider);
   lines.push(centerText(`*** ${payload.title.toUpperCase()} ***`));
   if (payload.code) lines.push(`Código: ${payload.code}`);
-  lines.push(`Data/Hora: ${dateTime}`);
-  if (payload.employeeName) lines.push(`Atendente: ${payload.employeeName}`);
+  lines.push(payload.employeeName ? `${dateTime} · ${payload.employeeName}` : dateTime);
   lines.push(subDivider);
 
   if (isGuardReceipt) {
-    // O código de saída é a única informação desta via que alguém vai
-    // procurar com pressa, na porta, com a criança chorando. Fica sozinho,
-    // no topo, cercado de espaço em branco.
+    // Compacto de propósito: o código de saída precisa ser achado rápido,
+    // mas sem página inteira de espaço em branco ao redor.
+    lines.push(`Código de saída: ${formatAccessCode(payload.accessCode)}`);
+    if (payload.exitPin) lines.push(`PIN rápido (Saída): ${payload.exitPin}`);
+    lines.push("Apresente este recibo na saída");
+    lines.push(subDivider);
+  }
+
+  // Marca onde entram os bytes crus do QR de acompanhamento no meio do
+  // stream ESC/POS — text/lines seguem só como transcrição legível
+  // (preview na tela e fallback HTML), o QR em si é comando de impressora.
+  let qrInsertAt = -1;
+  if (isGuardReceipt && payload.trackingUrl) {
     lines.push("");
-    lines.push(centerText("CÓDIGO DE SAÍDA"));
-    lines.push(centerText(formatAccessCode(payload.accessCode)));
-    if (payload.exitPin) {
-      lines.push("");
-      lines.push(centerText("PIN RÁPIDO (digite na Saída)"));
-      lines.push(centerText(payload.exitPin));
-    }
+    lines.push(centerText("ACOMPANHE PELO CELULAR"));
+    lines.push(centerText("Aponte a câmera para o QR abaixo"));
+    qrInsertAt = lines.length;
+    for (const line of chunkString(payload.trackingUrl.replace(/^https?:\/\//, ""))) lines.push(centerText(line));
     lines.push("");
-    lines.push(centerText("Apresente este recibo na saída"));
     lines.push(subDivider);
   }
 
   if (payload.customerInfo) {
     const c = payload.customerInfo;
-    if (c.childName) lines.push(`Criança: ${c.childName}`);
-    if (c.childBirthDate) lines.push(`Nascimento: ${c.childBirthDate}`);
-    if (c.guardianName) lines.push(`Resp: ${c.guardianName}`);
-    if (c.guardianCpf) lines.push(`CPF: ${c.guardianCpf}`);
-    if (c.phone) lines.push(`Tel: ${c.phone}`);
+    const nameLine = [c.childName, c.guardianName ? `Resp: ${c.guardianName}` : null].filter(Boolean).join(" · ");
+    // wrap() em vez de push direto: nome+responsável ou nascimento+CPF podem
+    // passar dos 42 caracteres da bobina — aqui a linha quebra em duas em vez
+    // de estourar a largura física do papel.
+    for (const line of wrap(nameLine)) lines.push(line);
+    const idLine = [c.childBirthDate ? `Nascimento: ${c.childBirthDate}` : null, c.guardianCpf ? `CPF: ${c.guardianCpf}` : null]
+      .filter(Boolean)
+      .join(" · ");
+    for (const line of wrap(idLine)) lines.push(line);
     lines.push(subDivider);
   }
 
@@ -151,27 +207,37 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
     }
   }
 
-  // Layout 42 colunas: ITEM (22) + QTD (4) + VALOR R$ (14)
-  lines.push("ITEM                    QTD        VALOR");
-  lines.push(subDivider);
-  for (const item of payload.items) {
-    const desc = item.description.padEnd(22, " ").slice(0, 22);
-    const qty = String(item.quantity ?? 1).padStart(4, " ");
-    const val = (item.amountCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).padStart(11, " ");
-    lines.push(`${desc} ${qty} R$ ${val}`);
+  // Recibo de guarda sempre tem 1 item (o plano) — o valor já aparece em
+  // "PREVISTO" logo abaixo, então a tabela ficaria repetindo a mesma
+  // informação 3 vezes. Só cupom de venda (checkout/PDV) mostra a tabela.
+  if (!isGuardReceipt) {
+    lines.push(`${"ITEM".padEnd(WIDTH - 5, " ")}VALOR`);
+    lines.push(subDivider);
+    for (const item of payload.items) {
+      const qty = item.quantity ?? 1;
+      const label = qty > 1 ? `${item.description} x${qty}` : item.description;
+      lines.push(moneyLine(label, item.amountCents));
+    }
+    lines.push(subDivider);
   }
-  lines.push(subDivider);
+
+  const singlePayment =
+    !isGuardReceipt && payload.payments && payload.payments.length === 1 && payload.payments[0]!.amountCents === payload.totalCents
+      ? payload.payments[0]!
+      : null;
 
   if (isGuardReceipt) {
     // No check-in nada foi cobrado ainda: o valor do plano é uma previsão, e
     // imprimir "TOTAL" aqui já fez pai achar que tinha pago na entrada.
     lines.push(moneyLine("PREVISTO (pagar na saída):", payload.totalCents));
     lines.push("Tempo excedente é cobrado à parte.");
+  } else if (singlePayment) {
+    lines.push(moneyLine(`TOTAL (${singlePayment.method}):`, payload.totalCents));
   } else {
     lines.push(moneyLine("TOTAL:", payload.totalCents));
   }
 
-  if (payload.payments && payload.payments.length > 0) {
+  if (!singlePayment && payload.payments && payload.payments.length > 0) {
     lines.push(subDivider);
     lines.push("PAGAMENTO:");
     for (const p of payload.payments) {
@@ -182,20 +248,11 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
 
   if (isGuardReceipt) {
     lines.push(divider);
-    lines.push(centerText("REGRAS DE RETIRADA"));
+    lines.push(centerText("RETIRADA"));
     lines.push(subDivider);
-    for (const rule of [
-      "1. A criança é entregue mediante leitura do QR Code deste recibo ou da pulseira.",
-      "2. Na falta dos dois, a retirada é feita com documento com foto do responsável cadastrado acima, conferido pelo atendente.",
-      "3. A retirada por terceiro é registrada como exceção, com identificação de quem retirou.",
-      "4. Não deixe a criança sem acompanhante fora do espaço monitorado.",
-    ]) {
-      for (const line of wrap(rule)) lines.push(line);
+    for (const line of wrap("Mediante leitura do QR (deste recibo ou da pulseira) ou documento com foto do responsável cadastrado.")) {
+      lines.push(line);
     }
-    lines.push("");
-    lines.push("Assinatura do responsável:");
-    lines.push("");
-    lines.push("_".repeat(WIDTH));
   }
 
   lines.push(divider);
@@ -204,7 +261,7 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   } else if (!isGuardReceipt) {
     lines.push(centerText("Obrigado por brincar com a gente!"));
   }
-  lines.push(centerText("Não possui valor fiscal — Comprovante Interno"));
+  lines.push(centerText("Comprovante interno, sem valor fiscal"));
   lines.push(divider);
 
   // Avanço de 3 linhas de papel para garantir que o corte da guilhotina não atinja o texto
@@ -219,12 +276,17 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   const hexFeed = "1b6403"; // ESC d 3 (avança 3 linhas de papel antes da guilhotina)
   const hexCut = "1d564200"; // GS V 66 0 (corte automático de papel)
 
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(text);
-  let hexText = "";
-  for (let i = 0; i < bytes.length; i++) {
-    hexText += bytes[i]!.toString(16).padStart(2, "0");
+  // Quando há QR de acompanhamento, os bytes do comando de QR entram no meio
+  // do stream, no lugar exato onde a URL apareceria como texto — o resto do
+  // recibo (regras de retirada, itens, rodapé) segue normal depois dele.
+  let hexBody: string;
+  if (qrInsertAt >= 0 && payload.trackingUrl) {
+    const before = lines.slice(0, qrInsertAt).join("\n") + "\n";
+    const after = "\n" + lines.slice(qrInsertAt).join("\n");
+    hexBody = textToHex(before) + qrCommandHex(payload.trackingUrl) + textToHex(after);
+  } else {
+    hexBody = textToHex(text);
   }
 
-  return { text, commandsHex: hexHeader + hexText + hexFeed + hexCut };
+  return { text, commandsHex: hexHeader + hexBody + hexFeed + hexCut };
 }

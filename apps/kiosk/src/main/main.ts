@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { app, BrowserWindow, Menu, ipcMain, dialog } from "electron";
 import { openDatabase, migrate } from "@facaamigos/db-local";
@@ -8,6 +9,29 @@ import { loadOrCreateTls } from "../server/tls.js";
 import { startPrintBridge } from "./printBridge.js";
 import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
+
+/**
+ * O bundle é puro esbuild sem `dotenv` — sem isto, `apps/kiosk/.env`
+ * (FACAAMIGOS_SUPABASE_URL/SERVICE_ROLE_KEY/PUBLIC_APP_URL) fica só um
+ * arquivo no disco que ninguém lê: o print bridge via `process.env` direto,
+ * então a ponte de impressão "desligava silenciosamente" mesmo com o .env
+ * preenchido. Variáveis já definidas no ambiente real (produção) não são
+ * sobrescritas.
+ */
+function loadDotEnv(path: string): void {
+  if (!existsSync(path)) return;
+  for (const rawLine of readFileSync(path, "utf8").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    const key = line.slice(0, eq).trim();
+    const value = line.slice(eq + 1).trim();
+    if (key && process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+loadDotEnv(join(import.meta.dirname, "../.env"));
 
 /**
  * D1/D2 do plano: o Electron não fala com o banco diretamente — ele

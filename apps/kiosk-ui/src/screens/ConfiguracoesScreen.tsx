@@ -544,6 +544,7 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
   const [validityDays, setValidityDays] = useState("30");
   const [benefitText, setBenefitText] = useState("");
   const [color, setColor] = useState("#FF7A00");
+  const [overageReais, setOverageReais] = useState("0");
   const [busy, setBusy] = useState(false);
 
   const [vipVisits, setVipVisits] = useState("4");
@@ -552,7 +553,7 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
   const [savingRules, setSavingRules] = useState(false);
 
   function load() {
-    Api.packages(unitId, false).then(setPackages).catch(() => {});
+    Api.packages(unitId, activity, false).then(setPackages).catch(() => {});
   }
   useEffect(load, [unitId]);
 
@@ -578,6 +579,7 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
     setValidityDays(String(p.validityDays));
     setBenefitText(p.benefitText);
     setColor(p.color);
+    setOverageReais((p.overageCentsPerMinute / 100).toFixed(2));
   }
 
   function cancelEdit() {
@@ -588,6 +590,7 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
     setValidityDays("30");
     setBenefitText("");
     setColor("#FF7A00");
+    setOverageReais("0");
   }
 
   async function save() {
@@ -600,6 +603,7 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
         validityDays: Math.max(1, Math.round(Number(validityDays))),
         benefitText: benefitText.trim(),
         color,
+        overageCentsPerMinute: Math.round(Number(overageReais) * 100),
       };
 
       if (editingId) {
@@ -684,6 +688,13 @@ function PacotesTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUN
           value={validityDays}
           onChange={(e) => setValidityDays(e.target.value)}
           title="Por quantos dias o saldo de horas continua valendo depois da compra"
+        />
+        <Input
+          label="Excedente por minuto (R$)"
+          type="number"
+          value={overageReais}
+          onChange={(e) => setOverageReais(e.target.value)}
+          title="Valor cobrado por minuto além do incluído, quando o pacote é usado direto na Entrada"
         />
         <Input
           label="Benefício (frase do script de venda)"
@@ -1417,6 +1428,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   const [receiptPrinter, setReceiptPrinter] = useState("");
   const [saving, setSaving] = useState<"WRISTBAND" | "RECEIPT" | null>(null);
   const [testingReceipt, setTestingReceipt] = useState(false);
+  const [testingCheckinReceipt, setTestingCheckinReceipt] = useState(false);
   const [testingWristband, setTestingWristband] = useState(false);
   const [showWristbandTestModal, setShowWristbandTestModal] = useState(false);
   // Nomes instalados no Windows deste terminal (via preload do Electron —
@@ -1489,6 +1501,37 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       toast.error(err instanceof Error ? err.message : "Não foi possível enviar cupom de teste.");
     } finally {
       setTestingReceipt(false);
+    }
+  }
+
+  /**
+   * "TESTE" + 7 dígitos fixos: não é um código de acesso real (nenhuma
+   * sessão por trás dele), só precisa ter a cara de um — formatAccessCode
+   * só formata em grupos de 4, não confere dígito verificador nenhum.
+   */
+  async function testCheckinReceiptPrint() {
+    setTestingCheckinReceipt(true);
+    try {
+      const now = new Date();
+      await Api.queuePrintJob(unitId, "RECEIPT", {
+        title: "Check-in",
+        unitName: "Unidade FaçaAmigos",
+        employeeName: "Operador Kiosk",
+        accessCode: "TESTE0001AB",
+        exitPin: "0000",
+        entryTime: now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        expectedExitTime: new Date(now.getTime() + 60 * 60_000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        planName: "Plano Teste 1h",
+        careNotes: "Teste de acompanhamento — ignorar",
+        items: [{ description: "Plano Teste 1h", quantity: 1, amountCents: 0 }],
+        totalCents: 0,
+        customerInfo: { childName: "Criança Teste", guardianName: "Responsável Teste" },
+      });
+      toast.success("Cupom de teste de Check-in enviado — inclui o QR de acompanhamento.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar cupom de teste de Check-in.");
+    } finally {
+      setTestingCheckinReceipt(false);
     }
   }
 
@@ -1569,7 +1612,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
 
       {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Impressora de Cupons Não Fiscais (80mm / Apptech T271U)</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Impressora de Cupons Não Fiscais (80mm)</h2>
         <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
           <div style={{ flex: 1 }}>
             <Select value={receiptPrinter} onChange={(e) => setReceiptPrinter(e.target.value)} disabled={!installedPrinters || installedPrinters.length === 0}>
@@ -1593,6 +1636,15 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
           <Button variant="secondary" size="sm" loading={testingReceipt} onClick={testReceiptPrint}>
             🖨️ Enviar Cupom de Teste
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={testingCheckinReceipt}
+            onClick={testCheckinReceiptPrint}
+            title="Cupom de teste com accessCode fake — o único jeito de ver o QR de acompanhamento sem fazer um check-in de verdade"
+          >
+            📱 Cupom de Teste — Check-in
+          </Button>
         </div>
       </Card>
 
@@ -1600,7 +1652,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       <div>
         <h2 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Visualização rápida de impressão</h2>
         <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: "0 0 12px 0" }}>
-          Layout em tempo real — mostra o enquadramento exato de 42 colunas como sairá na impressora Apptech T271U.
+          Layout em tempo real — mostra o enquadramento exato de 42 colunas como sairá na impressora térmica de 80mm.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -1620,7 +1672,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
             </div>
           </Card>
           <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Cupom não fiscal (Apptech T271U / 80mm - 42 Colunas)</h3>
+            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Cupom não fiscal (80mm - 42 Colunas)</h3>
             <pre
               style={{
                 background: "#ffffff",

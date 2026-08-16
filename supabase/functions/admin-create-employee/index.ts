@@ -20,7 +20,7 @@ import { jsonResponse, preflight } from "../_shared/http.ts";
 import { requireCapability } from "../_shared/requireCapability.ts";
 
 const CONTRACT_TYPES = ["CLT", "ESTAGIO", "AUTONOMO"];
-const ROLES = ["OPERADOR", "GERENTE", "ADMIN"];
+const ROLES = ["ESTAGIARIO", "OPERADOR", "GERENTE", "ADMIN"];
 const PIN_PATTERN = /^\d{6}$/;
 const CPF_PATTERN = /^\d{11}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

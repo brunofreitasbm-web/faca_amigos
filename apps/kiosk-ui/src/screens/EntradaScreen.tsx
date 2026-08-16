@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { Asset, ChildMatch, Coupon, Plan, Product, UpsellOffer } from "../api/client.js";
+import type { Asset, ChildMatch, Coupon, Package, Plan, Product, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
 import { generateCheckinSuggestions, type CheckinOffer } from "../lib/geminiAgent.js";
@@ -129,6 +129,7 @@ export function EntradaScreen({
   const activity = unit?.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
 
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [planId, setPlanId] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
@@ -256,6 +257,7 @@ export function EntradaScreen({
     if (!unit) return;
     setPlanId(null);
     Api.plans(unit.id, activity).then(setPlans);
+    Api.packages(unit.id, activity).then(setPackages);
     Api.coupons(unit.id).then(setCoupons);
     if (activity === "CARRINHO") Api.assets(unit.id).then(setAssets);
   }, [unit, activity]);
@@ -459,7 +461,24 @@ export function EntradaScreen({
   // dos planos sem virar um plano de verdade.
   const HOUR_BANK = "HOUR_BANK";
   const usingHourBank = planId === HOUR_BANK;
-  const selectedPlan = plans.find((p) => p.id === planId);
+  // Pacotes aparecem no mesmo grid dos planos, sem distinção: cada um vira
+  // um Plan sintético (id prefixado) — o resto da tela (preço, "cabe até o
+  // fechamento", contrato >2h, cross-sell) já sabe lidar com um Plan
+  // sintético, mesmo truque já usado para o Banco de Horas.
+  const PACKAGE_PREFIX = "PKG:";
+  const packagePlans: Plan[] = packages.map((pkg) => ({
+    id: `${PACKAGE_PREFIX}${pkg.id}`,
+    activity: pkg.activity,
+    name: pkg.name,
+    valueCents: pkg.priceCents,
+    durationValue: pkg.includedMinutes,
+    durationUnit: "MINUTO",
+    overageCentsPerMinute: pkg.overageCentsPerMinute,
+    color: pkg.color,
+  }));
+  const usingPackage = planId?.startsWith(PACKAGE_PREFIX) ?? false;
+  const selectedPackageId = usingPackage ? planId!.slice(PACKAGE_PREFIX.length) : null;
+  const selectedPlan = plans.find((p) => p.id === planId) ?? packagePlans.find((p) => p.id === planId);
   const threshold = 120;
 
   // Cupons restritos a um plano (ex.: "N ESTRELAS", só no plano de 30min)
@@ -561,8 +580,9 @@ export function EntradaScreen({
         unitId: unit.id,
         activity,
         assetId: assetId ?? undefined,
-        planId: usingHourBank ? null : planId!,
+        planId: usingHourBank || usingPackage ? null : planId!,
         useHourBank: usingHourBank,
+        packageId: usingPackage ? selectedPackageId : undefined,
         employeeId: employee.id,
         child: { id: matchedChild?.id, fullName: childName.trim(), birthDate, inclusiveEligible: false },
         guardian: {
@@ -571,7 +591,7 @@ export function EntradaScreen({
           cpf: normalizeCpf(cpf),
           phoneE164: normalizePhoneE164(phone),
         },
-        couponCode: usingHourBank ? undefined : couponCode || undefined,
+        couponCode: usingHourBank || usingPackage ? undefined : couponCode || undefined,
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
         preCheckinId: preCheckinId ?? undefined,
@@ -954,16 +974,26 @@ export function EntradaScreen({
               </div>
             </Card>
           )}
-          {plans.map((plan) => {
+          {/* Pacotes entram no mesmo grid dos planos, sem seção ou marca
+              visual separada — cada um já chegou aqui como um Plan
+              sintético (packagePlans). */}
+          {[...plans, ...packagePlans].map((plan) => {
+            const isPackage = plan.id.startsWith(PACKAGE_PREFIX);
             const minutes = planDurationMinutes(plan);
             // Planos acima de 2h não são mais bloqueados perto do fechamento:
             // a sobra vira crédito no banco de horas em vez de se perder.
             // Só continuam bloqueados quando o shopping já está fechando.
+            // Pacotes seguem a mesma regra (o saldo comprado não se perde).
             const fits =
               remainingMinutes === null ||
               minutes <= remainingMinutes ||
-              (minutes > threshold && remainingMinutes > 0);
-            const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
+              ((minutes > threshold || isPackage) && remainingMinutes > 0);
+            // Cupom nunca se aplica a Pacote (submit() já descarta o código
+            // nesse caso) — mostrar preço com desconto aqui enganaria o
+            // operador sobre o valor que será cobrado de verdade.
+            const discountInfo = isPackage
+              ? { finalCents: plan.valueCents, originalCents: plan.valueCents, discountText: null }
+              : getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
             return (
               <Card
                 key={plan.id}
@@ -1236,7 +1266,9 @@ export function EntradaScreen({
             ? " — Banco de horas (R$ 0,00)"
             : selectedPlan
               ? ` — ${money(
-                  getPlanDiscountedCents(selectedPlan.valueCents, couponCode, coupons, selectedPlan.id).finalCents +
+                  (usingPackage
+                    ? selectedPlan.valueCents
+                    : getPlanDiscountedCents(selectedPlan.valueCents, couponCode, coupons, selectedPlan.id).finalCents) +
                     (quickUpsellAccepted && quickProduct ? quickProduct.price_cents : 0),
                 )}`
               : ""}

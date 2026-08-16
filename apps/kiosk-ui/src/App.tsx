@@ -107,7 +107,15 @@ export function App() {
   // Calculado antes dos retornos antecipados abaixo (tela de login, seleção
   // de módulo etc.) porque o gesto de arrastar já precisa dele — hooks não
   // podem vir depois de um `return` condicional.
-  const visibleScreens = SCREENS.filter((s) => can(SCREEN_CAPABILITY[s.value]));
+  // Estagiário não "bate ponto" no vocabulário do RH — é "Controle de
+  // Frequência". O papel é o único gate: a tela e a capacidade continuam
+  // as mesmas (PONTO / ponto.self), só o rótulo muda pra quem só tem esse
+  // acesso.
+  const visibleScreens = SCREENS.filter((s) => can(SCREEN_CAPABILITY[s.value])).map((s) =>
+    s.value === "PONTO" && employee?.role === "ESTAGIARIO"
+      ? { ...s, label: "Controle de Frequência", help: "Registrar entrada, intervalo e saída" }
+      : s,
+  );
 
   const handleGoBack = useCallback(() => {
     if (showConnectModal) {

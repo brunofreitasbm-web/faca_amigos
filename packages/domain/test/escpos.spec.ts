@@ -19,11 +19,13 @@ describe("generateEscPosReceipt", () => {
 
     expect(receipt.text).toContain("FAÇA AMIGOS");
     expect(receipt.text).toContain("*** RECIBO DE CAIXA ***");
-    expect(receipt.text).toContain("Criança: Helena Souza");
+    expect(receipt.text).toContain("Helena Souza · Resp: Maria Souza");
     expect(receipt.text).toContain("Plano 30 minutos");
-    // 42 colunas exatas: rótulo à esquerda, valor encostado na borda da bobina.
-    expect(receipt.text).toContain("TOTAL:                      R$       50,00");
-    expect(receipt.text).toContain("Não possui valor fiscal");
+    // Quantidade > 1 vai junto da descrição do item (sem coluna QTD própria).
+    expect(receipt.text).toContain("Água mineral x2");
+    // Uma forma de pagamento só: TOTAL e forma de pagamento saem numa linha.
+    expect(receipt.text).toContain("TOTAL (PIX):                R$       50,00");
+    expect(receipt.text).toContain("Comprovante interno, sem valor fiscal");
 
     // Verifica que cada linha de divisor tem exatamente 42 caracteres
     const lines = receipt.text.split("\n");
@@ -35,6 +37,77 @@ describe("generateEscPosReceipt", () => {
     expect(receipt.commandsHex).toBeDefined();
     expect(receipt.commandsHex.startsWith("1b401b6101")).toBe(true);
     expect(receipt.commandsHex.endsWith("1b64031d564200")).toBe(true);
+
+    // Cupom sem accessCode não é recibo de guarda — sem trackingUrl, sem comando de QR.
+    expect(receipt.commandsHex).not.toContain("1d286b");
+  });
+
+  it("imprime o QR de acompanhamento (GS ( k) no recibo de guarda quando trackingUrl é informado", () => {
+    const receipt = generateEscPosReceipt({
+      title: "Comprovante de Check-in",
+      unitName: "Playground Parque Shopping",
+      dateTime: "06/08/2026 15:30:00",
+      items: [{ description: "Plano 2 horas", quantity: 1, amountCents: 6000 }],
+      totalCents: 6000,
+      accessCode: "K7QP3F2X9AB",
+      exitPin: "4821",
+      trackingUrl: "https://kiosk-ui.vercel.app/?acompanhar=K7QP3F2X9AB",
+    });
+
+    expect(receipt.text).toContain("ACOMPANHE PELO CELULAR");
+    // URL de teste tem 44 colunas — maior que as 42 da bobina, por isso quebra
+    // em duas linhas no texto; o dado do QR em si (abaixo) carrega a URL inteira.
+    expect(receipt.text).toContain("kiosk-ui.vercel.app");
+
+    // GS ( k = 1d 28 6b — comando padrão ESC/POS de QR Code embutido no meio do stream RAW.
+    expect(receipt.commandsHex).toContain("1d286b");
+    // A URL completa também precisa estar presente em bytes (dado armazenado do QR).
+    const urlHex = Buffer.from("https://kiosk-ui.vercel.app/?acompanhar=K7QP3F2X9AB", "utf8").toString("hex");
+    expect(receipt.commandsHex).toContain(urlHex);
+    // Continua terminando com o mesmo avanço/corte de sempre, mesmo com o QR no meio.
+    expect(receipt.commandsHex.endsWith("1b64031d564200")).toBe(true);
+  });
+
+  it("recibo de guarda (Check-in) sai compacto: sem bloco de assinatura, uma regra de retirada só", () => {
+    const receipt = generateEscPosReceipt({
+      title: "Check-in",
+      unitName: "Playground Parque Shopping",
+      dateTime: "06/08/2026 15:30:00",
+      employeeName: "Ana Torres",
+      items: [{ description: "Plano 2 horas", quantity: 1, amountCents: 6000 }],
+      totalCents: 6000,
+      accessCode: "K7QP3F2X9AB",
+      exitPin: "4821",
+      customerInfo: {
+        childName: "Helena Souza",
+        childBirthDate: "10/03/2019",
+        guardianName: "Maria Souza",
+        guardianCpf: "123.456.789-00",
+      },
+      planName: "Plano 2 horas",
+      entryTime: "14:02",
+      expectedExitTime: "16:02",
+    });
+
+    expect(receipt.text).toContain("*** CHECK-IN ***");
+    // Código e PIN compactos, sem linhas em branco ao redor.
+    expect(receipt.text).toContain("Código de saída: K7QP-3F2X-9AB");
+    expect(receipt.text).toContain("PIN rápido (Saída): 4821");
+    // Nome da criança e responsável numa linha; nascimento e CPF em outra.
+    expect(receipt.text).toContain("Helena Souza · Resp: Maria Souza");
+    // Nascimento + CPF juntos passam de 42 colunas — quebram em duas linhas, sem perder dado.
+    expect(receipt.text).toContain("Nascimento: 10/03/2019");
+    expect(receipt.text).toContain("123.456.789-00");
+    // Só a regra essencial de retirada — sem a numeração de 4 regras antiga.
+    expect(receipt.text).toContain("RETIRADA");
+    expect(receipt.text).not.toContain("Não deixe a criança sem acompanhante");
+    expect(receipt.text).not.toContain("retirada por terceiro");
+    // Bloco de assinatura removido.
+    expect(receipt.text).not.toContain("Assinatura do responsável");
+    expect(receipt.text).not.toContain("__________");
+    // Recibo de guarda não tem tabela ITEM/QTD/VALOR — o valor já está em PREVISTO.
+    expect(receipt.text).not.toContain("ITEM");
+    expect(receipt.text).toContain("PREVISTO (pagar na saída):  R$       60,00");
   });
 });
 

@@ -36,6 +36,11 @@ export function ColaboradoresTab() {
 
   const selectedFunction = FUNCTION_OPTIONS.find((f) => f.value === functionKey) ?? FUNCTION_OPTIONS[0]!;
 
+  function selectFunction(value: string) {
+    setFunctionKey(value);
+    if (value === "ESTAGIARIO") setContractType("ESTAGIO");
+  }
+
   const [resetPinTarget, setResetPinTarget] = useState<Employee | null>(null);
   const [newPin, setNewPin] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
@@ -259,7 +264,7 @@ export function ColaboradoresTab() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
               <Input label="Nome completo *" placeholder="Ex: Maria Silva" value={fullName} onChange={(e) => setFullName(e.target.value)} />
 
-              <Select label="Função e Permissão *" title={ROLE_DESCRIPTION[selectedFunction.role]} value={functionKey} onChange={(e) => setFunctionKey(e.target.value)}>
+              <Select label="Função e Permissão *" title={ROLE_DESCRIPTION[selectedFunction.role]} value={functionKey} onChange={(e) => selectFunction(e.target.value)}>
                 {FUNCTION_OPTIONS.map((f) => (
                   <option key={f.value} value={f.value}>
                     {f.label} ({ROLE_LABEL[f.role]})
@@ -433,6 +438,8 @@ export function ColaboradoresTab() {
               ? { bg: "rgba(124, 58, 237, 0.12)", color: "#6d28d9", label: "👑 Admin" }
               : e.role === "GERENTE"
               ? { bg: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", label: "⭐ Gerente" }
+              : e.role === "ESTAGIARIO"
+              ? { bg: "rgba(180, 83, 9, 0.12)", color: "#b45309", label: "🎓 Estagiário" }
               : { bg: "rgba(13, 148, 136, 0.12)", color: "#0f766e", label: "👤 Operador" };
           const employeeUnitNames = (e.unitIds ?? []).map((id) => units.find((u) => u.id === id)?.name).filter(Boolean);
 
@@ -498,7 +505,7 @@ export function ColaboradoresTab() {
                     onChange={(ev) => void changeRole(e, ev.target.value as Employee["role"])}
                     style={{ minWidth: "120px", fontSize: "13px" }}
                   >
-                    {(["OPERADOR", "GERENTE", "ADMIN"] as const).map((r) => (
+                    {(["ESTAGIARIO", "OPERADOR", "GERENTE", "ADMIN"] as const).map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABEL[r]}
                       </option>

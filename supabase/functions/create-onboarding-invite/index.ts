@@ -16,7 +16,7 @@ import bcrypt from "npm:bcryptjs@2.4.3";
 import { jsonResponse, preflight } from "../_shared/http.ts";
 import { requireCapability } from "../_shared/requireCapability.ts";
 
-const ROLES = ["OPERADOR", "GERENTE", "ADMIN"];
+const ROLES = ["ESTAGIARIO", "OPERADOR", "GERENTE", "ADMIN"];
 const EXPIRES_IN_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface CreateInviteBody {

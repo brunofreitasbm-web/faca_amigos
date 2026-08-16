@@ -39,6 +39,7 @@ export function PacotesTab() {
   const [validityDays, setValidityDays] = useState("30");
   const [benefitText, setBenefitText] = useState("");
   const [color, setColor] = useState("#FF7A00");
+  const [overageReais, setOverageReais] = useState("0");
   const [unitIds, setUnitIds] = useState<string[]>(units.map((u) => u.id));
   const [busy, setBusy] = useState(false);
 
@@ -60,6 +61,7 @@ export function PacotesTab() {
     setValidityDays(String(p.validityDays));
     setBenefitText(p.benefitText);
     setColor(p.color);
+    setOverageReais((p.overageCentsPerMinute / 100).toFixed(2));
   }
 
   function cancelEdit() {
@@ -70,6 +72,7 @@ export function PacotesTab() {
     setValidityDays("30");
     setBenefitText("");
     setColor("#FF7A00");
+    setOverageReais("0");
     setUnitIds(units.map((u) => u.id));
   }
 
@@ -83,6 +86,7 @@ export function PacotesTab() {
         validityDays: Math.max(1, Math.round(Number(validityDays))),
         benefitText: benefitText.trim(),
         color,
+        overageCentsPerMinute: Math.round(Number(overageReais) * 100),
       };
 
       if (editingId) {
@@ -134,6 +138,13 @@ export function PacotesTab() {
         <Input label="Valor de tabela (R$)" type="number" value={priceReais} onChange={(e) => setPriceReais(e.target.value)} />
         <Input label="Horas incluídas" type="number" step="0.5" value={includedHours} onChange={(e) => setIncludedHours(e.target.value)} />
         <Input label="Validade (dias)" type="number" value={validityDays} onChange={(e) => setValidityDays(e.target.value)} />
+        <Input
+          label="Excedente por minuto (R$)"
+          type="number"
+          value={overageReais}
+          onChange={(e) => setOverageReais(e.target.value)}
+          title="Valor cobrado por minuto além do incluído, quando o pacote é usado direto na Entrada"
+        />
         <Input label="Benefício (frase do script de venda)" placeholder="Ex.: 2 horas extras e um lanche por visita" value={benefitText} onChange={(e) => setBenefitText(e.target.value)} />
         <div>
           <label>Cor do pacote</label>

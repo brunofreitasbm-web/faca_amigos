@@ -58,7 +58,7 @@ function extractExpectedCents(message: string): number | null {
 }
 
 export function CheckoutModal({
-  entries,
+  entries: liveEntries,
   onClose,
   onDone,
 }: {
@@ -67,6 +67,22 @@ export function CheckoutModal({
   onDone: () => void;
 }) {
   const { employee, unit } = useAppState();
+  // O Painel/Saída recalculam `entries` a cada segundo (contador + valor
+  // ainda rodando). Ao abrir o fechamento, o operador está "fechando a
+  // sessão" — o tempo e a cobrança da criança devem parar aqui, não seguir
+  // subindo enquanto ele escolhe a forma de pagamento. Por isso o valor é
+  // congelado na primeira renderização e ignora atualizações da prop depois
+  // disso; o servidor (fa_checkout) usa esse mesmo instante como corte real.
+  const [entries] = useState(liveEntries);
+  // Reconstrói o instante "agora" (já corrigido pro relógio do servidor)
+  // que gerou o `elapsedMs` congelado acima: checkin + pausas + elapsed.
+  // É o mesmo valor que fa_checkout vai usar como teto de cobrança — não
+  // precisa de outra chamada de rede pra travar o relógio do servidor de
+  // novo, o congelamento acima já carrega essa informação embutida.
+  const [closedAtMs] = useState(() => {
+    const first = entries[0];
+    return first ? first.session.checkin_at_ms + first.session.paused_ms_total + first.quote.timing.elapsedMs : Date.now();
+  });
   const [method, setMethod] = useState<PaymentMethod>("PIX");
   const [secondMethod, setSecondMethod] = useState<PaymentMethod | null>(null);
   const [splitTyped, setSplitTyped] = useState("");
@@ -112,6 +128,7 @@ export function CheckoutModal({
         sessionIds: entries.map((e) => e.session.id),
         employeeId: employee.id,
         payments,
+        closedAtMs,
       });
 
       const nowStr = new Date().toLocaleString("pt-BR");
@@ -138,7 +155,7 @@ export function CheckoutModal({
             guardianName: e.session.guardian_name_snapshot,
             phone: e.session.guardian_phone_snapshot,
           },
-          footerNote: `Entrada: ${new Date(e.session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} | Saída: ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} | Excedente: ${e.quote.timing.overMinutes} min`,
+          footerNote: `Entrada ${new Date(e.session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} → Saída ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} (+${e.quote.timing.overMinutes}min)`,
         })),
       );
     } catch (err) {

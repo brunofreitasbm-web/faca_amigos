@@ -19,14 +19,14 @@ const STORAGE_KEY = "fa_kiosk_terminal_employees";
 interface CachedEmployee {
   employeeId: string;
   fullName: string;
-  role: "OPERADOR" | "GERENTE" | "ADMIN";
+  role: "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
 }
 
 /** Mesmo shape do antigo `Employee` de api/client.ts, para não exigir mudanças nas telas. */
 export interface TerminalEmployee {
   id: string;
   full_name: string;
-  role: "OPERADOR" | "GERENTE" | "ADMIN";
+  role: "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
 }
 
 function readCache(): CachedEmployee[] {

@@ -1,7 +1,9 @@
 # Instalador Windows one-click (NSIS). Fluxo completo: `pnpm dist:kiosk`
 # na raiz (builda workspace + ícones + kiosk-ui antes de empacotar).
 appId: br.com.facaamigos.kiosk
-productName: FacaAmigos Kiosk
+productName: FacaAmigos
+extraMetadata:
+  description: FaçaAmigos - AppGestão
 directories:
   output: release
   buildResources: build
@@ -22,7 +24,7 @@ win:
     - target: nsis
       arch: [x64]
   icon: build/icon.ico
-  artifactName: FacaAmigos-Kiosk-Setup-${version}.${ext}
+  artifactName: FacaAmigos-Setup-${version}.${ext}
 nsis:
   oneClick: true
   # perMachine + elevação: necessário para o installer.nsh abrir a porta

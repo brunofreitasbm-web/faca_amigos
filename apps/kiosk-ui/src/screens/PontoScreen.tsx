@@ -31,7 +31,12 @@ function formatTime(ms: number): string {
  * não bata com a sessão autenticada — a tela é só a primeira barreira.
  */
 export function PontoScreen() {
-  const { unit } = useAppState();
+  const { unit, employee } = useAppState();
+  // Estagiário não "bate ponto" no vocabulário do RH — é "Controle de
+  // Frequência". Mesmo fluxo e mesma RPC (fa_register_ponto), só o rótulo
+  // muda pra quem só tem a capacidade ponto.self.
+  const isEstagiario = employee?.role === "ESTAGIARIO";
+  const screenTitle = isEstagiario ? "Controle de Frequência" : "Bater ponto";
   const toast = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selected, setSelected] = useState<Employee | null>(null);
@@ -81,7 +86,7 @@ export function PontoScreen() {
 
   return (
     <div style={{ maxWidth: "560px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>Bater ponto</h1>
+      <h1 style={{ fontFamily: "var(--font-display)" }}>{screenTitle}</h1>
       <HelpText>
         Registro obrigatório de horário de trabalho. Toque no seu nome na lista abaixo, confirme que é você com
         login/PIN e depois escolha o que está registrando (chegada, saída ou intervalo).
@@ -99,7 +104,7 @@ export function PontoScreen() {
       ) : !authedAs ? (
         <Modal onClose={trocarColaborador} ariaLabel="Confirmar identidade" maxWidth="420px">
           <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
-            Para bater o ponto de <strong>{selected.full_name}</strong>, confirme com login ou PIN.
+            {isEstagiario ? "Para registrar a frequência de" : "Para bater o ponto de"} <strong>{selected.full_name}</strong>, confirme com login ou PIN.
           </p>
           <EmployeeAuthGate restrictToEmployeeId={selected.id} onAuthenticated={setAuthedAs} onCancel={trocarColaborador} />
         </Modal>

@@ -34,21 +34,26 @@ export const CAPABILITIES = [
 export type Capability = (typeof CAPABILITIES)[number];
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
-export type Role = "OPERADOR" | "GERENTE" | "ADMIN";
+export type Role = "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
 
 /**
  * Os valores no banco continuam OPERADOR/GERENTE/ADMIN — renomeá-los
  * exigiria migrar check constraint, linhas, funções e policies de uma vez,
  * com risco de deixar um 'ADMIN' hardcoded para trás. O rótulo resolve o
  * mesmo problema visível com risco zero.
+ *
+ * ESTAGIARIO não é hierárquico como os outros três (não herda nem é
+ * herdado) — só bate ponto, sem nenhum outro acesso ao sistema.
  */
 export const ROLE_LABEL: Record<Role, string> = {
+  ESTAGIARIO: "Estagiário",
   OPERADOR: "Operador",
   GERENTE: "Líder",
   ADMIN: "Owner",
 };
 
 export const ROLE_DESCRIPTION: Record<Role, string> = {
+  ESTAGIARIO: "Só acessa o Controle de Frequência. Não opera caixa, vendas nem check-in/saída.",
   OPERADOR: "Caixa e vendas. Não acessa Configurações.",
   GERENTE: "Tudo do Operador, mais cancelamentos, sangrias, estornos e relatórios.",
   ADMIN: "Acesso total, incluindo o menu Configurações.",
@@ -75,4 +80,5 @@ export const FUNCTION_OPTIONS: ReadonlyArray<{ value: string; label: string; rol
   { value: "SUPERVISOR", label: "Supervisor", role: "GERENTE" },
   { value: "GERENTE", label: "Gerente", role: "GERENTE" },
   { value: "OWNER", label: "Owner / Administrador", role: "ADMIN" },
+  { value: "ESTAGIARIO", label: "Estagiário", role: "ESTAGIARIO" },
 ];

@@ -3,7 +3,7 @@ import { generateEscPosReceipt } from "../src/printers/escpos.js";
 import type { ReceiptPrintPayload } from "../src/printers/escpos.js";
 
 const RECIBO_DE_GUARDA: ReceiptPrintPayload = {
-  title: "Recibo de Guarda",
+  title: "Check-in",
   unitName: "Playground Parque Shopping",
   unitCnpj: "12.345.678/0001-90",
   employeeName: "Admin Dev",
@@ -25,20 +25,21 @@ const RECIBO_DE_GUARDA: ReceiptPrintPayload = {
   },
 };
 
-describe("recibo de guarda (via dos pais, impressa no check-in)", () => {
+describe("recibo de guarda / Check-in (via dos pais, impressa no check-in)", () => {
   const { text } = generateEscPosReceipt(RECIBO_DE_GUARDA);
   const linhas = text.split("\n");
 
-  it("destaca o codigo de saida agrupado, que e o que se procura com pressa na porta", () => {
-    expect(text).toContain("CÓDIGO DE SAÍDA");
-    expect(text).toContain("K7M2-P9QX-3B7");
+  it("destaca o codigo de saida, compacto e sem espaco em branco ao redor", () => {
+    expect(text).toContain("Código de saída: K7M2-P9QX-3B7");
+    expect(text).toContain("Apresente este recibo na saída");
   });
 
   it("identifica a crianca e quem a entregou, para valer como prova da guarda", () => {
-    expect(text).toContain("Criança: Helena Souza");
+    expect(text).toContain("Helena Souza · Resp: Maria Souza");
+    // Nascimento + CPF juntos podem passar de 42 colunas — aqui quebram em duas linhas, mas sem perder dado nenhum.
     expect(text).toContain("Nascimento: 12/03/2019");
-    expect(text).toContain("Resp: Maria Souza");
-    expect(text).toContain("CPF: 123.456.789-00");
+    expect(text).toContain("CPF:");
+    expect(text).toContain("123.456.789-00");
   });
 
   it("imprime horario de entrada e saida prevista", () => {
@@ -51,16 +52,18 @@ describe("recibo de guarda (via dos pais, impressa no check-in)", () => {
     expect(text).toContain("Usa Abafador");
   });
 
-  it("nao diz TOTAL: no check-in nada foi pago ainda", () => {
+  it("nao diz TOTAL: no check-in nada foi pago ainda, e nao repete a tabela de itens", () => {
     expect(text).not.toContain("TOTAL:");
+    expect(text).not.toContain("ITEM");
     expect(text).toContain("PREVISTO (pagar na saída)");
     expect(text).toContain("Tempo excedente é cobrado à parte.");
   });
 
-  it("traz as regras de retirada e a linha de assinatura", () => {
-    expect(text).toContain("REGRAS DE RETIRADA");
+  it("traz uma regra de retirada só, sem bloco de assinatura", () => {
+    expect(text).toContain("RETIRADA");
     expect(text).toContain("documento com foto");
-    expect(text).toContain("Assinatura do responsável:");
+    expect(text).not.toContain("Assinatura do responsável");
+    expect(text).not.toContain("__________");
   });
 
   it("respeita a largura de 42 colunas da bobina de 80mm", () => {
@@ -89,8 +92,9 @@ describe("cupom de venda (sem accessCode) segue igual", () => {
     });
 
     expect(text).toContain("Código: VD260807-00042");
-    expect(text).toContain("TOTAL:");
-    expect(text).not.toContain("REGRAS DE RETIRADA");
+    // Uma única forma de pagamento: TOTAL e forma saem numa linha só.
+    expect(text).toContain("TOTAL (PIX):");
+    expect(text).not.toContain("RETIRADA");
     expect(text).toContain("Obrigado por brincar com a gente!");
   });
 });

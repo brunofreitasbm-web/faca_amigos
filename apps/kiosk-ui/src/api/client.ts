@@ -81,7 +81,7 @@ export interface JobApplication {
 export interface Employee {
   id: string;
   full_name: string;
-  role: "OPERADOR" | "GERENTE" | "ADMIN";
+  role: "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
   cpf?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -408,6 +408,8 @@ export interface Package {
   benefitText: string;
   color: string;
   active: boolean;
+  /** Tarifa por minuto além do incluído, cobrada quando o pacote é usado direto na Entrada. */
+  overageCentsPerMinute: number;
   /** Só preenchido por `Api.packagesAllUnits()` (Gerencial). */
   unitId?: string;
 }
@@ -605,6 +607,11 @@ export interface ActiveSessionEntry {
     uses_hour_bank?: boolean;
     /** Saldo alocado no check-in — a "duração do plano" da sessão de banco. */
     hour_bank_allocated_minutes?: number;
+    /** Entrada feita por um Pacote (compra + uso no mesmo ato, sem plano vendido). */
+    uses_package?: boolean;
+    package_id?: string | null;
+    /** Minutos alocados no check-in — a "duração do plano" da sessão de pacote. */
+    package_allocated_minutes?: number;
   };
   quote: {
     lines: QuoteLine[];
@@ -856,6 +863,7 @@ function packageFromRow(row: Record<string, unknown>): Package {
     benefitText: row.benefit_text as string,
     color: row.color as string,
     active: Boolean(row.active),
+    overageCentsPerMinute: (row.overage_cents_per_minute as number | null) ?? 0,
     unitId: row.unit_id as string | undefined,
   };
 }
@@ -997,9 +1005,13 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
 
   return raw.sessions.map((row) => {
     const usesHourBank = Boolean(row.uses_hour_bank);
+    const usesPackage = Boolean(row.uses_package);
     // Sessão de banco de horas: não existe plano vendido. O pseudo-plano
     // reusa o mesmo motor de preço — valor 0, duração = saldo alocado no
     // check-in e excedente pela tarifa congelada do crédito de origem.
+    // Sessão de Pacote: também não existe plano vendido, mas o pacote É
+    // cobrado no fechamento (preço cheio, congelado no check-in) — só a
+    // duração/excedente seguem o mesmo padrão do banco de horas.
     const plan: Plan = usesHourBank
       ? {
           id: "HOUR_BANK",
@@ -1011,7 +1023,18 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
           overageCentsPerMinute: (row.hour_bank_overage_cents_per_minute as number | null) ?? 0,
           color: "#2ECFB5",
         }
-      : raw.planById.get(row.plan_id as string)!;
+      : usesPackage
+        ? {
+            id: `PKG:${row.package_id as string}`,
+            activity: row.activity as Plan["activity"],
+            name: (row.package_name_snapshot as string | null) ?? "Pacote",
+            valueCents: (row.package_price_cents as number | null) ?? 0,
+            durationValue: (row.package_allocated_minutes as number | null) ?? 0,
+            durationUnit: "MINUTO",
+            overageCentsPerMinute: (row.package_overage_cents_per_minute as number | null) ?? 0,
+            color: "#FF7A00",
+          }
+        : raw.planById.get(row.plan_id as string)!;
     const guardian = raw.guardianById.get(row.guardian_id as string);
     const assetRow = row.asset_id ? raw.assetById.get(row.asset_id as string) : undefined;
     const childRow = raw.childById.get(row.child_id as string);
@@ -1054,6 +1077,9 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         package_balance_minutes: raw.packageBalanceByGuardian.get(row.guardian_id as string),
         uses_hour_bank: usesHourBank,
         hour_bank_allocated_minutes: (row.hour_bank_allocated_minutes as number | null) ?? undefined,
+        uses_package: usesPackage,
+        package_id: (row.package_id as string | null) ?? undefined,
+        package_allocated_minutes: (row.package_allocated_minutes as number | null) ?? undefined,
       },
       quote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
@@ -1234,8 +1260,8 @@ export const Api = {
     );
     return new Map(rows.map((r) => [r.child_id, r]));
   },
-  packages: async (unitId: string, onlyActive = true) => {
-    let query = supabase().from("fa_kiosk_packages").select("*").eq("unit_id", unitId);
+  packages: async (unitId: string, activity: string, onlyActive = true) => {
+    let query = supabase().from("fa_kiosk_packages").select("*").eq("unit_id", unitId).eq("activity", activity);
     if (onlyActive) query = query.eq("active", true);
     const rows = await unwrap<Record<string, unknown>[]>(query.order("price_cents"));
     return rows.map(packageFromRow);
@@ -1254,6 +1280,7 @@ export const Api = {
     validityDays: number;
     benefitText: string;
     color: string;
+    overageCentsPerMinute: number;
   }) =>
     unwrap<{ id: string }>(
       supabase()
@@ -1267,13 +1294,14 @@ export const Api = {
           validity_days: body.validityDays,
           benefit_text: body.benefitText,
           color: body.color,
+          overage_cents_per_minute: body.overageCentsPerMinute,
         })
         .select("id")
         .single(),
     ),
   setPackageActive: (id: string, active: boolean) =>
     unwrap(supabase().from("fa_kiosk_packages").update({ active }).eq("id", id)),
-  updatePackage: (id: string, body: { name: string; priceCents: number; includedMinutes: number; validityDays: number; benefitText: string; color: string }) =>
+  updatePackage: (id: string, body: { name: string; priceCents: number; includedMinutes: number; validityDays: number; benefitText: string; color: string; overageCentsPerMinute: number }) =>
     unwrap(supabase().from("fa_kiosk_packages").update({
       name: body.name,
       price_cents: body.priceCents,
@@ -1281,6 +1309,7 @@ export const Api = {
       validity_days: body.validityDays,
       benefit_text: body.benefitText,
       color: body.color,
+      overage_cents_per_minute: body.overageCentsPerMinute,
     }).eq("id", id)),
   redeemableRewards: (childId: string) =>
     unwrap<RedeemableReward[]>(
@@ -1338,10 +1367,12 @@ export const Api = {
     unitId: string;
     activity: "PLAYGROUND" | "CARRINHO";
     assetId?: string;
-    /** Nulo quando a entrada é pelo banco de horas (useHourBank). */
+    /** Nulo quando a entrada é pelo banco de horas (useHourBank) ou por um Pacote (packageId). */
     planId: string | null;
     /** Entrada pelo saldo do banco de horas da criança (exige criança já cadastrada). */
     useHourBank?: boolean;
+    /** Entrada por um Pacote: compra/renova o saldo do responsável e usa nesta mesma visita. */
+    packageId?: string | null;
     employeeId: string;
     child: { id?: string; fullName: string; birthDate: string; inclusiveEligible: boolean; inclusiveProofType?: string };
     guardian: { id?: string; fullName: string; cpf: string; phoneE164: string };
@@ -1367,6 +1398,8 @@ export const Api = {
       ticketCode: string;
       /** Minutos do banco de horas alocados nesta entrada (só quando useHourBank). */
       hourBankAllocatedMinutes: number | null;
+      /** Minutos do pacote alocados nesta entrada (só quando packageId). */
+      packageAllocatedMinutes: number | null;
     }>(
       "fa_checkin",
       {
@@ -1374,6 +1407,7 @@ export const Api = {
         p_activity: body.activity,
         p_plan_id: body.planId,
         p_use_hour_bank: body.useHourBank ?? false,
+        p_package_id: body.packageId ?? null,
         p_asset_id: body.assetId ?? null,
         p_guardian: { id: body.guardian.id, fullName: body.guardian.fullName, cpf: body.guardian.cpf, phoneE164: body.guardian.phoneE164 },
         p_child: {
@@ -1503,12 +1537,21 @@ export const Api = {
     employeeId: string;
     payments: { method: string; amountCents: number; nsu?: string; authorization?: string; pixTxid?: string }[];
     redeemRewardIds?: string[];
+    /**
+     * Instante (ms, corrigido pro relógio do servidor) em que o operador
+     * clicou para fechar a sessão — o contador e a cobrança da criança
+     * travam aqui. O servidor nunca cobra por tempo depois disso, mesmo
+     * que a confirmação do pagamento demore (ver fa_checkout: usa o menor
+     * entre este valor e o relógio real do servidor).
+     */
+    closedAtMs?: number;
   }) =>
     callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_checkout", {
       p_session_ids: body.sessionIds,
       p_payments: body.payments,
       p_redeem_reward_ids: body.redeemRewardIds ?? [],
       p_employee_id: body.employeeId,
+      p_closed_at_ms: body.closedAtMs ?? null,
     }),
   pdvOrder: (body: { unitId: string; employeeId: string; items: { productId: string; quantity: number }[]; payments: unknown[] }) =>
     callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_create_pdv_order", {
