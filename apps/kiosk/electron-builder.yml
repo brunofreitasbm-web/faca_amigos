@@ -10,6 +10,10 @@ files:
   - package.json
 asar: true
 npmRebuild: false
+# Sem electron-updater no código: nada consome feed de auto-update, e sem
+# isso o electron-builder tenta detectar publish/repository do zero (e
+# quebra em ambientes sem esse metadado no package.json).
+publish: null
 extraResources:
   # SPA servida pelo Fastify local (ver src/server/staticSpa.ts)
   - from: ../kiosk-ui/dist

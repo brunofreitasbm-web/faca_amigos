@@ -25,6 +25,13 @@ apps/kiosk/bundle/
 *.dmg
 *.AppImage
 
+# apps/kiosk/build/ é majoritariamente gerado (icon.ico via `pnpm icons`),
+# mas installer.nsh é código-fonte do instalador (regra de firewall da
+# porta 7317) e precisa ficar versionado.
+!apps/kiosk/build/
+apps/kiosk/build/*
+!apps/kiosk/build/installer.nsh
+
 # === Env / secrets ===
 .env
 .env.*
