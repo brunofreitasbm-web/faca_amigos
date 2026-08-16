@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, Button, HelpText } from "@facaamigos/ui";
 import { PinPad } from "./PinPad.js";
 import { Api } from "../api/client.js";
@@ -45,12 +45,28 @@ export function EmployeeAuthGate({
   const restrictedCached = restrictToEmployeeId ? cachedEmployees.find((e) => e.id === restrictToEmployeeId) : undefined;
 
   const [mode, setMode] = useState<Mode>(
-    restrictToEmployeeId ? (restrictedCached ? { kind: "PIN", employee: restrictedCached } : { kind: "ALL" }) : { kind: "PICK" },
+    restrictToEmployeeId
+      ? restrictedCached
+        ? { kind: "PIN", employee: restrictedCached }
+        : { kind: "ALL" }
+      : cachedEmployees.length === 0
+        ? { kind: "ALL" }
+        : { kind: "PICK" },
   );
   const [terminalEmployees, setTerminalEmployees] = useState(cachedEmployees);
   const [allEmployees, setAllEmployees] = useState<LoginCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (mode.kind !== "ALL" || allEmployees) return;
+    Api.employeesForLogin()
+      .then(setAllEmployees)
+      .catch(() => {
+        setAllEmployees([]);
+        setError("Não foi possível carregar a lista. Verifique a conexão.");
+      });
+  }, [mode.kind, allEmployees]);
 
   async function checkAndAccept(employee: TerminalEmployee) {
     if (restrictToEmployeeId && employee.id !== restrictToEmployeeId) {
@@ -84,6 +100,7 @@ export function EmployeeAuthGate({
   function openAllEmployees() {
     setError(null);
     setMode({ kind: "ALL" });
+<<<<<<< HEAD
     if (!allEmployees) {
       Api.employeesForLogin()
         .then(setAllEmployees)
@@ -93,6 +110,8 @@ export function EmployeeAuthGate({
           setError(`Não foi possível carregar a lista: ${err instanceof Error ? err.message : String(err)}`);
         });
     }
+=======
+>>>>>>> 769cba0f3d7545dea10becdc57e338898c32dd47
   }
 
   if (mode.kind === "ALL") {
@@ -106,9 +125,11 @@ export function EmployeeAuthGate({
             <strong>{emp.full_name}</strong>
           </Card>
         ))}
-        <Button variant="ghost" onClick={restrictToEmployeeId ? onCancel : () => setMode({ kind: "PICK" })}>
-          voltar
-        </Button>
+        {(restrictToEmployeeId || terminalEmployees.length > 0) && (
+          <Button variant="ghost" onClick={restrictToEmployeeId ? onCancel : () => setMode({ kind: "PICK" })}>
+            voltar
+          </Button>
+        )}
       </div>
     );
   }
@@ -124,7 +145,7 @@ export function EmployeeAuthGate({
             ? onCancel
             : () => {
                 setError(null);
-                setMode({ kind: "PICK" });
+                setMode(terminalEmployees.length === 0 ? { kind: "ALL" } : { kind: "PICK" });
               }
         }
         onSubmit={(pin) => void handlePinLogin(mode.employee.id, pin)}
