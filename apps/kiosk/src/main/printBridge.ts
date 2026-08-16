@@ -117,15 +117,26 @@ function printHtml(html: string, deviceName: string): Promise<void> {
   });
 }
 
-export function startPrintBridge(): void {
+export interface PrintBridgeStartResult {
+  started: boolean;
+  reason?: string;
+}
+
+/**
+ * Se isto retornar `started: false`, NENHUM job de fa_kiosk_print_jobs vai
+ * ser processado neste terminal — os jobs ficam acumulando como PENDING
+ * para sempre, sem nenhum aviso além deste retorno (foi assim que uma
+ * falta de .env em produção virou "a impressora não funciona" sem erro
+ * nenhum na tela). Quem chama isto deve avisar o operador visivelmente.
+ */
+export function startPrintBridge(): PrintBridgeStartResult {
   const url = process.env.FACAAMIGOS_SUPABASE_URL;
   const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
-    console.warn(
-      "[print-bridge] FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados neste terminal — " +
-        "impressão de pulseira/cupom continua exigindo o diálogo do navegador no kiosk-ui.",
-    );
-    return;
+    const reason =
+      "FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados em apps/kiosk/.env — impressão automática de pulseira/cupom está desligada neste terminal.";
+    console.warn(`[print-bridge] ${reason}`);
+    return { started: false, reason };
   }
 
   // supabase-js/realtime-js precisa de um WebSocket explícito fora do
@@ -190,6 +201,14 @@ export function startPrintBridge(): void {
       void handleJob(payload.new as PrintJobRow);
     })
     .subscribe((status) => {
-      console.log(`[print-bridge] canal Realtime: ${status}`);
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        console.error(
+          `[print-bridge] canal Realtime caiu (${status}) — jobs novos de impressão vão ficar PENDING até o terminal reiniciar.`,
+        );
+      } else {
+        console.log(`[print-bridge] canal Realtime: ${status}`);
+      }
     });
+
+  return { started: true };
 }

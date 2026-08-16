@@ -136,7 +136,20 @@ if (isPrimaryInstance) {
     }
 
     const mainWindow = createWindow(protocol, splash);
-    startPrintBridge();
+
+    // Sem isto, a ponte de impressão falhava só com um console.warn: o
+    // terminal parecia funcionar normalmente, mas nenhuma pulseira/recibo
+    // saía e ninguém no balcão descobria até a família já ter ido embora.
+    const printBridgeResult = startPrintBridge();
+    if (!printBridgeResult.started) {
+      dialog.showMessageBox({
+        type: "warning",
+        title: "Impressão automática desligada",
+        message: "A impressão automática de pulseira/recibo está desligada neste terminal.",
+        detail: `${printBridgeResult.reason}\n\nOs check-ins continuam funcionando normalmente, mas nada será impresso até isso ser corrigido e o app reiniciado.`,
+        buttons: ["OK"],
+      });
+    }
 
     // Fonte da verdade para a tela Configurações > Impressoras validar o
     // nome digitado: o print bridge usa esse mesmo nome literal em

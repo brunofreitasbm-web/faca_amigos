@@ -18,6 +18,7 @@ import {
 import { unitBrandFor } from "./branding/unitBrand.js";
 import { useSwipeNavigation } from "./hooks/useSwipeNavigation.js";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts.js";
+import { usePrintFailureAlerts } from "./hooks/usePrintFailureAlerts.js";
 import { useAppState } from "./state/AppState.js";
 import { useConfirm } from "./state/ConfirmContext.js";
 import { useAuth } from "./auth/AuthContext.js";
@@ -152,6 +153,8 @@ export function App() {
     onSave: handleSave,
     enabled: !!employee && !gerencial && !!unit,
   });
+
+  usePrintFailureAlerts(unit?.id ?? null);
 
   const swipeHandlers = useSwipeNavigation(
     () => {

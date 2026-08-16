@@ -11,7 +11,15 @@
 const FALLBACK_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:4173",
+  "https://kiosk-ui.vercel.app",
   "https://app.institutofacaamigos.com.br",
+  // App Electron do quiosque (apps/kiosk): a SPA é servida pelo Fastify
+  // local em 127.0.0.1:7317 e chama estas functions direto do renderer —
+  // sem essa origem aqui, o navegador bloqueia a resposta (CORS) e o
+  // supabase-js reporta "Failed to send a request to the Edge Function",
+  // escondendo que o motivo real é CORS e não falta de rede.
+  "http://127.0.0.1:7317",
+  "https://127.0.0.1:7317",
 ];
 
 function allowedOrigins(): string[] {
