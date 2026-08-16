@@ -161,7 +161,7 @@ export function startPrintBridge(): PrintBridgeStartResult {
   const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
     const reason =
-      "FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados em apps/kiosk/.env — impressão automática de pulseira/cupom está desligada neste terminal.";
+      "FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados (verifique o arquivo .env em apps/kiosk, AppData ou pasta resources) — impressão automática de pulseira/cupom está desligada neste terminal.";
     console.warn(`[print-bridge] ${reason}`);
     return { started: false, reason };
   }

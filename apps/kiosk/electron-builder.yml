@@ -19,6 +19,10 @@ extraResources:
   # Migrations .sql lidas em runtime (ver packages/db-local/src/migrate.ts)
   - from: ../../packages/db-local/dist/migrations
     to: migrations
+  # Arquivo de configuração .env para o quiosque
+  - from: .env
+    to: .env
+
 win:
   target:
     - target: nsis

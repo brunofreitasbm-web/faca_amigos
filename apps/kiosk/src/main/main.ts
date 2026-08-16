@@ -18,20 +18,43 @@ import { startFiscalWorker } from "../fiscal/index.js";
  * preenchido. Variáveis já definidas no ambiente real (produção) não são
  * sobrescritas.
  */
-function loadDotEnv(path: string): void {
-  if (!existsSync(path)) return;
-  for (const rawLine of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq === -1) continue;
-    const key = line.slice(0, eq).trim();
-    const value = line.slice(eq + 1).trim();
-    if (key && process.env[key] === undefined) process.env[key] = value;
+function loadDotEnvFromCandidates(): void {
+  let userDataEnv = "";
+  try {
+    userDataEnv = join(app.getPath("userData"), ".env");
+  } catch {
+    // app.getPath pode falhar se chamado antes da inicialização completa dos caminhos
+  }
+
+  const candidates: string[] = [
+    process.resourcesPath ? join(process.resourcesPath, ".env") : "",
+    userDataEnv,
+    join(process.cwd(), ".env"),
+    join(import.meta.dirname, "../.env"),
+    process.execPath ? join(process.execPath, "../.env") : "",
+  ].filter(Boolean);
+
+  for (const envPath of candidates) {
+    if (!existsSync(envPath)) continue;
+    try {
+      const content = readFileSync(envPath, "utf8");
+      for (const rawLine of content.split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith("#")) continue;
+        const eq = line.indexOf("=");
+        if (eq === -1) continue;
+        const key = line.slice(0, eq).trim();
+        const value = line.slice(eq + 1).trim();
+        if (key && process.env[key] === undefined) process.env[key] = value;
+      }
+      console.log(`[main] Carregou variáveis de ambiente de: ${envPath}`);
+    } catch (err) {
+      console.warn(`[main] Erro ao ler ${envPath}:`, err);
+    }
   }
 }
 
-loadDotEnv(join(import.meta.dirname, "../.env"));
+loadDotEnvFromCandidates();
 
 /**
  * D1/D2 do plano: o Electron não fala com o banco diretamente — ele
