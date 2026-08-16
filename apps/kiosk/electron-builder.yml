@@ -4,7 +4,7 @@ appId: br.com.facaamigos.kiosk
 productName: FacaAmigos
 publish:
   provider: generic
-  url: https://updates.facaamigos.com.br/kiosk
+  url: https://update.institutofacaamigos.com.br/kiosk
 extraMetadata:
   description: FaçaAmigos - AppGestão
 directories:
