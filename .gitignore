@@ -24,6 +24,10 @@ apps/kiosk/bundle/
 *.msi
 *.dmg
 *.AppImage
+*.blockmap
+
+# === Auto-updater feed (artefatos gerados por scripts/release-kiosk.mjs) ===
+apps/kiosk/update-feed/kiosk/
 
 # === Env / secrets ===
 .env
