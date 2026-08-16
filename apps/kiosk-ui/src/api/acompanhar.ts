@@ -11,7 +11,12 @@ import { supabase } from "../lib/supabase/client.js";
 export async function fetchAcompanharSessao(code: string): Promise<AcompanharSessao> {
   const { data, error } = await supabase().rpc("fa_acompanhar_por_codigo", { p_code: code });
   if (error) throw new Error(error.message);
-  return acompanharSessaoSchema.parse(data);
+  try {
+    return acompanharSessaoSchema.parse(data);
+  } catch (err) {
+    console.error("[useAcompanhar] Falha de validação Zod nos dados recebidos:", err, data);
+    throw new Error("Não foi possível carregar os dados de acompanhamento da sessão.");
+  }
 }
 
 export async function logAcompanharEvento(

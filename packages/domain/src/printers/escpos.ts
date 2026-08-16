@@ -258,8 +258,9 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   }
 
   lines.push(divider);
-  if (payload.footerNote) {
-    for (const line of wrap(payload.footerNote)) lines.push(centerText(line));
+  const showFooterNote = payload.footerNote && (!isGuardReceipt || payload.activity !== "PLAYGROUND");
+  if (showFooterNote) {
+    for (const line of wrap(payload.footerNote!)) lines.push(centerText(line));
   } else if (!isGuardReceipt) {
     lines.push(centerText("Obrigado por brincar com a gente!"));
   }

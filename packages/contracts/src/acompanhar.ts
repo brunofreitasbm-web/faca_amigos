@@ -13,7 +13,7 @@ export const acompanharPlanoSchema = z.object({
   valueCents: z.number().int().nonnegative(),
   overageCentsPerMinute: z.number().int().nonnegative(),
   /** Só preenchido para activity=CARRINHO — distingue carro elétrico de pelúcia (mesma activity, ver copyCircuito.ts). */
-  assetKind: z.enum(["CARRO", "PELUCIA"]).nullable().optional().transform((v) => v ?? null),
+  assetKind: z.enum(["CARRO", "PELUCIA"]).nullable().optional().catch(null).transform((v) => v ?? null),
 });
 
 export const acompanharSessaoSchema = z.discriminatedUnion("status", [
@@ -31,7 +31,7 @@ export const acompanharSessaoSchema = z.discriminatedUnion("status", [
     status: z.enum(["ATIVA", "PAUSADA"]),
     sessionId: uuidV7,
     childFirstName: z.string(),
-    activity: z.enum(["PLAYGROUND", "CARRINHO"]).optional().default("PLAYGROUND"),
+    activity: z.enum(["PLAYGROUND", "CARRINHO"]).optional().default("PLAYGROUND").catch("PLAYGROUND"),
     checkinAtMs: z.number().int().nonnegative(),
     pausedAtMs: z.number().int().nonnegative().nullable(),
     pausedMsTotal: z.number().int().nonnegative(),

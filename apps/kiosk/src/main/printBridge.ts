@@ -210,6 +210,7 @@ function isVirtualOrPdfPrinter(deviceName: string): boolean {
         const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
         const isCircuito =
           Boolean(payload.accessCode) &&
+          payload.activity !== "PLAYGROUND" &&
           (payload.activity === "CARRINHO" ||
             /circuito/i.test(payload.unitName) ||
             Boolean(payload.assetName));
