@@ -180,6 +180,11 @@ export function startPrintBridge(): PrintBridgeStartResult {
     return (data?.value as string | undefined) ?? null;
   }
 
+function isVirtualOrPdfPrinter(deviceName: string): boolean {
+  const lower = deviceName.toLowerCase();
+  return lower.includes("pdf") || lower.includes("xps") || lower.includes("virtual") || lower.includes("fax") || lower.includes("onenote");
+}
+
   async function handleJob(job: PrintJobRow): Promise<void> {
     try {
       const deviceName = await printerNameFor(job.unit_id, job.kind);
@@ -187,23 +192,36 @@ export function startPrintBridge(): PrintBridgeStartResult {
         throw new Error(`Nenhuma impressora de ${job.kind === "WRISTBAND" ? "pulseira" : "cupom"} configurada (Configurações > Impressoras)`);
       }
 
+      const isVirtualOrPdf = isVirtualOrPdfPrinter(deviceName);
+
       if (job.kind === "WRISTBAND") {
-        const tspl = generateGainschaGS2208DTSPL(job.payload_json as unknown as WristbandPrintPayload);
-        const printedRaw = await printRawWindows(tspl, deviceName);
-        if (!printedRaw) {
+        if (isVirtualOrPdf) {
           const html = await wristbandHtml(job.payload_json as unknown as WristbandPayload);
           await printHtml(html, deviceName);
+        } else {
+          const tspl = generateGainschaGS2208DTSPL(job.payload_json as unknown as WristbandPrintPayload);
+          const printedRaw = await printRawWindows(tspl, deviceName);
+          if (!printedRaw) {
+            const html = await wristbandHtml(job.payload_json as unknown as WristbandPayload);
+            await printHtml(html, deviceName);
+          }
         }
       } else {
         const rawPayload = job.payload_json as unknown as ReceiptPrintPayload;
         const trackingUrl = trackingUrlFor(rawPayload.accessCode);
         const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
-        const escpos = generateEscPosReceipt(payload);
-        const rawBuffer = Buffer.from(escpos.commandsHex, "hex");
-        const printedRaw = await printRawWindows(rawBuffer, deviceName);
-        if (!printedRaw) {
+
+        if (isVirtualOrPdf) {
           const html = await receiptHtml(payload);
           await printHtml(html, deviceName);
+        } else {
+          const escpos = generateEscPosReceipt(payload);
+          const rawBuffer = Buffer.from(escpos.commandsHex, "hex");
+          const printedRaw = await printRawWindows(rawBuffer, deviceName);
+          if (!printedRaw) {
+            const html = await receiptHtml(payload);
+            await printHtml(html, deviceName);
+          }
         }
       }
 
