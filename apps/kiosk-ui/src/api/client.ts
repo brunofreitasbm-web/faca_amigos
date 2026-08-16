@@ -527,6 +527,18 @@ export interface GerencialCliente {
   }>;
 }
 
+/** Uma linha do audit log (`fa_kiosk_audit_log`), já com o nome/papel do operador resolvidos. */
+export interface AuditLogEntry {
+  id: string;
+  at_ms: number;
+  action: string;
+  severity: "INFO" | "ALERTA";
+  details_json: Record<string, unknown> | null;
+  employee_id: string | null;
+  employee_name: string | null;
+  employee_role: string | null;
+}
+
 /** Dados cadastrais do Contratante para o contrato dos planos >2h. */
 export interface GuardianContractInfo {
   id: string;
@@ -1908,6 +1920,23 @@ export const Api = {
    * contar só sessões a partir de agora (ver fa_kiosk_visit_counter_reset).
    */
   resetVisitCounter: () => unwrap(supabase().rpc("fa_config_reset_visit_counter")),
+  /** Lista o audit log (`fa_kiosk_audit_log`) para o Gerencial > Auditoria — quem fez o quê, quando. */
+  auditLog: async (filters: {
+    search?: string;
+    employeeId?: string;
+    severity?: string;
+    startMs?: number;
+    endMs?: number;
+  }) =>
+    (await unwrap<AuditLogEntry[] | null>(
+      supabase().rpc("fa_gerencial_audit_log", {
+        p_search: filters.search ?? null,
+        p_employee_id: filters.employeeId ?? null,
+        p_severity: filters.severity ?? null,
+        p_start_ms: filters.startMs ?? null,
+        p_end_ms: filters.endMs ?? null,
+      }),
+    )) ?? [],
   /** Registra a liberação de contingência (recibo perdido / etiqueta danificada) antes de cobrar. */
   saidaManualAuthorize: (body: {
     sessionId: string;

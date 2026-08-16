@@ -16,12 +16,13 @@ import { AberturaFechamentoTab } from "./tabs/AberturaFechamentoTab.js";
 import { FotosEnvelopeTab } from "./tabs/FotosEnvelopeTab.js";
 import { SaldoEnvelopesTab } from "./tabs/SaldoEnvelopesTab.js";
 import { HistoricoTab } from "./tabs/HistoricoTab.js";
+import { AuditoriaTab } from "./tabs/AuditoriaTab.js";
 import { ContratoTab } from "./tabs/ContratoTab.js";
 import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "COPILOT_IA", label: "✦ ZoeIA (Copilot)" },
@@ -40,6 +41,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "FOTOS_ENVELOPE", label: "Fotos de Envelope" },
   { value: "SALDO_ENVELOPES", label: "Saldo em Envelopes" },
   { value: "HISTORICO", label: "Histórico" },
+  { value: "AUDITORIA", label: "Auditoria" },
   { value: "CONTRATO", label: "Contrato (Planos 2h+)" },
 ];
 
@@ -60,6 +62,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
   FOTOS_ENVELOPE: "Fotos dos envelopes de sangria registrados em cada loja, com valor e operador responsável.",
   SALDO_ENVELOPES: "Quanto cada loja tem guardado em envelopes de sangria ainda não recolhidos, e o que há na gaveta agora.",
   HISTORICO: "Fluxograma visual de onde o dinheiro do turno veio e para onde foi, para facilitar a conferência.",
+  AUDITORIA: "Quem fez o quê, quando: log de ações sensíveis do sistema (login, alteração de colaborador, dados fiscais, unidades) para conferência e apuração.",
   CONTRATO: "Modelo do contrato de prestação de serviços dos planos acima de 2h (banco de horas), impresso em A4 na Entrada com timbre da unidade.",
 };
 
@@ -128,6 +131,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
               {tab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
               {tab === "HISTORICO" && <HistoricoTab />}
+              {tab === "AUDITORIA" && <AuditoriaTab />}
               {tab === "CONTRATO" && <ContratoTab />}
             </div>
           </div>
