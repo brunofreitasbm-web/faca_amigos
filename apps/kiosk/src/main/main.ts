@@ -18,6 +18,10 @@ import { startFiscalWorker } from "../fiscal/index.js";
  * preenchido. Variáveis já definidas no ambiente real (produção) não são
  * sobrescritas.
  */
+const DEFAULT_SUPABASE_URL = "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
+const DEFAULT_SUPABASE_SERVICE_ROLE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2anZwZHpzZmpkcHlhYmJ6enVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDUwNjA2OSwiZXhwIjoyMTAwMDgyMDY5fQ.wuwMmQAX8ICxFrOltge1QSCf-O31J9FZ021--behJFM";
+
 function loadDotEnvFromCandidates(): void {
   let userDataEnv = "";
   try {
@@ -45,12 +49,22 @@ function loadDotEnvFromCandidates(): void {
         if (eq === -1) continue;
         const key = line.slice(0, eq).trim();
         const value = line.slice(eq + 1).trim();
-        if (key && process.env[key] === undefined) process.env[key] = value;
+        if (key && (process.env[key] === undefined || process.env[key] === "")) {
+          process.env[key] = value;
+        }
       }
       console.log(`[main] Carregou variáveis de ambiente de: ${envPath}`);
     } catch (err) {
       console.warn(`[main] Erro ao ler ${envPath}:`, err);
     }
+  }
+
+  // Fallback garantido para o Supabase no quiosque se não definido em nenhum .env
+  if (!process.env.FACAAMIGOS_SUPABASE_URL) {
+    process.env.FACAAMIGOS_SUPABASE_URL = DEFAULT_SUPABASE_URL;
+  }
+  if (!process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY) {
+    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY = DEFAULT_SUPABASE_SERVICE_ROLE_KEY;
   }
 }
 
