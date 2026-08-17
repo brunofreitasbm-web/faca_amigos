@@ -10,6 +10,7 @@ import { CuponsTab } from "./tabs/CuponsTab.js";
 import { FidelidadeTab } from "./tabs/FidelidadeTab.js";
 import { MetasTab } from "./tabs/MetasTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
+import { PermissoesTab } from "./tabs/PermissoesTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
 import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
 import { AberturaFechamentoTab } from "./tabs/AberturaFechamentoTab.js";
@@ -22,7 +23,7 @@ import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "COPILOT_IA", label: "✦ ZoeIA (Copilot)" },
@@ -33,6 +34,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "FIDELIDADE", label: "Fidelidade" },
   { value: "METAS", label: "Metas" },
   { value: "COLABORADORES", label: "Colaboradores" },
+  { value: "PERMISSOES", label: "Permissões" },
   { value: "CLIENTES", label: "Clientes" },
   { value: "TALENTOS", label: "Banco de Talentos" },
   { value: "FOLHA", label: "Folha de Pagamento" },
@@ -54,6 +56,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
   FIDELIDADE: "Recompensas automáticas para clientes recorrentes.",
   METAS: "Regras de bonificação da equipe quando a meta diária é batida. Meta de faturamento e horário de fechamento continuam por unidade, em Configurações.",
   COLABORADORES: "Cadastro único de toda a equipe — escolha em qual(is) unidade(s) cada colaborador atua.",
+  PERMISSOES: "Escolha o nível mínimo de acesso (Operador, Líder ou Owner) exigido para cada ação do sistema.",
   CLIENTES: "Base de dados unificada de responsáveis e crianças cadastradas em todas as unidades da rede — consulte histórico de visitas, CPF e contatos.",
   TALENTOS: "Candidaturas recebidas pelo formulário \"Venha Fazer Parte do Nosso Time\" da landing page — analise o currículo e atualize o status conforme a triagem avança.",
   FOLHA: "Extrato mensal de salários, dados bancários e fechamento da folha para conferência e exportação/Bradesco.",
@@ -106,33 +109,42 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
 
       <main style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         <RequireCapability capability="config.write">
-          <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
+          <div className="gerencial-shell" style={{ padding: "24px", maxWidth: "1100px", margin: "0 auto" }}>
             <h1 style={{ fontFamily: "var(--font-display)" }}>Gerencial</h1>
             <HelpText>
               Configurações macro, fora das 3 unidades — o que é cadastrado aqui aparece nas unidades escolhidas.
             </HelpText>
-            <Tabs value={tab} onChange={setTab} tabs={TABS} />
-            <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
 
-            <div role="tabpanel">
-              {tab === "COPILOT_IA" && <GeminiGerencialCopilot />}
-              {tab === "PLANOS" && <PlanosTab />}
-              {tab === "PACOTES" && <PacotesTab />}
-              {tab === "PRODUTOS" && <ProdutosTab />}
-              {tab === "CUPONS" && <CuponsTab />}
-              {tab === "FIDELIDADE" && <FidelidadeTab />}
-              {tab === "METAS" && <MetasTab />}
-              {tab === "COLABORADORES" && <ColaboradoresTab />}
-              {tab === "CLIENTES" && <ClientesTab />}
-              {tab === "TALENTOS" && <BancoTalentosTab />}
-              {tab === "FOLHA" && <FolhaPagamentoTab />}
-              {tab === "RELATORIOS" && <GerencialRelatorioTab />}
-              {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
-              {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
-              {tab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
-              {tab === "HISTORICO" && <HistoricoTab />}
-              {tab === "AUDITORIA" && <AuditoriaTab />}
-              {tab === "CONTRATO" && <ContratoTab />}
+            <div className="gerencial-body">
+              <div className="gerencial-tabs-col">
+                <Tabs value={tab} onChange={setTab} tabs={TABS} />
+              </div>
+
+              <div className="gerencial-content-col">
+                <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
+
+                <div role="tabpanel">
+                  {tab === "COPILOT_IA" && <GeminiGerencialCopilot />}
+                  {tab === "PLANOS" && <PlanosTab />}
+                  {tab === "PACOTES" && <PacotesTab />}
+                  {tab === "PRODUTOS" && <ProdutosTab />}
+                  {tab === "CUPONS" && <CuponsTab />}
+                  {tab === "FIDELIDADE" && <FidelidadeTab />}
+                  {tab === "METAS" && <MetasTab />}
+                  {tab === "COLABORADORES" && <ColaboradoresTab />}
+                  {tab === "PERMISSOES" && <PermissoesTab />}
+                  {tab === "CLIENTES" && <ClientesTab />}
+                  {tab === "TALENTOS" && <BancoTalentosTab />}
+                  {tab === "FOLHA" && <FolhaPagamentoTab />}
+                  {tab === "RELATORIOS" && <GerencialRelatorioTab />}
+                  {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
+                  {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
+                  {tab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
+                  {tab === "HISTORICO" && <HistoricoTab />}
+                  {tab === "AUDITORIA" && <AuditoriaTab />}
+                  {tab === "CONTRATO" && <ContratoTab />}
+                </div>
+              </div>
             </div>
           </div>
         </RequireCapability>

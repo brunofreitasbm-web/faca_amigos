@@ -5,6 +5,7 @@ import type { Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
 import { CashPaymentPad } from "../components/CashPaymentPad.js";
+import { openTapCharge, savePendingTap } from "../lib/infinitepayTap.js";
 
 interface CartLine {
   product: Product;
@@ -75,14 +76,36 @@ export function PdvScreen() {
     }
   }
 
+  function handleTapCharge() {
+    if (!unit || !employee || cart.length === 0 || (method !== "CREDITO" && method !== "DEBITO")) return;
+    const orderId = crypto.randomUUID();
+    savePendingTap(orderId, {
+      kind: "pdv",
+      unitId: unit.id,
+      employeeId: employee.id,
+      method,
+      amountCents: totalCents,
+      items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
+    });
+    openTapCharge({
+      amountCents: totalCents,
+      method,
+      orderId,
+      handle: import.meta.env.VITE_INFINITEPAY_HANDLE as string | undefined,
+      docNumber: unit.cnpj ?? undefined,
+    });
+  }
+
   if (!unit) return null;
 
+  const itemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+
   return (
-    <div style={{ display: "flex", gap: "24px", padding: "24px" }}>
+    <div className="pdv-shell" style={{ display: "flex", gap: "24px", padding: "24px" }}>
       <div style={{ flex: 2 }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>PDV</h1>
         <HelpText>Toque num produto para adicioná-lo ao carrinho, ao lado. Produtos sem estoque aparecem apagados.</HelpText>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px", marginTop: "16px" }}>
+        <div className="pdv-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px", marginTop: "16px" }}>
           {products.map((p) => (
             <Card key={p.id} onClick={() => p.stock > 0 && addToCart(p)} style={{ cursor: p.stock > 0 ? "pointer" : "not-allowed", opacity: p.stock > 0 ? 1 : 0.4, padding: "12px" }}>
               <div style={{ fontSize: "28px" }}>{p.emoji}</div>
@@ -94,7 +117,7 @@ export function PdvScreen() {
         </div>
       </div>
 
-      <Card style={{ flex: 1, padding: "16px", height: "fit-content" }}>
+      <Card id="pdv-cart-section" className="pdv-cart" style={{ flex: 1, padding: "16px", height: "fit-content" }}>
         <h2>Carrinho</h2>
         {cart.length === 0 && <p>Vazio</p>}
         {cart.map((line) => (
@@ -137,18 +160,46 @@ export function PdvScreen() {
         {method === "DINHEIRO" ? (
           <CashPaymentPad totalCents={totalCents} busy={busy || cart.length === 0 || hasOpenShift === false} onConfirm={() => confirm()} />
         ) : (
-          <Button
-            variant="primary"
-            fullWidth
-            loading={busy}
-            disabled={busy || cart.length === 0 || hasOpenShift === false}
-            onClick={confirm}
-            title="Confirmar a venda com o método selecionado"
-          >
-            Confirmar venda
-          </Button>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {(method === "CREDITO" || method === "DEBITO") && (
+              <Button
+                variant="secondary"
+                fullWidth
+                disabled={busy || cart.length === 0 || hasOpenShift === false}
+                onClick={handleTapCharge}
+                title="Cobrar por aproximação usando o celular/tablet como maquininha (InfiniteTap)"
+              >
+                📲 Cobrar com InfiniteTap
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              fullWidth
+              loading={busy}
+              disabled={busy || cart.length === 0 || hasOpenShift === false}
+              onClick={confirm}
+              title="Confirmar a venda com o método selecionado"
+            >
+              Confirmar venda
+            </Button>
+          </div>
         )}
       </Card>
+
+      {cart.length > 0 && (
+        <button
+          type="button"
+          className="pdv-cart-bar"
+          onClick={() => document.getElementById("pdv-cart-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          title="Ir para o carrinho"
+        >
+          <span>
+            🛒 {itemCount} {itemCount === 1 ? "item" : "itens"}
+          </span>
+          <span>{money(totalCents)}</span>
+          <span>Ver carrinho ▲</span>
+        </button>
+      )}
     </div>
   );
 }

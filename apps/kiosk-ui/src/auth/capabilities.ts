@@ -27,11 +27,38 @@ export const CAPABILITIES = [
   "config.unit.write",
   "config.fiscal.write",
   "config.terms.write",
+  "config.rbac.write",
   "talentos.read",
   "talentos.write",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
+
+/** Rótulo em PT-BR de cada capacidade, para a tela Gerencial > Permissões. */
+export const CAPABILITY_LABEL: Record<Capability, string> = {
+  "sessao.checkin": "Fazer check-in de sessão",
+  "sessao.checkout": "Fazer saída/check-out de sessão",
+  "sessao.cancel": "Cancelar sessão",
+  "sessao.change_plan": "Trocar o plano de uma sessão em andamento",
+  "pdv.sell": "Vender no PDV",
+  "venda.upsell": "Fazer upsell de venda",
+  "venda.estorno": "Estornar venda",
+  "caixa.open_close": "Abrir e fechar caixa",
+  "caixa.sangria": "Registrar sangria de caixa",
+  "desconto.manual": "Aplicar desconto manual",
+  "ponto.self": "Bater o próprio ponto",
+  "relatorio.read": "Ver relatórios",
+  "relatorio.ponto": "Ver espelho de ponto de colaboradores",
+  "config.read": "Ver Configurações",
+  "config.write": "Editar Configurações (planos, produtos, cupons etc.)",
+  "config.employees.write": "Editar cadastro de colaboradores",
+  "config.unit.write": "Editar dados da unidade",
+  "config.fiscal.write": "Editar dados fiscais",
+  "config.terms.write": "Editar Termos de Uso",
+  "config.rbac.write": "Editar permissões de cada papel (esta tela)",
+  "talentos.read": "Ver Banco de Talentos",
+  "talentos.write": "Editar Banco de Talentos",
+};
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
 export type Role = "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
@@ -55,8 +82,8 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const ROLE_DESCRIPTION: Record<Role, string> = {
   ESTAGIARIO: "Só acessa o Controle de Frequência. Não opera caixa, vendas nem check-in/saída.",
   OPERADOR: "Caixa e vendas. Não acessa Configurações.",
-  GERENTE: "Tudo do Operador, mais cancelamentos, sangrias, estornos e relatórios.",
-  ADMIN: "Acesso total, incluindo o menu Configurações.",
+  GERENTE: "Tudo do Operador, mais troca de planos, sangrias, estornos e relatórios.",
+  ADMIN: "Acesso total, incluindo cancelamento de sessões e o menu Configurações.",
 };
 
 /**

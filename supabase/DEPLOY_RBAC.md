@@ -60,8 +60,15 @@ Variável de ambiente nova (senão o CORS cai no fallback de localhost e o
 terminal em produção não consegue logar):
 
 ```bash
-supabase secrets set FUNCTIONS_ALLOWED_ORIGINS="https://app.institutofacaamigos.com.br,http://localhost:5173"
+supabase secrets set FUNCTIONS_ALLOWED_ORIGINS="https://app.institutofacaamigos.com.br,http://localhost:5173,http://127.0.0.1:7317,https://127.0.0.1:7317"
 ```
+
+⚠️ Inclua `http://127.0.0.1:7317` e `https://127.0.0.1:7317` na lista — é a
+origem do app Electron do quiosque (`apps/kiosk`), servido localmente pelo
+Fastify em 127.0.0.1:7317. Sem essas duas origens aqui, definir este secret
+quebra o login por PIN do quiosque físico contra o projeto de produção (o
+fallback embutido no código cobre isso, mas some assim que a variável é
+definida).
 
 ## 3. Front
 

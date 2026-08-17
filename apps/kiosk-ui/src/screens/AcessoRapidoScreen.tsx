@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Checkbox, DateInput, Input, HelpText, Tag, BrandLockup, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { Plan } from "../api/client.js";
+import type { Plan, Package } from "../api/client.js";
 import { AcompanharScreen } from "./AcompanharScreen.js";
 import { SENSORY_TAG_OPTIONS } from "./EntradaScreen.js";
 import {
@@ -23,8 +23,13 @@ type FormOptions = {
   unitName: string;
   activity: "PLAYGROUND" | "CARRINHO";
   plans: Array<Pick<Plan, "id" | "name" | "valueCents" | "durationValue" | "durationUnit" | "color">>;
+  /** Pacotes ativos da unidade — entram no mesmo seletor dos Planos, igual à Entrada (EntradaScreen). */
+  packages: Array<Pick<Package, "id" | "name" | "priceCents" | "includedMinutes" | "color">>;
   termsText: string;
 };
+
+/** Mesmo prefixo usado em EntradaScreen para distinguir Pacote de Plano num seletor único. */
+const PACKAGE_PREFIX = "PKG:";
 
 type ChildForm = {
   childName: string;
@@ -90,21 +95,36 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Não foi possível carregar o formulário."));
   }, [unitId]);
 
+  // Pacotes entram no mesmo seletor dos Planos, sem seção separada — cada
+  // um vira um Plan sintético (id prefixado), mesmo truque de EntradaScreen.
+  const selectablePlans: Array<Pick<Plan, "id" | "name" | "valueCents" | "durationValue" | "durationUnit" | "color">> = useMemo(() => {
+    if (!options) return [];
+    const packagePlans = options.packages.map((pkg) => ({
+      id: `${PACKAGE_PREFIX}${pkg.id}`,
+      name: pkg.name,
+      valueCents: pkg.priceCents,
+      durationValue: pkg.includedMinutes,
+      durationUnit: "MINUTO" as const,
+      color: pkg.color,
+    }));
+    return [...options.plans, ...packagePlans];
+  }, [options]);
+
   useEffect(() => {
     if (!options) return;
-    const selPlan = options.plans.find((p) => p.id === planId);
+    const selPlan = selectablePlans.find((p) => p.id === planId);
     generateMobileAcessoRapidoSuggestions({
       childrenCount: children.length,
       selectedPlanName: selPlan?.name,
       selectedPlanMinutes: selPlan ? planDurationMinutes(selPlan) : 30,
       unitName: options.unitName,
-      availablePlans: options.plans.map((p) => ({
+      availablePlans: selectablePlans.map((p) => ({
         name: p.name,
         minutes: planDurationMinutes(p),
         valueCents: p.valueCents,
       })),
     }).then(setZoeOffers);
-  }, [options, planId, children.length]);
+  }, [options, selectablePlans, planId, children.length]);
 
   // Enquanto aguarda o balcão confirmar: consulta pontual pelo `id`
   // devolvido no envio (não é uma listagem — ninguém mais enxerga este
@@ -182,10 +202,12 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const usingPackage = planId!.startsWith(PACKAGE_PREFIX);
       const res = await Api.preCheckinSubmit({
         unitId,
         activity: options.activity,
-        planId: planId!,
+        planId: usingPackage ? undefined : planId!,
+        packageId: usingPackage ? planId!.slice(PACKAGE_PREFIX.length) : undefined,
         children: children.map((c) => ({
           childName: c.childName.trim(),
           birthDate: c.birthDate,
@@ -445,7 +467,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
             <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
               <strong style={{ fontSize: "15px" }}>3. Qual plano combina mais? ⏰</strong>
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                {options.plans.map((plan) => {
+                {selectablePlans.map((plan) => {
                   const isSelected = planId === plan.id;
                   const isBestValue = plan.id === bestValuePlanId;
                   const discountedCents = discountPct > 0 ? Math.round((plan.valueCents * (100 - discountPct)) / 100) : plan.valueCents;

@@ -11,7 +11,7 @@ import type { OfflineFlushDetail } from "../lib/supabase/offlineQueue.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
-type CloseResult = { expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number> };
+type CloseResult = { expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number>; justifications: Record<string, string> };
 
 export function CaixaScreen() {
   const { unit, employee } = useAppState();
@@ -30,6 +30,7 @@ export function CaixaScreen() {
 
   const [closing, setClosing] = useState(false);
   const [declared, setDeclared] = useState<Record<string, string>>({ DINHEIRO: "0", PIX: "0", CREDITO: "0", DEBITO: "0" });
+  const [closeJustifications, setCloseJustifications] = useState<Record<string, string>>({});
   const [closeResult, setCloseResult] = useState<CloseResult | null>(null);
   const [refreshError, setRefreshError] = useState(false);
   // Enquanto isso está preenchido, o fechamento foi enviado mas ficou na fila
@@ -41,7 +42,7 @@ export function CaixaScreen() {
   const [envelopeModalOpen, setEnvelopeModalOpen] = useState(false);
   const [envelopeNum, setEnvelopeNum] = useState("");
   const [envelopeVal, setEnvelopeVal] = useState("0");
-  const [envelopeObs, setEnvelopeObs] = useState("");
+  const [envelopeFundoCaixa, setEnvelopeFundoCaixa] = useState("0");
   const [envelopePhoto, setEnvelopePhoto] = useState<File | null>(null);
   const [envelopeBusy, setEnvelopeBusy] = useState(false);
 
@@ -52,23 +53,32 @@ export function CaixaScreen() {
       alert("Informe um valor válido maior que zero para o envelope.");
       return;
     }
+    if (!envelopePhoto) {
+      alert("Anexe a foto do envelope antes de confirmar.");
+      return;
+    }
+    const fundoCaixaCents = Math.round(Number(envelopeFundoCaixa) * 100);
+    if (!Number.isFinite(fundoCaixaCents) || fundoCaixaCents < 0) {
+      alert("Informe um valor válido para o fundo de caixa.");
+      return;
+    }
     setEnvelopeBusy(true);
     try {
-      const photoUrl = envelopePhoto ? await Api.uploadEnvelopePhoto(unit.id, envelopePhoto) : undefined;
+      const photoUrl = await Api.uploadEnvelopePhoto(unit.id, envelopePhoto);
       await Api.cashMovement(shift.id, {
         employeeId: employee.id,
         kind: "SANGRIA",
         amountCents,
-        reason: envelopeObs || undefined,
         envelopeNumber: envelopeNum,
         photoUrl,
+        fundoCaixaCents,
       });
 
       alert(`Envelope #${envelopeNum} registrado com sucesso!`);
       setEnvelopeModalOpen(false);
       setEnvelopeNum("");
       setEnvelopeVal("0");
-      setEnvelopeObs("");
+      setEnvelopeFundoCaixa("0");
       setEnvelopePhoto(null);
       await refresh();
     } catch {
@@ -169,7 +179,13 @@ export function CaixaScreen() {
     try {
       const declaredCents: Record<string, number> = {};
       for (const [method, value] of Object.entries(declared)) declaredCents[method] = Math.round(Number(value) * 100);
-      const result = await Api.closeShift(shift.id, { employeeId: employee.id, declared: declaredCents });
+      const justificationsToSend: Record<string, string> = {};
+      for (const method of METHODS) {
+        const divergenceCents = (declaredCents[method] ?? 0) - expectedHint(method, revenue, movements);
+        const text = (closeJustifications[method] ?? "").trim();
+        if (divergenceCents !== 0 && text) justificationsToSend[method] = text;
+      }
+      const result = await Api.closeShift(shift.id, { employeeId: employee.id, declared: declaredCents, justifications: justificationsToSend });
       setCloseResult(result);
     } catch (err) {
       if (err instanceof OfflineQueuedError) {
@@ -231,13 +247,14 @@ export function CaixaScreen() {
               onChange={(e) => setEnvelopeVal(e.target.value)}
             />
             <Input
-              label="Motivo / Observação"
-              placeholder="Ex: Sangria para depósito no banco..."
-              value={envelopeObs}
-              onChange={(e) => setEnvelopeObs(e.target.value)}
+              label="Fundo de Caixa (R$)"
+              placeholder="Valor que fica na gaveta após a sangria"
+              type="number"
+              value={envelopeFundoCaixa}
+              onChange={(e) => setEnvelopeFundoCaixa(e.target.value)}
             />
             <div>
-              <label style={{ fontSize: "13px", fontWeight: "bold", display: "block", marginBottom: "4px" }}>Foto do Envelope (opcional — JPG ou PNG)</label>
+              <label style={{ fontSize: "13px", fontWeight: "bold", display: "block", marginBottom: "4px" }}>Foto do Envelope (obrigatória — JPG ou PNG)</label>
               <input
                 type="file"
                 accept="image/jpeg,image/png"
@@ -257,7 +274,14 @@ export function CaixaScreen() {
               <Button
                 variant="primary"
                 loading={envelopeBusy}
-                disabled={envelopeBusy || !envelopeNum || Number(envelopeVal) <= 0}
+                disabled={
+                  envelopeBusy ||
+                  !envelopeNum ||
+                  Number(envelopeVal) <= 0 ||
+                  !envelopePhoto ||
+                  Number.isNaN(Number(envelopeFundoCaixa)) ||
+                  Number(envelopeFundoCaixa) < 0
+                }
                 onClick={handleSaveEnvelope}
               >
                 💾 Confirmar Registro
@@ -279,7 +303,7 @@ export function CaixaScreen() {
           É preciso abrir o turno de caixa antes de vender no PDV ou fechar atendimentos. Informe quanto dinheiro
           (em espécie) já está na gaveta para começar — normalmente o troco combinado com a gerência.
         </HelpText>
-        <Input label="Troco inicial (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
+        <Input label="Fundo de Caixa (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
           Abrir turno
@@ -308,6 +332,7 @@ export function CaixaScreen() {
               <th style={{ textAlign: "right" }}>Esperado</th>
               <th style={{ textAlign: "right" }}>Declarado</th>
               <th style={{ textAlign: "right" }}>Diferença</th>
+              <th style={{ textAlign: "left" }}>Justificativa</th>
             </tr>
           </thead>
           <tbody>
@@ -330,12 +355,17 @@ export function CaixaScreen() {
                         enxergar a cor. */}
                     {balanced ? "✓ bateu" : `⚠ ${money(closeResult.divergence[method] ?? 0)}`}
                   </td>
+                  <td style={{ fontSize: "13px" }}>{balanced ? "—" : closeResult.justifications[method] ?? "—"}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-        <Button variant="primary" onClick={() => { setCloseResult(null); setClosing(false); refresh(); }} style={{ marginTop: "16px" }}>
+        <Button
+          variant="primary"
+          onClick={() => { setCloseResult(null); setClosing(false); setCloseJustifications({}); refresh(); }}
+          style={{ marginTop: "16px" }}
+        >
           Ir para novo turno
         </Button>
       </div>
@@ -343,6 +373,10 @@ export function CaixaScreen() {
   }
 
   if (closing) {
+    const canConfirmClose = METHODS.every((method) => {
+      const divergenceCents = Math.round(Number(declared[method]) * 100) - expectedHint(method, revenue, movements);
+      return divergenceCents === 0 || (closeJustifications[method] ?? "").trim().length >= 3;
+    });
     return (
       <div style={{ maxWidth: "420px", margin: "40px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
         {renderEnvelopeModal()}
@@ -353,19 +387,56 @@ export function CaixaScreen() {
           diferença aparece destacada depois de confirmar.
         </HelpText>
         <p>Digite o que foi contado por método (o sistema já mostra o esperado ao lado — sem fechamento cego):</p>
-        {METHODS.map((method) => (
-          <div key={method} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ width: "100px" }}>{method}</span>
-            <span style={{ width: "100px", color: "var(--text-secondary)" }}>
-              esperado {money(expectedHint(method, revenue, movements))}
-            </span>
-            <Input
-              type="number"
-              value={declared[method]}
-              onChange={(e) => setDeclared((prev) => ({ ...prev, [method]: e.target.value }))}
-            />
-          </div>
-        ))}
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left" }}>Método</th>
+              <th style={{ textAlign: "right" }}>Esperado</th>
+              <th style={{ textAlign: "right" }}>Declarado</th>
+              <th style={{ textAlign: "right" }}>Divergência</th>
+              <th style={{ textAlign: "left" }}>Justificativa</th>
+            </tr>
+          </thead>
+          <tbody>
+            {METHODS.map((method) => {
+              const expectedCents = expectedHint(method, revenue, movements);
+              const declaredCents = Math.round(Number(declared[method]) * 100);
+              const divergenceCents = declaredCents - expectedCents;
+              const hasDivergence = divergenceCents !== 0;
+              return (
+                <tr key={method}>
+                  <td>{method}</td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{money(expectedCents)}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <Input
+                      type="number"
+                      value={declared[method]}
+                      onChange={(e) => setDeclared((prev) => ({ ...prev, [method]: e.target.value }))}
+                    />
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                      color: hasDivergence ? "var(--color-error-text)" : "var(--color-teal-text)",
+                    }}
+                  >
+                    {hasDivergence ? money(divergenceCents) : "✓"}
+                  </td>
+                  <td>
+                    {hasDivergence && (
+                      <Input
+                        placeholder="Por que houve diferença? (mín. 3 caracteres)"
+                        value={closeJustifications[method] ?? ""}
+                        onChange={(e) => setCloseJustifications((prev) => ({ ...prev, [method]: e.target.value }))}
+                      />
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         {pendingCloseKey && (
           <p style={{ color: "var(--color-amber)" }}>
@@ -380,7 +451,7 @@ export function CaixaScreen() {
           <Button variant="secondary" onClick={() => setEnvelopeModalOpen(true)} disabled={busy || !!pendingCloseKey}>
             ✉️ Registrar Envelope
           </Button>
-          <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy || !!pendingCloseKey}>
+          <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy || !!pendingCloseKey || !canConfirmClose}>
             {pendingCloseKey ? "Aguardando conexão..." : "Confirmar fechamento"}
           </Button>
         </div>
@@ -564,26 +635,25 @@ export function CaixaScreen() {
         <Button
           variant="teal"
           size="sm"
-          onClick={() => {
+          onClick={async () => {
+            if (!unit) return;
             const loc = (document.getElementById("fa_locacoes") as HTMLInputElement)?.value;
             const v30 = (document.getElementById("fa_vendas30") as HTMLInputElement)?.value;
             const v1h = (document.getElementById("fa_vendas1h") as HTMLInputElement)?.value;
             const v2h = (document.getElementById("fa_vendas2h") as HTMLInputElement)?.value;
 
-            fetch("/api/caixa/bonificacao-diaria", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                unit_id: unit?.id,
-                employee_name: employee?.full_name,
-                locacoes_count: Number(loc),
-                vendas_30m: Number(v30),
-                vendas_1h: Number(v1h),
-                vendas_2h: Number(v2h),
-              }),
-            })
-              .then(() => alert("Lançamento de Bonificação FA salvo com sucesso!"))
-              .catch(() => alert("Lançamento registrado localmente."));
+            try {
+              await Api.saveDailyBonus({
+                unitId: unit.id,
+                locacoesCount: Number(loc),
+                vendas30m: Number(v30),
+                vendas1h: Number(v1h),
+                vendas2h: Number(v2h),
+              });
+              alert("Lançamento de Bonificação FA salvo com sucesso!");
+            } catch {
+              alert("Não foi possível salvar o lançamento. Tente novamente.");
+            }
           }}
           style={{ fontWeight: "bold" }}
         >

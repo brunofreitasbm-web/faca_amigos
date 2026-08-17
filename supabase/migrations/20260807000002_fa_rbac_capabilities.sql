@@ -43,13 +43,13 @@ insert into fa_kiosk_role_capabilities (role, capability) values
   ('OPERADOR', 'caixa.open_close'),
   ('OPERADOR', 'ponto.self'),
   -- Líder: operação estendida — as exceções que o Operador não decide sozinho.
-  ('GERENTE',  'sessao.cancel'),
   ('GERENTE',  'sessao.change_plan'),
   ('GERENTE',  'venda.estorno'),
   ('GERENTE',  'caixa.sangria'),
   ('GERENTE',  'desconto.manual'),
   ('GERENTE',  'relatorio.read'),
-  -- Owner: exclusividade do menu Configurações.
+  -- Owner: exclusividade de cancelamento de sessões e do menu Configurações.
+  ('ADMIN',    'sessao.cancel'),
   ('ADMIN',    'config.read'),
   ('ADMIN',    'config.write'),
   ('ADMIN',    'config.employees.write'),

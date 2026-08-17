@@ -647,6 +647,7 @@ export interface CashMovement {
   reason: string | null;
   envelope_number: string | null;
   photo_url: string | null;
+  fundo_caixa_cents: number | null;
   employee_id: string;
   at_ms: number;
 }
@@ -660,6 +661,7 @@ export interface UnitShiftRow {
   closed_at_ms: number | null;
   opened_by_employee_id: string;
   closed_by_employee_id: string | null;
+  close_justifications_json: Record<string, string> | null;
 }
 
 export interface EnvelopeMovement {
@@ -669,6 +671,7 @@ export interface EnvelopeMovement {
   reason: string | null;
   envelope_number: string | null;
   photo_url: string | null;
+  fundo_caixa_cents: number | null;
   employee_id: string;
   at_ms: number;
   fa_kiosk_shifts: { unit_id: string }[];
@@ -1450,6 +1453,8 @@ export const Api = {
       unitName: string;
       activity: "PLAYGROUND" | "CARRINHO";
       plans: Array<Pick<Plan, "id" | "name" | "valueCents" | "durationValue" | "durationUnit" | "color">>;
+      /** Pacotes ativos da unidade — aparecem no mesmo seletor dos Planos, igual à Entrada (EntradaScreen). */
+      packages: Array<Pick<Package, "id" | "name" | "priceCents" | "includedMinutes" | "color">>;
       termsText: string;
     }>(supabase().rpc("fa_pre_checkin_form_options", { p_unit_id: unitId })),
   /**
@@ -1463,7 +1468,9 @@ export const Api = {
   preCheckinSubmit: (body: {
     unitId: string;
     activity: "PLAYGROUND" | "CARRINHO";
-    planId: string;
+    /** Exatamente um dos dois — planId (permanência avulsa) ou packageId (pacote mensal). */
+    planId?: string;
+    packageId?: string;
     children: Array<{
       childName: string;
       birthDate: string;
@@ -1480,7 +1487,8 @@ export const Api = {
       supabase().rpc("fa_pre_checkin_submit", {
         p_unit_id: body.unitId,
         p_activity: body.activity,
-        p_plan_id: body.planId,
+        p_plan_id: body.planId ?? null,
+        p_package_id: body.packageId ?? null,
         p_children: body.children.map((c) => ({
           childName: c.childName,
           birthDate: c.birthDate,
@@ -1510,8 +1518,10 @@ export const Api = {
         childIndex: number;
         totalChildren: number;
         activity: "PLAYGROUND" | "CARRINHO";
-        planId: string;
-        planName: string;
+        planId: string | null;
+        planName: string | null;
+        packageId: string | null;
+        packageName: string | null;
         childName: string;
         birthDate: string;
         guardianName: string;
@@ -1565,7 +1575,12 @@ export const Api = {
       p_employee_id: body.employeeId,
       p_closed_at_ms: body.closedAtMs ?? null,
     }),
-  pdvOrder: (body: { unitId: string; employeeId: string; items: { productId: string; quantity: number }[]; payments: unknown[] }) =>
+  pdvOrder: (body: {
+    unitId: string;
+    employeeId: string;
+    items: { productId: string; quantity: number }[];
+    payments: { method: string; amountCents: number; nsu?: string; authorization?: string; pixTxid?: string }[];
+  }) =>
     callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_create_pdv_order", {
       p_unit_id: body.unitId,
       p_employee_id: body.employeeId,
@@ -1579,12 +1594,12 @@ export const Api = {
       p_employee_id: body.employeeId,
       p_opening_cash_cents: body.openingCashCents,
     }),
-  closeShift: (shiftId: string, body: { employeeId: string; declared: Record<string, number> }) =>
-    callResilient<{ expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number> }>(
+  closeShift: (shiftId: string, body: { employeeId: string; declared: Record<string, number>; justifications?: Record<string, string> }) =>
+    callResilient<{ expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number>; justifications: Record<string, string> }>(
       "fa_close_shift",
-      { p_shift_id: shiftId, p_employee_id: body.employeeId, p_declared: body.declared },
+      { p_shift_id: shiftId, p_employee_id: body.employeeId, p_declared: body.declared, p_justifications: body.justifications ?? {} },
     ),
-  cashMovement: (shiftId: string, body: { employeeId: string; kind: string; amountCents: number; reason?: string; envelopeNumber?: string; photoUrl?: string }) =>
+  cashMovement: (shiftId: string, body: { employeeId: string; kind: string; amountCents: number; reason?: string; envelopeNumber?: string; photoUrl?: string; fundoCaixaCents?: number }) =>
     callResilient("fa_record_cash_movement", {
       p_shift_id: shiftId,
       p_kind: body.kind,
@@ -1593,12 +1608,25 @@ export const Api = {
       p_employee_id: body.employeeId,
       p_envelope_number: body.envelopeNumber ?? null,
       p_photo_url: body.photoUrl ?? null,
+      p_fundo_caixa_cents: body.fundoCaixaCents ?? null,
+    }),
+  // Módulo FA — lançamento diário de locações/velocidade de atendimento
+  // (CaixaScreen.tsx, card "Bonificação Diária & Locações"). Upsert por
+  // unidade/funcionário/dia: reenviar no mesmo dia atualiza em vez de duplicar.
+  saveDailyBonus: (body: { unitId: string; locacoesCount: number; vendas30m: number; vendas1h: number; vendas2h: number }) =>
+    callResilient("fa_kiosk_save_daily_bonus", {
+      p_unit_id: body.unitId,
+      p_locacoes_count: body.locacoesCount,
+      p_vendas_30m: body.vendas30m,
+      p_vendas_1h: body.vendas1h,
+      p_vendas_2h: body.vendas2h,
+      p_now_ms: Date.now(),
     }),
   cashMovements: (shiftId: string) =>
     unwrap<CashMovement[]>(
       supabase()
         .from("fa_kiosk_cash_movements")
-        .select("id, kind, amount_cents, reason, envelope_number, photo_url, employee_id, at_ms")
+        .select("id, kind, amount_cents, reason, envelope_number, photo_url, fundo_caixa_cents, employee_id, at_ms")
         .eq("shift_id", shiftId)
         .order("at_ms", { ascending: true }),
     ),
@@ -1624,7 +1652,7 @@ export const Api = {
   unitShifts: (unitId: string | null) => {
     let query = supabase()
       .from("fa_kiosk_shifts")
-      .select("id, unit_id, status, opening_cash_cents, opened_at_ms, closed_at_ms, opened_by_employee_id, closed_by_employee_id")
+      .select("id, unit_id, status, opening_cash_cents, opened_at_ms, closed_at_ms, opened_by_employee_id, closed_by_employee_id, close_justifications_json")
       .order("opened_at_ms", { ascending: false })
       .limit(100);
     if (unitId) query = query.eq("unit_id", unitId);
@@ -1635,7 +1663,7 @@ export const Api = {
   envelopeMovements: (unitId: string | null) => {
     let query = supabase()
       .from("fa_kiosk_cash_movements")
-      .select("id, shift_id, amount_cents, reason, envelope_number, photo_url, employee_id, at_ms, fa_kiosk_shifts!inner(unit_id)")
+      .select("id, shift_id, amount_cents, reason, envelope_number, photo_url, fundo_caixa_cents, employee_id, at_ms, fa_kiosk_shifts!inner(unit_id)")
       .eq("kind", "SANGRIA")
       .not("envelope_number", "is", null)
       .order("at_ms", { ascending: false })
@@ -2301,6 +2329,13 @@ export const Api = {
     if (!data?.session) return [];
     return unwrap<{ capability: string }[]>(supabase().from("fa_kiosk_my_capabilities").select("capability")).catch(() => []);
   },
+
+  /** Matriz completa papel→capacidade — Gerencial > Permissões, exige `config.rbac.write`. */
+  roleCapabilities: () =>
+    unwrap<{ role: Employee["role"]; capability: string }[]>(supabase().rpc("fa_config_list_role_capabilities")),
+  /** Troca o papel mínimo dono de uma capacidade — Gerencial > Permissões. */
+  setCapabilityRole: (capability: string, role: Employee["role"]) =>
+    unwrap(supabase().rpc("fa_config_set_capability_role", { p_capability: capability, p_role: role })),
 
   // --- Configurações: unidade, fiscal e termos de uso -----------------------
   // Todas passam por RPC `fa_config_*`, que checa fa_kiosk_can() no servidor

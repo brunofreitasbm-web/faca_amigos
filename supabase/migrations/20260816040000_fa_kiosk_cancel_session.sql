@@ -14,3 +14,5 @@ begin
   perform fa_kiosk_log_session_event(p_session_id, 'CANCELADA', null, jsonb_build_object('reason', p_reason));
 end;
 $$ language plpgsql security definer;
+
+grant execute on function fa_kiosk_cancel_session(uuid, text) to authenticated;

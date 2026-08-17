@@ -3,17 +3,8 @@ import type { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import type { AppContext } from "./context.js";
-import { registerCatalogRoutes } from "./routes/catalog.js";
-import { registerCheckinRoutes } from "./routes/checkin.js";
-import { registerSessionRoutes } from "./routes/sessions.js";
-import { registerCheckoutRoutes } from "./routes/checkout.js";
-import { registerPdvRoutes } from "./routes/pdv.js";
-import { registerShiftRoutes } from "./routes/shifts.js";
 import { registerPontoRoutes } from "./routes/ponto.js";
 import { registerAuthRoutes } from "./routes/auth.js";
-import { registerReportRoutes } from "./routes/reports.js";
-import { registerAniversariosRoutes } from "./routes/aniversarios.js";
-import { registerCaixaFaRoutes } from "./routes/caixa-fa.js";
 import { registerShoppingRoutes } from "./routes/shopping.js";
 import { registerSecretVaultRoutes } from "./routes/secret-vault.js";
 import { registerTickChannel } from "./ws-tick.js";
@@ -77,17 +68,15 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
 
   app.get("/api/health", async () => ({ ok: true, nowMs: ctx.nowMs() }));
 
-  registerCatalogRoutes(app, ctx);
-  registerCheckinRoutes(app, ctx);
-  registerSessionRoutes(app, ctx);
-  registerCheckoutRoutes(app, ctx);
-  registerPdvRoutes(app, ctx);
-  registerShiftRoutes(app, ctx);
+  // catalog/checkin/checkout/pdv/shifts/sessions/reports/aniversarios/caixa-fa
+  // foram removidas daqui (raio-x de 2026-08-16): a SPA em apps/kiosk-ui
+  // migrou para o Supabase e nenhuma delas tinha chamador real, só os
+  // próprios testes injetando HTTP nelas mesmas. ponto/auth/shopping ficam
+  // por ora — risco trabalhista (ponto) e possível consumidor externo
+  // (auth/shopping validam bearer/api-key, típico de integração fora do
+  // monorepo) que não dava para descartar com o grep disponível aqui.
   registerPontoRoutes(app, ctx);
   registerAuthRoutes(app, ctx);
-  registerReportRoutes(app, ctx);
-  registerAniversariosRoutes(app, ctx);
-  registerCaixaFaRoutes(app, ctx);
   registerShoppingRoutes(app, ctx);
   registerSecretVaultRoutes(app, ctx);
   registerTickChannel(app, ctx);

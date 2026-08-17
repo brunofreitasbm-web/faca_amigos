@@ -105,6 +105,9 @@ export function FotosEnvelopeTab() {
                 <div>
                   <strong style={{ color: "var(--color-primary)" }}>✉️ #{m.envelope_number}</strong>
                   <div style={{ fontSize: "18px", fontWeight: "bold" }}>{money(m.amount_cents)}</div>
+                  {m.fundo_caixa_cents !== null && (
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Fundo de caixa: {money(m.fundo_caixa_cents)}</div>
+                  )}
                   <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{new Date(m.at_ms).toLocaleString("pt-BR")}</div>
                   <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{employeeNames[m.employee_id] ?? "—"}</div>
                   {m.reason && <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{m.reason}</div>}
