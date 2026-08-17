@@ -106,33 +106,41 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
 
       <main style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         <RequireCapability capability="config.write">
-          <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
+          <div className="gerencial-shell" style={{ padding: "24px", maxWidth: "1100px", margin: "0 auto" }}>
             <h1 style={{ fontFamily: "var(--font-display)" }}>Gerencial</h1>
             <HelpText>
               Configurações macro, fora das 3 unidades — o que é cadastrado aqui aparece nas unidades escolhidas.
             </HelpText>
-            <Tabs value={tab} onChange={setTab} tabs={TABS} />
-            <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
 
-            <div role="tabpanel">
-              {tab === "COPILOT_IA" && <GeminiGerencialCopilot />}
-              {tab === "PLANOS" && <PlanosTab />}
-              {tab === "PACOTES" && <PacotesTab />}
-              {tab === "PRODUTOS" && <ProdutosTab />}
-              {tab === "CUPONS" && <CuponsTab />}
-              {tab === "FIDELIDADE" && <FidelidadeTab />}
-              {tab === "METAS" && <MetasTab />}
-              {tab === "COLABORADORES" && <ColaboradoresTab />}
-              {tab === "PERMISSOES" && <PermissoesTab />}
-              {tab === "CLIENTES" && <ClientesTab />}
-              {tab === "TALENTOS" && <BancoTalentosTab />}
-              {tab === "FOLHA" && <FolhaPagamentoTab />}
-              {tab === "RELATORIOS" && <GerencialRelatorioTab />}
-              {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
-              {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
-              {tab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
-              {tab === "HISTORICO" && <HistoricoTab />}
-              {tab === "CONTRATO" && <ContratoTab />}
+            <div className="gerencial-body">
+              <div className="gerencial-tabs-col">
+                <Tabs value={tab} onChange={setTab} tabs={TABS} />
+              </div>
+
+              <div className="gerencial-content-col">
+                <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
+
+                <div role="tabpanel">
+                  {tab === "COPILOT_IA" && <GeminiGerencialCopilot />}
+                  {tab === "PLANOS" && <PlanosTab />}
+                  {tab === "PACOTES" && <PacotesTab />}
+                  {tab === "PRODUTOS" && <ProdutosTab />}
+                  {tab === "CUPONS" && <CuponsTab />}
+                  {tab === "FIDELIDADE" && <FidelidadeTab />}
+                  {tab === "METAS" && <MetasTab />}
+                  {tab === "COLABORADORES" && <ColaboradoresTab />}
+                  {tab === "PERMISSOES" && <PermissoesTab />}
+                  {tab === "CLIENTES" && <ClientesTab />}
+                  {tab === "TALENTOS" && <BancoTalentosTab />}
+                  {tab === "FOLHA" && <FolhaPagamentoTab />}
+                  {tab === "RELATORIOS" && <GerencialRelatorioTab />}
+                  {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
+                  {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
+                  {tab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
+                  {tab === "HISTORICO" && <HistoricoTab />}
+                  {tab === "CONTRATO" && <ContratoTab />}
+                </div>
+              </div>
             </div>
           </div>
         </RequireCapability>
