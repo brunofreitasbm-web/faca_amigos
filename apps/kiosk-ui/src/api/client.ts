@@ -1438,6 +1438,8 @@ export const Api = {
       unitName: string;
       activity: "PLAYGROUND" | "CARRINHO";
       plans: Array<Pick<Plan, "id" | "name" | "valueCents" | "durationValue" | "durationUnit" | "color">>;
+      /** Pacotes ativos da unidade — aparecem no mesmo seletor dos Planos, igual à Entrada (EntradaScreen). */
+      packages: Array<Pick<Package, "id" | "name" | "priceCents" | "includedMinutes" | "color">>;
       termsText: string;
     }>(supabase().rpc("fa_pre_checkin_form_options", { p_unit_id: unitId })),
   /**
@@ -1451,7 +1453,9 @@ export const Api = {
   preCheckinSubmit: (body: {
     unitId: string;
     activity: "PLAYGROUND" | "CARRINHO";
-    planId: string;
+    /** Exatamente um dos dois — planId (permanência avulsa) ou packageId (pacote mensal). */
+    planId?: string;
+    packageId?: string;
     children: Array<{
       childName: string;
       birthDate: string;
@@ -1468,7 +1472,8 @@ export const Api = {
       supabase().rpc("fa_pre_checkin_submit", {
         p_unit_id: body.unitId,
         p_activity: body.activity,
-        p_plan_id: body.planId,
+        p_plan_id: body.planId ?? null,
+        p_package_id: body.packageId ?? null,
         p_children: body.children.map((c) => ({
           childName: c.childName,
           birthDate: c.birthDate,
@@ -1498,8 +1503,10 @@ export const Api = {
         childIndex: number;
         totalChildren: number;
         activity: "PLAYGROUND" | "CARRINHO";
-        planId: string;
-        planName: string;
+        planId: string | null;
+        planName: string | null;
+        packageId: string | null;
+        packageName: string | null;
         childName: string;
         birthDate: string;
         guardianName: string;

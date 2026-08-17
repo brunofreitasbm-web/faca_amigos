@@ -279,7 +279,7 @@ export function EntradaScreen({
     setGuardianName(prefill.guardianName);
     setCpf(prefill.cpf ? formatCpf(prefill.cpf) : "");
     setPhone(formatPhoneBr(prefill.phoneE164));
-    setPlanId(prefill.planId);
+    setPlanId(prefill.packageId ? `${PACKAGE_PREFIX}${prefill.packageId}` : prefill.planId);
     setIsNeurodivergent(prefill.inclusiveEligible || (prefill.sensoryTags?.length ?? 0) > 0);
     setSelectedSensoryTags(prefill.sensoryTags ?? []);
     setCustomNotes(prefill.notes ?? "");
@@ -591,7 +591,7 @@ export function EntradaScreen({
           cpf: normalizeCpf(cpf),
           phoneE164: normalizePhoneE164(phone),
         },
-        couponCode: usingHourBank || usingPackage ? undefined : couponCode || undefined,
+        couponCode: usingHourBank ? undefined : couponCode || undefined,
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
         preCheckinId: preCheckinId ?? undefined,
@@ -988,12 +988,7 @@ export function EntradaScreen({
               remainingMinutes === null ||
               minutes <= remainingMinutes ||
               ((minutes > threshold || isPackage) && remainingMinutes > 0);
-            // Cupom nunca se aplica a Pacote (submit() já descarta o código
-            // nesse caso) — mostrar preço com desconto aqui enganaria o
-            // operador sobre o valor que será cobrado de verdade.
-            const discountInfo = isPackage
-              ? { finalCents: plan.valueCents, originalCents: plan.valueCents, discountText: null }
-              : getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
+            const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
             return (
               <Card
                 key={plan.id}
@@ -1266,9 +1261,7 @@ export function EntradaScreen({
             ? " — Banco de horas (R$ 0,00)"
             : selectedPlan
               ? ` — ${money(
-                  (usingPackage
-                    ? selectedPlan.valueCents
-                    : getPlanDiscountedCents(selectedPlan.valueCents, couponCode, coupons, selectedPlan.id).finalCents) +
+                  getPlanDiscountedCents(selectedPlan.valueCents, couponCode, coupons, selectedPlan.id).finalCents +
                     (quickUpsellAccepted && quickProduct ? quickProduct.price_cents : 0),
                 )}`
               : ""}
