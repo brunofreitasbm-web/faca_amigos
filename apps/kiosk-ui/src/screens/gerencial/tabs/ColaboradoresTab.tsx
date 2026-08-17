@@ -97,6 +97,42 @@ export function ColaboradoresTab() {
     toast.success("Link copiado.");
   }
 
+  // Link Geral de auto-cadastro de estagiário: token fixo por unidade —
+  // sempre ESTAGIARIO, liberado na hora que a pessoa preenche (sem fila de
+  // aprovação). Diferente do convite individual, é idempotente: reabrir o
+  // modal para a mesma unidade devolve o MESMO link, nunca gera outro.
+  const [showGeneralInviteModal, setShowGeneralInviteModal] = useState(false);
+  const [generalInviteUnitId, setGeneralInviteUnitId] = useState(units[0]?.id ?? "");
+  const [generalInviteBusy, setGeneralInviteBusy] = useState(false);
+  const [generalInviteError, setGeneralInviteError] = useState<string | null>(null);
+  const [generalInviteLink, setGeneralInviteLink] = useState<string | null>(null);
+
+  function closeGeneralInviteModal() {
+    setShowGeneralInviteModal(false);
+    setGeneralInviteError(null);
+    setGeneralInviteLink(null);
+  }
+
+  async function fetchGeneralInvite() {
+    if (!generalInviteUnitId) return;
+    setGeneralInviteBusy(true);
+    setGeneralInviteError(null);
+    try {
+      const { unitId, token } = await Api.generalInviteLink(generalInviteUnitId);
+      setGeneralInviteLink(`${window.location.origin}${window.location.pathname}?cadastro-estagiario=${unitId}.${token}`);
+    } catch (err) {
+      setGeneralInviteError(err instanceof Error ? err.message : "Não foi possível gerar o link");
+    } finally {
+      setGeneralInviteBusy(false);
+    }
+  }
+
+  async function copyGeneralInviteLink() {
+    if (!generalInviteLink) return;
+    await navigator.clipboard.writeText(generalInviteLink);
+    toast.success("Link copiado.");
+  }
+
   function load() {
     Api.allEmployees().then(setEmployees);
     // Quem já completou o auto-cadastro de RH (módulo "Cadastro de
@@ -108,6 +144,9 @@ export function ColaboradoresTab() {
   }
   useEffect(load, []);
   useEffect(() => setUnitIds(units.map((u) => u.id)), [units]);
+  useEffect(() => {
+    if (!generalInviteUnitId && units[0]) setGeneralInviteUnitId(units[0].id);
+  }, [units, generalInviteUnitId]);
 
   function resetForm() {
     setFullName("");
@@ -239,6 +278,9 @@ export function ColaboradoresTab() {
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <Button variant="secondary" onClick={() => setShowInviteModal(true)} style={{ borderRadius: "9999px" }}>
               🔗 Gerar link de cadastro
+            </Button>
+            <Button variant="secondary" onClick={() => setShowGeneralInviteModal(true)} style={{ borderRadius: "9999px" }}>
+              🎓 Link Geral de Estagiário
             </Button>
             <Button variant="primary" onClick={() => setShowForm(true)} style={{ borderRadius: "9999px" }}>
               ⚡ + Novo colaborador rápido
@@ -421,6 +463,54 @@ export function ColaboradoresTab() {
                     📋 Copiar link
                   </Button>
                   <Button variant="ghost" onClick={closeInviteModal}>
+                    Fechar
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {showGeneralInviteModal && (
+        <Modal onClose={closeGeneralInviteModal} title="🎓 Link Geral de Estagiário">
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {!generalInviteLink ? (
+              <>
+                <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
+                  Link fixo por unidade — pode divulgar livremente (grupo do WhatsApp, cartaz). Quem abrir preenche os
+                  próprios dados, escolhe o PIN e já entra como Estagiário, sem fila de aprovação. Reabrir aqui mostra
+                  sempre o mesmo link.
+                </p>
+                <Select label="Unidade *" value={generalInviteUnitId} onChange={(e) => setGeneralInviteUnitId(e.target.value)}>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </Select>
+                {generalInviteError && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{generalInviteError}</p>}
+                <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                  <Button variant="primary" disabled={generalInviteBusy || !generalInviteUnitId} onClick={fetchGeneralInvite} style={{ borderRadius: "9999px", flex: 1 }}>
+                    {generalInviteBusy ? "Gerando…" : "Gerar link"}
+                  </Button>
+                  <Button variant="ghost" onClick={closeGeneralInviteModal}>
+                    Cancelar
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
+                  Não expira e não é de uso único — qualquer pessoa com o link vira Estagiário nesta unidade assim que
+                  preencher o cadastro.
+                </p>
+                <Input label="Link de cadastro" value={generalInviteLink} readOnly onFocus={(e) => e.target.select()} />
+                <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                  <Button variant="primary" onClick={copyGeneralInviteLink} style={{ borderRadius: "9999px", flex: 1 }}>
+                    📋 Copiar link
+                  </Button>
+                  <Button variant="ghost" onClick={closeGeneralInviteModal}>
                     Fechar
                   </Button>
                 </div>

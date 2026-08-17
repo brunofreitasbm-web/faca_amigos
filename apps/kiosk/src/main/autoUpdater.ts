@@ -3,11 +3,28 @@ import electronUpdater from "electron-updater";
 
 const { autoUpdater } = electronUpdater;
 
+let initialized = false;
+
+/**
+ * Dispara uma verificação (e, se houver versão nova, download em segundo
+ * plano). Chamado na abertura do app e de novo antes de fechar — assim a
+ * atualização baixada fica pronta e o autoInstallOnAppQuit instala no
+ * fechamento seguinte, sem depender do intervalo de 4h que existia antes.
+ */
+export function checkForUpdates(): void {
+  if (!app.isPackaged) return;
+  void autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+    console.warn("[auto-updater] Falha ao verificar atualizações:", err);
+  });
+}
+
 export function initAutoUpdater(): void {
   if (!app.isPackaged) {
     console.log("[auto-updater] Ignorado em ambiente de desenvolvimento.");
     return;
   }
+  if (initialized) return;
+  initialized = true;
 
   const customFeedUrl = process.env.FACAAMIGOS_UPDATE_URL;
   if (customFeedUrl) {
@@ -50,14 +67,7 @@ export function initAutoUpdater(): void {
     console.log(`[auto-updater] Versão ${info.version} baixada e pronta para ser aplicada ao fechar o app.`);
   });
 
-  // Executa uma verificação inicial e depois a cada 4 horas
-  void autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-    console.warn("[auto-updater] Falha ao verificar atualizações:", err);
-  });
-
-  setInterval(() => {
-    void autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      console.warn("[auto-updater] Falha periódica ao verificar atualizações:", err);
-    });
-  }, 4 * 60 * 60 * 1000);
+  // Verificação inicial na abertura do app (a de fechamento é disparada
+  // por checkForUpdates() a partir do main.ts, no window-all-closed).
+  checkForUpdates();
 }

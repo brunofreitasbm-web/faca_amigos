@@ -38,3 +38,14 @@ verify_jwt = false
 
 [functions.onboarding-complete]
 verify_jwt = false
+
+# Link Geral de auto-cadastro de estagiário: mesmo espírito acima, mas o
+# token é fixo por unidade (ver fa_kiosk_unit_general_invites), conferido em
+# supabase/functions/_shared/generalInvite.ts. general-invite-link NÃO
+# entra aqui: quem gera/consulta o link já está logado com
+# config.employees.write.
+[functions.general-invite-info]
+verify_jwt = false
+
+[functions.general-onboarding-complete]
+verify_jwt = false

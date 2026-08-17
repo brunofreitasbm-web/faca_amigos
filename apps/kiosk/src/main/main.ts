@@ -9,7 +9,7 @@ import { loadOrCreateTls } from "../server/tls.js";
 import { startPrintBridge } from "./printBridge.js";
 import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
-import { initAutoUpdater } from "./autoUpdater.js";
+import { initAutoUpdater, checkForUpdates } from "./autoUpdater.js";
 
 /**
  * O bundle é puro esbuild sem `dotenv` — sem isto, `apps/kiosk/.env`
@@ -258,6 +258,7 @@ if (isPrimaryInstance) {
   });
 
   app.on("window-all-closed", () => {
+    if (app.isPackaged) checkForUpdates();
     if (process.platform !== "darwin") app.quit();
   });
 }

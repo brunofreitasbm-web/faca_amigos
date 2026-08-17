@@ -1,5 +1,59 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { jsonResponse, preflight, requireWebhookSecret } from "../_shared/http.ts";
+
+// CORS/JSON/segredo de webhook inline em vez de importar ../_shared/http.ts
+// — mesmo motivo de push-alert-dispatch/owner-report-dispatch: o import
+// relativo pro _shared causa falha de bundling no deploy via MCP (o
+// arquivo fica fora da raiz enviada para a function).
+const FALLBACK_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:4173",
+  "https://kiosk-ui.vercel.app",
+  "https://app.institutofacaamigos.com.br",
+  "http://127.0.0.1:7317",
+  "https://127.0.0.1:7317",
+];
+
+function allowedOrigins(): string[] {
+  const raw = Deno.env.get("FUNCTIONS_ALLOWED_ORIGINS");
+  if (!raw) return FALLBACK_ORIGINS;
+  return raw.split(",").map((o) => o.trim()).filter(Boolean);
+}
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allowed = allowedOrigins();
+  return {
+    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : allowed[0]!,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
+}
+
+function jsonResponse(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders(req) },
+  });
+}
+
+function preflight(req: Request): Response | null {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
+  return null;
+}
+
+function requireWebhookSecret(req: Request, envVarName: string): Response | null {
+  const expected = Deno.env.get(envVarName);
+  if (!expected) {
+    console.error(`${envVarName} não configurado — recusando chamada por padrão seguro`);
+    return jsonResponse(req, { error: "webhook não configurado" }, 503);
+  }
+  const provided = req.headers.get("x-webhook-secret");
+  if (provided !== expected) {
+    return jsonResponse(req, { error: "não autorizado" }, 401);
+  }
+  return null;
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

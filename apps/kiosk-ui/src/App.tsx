@@ -28,6 +28,7 @@ import { ROLE_LABEL } from "./auth/capabilities.js";
 import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { OnboardingInviteScreen } from "./screens/OnboardingInviteScreen.js";
+import { GeneralOnboardingScreen } from "./screens/GeneralOnboardingScreen.js";
 import { AcompanharScreen } from "./screens/AcompanharScreen.js";
 import { AcessoRapidoScreen } from "./screens/AcessoRapidoScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
@@ -210,6 +211,16 @@ export function App() {
   if (inviteParam) {
     const [inviteId, token] = inviteParam.split(".");
     if (inviteId && token) return <OnboardingInviteScreen inviteId={inviteId} token={token} />;
+  }
+
+  // Link Geral de auto-cadastro de estagiário (?cadastro-estagiario=<unitId>.<token>):
+  // token fixo por unidade (ver botão na ColaboradoresTab), quem abre ainda
+  // não tem NENHUMA conta — mesmo cuidado do branch `?convite=` acima, tem
+  // que vir antes de qualquer checagem de sessão salva.
+  const cadastroEstagiarioParam = new URLSearchParams(window.location.search).get("cadastro-estagiario");
+  if (cadastroEstagiarioParam) {
+    const [unitId, token] = cadastroEstagiarioParam.split(".");
+    if (unitId && token) return <GeneralOnboardingScreen unitId={unitId} token={token} />;
   }
 
   // Painel do responsável (?acompanhar=<access_code>): quem abre é o pai/mãe

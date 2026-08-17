@@ -225,6 +225,26 @@ export interface OnboardingCompleteInput {
   bankContaDv?: string;
 }
 
+export interface GeneralInviteLink {
+  unitId: string;
+  token: string;
+}
+
+export interface GeneralInviteInfo {
+  unitName: string | null;
+}
+
+export interface GeneralOnboardingCompleteInput {
+  unitId: string;
+  token: string;
+  fullName: string;
+  cpf?: string;
+  email?: string;
+  phone?: string;
+  birthDate?: string;
+  pin: string;
+}
+
 export interface NewEmployeeInput {
   fullName: string;
   role: Employee["role"];
@@ -1901,7 +1921,7 @@ export const Api = {
     const rows = await unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_ocorrencias")
-        .select("id, employee_id, unit_id, tipo, days_away, document_path, notes, created_at_ms, fa_kiosk_employees(full_name)")
+        .select("id, employee_id, unit_id, tipo, days_away, document_path, notes, created_at_ms, fa_kiosk_employees!fa_kiosk_ocorrencias_employee_id_fkey(full_name)")
         .eq("unit_id", unitId)
         .order("created_at_ms", { ascending: false }),
     );
@@ -1921,7 +1941,7 @@ export const Api = {
   frequenciaRecords: async (unitId: string | null, fromMs: number, toMs: number) => {
     let query = supabase()
       .from("fa_kiosk_ponto_records")
-      .select("id, employee_id, unit_id, kind, nsr, at_ms, punch_photo_path, fa_kiosk_employees(full_name, role)")
+      .select("id, employee_id, unit_id, kind, nsr, at_ms, punch_photo_path, fa_kiosk_employees!fa_kiosk_ponto_records_employee_id_fkey(full_name, role)")
       .gte("at_ms", fromMs)
       .lte("at_ms", toMs)
       .order("at_ms", { ascending: false });
@@ -2408,6 +2428,19 @@ export const Api = {
     ),
   onboardingComplete: (body: OnboardingCompleteInput) =>
     unwrap<{ id: string }>(supabase().functions.invoke("onboarding-complete", { body })),
+
+  // Link Geral de auto-cadastro de estagiário — token fixo por unidade, ver
+  // supabase/functions/general-invite-link. generalInviteLink exige sessão
+  // com config.employees.write (JWT); as outras duas rodam ANTES de
+  // qualquer conta existir (anon, ver supabase/config.toml).
+  generalInviteLink: (unitId: string) =>
+    unwrap<GeneralInviteLink>(supabase().functions.invoke("general-invite-link", { body: { unitId } })),
+  generalInviteInfo: (unitId: string, token: string) =>
+    unwrap<GeneralInviteInfo>(
+      supabase().functions.invoke("general-invite-info", { body: { unitId, token } }),
+    ),
+  generalOnboardingComplete: (body: GeneralOnboardingCompleteInput) =>
+    unwrap<{ id: string }>(supabase().functions.invoke("general-onboarding-complete", { body })),
 
   /**
    * Colaborador correspondente à sessão do Supabase Auth atual. É daqui
