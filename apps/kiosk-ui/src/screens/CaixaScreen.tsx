@@ -564,26 +564,25 @@ export function CaixaScreen() {
         <Button
           variant="teal"
           size="sm"
-          onClick={() => {
+          onClick={async () => {
+            if (!unit) return;
             const loc = (document.getElementById("fa_locacoes") as HTMLInputElement)?.value;
             const v30 = (document.getElementById("fa_vendas30") as HTMLInputElement)?.value;
             const v1h = (document.getElementById("fa_vendas1h") as HTMLInputElement)?.value;
             const v2h = (document.getElementById("fa_vendas2h") as HTMLInputElement)?.value;
 
-            fetch("/api/caixa/bonificacao-diaria", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                unit_id: unit?.id,
-                employee_name: employee?.full_name,
-                locacoes_count: Number(loc),
-                vendas_30m: Number(v30),
-                vendas_1h: Number(v1h),
-                vendas_2h: Number(v2h),
-              }),
-            })
-              .then(() => alert("Lançamento de Bonificação FA salvo com sucesso!"))
-              .catch(() => alert("Lançamento registrado localmente."));
+            try {
+              await Api.saveDailyBonus({
+                unitId: unit.id,
+                locacoesCount: Number(loc),
+                vendas30m: Number(v30),
+                vendas1h: Number(v1h),
+                vendas2h: Number(v2h),
+              });
+              alert("Lançamento de Bonificação FA salvo com sucesso!");
+            } catch {
+              alert("Não foi possível salvar o lançamento. Tente novamente.");
+            }
           }}
           style={{ fontWeight: "bold" }}
         >

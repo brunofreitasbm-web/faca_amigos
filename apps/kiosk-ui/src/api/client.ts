@@ -1589,6 +1589,18 @@ export const Api = {
       p_envelope_number: body.envelopeNumber ?? null,
       p_photo_url: body.photoUrl ?? null,
     }),
+  // Módulo FA — lançamento diário de locações/velocidade de atendimento
+  // (CaixaScreen.tsx, card "Bonificação Diária & Locações"). Upsert por
+  // unidade/funcionário/dia: reenviar no mesmo dia atualiza em vez de duplicar.
+  saveDailyBonus: (body: { unitId: string; locacoesCount: number; vendas30m: number; vendas1h: number; vendas2h: number }) =>
+    callResilient("fa_kiosk_save_daily_bonus", {
+      p_unit_id: body.unitId,
+      p_locacoes_count: body.locacoesCount,
+      p_vendas_30m: body.vendas30m,
+      p_vendas_1h: body.vendas1h,
+      p_vendas_2h: body.vendas2h,
+      p_now_ms: Date.now(),
+    }),
   cashMovements: (shiftId: string) =>
     unwrap<CashMovement[]>(
       supabase()
