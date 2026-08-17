@@ -55,8 +55,8 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const ROLE_DESCRIPTION: Record<Role, string> = {
   ESTAGIARIO: "Só acessa o Controle de Frequência. Não opera caixa, vendas nem check-in/saída.",
   OPERADOR: "Caixa e vendas. Não acessa Configurações.",
-  GERENTE: "Tudo do Operador, mais cancelamentos, sangrias, estornos e relatórios.",
-  ADMIN: "Acesso total, incluindo o menu Configurações.",
+  GERENTE: "Tudo do Operador, mais troca de planos, sangrias, estornos e relatórios.",
+  ADMIN: "Acesso total, incluindo cancelamento de sessões e o menu Configurações.",
 };
 
 /**
