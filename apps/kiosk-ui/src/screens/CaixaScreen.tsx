@@ -303,7 +303,7 @@ export function CaixaScreen() {
           É preciso abrir o turno de caixa antes de vender no PDV ou fechar atendimentos. Informe quanto dinheiro
           (em espécie) já está na gaveta para começar — normalmente o troco combinado com a gerência.
         </HelpText>
-        <Input label="Troco inicial (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
+        <Input label="Fundo de Caixa (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
           Abrir turno

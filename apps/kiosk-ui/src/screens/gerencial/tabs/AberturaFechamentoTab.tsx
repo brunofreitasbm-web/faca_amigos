@@ -89,7 +89,7 @@ export function AberturaFechamentoTab() {
                 <th style={{ padding: "8px" }}>Status</th>
                 <th style={{ padding: "8px" }}>Abertura</th>
                 <th style={{ padding: "8px" }}>Aberto por</th>
-                <th style={{ padding: "8px" }}>Troco Inicial</th>
+                <th style={{ padding: "8px" }}>Fundo de Caixa</th>
                 <th style={{ padding: "8px" }}>Fechamento</th>
                 <th style={{ padding: "8px" }}>Fechado por</th>
                 <th style={{ padding: "8px" }}>Justificativas</th>
