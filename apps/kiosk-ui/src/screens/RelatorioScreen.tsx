@@ -9,6 +9,7 @@ import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import { money } from "../format.js";
 import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { AssetUsageChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
+import { exportFrequenciaCsv } from "../lib/csvExport.js";
 
 type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 export type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
@@ -824,7 +825,12 @@ function PontoTab({ from, to }: { from: string; to: string }) {
         </table>
       </Card>
 
-      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Marcações (registro de auditoria)</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+        <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Marcações (registro de auditoria)</h3>
+        <Button variant="secondary" size="sm" disabled={rows.length === 0} onClick={() => exportFrequenciaCsv(rows)}>
+          ⬇️ Exportar CSV
+        </Button>
+      </div>
       <Card style={{ padding: "8px", marginTop: "16px", overflowX: "auto" }}>
         <table className="report-table">
           <thead>

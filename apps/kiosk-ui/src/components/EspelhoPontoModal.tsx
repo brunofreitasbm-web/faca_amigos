@@ -279,7 +279,7 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
             <div><strong>CTPS:</strong> {formatCtps(data.employee.ctps_numero, data.employee.ctps_serie, data.employee.ctps_uf)}</div>
             <div><strong>Data de nascimento:</strong> {formatDate(data.employee.birth_date)}</div>
             <div><strong>Data de admissão:</strong> {formatDate(data.employee.admission_date)}</div>
-            <div><strong>Função:</strong> {data.employee.position ?? ROLE_LABEL[data.employee.role]}</div>
+            <div><strong>Permissão:</strong> {ROLE_LABEL[data.employee.role]}</div>
             <div><strong>Jornada semanal contratada:</strong> {data.employee.weekly_hours_contracted ?? "—"}h</div>
           </div>
 

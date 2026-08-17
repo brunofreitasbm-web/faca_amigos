@@ -23,6 +23,7 @@ const GROUP_LABEL: Record<string, string> = {
   relatorio: "Relatórios",
   config: "Configurações",
   talentos: "Banco de Talentos",
+  ocorrencias: "Ocorrências",
 };
 
 function groupOf(capability: string): string {

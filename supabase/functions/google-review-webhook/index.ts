@@ -5,6 +5,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 interface WebhookBody {
   guardian_id: string;
+  // Opcionais — caller antigo (só cupom de 5 estrelas) não manda nenhum
+  // dos dois. Quando `rating` vem preenchido e <= 3, a avaliação é só
+  // registrada (fa_kiosk_google_reviews, trigger notifica o Owner) e o
+  // fluxo de cupom abaixo é pulado — nota baixa não ganha desconto.
+  rating?: number;
+  comment?: string;
 }
 
 Deno.serve(async (req) => {
@@ -56,6 +62,25 @@ Deno.serve(async (req) => {
 
   if (!unitData) {
     return jsonResponse(req, { error: "unidade circuito não encontrada" }, 404);
+  }
+
+  const rating = typeof body.rating === "number" ? Math.round(body.rating) : null;
+  if (rating !== null && (rating < 1 || rating > 5)) {
+    return jsonResponse(req, { error: "rating inválido" }, 400);
+  }
+
+  if (rating !== null && rating <= 3) {
+    const { error: reviewError } = await adminClient.from("fa_kiosk_google_reviews").insert({
+      unit_id: unitData.id,
+      guardian_id: body.guardian_id,
+      rating,
+      comment: body.comment ?? null,
+    });
+    if (reviewError) {
+      console.error("Erro ao registrar avaliação:", reviewError);
+      return jsonResponse(req, { error: "falha ao registrar avaliação" }, 500);
+    }
+    return jsonResponse(req, { success: true, message: "Avaliação registrada." });
   }
 
   const code = `5STARS_${body.guardian_id.substring(0, 8).toUpperCase()}`;

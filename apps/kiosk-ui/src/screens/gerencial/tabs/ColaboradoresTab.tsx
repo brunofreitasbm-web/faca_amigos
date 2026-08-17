@@ -5,8 +5,9 @@ import type { Employee, PersonalInfoStatus } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { useAuth } from "../../../auth/AuthContext.js";
-import { ROLE_LABEL, ROLE_DESCRIPTION, FUNCTION_OPTIONS } from "../../../auth/capabilities.js";
+import { ROLE_LABEL, ROLE_DESCRIPTION, ROLE_OPTIONS, type Role } from "../../../auth/capabilities.js";
 import { EspelhoPontoModal } from "../../../components/EspelhoPontoModal.js";
+import { FaceEnrollmentModal } from "../../../components/FaceEnrollmentModal.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
 import { dateBrFromIso } from "@facaamigos/domain";
 
@@ -19,6 +20,7 @@ export function ColaboradoresTab() {
   const [showForm, setShowForm] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [espelhoTarget, setEspelhoTarget] = useState<Employee | null>(null);
+  const [faceEnrollTarget, setFaceEnrollTarget] = useState<Employee | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -27,17 +29,15 @@ export function ColaboradoresTab() {
   const [pin, setPin] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [admissionDate, setAdmissionDate] = useState("");
-  const [functionKey, setFunctionKey] = useState<string>(FUNCTION_OPTIONS[0]!.value);
+  const [role, setRole] = useState<Role>("OPERADOR");
   const [contractType, setContractType] = useState<NonNullable<Employee["contract_type"]>>("CLT");
   const [weeklyHours, setWeeklyHours] = useState("44");
   const [unitIds, setUnitIds] = useState<string[]>(units.map((u) => u.id));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedFunction = FUNCTION_OPTIONS.find((f) => f.value === functionKey) ?? FUNCTION_OPTIONS[0]!;
-
-  function selectFunction(value: string) {
-    setFunctionKey(value);
+  function selectRole(value: Role) {
+    setRole(value);
     if (value === "ESTAGIARIO") setContractType("ESTAGIO");
   }
 
@@ -50,22 +50,21 @@ export function ColaboradoresTab() {
   const [unitsTargetIds, setUnitsTargetIds] = useState<string[]>([]);
   const [unitsBusy, setUnitsBusy] = useState(false);
 
-  // Link de convite individual: o Owner decide função/cargo/unidade(s)/
+  // Link de convite individual: o Owner decide permissão/unidade(s)/
   // admissão aqui — quem preenche o convite depois só completa os próprios
   // dados pessoais, nunca escolhe o próprio nível de acesso.
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteFunctionKey, setInviteFunctionKey] = useState<string>(FUNCTION_OPTIONS[0]!.value);
+  const [inviteRole, setInviteRole] = useState<Role>("OPERADOR");
   const [inviteUnitIds, setInviteUnitIds] = useState<string[]>(units.map((u) => u.id));
   const [inviteFullNameHint, setInviteFullNameHint] = useState("");
   const [inviteAdmissionDate, setInviteAdmissionDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const inviteSelectedFunction = FUNCTION_OPTIONS.find((f) => f.value === inviteFunctionKey) ?? FUNCTION_OPTIONS[0]!;
 
   function closeInviteModal() {
     setShowInviteModal(false);
-    setInviteFunctionKey(FUNCTION_OPTIONS[0]!.value);
+    setInviteRole("OPERADOR");
     setInviteUnitIds(units.map((u) => u.id));
     setInviteFullNameHint("");
     setInviteAdmissionDate(new Date().toISOString().slice(0, 10));
@@ -78,8 +77,8 @@ export function ColaboradoresTab() {
     setInviteError(null);
     try {
       const { inviteId, token } = await Api.createOnboardingInvite({
-        role: inviteSelectedFunction.role,
-        position: inviteSelectedFunction.label,
+        role: inviteRole,
+        position: ROLE_LABEL[inviteRole],
         unitIds: inviteUnitIds,
         fullNameHint: inviteFullNameHint.trim() || undefined,
         admissionDate: inviteAdmissionDate || undefined,
@@ -118,7 +117,7 @@ export function ColaboradoresTab() {
     setPin("");
     setBirthDate("");
     setAdmissionDate("");
-    setFunctionKey(FUNCTION_OPTIONS[0]!.value);
+    setRole("OPERADOR");
     setContractType("CLT");
     setWeeklyHours("44");
     setShowOptionalFields(false);
@@ -131,14 +130,14 @@ export function ColaboradoresTab() {
     try {
       const created = await Api.createEmployee({
         fullName: fullName.trim(),
-        role: selectedFunction.role,
+        role,
         cpf: cpfDigits ? cpfDigits : undefined,
         email: email.trim() ? email.trim() : undefined,
         phone: phoneDigits ? phoneDigits : undefined,
         pin,
         birthDate: birthDate || undefined,
         admissionDate: admissionDate || undefined,
-        position: selectedFunction.label,
+        position: ROLE_LABEL[role],
         contractType,
         weeklyHoursContracted: Number(weeklyHours) || 44,
       });
@@ -253,7 +252,7 @@ export function ColaboradoresTab() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <div>
               <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>⚡ Cadastro Rápido de Colaborador</h2>
-              <HelpText style={{ margin: 0 }}>Apenas Nome, Função e PIN são obrigatórios para cadastro imediato.</HelpText>
+              <HelpText style={{ margin: 0 }}>Apenas Nome, Permissão e PIN são obrigatórios para cadastro imediato.</HelpText>
             </div>
             <Button variant="ghost" size="sm" onClick={() => { setShowForm(false); resetForm(); }}>
               ✕ Fechar
@@ -264,10 +263,10 @@ export function ColaboradoresTab() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
               <Input label="Nome completo *" placeholder="Ex: Maria Silva" value={fullName} onChange={(e) => setFullName(e.target.value)} />
 
-              <Select label="Função e Permissão *" title={ROLE_DESCRIPTION[selectedFunction.role]} value={functionKey} onChange={(e) => selectFunction(e.target.value)}>
-                {FUNCTION_OPTIONS.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label} ({ROLE_LABEL[f.role]})
+              <Select label="Permissão *" title={ROLE_DESCRIPTION[role]} value={role} onChange={(e) => selectRole(e.target.value as Role)}>
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABEL[r]}
                   </option>
                 ))}
               </Select>
@@ -286,7 +285,7 @@ export function ColaboradoresTab() {
             </div>
 
             <HelpText style={{ margin: 0 }}>
-              Permissão concedida: <strong>{ROLE_LABEL[selectedFunction.role]}</strong> — {ROLE_DESCRIPTION[selectedFunction.role]}
+              Permissão concedida: <strong>{ROLE_LABEL[role]}</strong> — {ROLE_DESCRIPTION[role]}
             </HelpText>
 
             <UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} />
@@ -387,13 +386,13 @@ export function ColaboradoresTab() {
             {!inviteLink ? (
               <>
                 <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
-                  Escolha a função, unidade(s) e data de admissão — quem abrir o link só completa os próprios dados
-                  pessoais e escolhe o PIN, sem poder alterar o nível de acesso.
+                  Escolha a permissão, unidade(s) e data de admissão — quem abrir o link só completa os próprios
+                  dados pessoais e escolhe o PIN, sem poder alterar o nível de acesso.
                 </p>
-                <Select label="Função e Permissão *" title={ROLE_DESCRIPTION[inviteSelectedFunction.role]} value={inviteFunctionKey} onChange={(e) => setInviteFunctionKey(e.target.value)}>
-                  {FUNCTION_OPTIONS.map((f) => (
-                    <option key={f.value} value={f.value}>
-                      {f.label} ({ROLE_LABEL[f.role]})
+                <Select label="Permissão *" title={ROLE_DESCRIPTION[inviteRole]} value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Role)}>
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r} value={r}>
+                      {ROLE_LABEL[r]}
                     </option>
                   ))}
                 </Select>
@@ -486,7 +485,7 @@ export function ColaboradoresTab() {
                       )}
                     </div>
                     <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>
-                      {e.position || ROLE_LABEL[e.role]}
+                      Permissão: {ROLE_LABEL[e.role]}
                       {e.cpf ? ` · CPF: ${e.cpf}` : ""}
                       {e.phone ? ` · Tel: ${e.phone}` : ""}
                       {e.admission_date ? ` · Admitido: ${dateBrFromIso(e.admission_date)}` : ""}
@@ -505,7 +504,7 @@ export function ColaboradoresTab() {
                     onChange={(ev) => void changeRole(e, ev.target.value as Employee["role"])}
                     style={{ minWidth: "120px", fontSize: "13px" }}
                   >
-                    {(["ESTAGIARIO", "OPERADOR", "GERENTE", "ADMIN"] as const).map((r) => (
+                    {ROLE_OPTIONS.map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABEL[r]}
                       </option>
@@ -526,6 +525,19 @@ export function ColaboradoresTab() {
                     </Button>
                   )}
 
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFaceEnrollTarget(e)}
+                    title={
+                      e.face_enrolled_photo_path
+                        ? "Recadastrar o rosto usado no reconhecimento facial do quiosque"
+                        : "Cadastrar o rosto para reconhecimento facial no quiosque"
+                    }
+                  >
+                    🙂 {e.face_enrolled_photo_path ? "Recadastrar rosto" : "Cadastrar rosto"}
+                  </Button>
+
                   <Button variant={e.active === false ? "secondary" : "ghost"} size="sm" onClick={() => toggleActive(e)} title={e.active === false ? "Ativar acesso do colaborador" : "Desativar acesso do colaborador"}>
                     {e.active === false ? "Reativar" : "Desativar"}
                   </Button>
@@ -537,6 +549,15 @@ export function ColaboradoresTab() {
       </div>
 
       {espelhoTarget && <EspelhoPontoModal employee={espelhoTarget} onClose={() => setEspelhoTarget(null)} />}
+
+      {faceEnrollTarget && (
+        <FaceEnrollmentModal
+          employeeId={faceEnrollTarget.id}
+          employeeName={faceEnrollTarget.full_name}
+          onClose={() => setFaceEnrollTarget(null)}
+          onEnrolled={load}
+        />
+      )}
     </div>
   );
 }

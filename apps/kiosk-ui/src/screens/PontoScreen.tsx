@@ -6,6 +6,10 @@ import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
+import { PunchPhotoCapture } from "../components/PunchPhotoCapture.js";
+import { useFaceCapture } from "../hooks/useFaceCapture.js";
+import { useGeolocation } from "../hooks/useGeolocation.js";
+import { isSameFace } from "../lib/faceRecognition.js";
 
 const KINDS = [
   { value: "ENTRADA", label: "Entrada", help: "Registrar que você chegou para trabalhar agora" },
@@ -44,6 +48,11 @@ export function PontoScreen() {
   const [today, setToday] = useState<PontoRecord[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [myDescriptor, setMyDescriptor] = useState<number[] | null>(null);
+
+  const faceCapture = useFaceCapture();
+  const geolocation = useGeolocation();
+  const geofenceRadiusM = unit?.geofence_radius_m ?? null;
 
   useEffect(() => {
     Api.employees().then(setEmployees);
@@ -56,6 +65,20 @@ export function PontoScreen() {
     Api.pontoHistory(authedAs.id, startOfDay.getTime(), Date.now()).then(setToday);
   }, [authedAs, message]);
 
+  // Liga a câmera e busca o descriptor cadastrado assim que a identidade é
+  // confirmada por PIN/login — cada marcação depois disso reaproveita a
+  // mesma câmera já ligada, só tira um frame novo por clique.
+  useEffect(() => {
+    if (!authedAs) return;
+    faceCapture.start();
+    Api.myFaceDescriptor(authedAs.id)
+      .then(setMyDescriptor)
+      .catch(() => setMyDescriptor(null));
+    if (geofenceRadiusM !== null) geolocation.request();
+    return () => faceCapture.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authedAs?.id]);
+
   async function bater(kind: (typeof KINDS)[number]["value"]) {
     // Guarda extra contra duplo clique/double-tap: `disabled={busy}` no
     // botão já cobre o caso normal, mas dois eventos de clique disparados
@@ -66,7 +89,46 @@ export function PontoScreen() {
     if (busy || !authedAs || !unit) return;
     setBusy(true);
     try {
-      const res = await Api.ponto({ unitId: unit.id, employeeId: authedAs.id, kind, registeredByEmployeeId: authedAs.id });
+      let punchPhotoPath: string | null = null;
+
+      // Reconhecimento facial: só bloqueia quem já tem rosto cadastrado —
+      // colaborador sem cadastro ainda (ver ColaboradoresTab > Cadastrar
+      // rosto) continua batendo ponto normalmente por PIN/login, sem essa
+      // segunda checagem, pra não travar quem nunca foi cadastrado.
+      if (faceCapture.ready) {
+        const captured = await faceCapture.capture();
+        if (!captured) {
+          toast.error("Não conseguimos identificar seu rosto na câmera. Centralize o rosto e tente de novo.");
+          return;
+        }
+        if (myDescriptor && !isSameFace(captured.descriptor, myDescriptor)) {
+          toast.error("O rosto na câmera não confere com o cadastro. Tente novamente ou chame um responsável.");
+          return;
+        }
+        punchPhotoPath = await Api.uploadPontoFoto(authedAs.id, captured.photo, "punch");
+      }
+
+      let lat: number | null = null;
+      let lng: number | null = null;
+      if (geofenceRadiusM !== null) {
+        const pos = geolocation.position ?? (await geolocation.request());
+        if (!pos) {
+          toast.error("Esta unidade exige localização para bater o ponto — libere o GPS e tente de novo.");
+          return;
+        }
+        lat = pos.lat;
+        lng = pos.lng;
+      }
+
+      const res = await Api.ponto({
+        unitId: unit.id,
+        employeeId: authedAs.id,
+        kind,
+        registeredByEmployeeId: authedAs.id,
+        lat,
+        lng,
+        punchPhotoPath,
+      });
       setMessage(`Registrado às ${formatTime(res.atMs)} — NSR ${res.nsr}`);
     } catch (err) {
       // Sem catch aqui, uma falha ficava muda: a marcação (registro
@@ -79,6 +141,7 @@ export function PontoScreen() {
   }
 
   function trocarColaborador() {
+    faceCapture.stop();
     setSelected(null);
     setAuthedAs(null);
     setMessage(null);
@@ -111,6 +174,9 @@ export function PontoScreen() {
       ) : (
         <>
           <h2>{authedAs.full_name}</h2>
+
+          <PunchPhotoCapture faceCapture={faceCapture} geolocation={geolocation} geofenceRadiusM={geofenceRadiusM} />
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
             {KINDS.map((k) => (
               <Button key={k.value} variant="secondary" size="lg" disabled={busy} title={k.help} onClick={() => bater(k.value)}>

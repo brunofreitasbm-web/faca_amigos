@@ -9,6 +9,7 @@ import {
   type PayrollCloseItem,
 } from "../../../api/client.js";
 import { PayrollCsvDownloadButton } from "./PayrollCsvDownloadButton.js";
+import { ROLE_LABEL } from "../../../auth/capabilities.js";
 
 const MONTH_LABEL = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -339,7 +340,7 @@ export function FolhaPagamentoTab() {
                         <tr key={e.id}>
                           <td style={cellStyle}>
                             <strong style={{ color: "var(--text-primary)" }}>{e.fullName}</strong>
-                            {e.position && <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{e.position}</div>}
+                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Permissão: {ROLE_LABEL[e.role]}</div>
                           </td>
                           <td style={cellStyle}>{e.cpf ?? "—"}</td>
                           <td style={cellStyle}>

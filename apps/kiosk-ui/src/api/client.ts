@@ -52,6 +52,10 @@ export interface Unit {
   phone?: string | null;
   cnpj?: string | null;
   timezone?: string | null;
+  /** Geofence opcional (ver migration fa_kiosk_units_geofence) — null = ponto não valida GPS nesta unidade. */
+  latitude?: number | null;
+  longitude?: number | null;
+  geofence_radius_m?: number | null;
 }
 
 export interface Birthday {
@@ -93,12 +97,15 @@ export interface Employee {
   active?: boolean;
   /** Unidades em que o colaborador atua — só preenchido por `Api.allEmployees()` (Gerencial). */
   unitIds?: string[];
+  /** Path no bucket `ponto-fotos` da última foto de cadastro do rosto — não confundir com o descriptor (ver `Api.myFaceDescriptor`). */
+  face_enrolled_photo_path?: string | null;
 }
 
 export interface FolhaPagamentoEmployee {
   id: string;
   fullName: string;
   cpf: string | null;
+  role: Employee["role"];
   position: string | null;
   weeklyHoursContracted: number | null;
   workedMinutes: number;
@@ -751,6 +758,7 @@ export interface PontoRecord {
   kind: "ENTRADA" | "SAIDA" | "INTERVALO_INICIO" | "INTERVALO_FIM";
   nsr: number;
   at_ms: number;
+  punch_photo_path?: string | null;
 }
 
 export interface DailySales {
@@ -1105,22 +1113,57 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
 export const Api = {
   units: () =>
     unwrap<Unit[]>(
-      supabase().from("fa_kiosk_units").select("id, kind, name, business_day_cutoff_hour, address, phone, cnpj, timezone"),
+      supabase()
+        .from("fa_kiosk_units")
+        .select("id, kind, name, business_day_cutoff_hour, address, phone, cnpj, timezone, latitude, longitude, geofence_radius_m"),
     ),
   employees: () =>
     unwrap<Employee[]>(
       supabase()
         .from("fa_kiosk_employees")
-        .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
+        // face_descriptor de propósito FORA desta lista: é a lista ampla usada
+        // pra montar o seletor de nomes no quiosque, e o vetor biométrico não
+        // deve viajar pra tela de ninguém além do próprio dono — ver
+        // Api.myFaceDescriptor(), que busca só o registro do chamador.
+        .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active, face_enrolled_photo_path")
         .eq("active", true)
         .order("full_name"),
     ),
+  /** Descriptor facial do PRÓPRIO colaborador autenticado, pra comparar no cliente antes de bater o ponto. */
+  myFaceDescriptor: async (employeeId: string): Promise<number[] | null> => {
+    const row = await unwrap<{ face_descriptor: number[] | null }>(
+      supabase().from("fa_kiosk_employees").select("face_descriptor").eq("id", employeeId).single(),
+    );
+    return row.face_descriptor ?? null;
+  },
+  /** Cadastra/atualiza o rosto de um colaborador — RPC fa_kiosk_enroll_face (self ou config.employees.write). */
+  enrollFace: (employeeId: string, descriptor: number[], photoPath: string) =>
+    unwrap(
+      supabase().rpc("fa_kiosk_enroll_face", {
+        p_employee_id: employeeId,
+        p_descriptor: descriptor,
+        p_photo_path: photoPath,
+      }),
+    ),
+  /** Upload da foto de rosto (cadastro OU marcação de ponto) — bucket privado `ponto-fotos`, path prefixado por employeeId. */
+  uploadPontoFoto: async (employeeId: string, photo: Blob, kind: "enroll" | "punch"): Promise<string> => {
+    assertValidImageUpload(photo);
+    const path = `${employeeId}/${kind}-${Date.now()}.jpg`;
+    const { error } = await supabase().storage.from("ponto-fotos").upload(path, photo, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    return path;
+  },
   allEmployees: async () => {
     const [employees, links] = await Promise.all([
       unwrap<Employee[]>(
         supabase()
           .from("fa_kiosk_employees")
-          .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active")
+          .select(
+            "id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active, face_enrolled_photo_path",
+          )
           .order("full_name"),
       ),
       unwrap<{ employee_id: string; unit_id: string }[]>(supabase().from("fa_kiosk_employee_units").select("employee_id, unit_id")),
@@ -1665,6 +1708,14 @@ export const Api = {
   // Saldo em envelopes pendentes (ainda na loja) por unidade — aba gerencial
   // "Saldo em Envelopes" (ver RPC fa_units_envelope_balance).
   unitsEnvelopeBalance: () => unwrap<UnitEnvelopeBalance[]>(supabase().rpc("fa_units_envelope_balance")),
+  // Rotinas de notificação do Owner (Web Push) — abertura/acompanhamento
+  // 17h-20h/fechamento de caixa, ver 20260818000001_fa_kiosk_owner_reports.
+  ownerPushSubscribe: (endpoint: string, p256dh: string, auth: string) =>
+    unwrap(supabase().rpc("fa_owner_push_subscribe", { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth })),
+  ownerPushUnsubscribe: (endpoint: string) =>
+    unwrap(supabase().rpc("fa_owner_push_unsubscribe", { p_endpoint: endpoint })),
+  ownerPushIsSubscribed: (endpoint: string) =>
+    unwrap<boolean>(supabase().rpc("fa_owner_push_is_subscribed", { p_endpoint: endpoint })),
   // Candidaturas do Banco de Talentos, mais recentes primeiro — só quem tem
   // talentos.read enxerga (RLS de fa_kiosk_job_applications).
   jobApplications: () =>
@@ -1789,12 +1840,23 @@ export const Api = {
     });
   },
 
-  ponto: (body: { unitId: string; employeeId: string; kind: PontoRecord["kind"]; registeredByEmployeeId: string }) =>
+  ponto: (body: {
+    unitId: string;
+    employeeId: string;
+    kind: PontoRecord["kind"];
+    registeredByEmployeeId: string;
+    lat?: number | null;
+    lng?: number | null;
+    punchPhotoPath?: string | null;
+  }) =>
     callResilient<{ id: string; nsr: number; atMs: number }>("fa_register_ponto", {
       p_employee_id: body.employeeId,
       p_unit_id: body.unitId,
       p_kind: body.kind,
       p_registered_by_employee_id: body.registeredByEmployeeId,
+      p_lat: body.lat ?? null,
+      p_lng: body.lng ?? null,
+      p_punch_photo_path: body.punchPhotoPath ?? null,
     }),
   /** Linha do tempo de uma sessão (pausas, retomadas, troca de plano, notificações) — botão "Sessão" no Painel. */
   sessionEvents: async (sessionId: string) => {
@@ -1817,11 +1879,91 @@ export const Api = {
     unwrap<PontoRecord[]>(
       supabase()
         .from("fa_kiosk_ponto_records")
-        .select("id, employee_id, kind, nsr, at_ms")
+        .select("id, employee_id, kind, nsr, at_ms, punch_photo_path")
         .eq("employee_id", employeeId)
         .gte("at_ms", fromMs)
         .lte("at_ms", toMs),
     ),
+  /** Ocorrências (atestado/falta) de uma unidade — Gerencial > Ocorrências, exige `ocorrencias.read`. */
+  ocorrencias: async (unitId: string) => {
+    const rows = await unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_ocorrencias")
+        .select("id, employee_id, unit_id, tipo, days_away, document_path, notes, created_at_ms, fa_kiosk_employees(full_name)")
+        .eq("unit_id", unitId)
+        .order("created_at_ms", { ascending: false }),
+    );
+    return rows.map((r) => ({
+      id: r.id as string,
+      employee_id: r.employee_id as string,
+      unit_id: r.unit_id as string,
+      tipo: r.tipo as "ATESTADO" | "FALTA",
+      days_away: r.days_away as number,
+      document_path: r.document_path as string | null,
+      notes: r.notes as string | null,
+      created_at_ms: r.created_at_ms as number,
+      fa_kiosk_employees: (r.fa_kiosk_employees as unknown as { full_name: string } | null) ?? null,
+    }));
+  },
+  /** Marcações de um período pro módulo Controle de Frequência (Gerencial > Frequência) — unitId null agrega as unidades todas. Exige `relatorio.ponto`. */
+  frequenciaRecords: async (unitId: string | null, fromMs: number, toMs: number) => {
+    let query = supabase()
+      .from("fa_kiosk_ponto_records")
+      .select("id, employee_id, unit_id, kind, nsr, at_ms, punch_photo_path, fa_kiosk_employees(full_name, role)")
+      .gte("at_ms", fromMs)
+      .lte("at_ms", toMs)
+      .order("at_ms", { ascending: false });
+    if (unitId) query = query.eq("unit_id", unitId);
+    const rows = await unwrap<Record<string, unknown>[]>(query);
+    return rows.map((r) => {
+      const emp = r.fa_kiosk_employees as unknown as { full_name: string; role: Employee["role"] } | null;
+      return {
+        id: r.id as string,
+        employee_id: r.employee_id as string,
+        unit_id: r.unit_id as string,
+        kind: r.kind as PontoRecord["kind"],
+        nsr: r.nsr as number,
+        at_ms: r.at_ms as number,
+        punch_photo_path: r.punch_photo_path as string | null,
+        full_name: emp?.full_name ?? "—",
+        role: emp?.role ?? null,
+      };
+    });
+  },
+  /** URL assinada (60s) pra exibir uma foto do bucket privado `ponto-fotos` — cadastro do rosto ou marcação. */
+  pontoFotoSignedUrl: async (path: string): Promise<string | null> => {
+    const { data, error } = await supabase().storage.from("ponto-fotos").createSignedUrl(path, 60);
+    if (error) return null;
+    return data.signedUrl;
+  },
+  /** Lança uma ocorrência (atestado/falta) — RPC fa_kiosk_register_ocorrencia, exige `ocorrencias.write`. */
+  registerOcorrencia: (body: {
+    employeeId: string;
+    unitId: string;
+    tipo: "ATESTADO" | "FALTA";
+    daysAway: number;
+    documentPath: string | null;
+    notes: string | null;
+  }) =>
+    callResilient<{ id: string; atMs: number }>("fa_kiosk_register_ocorrencia", {
+      p_employee_id: body.employeeId,
+      p_unit_id: body.unitId,
+      p_tipo: body.tipo,
+      p_days_away: body.daysAway,
+      p_document_path: body.documentPath,
+      p_notes: body.notes,
+    }),
+  /** Upload do anexo (atestado etc.) — bucket privado `ocorrencia-documentos`, path prefixado por employeeId. */
+  uploadOcorrenciaDocumento: async (employeeId: string, file: File): Promise<string> => {
+    assertValidImageUpload(file);
+    const path = `${employeeId}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+    const { error } = await supabase().storage.from("ocorrencia-documentos").upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    return path;
+  },
 
   bonusRules: (unitId: string) =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_rules").select("*").eq("unit_id", unitId).eq("active", true)).then(
@@ -2322,6 +2464,9 @@ export const Api = {
       businessDayCutoffHour?: number;
       address?: string | null;
       phone?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      geofenceRadiusM?: number | null;
     },
   ) => unwrap(supabase().rpc("fa_config_update_unit", { p_unit_id: unitId, p_payload: body })),
   unitFiscal: (unitId: string) =>
@@ -2391,10 +2536,19 @@ export const Api = {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([business_date, v]) => ({ business_date, ...v }));
 
-    const orderIds = orders.map((o) => o.id as string);
     let byMethod: RevenueByMethod[] = [];
-      if (orderIds.length > 0) {
-      let paymentsQuery = supabase().from("fa_kiosk_payments").select("method, amount_cents").in("order_id", orderIds);
+    if (orders.length > 0) {
+      // Junção embutida via FK (payments.order_id -> orders.id) em vez de
+      // `.in("order_id", orderIds)`: com muitos pedidos no período essa lista
+      // vira uma query string gigante e o Supabase (Kong/PostgREST) rejeita
+      // com 400 Bad Request antes mesmo de chegar no Postgres.
+      let paymentsQuery = supabase()
+        .from("fa_kiosk_payments")
+        .select("method, amount_cents, fa_kiosk_orders!inner(business_date, status, unit_id)")
+        .eq("fa_kiosk_orders.status", "PAGA")
+        .gte("fa_kiosk_orders.business_date", from)
+        .lte("fa_kiosk_orders.business_date", to);
+      if (unitId) paymentsQuery = paymentsQuery.eq("fa_kiosk_orders.unit_id", unitId);
       const payments = await unwrap<Record<string, unknown>[]>(paymentsQuery);
       const methodMap = new Map<string, number>();
       for (const p of payments) {
@@ -2567,7 +2721,7 @@ export const Api = {
       unwrap<Record<string, unknown>[]>(
         supabase()
           .from("fa_kiosk_employees")
-          .select("id, full_name, cpf, position, weekly_hours_contracted")
+          .select("id, full_name, cpf, role, position, weekly_hours_contracted")
           .eq("unit_id", unitId)
           .eq("active", true)
           .order("full_name"),
@@ -2616,6 +2770,7 @@ export const Api = {
         id: e.id as string,
         fullName: e.full_name as string,
         cpf: (e.cpf as string | null) ?? null,
+        role: e.role as Employee["role"],
         position: (e.position as string | null) ?? null,
         weeklyHoursContracted: (e.weekly_hours_contracted as number | null) ?? null,
         workedMinutes: worked.minutes,

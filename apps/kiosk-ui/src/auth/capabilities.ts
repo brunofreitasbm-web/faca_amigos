@@ -30,6 +30,9 @@ export const CAPABILITIES = [
   "config.rbac.write",
   "talentos.read",
   "talentos.write",
+  "ocorrencias.read",
+  "ocorrencias.write",
+  "notificacoes.owner_push",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -58,6 +61,9 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "config.rbac.write": "Editar permissões de cada papel (esta tela)",
   "talentos.read": "Ver Banco de Talentos",
   "talentos.write": "Editar Banco de Talentos",
+  "ocorrencias.read": "Ver ocorrências (atestado/falta) de colaboradores",
+  "ocorrencias.write": "Lançar ocorrências (atestado/falta) de colaboradores",
+  "notificacoes.owner_push": "Ativar notificações de relatório do Owner neste dispositivo",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
@@ -87,25 +93,9 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 };
 
 /**
- * Função do colaborador, como aparece no formulário de cadastro. Cada opção
- * já carrega o nível de acesso (`role`) correspondente — o campo não é mais
- * um texto livre desacoplado do RBAC, é a própria porta de entrada dele: ao
- * escolher "Líder de Turno", o colaborador já nasce GERENTE, sem um segundo
- * select para o Owner esquecer de ajustar.
- *
- * O rótulo (`position`) continua livre no banco para o cargo real do
- * colaborador aparecer no espelho de ponto e em relatórios — só a lista de
- * opções aqui é fechada, para toda função nova exigir uma decisão explícita
- * de nível de acesso.
+ * Ordem de exibição dos níveis de acesso nos seletores de cadastro/edição
+ * de colaborador. Não existe mais um cargo/função com nome próprio
+ * (Recepção, Vendedor, Líder de Turno...) desacoplado do RBAC — o único
+ * nível concedido é a própria permissão.
  */
-export const FUNCTION_OPTIONS: ReadonlyArray<{ value: string; label: string; role: Role }> = [
-  { value: "RECEPCAO", label: "Recepção", role: "OPERADOR" },
-  { value: "VENDEDOR", label: "Vendedor", role: "OPERADOR" },
-  { value: "CAIXA", label: "Caixa", role: "OPERADOR" },
-  { value: "MONITOR", label: "Monitor de Brincadeira", role: "OPERADOR" },
-  { value: "LIDER_TURNO", label: "Líder de Turno", role: "GERENTE" },
-  { value: "SUPERVISOR", label: "Supervisor", role: "GERENTE" },
-  { value: "GERENTE", label: "Gerente", role: "GERENTE" },
-  { value: "OWNER", label: "Owner / Administrador", role: "ADMIN" },
-  { value: "ESTAGIARIO", label: "Estagiário", role: "ESTAGIARIO" },
-];
+export const ROLE_OPTIONS: ReadonlyArray<Role> = ["OPERADOR", "GERENTE", "ADMIN", "ESTAGIARIO"];

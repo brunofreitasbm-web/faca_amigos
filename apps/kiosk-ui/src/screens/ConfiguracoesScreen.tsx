@@ -19,12 +19,13 @@ import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { RequireCapability } from "../auth/RequireCapability.js";
-import { ROLE_LABEL, ROLE_DESCRIPTION, FUNCTION_OPTIONS, type Capability } from "../auth/capabilities.js";
+import { ROLE_LABEL, ROLE_DESCRIPTION, type Capability } from "../auth/capabilities.js";
 import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import { EspelhoPontoModal } from "../components/EspelhoPontoModal.js";
+import { isPushSupported, subscribeToPush, getExistingPushSubscription, pushSubscriptionToKeys } from "../lib/push.js";
 import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/WristbandQRCode.js";
 import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
 import { money } from "../format.js";
@@ -41,7 +42,8 @@ type Tab =
   | "UNIDADE"
   | "FISCAL"
   | "TERMOS"
-  | "IMPRESSORAS";
+  | "IMPRESSORAS"
+  | "NOTIFICACOES";
 
 /**
  * Capacidade exigida por aba. Assim como em auth/screens.ts, o
@@ -71,6 +73,7 @@ const TAB_CAPABILITY: Record<Tab, Capability> = {
   UNIDADE: "config.unit.write",
   FISCAL: "config.fiscal.write",
   TERMOS: "config.terms.write",
+  NOTIFICACOES: "notificacoes.owner_push",
 };
 
 export function ConfiguracoesScreen() {
@@ -94,6 +97,7 @@ export function ConfiguracoesScreen() {
     { value: "FISCAL", label: "Dados Fiscais" },
     { value: "TERMOS", label: "Termos de Uso" },
     { value: "IMPRESSORAS", label: "Impressoras" },
+    { value: "NOTIFICACOES", label: "Notificações" },
   ];
   const tabs = allTabs.filter((t) => can(TAB_CAPABILITY[t.value]));
 
@@ -111,6 +115,7 @@ export function ConfiguracoesScreen() {
     FISCAL: "Dados do emitente para NFC-e (produtos) e o cadastro de NFS-e (serviço). Confira com seu contador antes de ligar a emissão.",
     TERMOS: "Texto que o responsável aceita no check-in. Alterações ficam registradas na trilha de auditoria.",
     IMPRESSORAS: "Informe o nome das impressoras de pulseira e de cupom instaladas neste terminal.",
+    NOTIFICACOES: "Ative para receber no seu celular/computador os relatórios automáticos de abertura, acompanhamento (17h e 20h) e fechamento de caixa desta unidade.",
   };
 
   return (
@@ -137,9 +142,101 @@ export function ConfiguracoesScreen() {
           {tab === "FISCAL" && <FiscalTab unitId={unit.id} />}
           {tab === "TERMOS" && <TermosTab unitId={unit.id} />}
           {tab === "IMPRESSORAS" && <ImpressorasTab unitId={unit.id} />}
+          {tab === "NOTIFICACOES" && <NotificacoesTab />}
         </RequireCapability>
       </div>
     </div>
+  );
+}
+
+/**
+ * Ativa/desativa Web Push neste dispositivo para as rotinas automáticas
+ * de relatório do Owner (abertura, acompanhamento 17h/20h, fechamento —
+ * ver 20260818000001_fa_kiosk_owner_reports.sql). Reaproveita a mesma
+ * função subscribeToPush() já usada no painel do responsável
+ * (AcompanharScreen); aqui o endpoint é vinculado ao colaborador logado
+ * em vez de a uma sessão de criança.
+ */
+function NotificacoesTab() {
+  const toast = useToast();
+  const [supported] = useState(isPushSupported());
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function refresh() {
+    if (!supported) return;
+    const existing = await getExistingPushSubscription();
+    const keys = existing ? pushSubscriptionToKeys(existing) : null;
+    if (!keys) {
+      setSubscribed(false);
+      return;
+    }
+    setSubscribed(await Api.ownerPushIsSubscribed(keys.endpoint).catch(() => false));
+  }
+  useEffect(() => {
+    refresh();
+  }, [supported]);
+
+  async function ativar() {
+    setBusy(true);
+    try {
+      const sub = await subscribeToPush();
+      const keys = sub ? pushSubscriptionToKeys(sub) : null;
+      if (!keys) {
+        toast.error("Não foi possível ativar notificações neste dispositivo/navegador.");
+        return;
+      }
+      await Api.ownerPushSubscribe(keys.endpoint, keys.p256dh, keys.auth);
+      toast.success("Notificações ativadas neste dispositivo.");
+      setSubscribed(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível ativar notificações.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function desativar() {
+    setBusy(true);
+    try {
+      const existing = await getExistingPushSubscription();
+      const keys = existing ? pushSubscriptionToKeys(existing) : null;
+      if (keys) await Api.ownerPushUnsubscribe(keys.endpoint);
+      toast.success("Notificações desativadas neste dispositivo.");
+      setSubscribed(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível desativar notificações.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+      <h2>Relatórios automáticos por notificação</h2>
+      <HelpText>
+        Com isto ativado, este dispositivo recebe automaticamente: <strong>Abertura</strong> (ao abrir o caixa),{" "}
+        <strong>Acompanhamento</strong> às 17h e 20h (ticket médio, faturamento e visitas do dia) e{" "}
+        <strong>Fechamento</strong> (fundo de caixa, envelope e faturamento por forma de pagamento).
+      </HelpText>
+      {!supported ? (
+        <Tag color="var(--color-orange, #FF7A00)">
+          Este navegador/dispositivo não suporta notificações push (no Electron local, ou fora do modo instalado no iOS,
+          isso é esperado).
+        </Tag>
+      ) : subscribed ? (
+        <>
+          <Tag color="var(--color-teal, #2ECFB5)">Ativado neste dispositivo</Tag>
+          <Button variant="secondary" disabled={busy} onClick={desativar}>
+            Desativar neste dispositivo
+          </Button>
+        </>
+      ) : (
+        <Button variant="primary" disabled={busy} onClick={ativar}>
+          Ativar neste dispositivo
+        </Button>
+      )}
+    </Card>
   );
 }
 
@@ -1377,7 +1474,6 @@ function EspelhoPontoTab({ unitId }: { unitId: string }) {
         >
           <span>
             <strong>{e.full_name}</strong> — {ROLE_LABEL[e.role]}
-            {e.position && <span style={{ color: "var(--text-muted)" }}> · {e.position}</span>}
           </span>
           <span aria-hidden>📄</span>
         </Card>
@@ -1716,6 +1812,9 @@ function UnidadeTab({ unitId }: { unitId: string }) {
   const [cutoffHour, setCutoffHour] = useState("4");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [geofenceRadiusM, setGeofenceRadiusM] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1724,6 +1823,9 @@ function UnidadeTab({ unitId }: { unitId: string }) {
     setCutoffHour(String(unit.business_day_cutoff_hour ?? 4));
     setAddress(unit.address ?? "");
     setPhone(unit.phone ?? "");
+    setLatitude(unit.latitude != null ? String(unit.latitude) : "");
+    setLongitude(unit.longitude != null ? String(unit.longitude) : "");
+    setGeofenceRadiusM(unit.geofence_radius_m != null ? String(unit.geofence_radius_m) : "");
   }, [unit?.id]);
 
   async function save() {
@@ -1735,6 +1837,9 @@ function UnidadeTab({ unitId }: { unitId: string }) {
         businessDayCutoffHour: Number(cutoffHour),
         address: address || null,
         phone: phone || null,
+        latitude: latitude.trim() ? Number(latitude) : null,
+        longitude: longitude.trim() ? Number(longitude) : null,
+        geofenceRadiusM: geofenceRadiusM.trim() ? Number(geofenceRadiusM) : null,
       });
       toast.success("Dados da unidade salvos. Recarregue a página para ver o nome no cabeçalho.");
     } catch (err) {
@@ -1742,6 +1847,21 @@ function UnidadeTab({ unitId }: { unitId: string }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function usarLocalizacaoAtual() {
+    if (!("geolocation" in navigator)) {
+      toast.error("Este dispositivo não tem geolocalização disponível.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLatitude(String(pos.coords.latitude));
+        setLongitude(String(pos.coords.longitude));
+      },
+      () => toast.error("Não foi possível obter a localização atual."),
+      { enableHighAccuracy: true },
+    );
   }
 
   // Mesmo endereço público usado no QR de acompanhamento (EntradaScreen) e
@@ -1805,6 +1925,28 @@ function UnidadeTab({ unitId }: { unitId: string }) {
           O CNPJ do cupom vem da aba Dados Fiscais — é o mesmo do emitente da nota, e ter dois campos para digitá-lo
           é o caminho mais curto para eles divergirem.
         </HelpText>
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Localização (Controle de Frequência)</h2>
+        <HelpText>
+          Opcional. Preenchendo os 3 campos abaixo, o quiosque passa a exigir que quem bate o ponto esteja dentro
+          deste raio — deixe em branco para não validar GPS nesta unidade.
+        </HelpText>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <Input label="Latitude" value={latitude} onChange={(e) => setLatitude(e.target.value)} style={{ flex: 1, minWidth: "140px" }} />
+          <Input label="Longitude" value={longitude} onChange={(e) => setLongitude(e.target.value)} style={{ flex: 1, minWidth: "140px" }} />
+          <Input
+            label="Raio (metros)"
+            type="number"
+            value={geofenceRadiusM}
+            onChange={(e) => setGeofenceRadiusM(e.target.value)}
+            style={{ flex: 1, minWidth: "120px" }}
+          />
+        </div>
+        <Button variant="secondary" onClick={usarLocalizacaoAtual} style={{ alignSelf: "flex-start" }}>
+          📍 Usar localização atual deste dispositivo
+        </Button>
       </Card>
 
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
