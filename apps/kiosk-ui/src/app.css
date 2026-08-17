@@ -199,6 +199,111 @@ body {
   background: var(--surface-sunken);
 }
 
+/* ---------- Gerencial: navegação lateral no desktop ----------
+
+   O módulo tem 18 abas (Tabs component, flex-wrap) dentro de um container
+   que travava em 900px de largura — pensado pra caber numa tela pequena,
+   mas desperdiçando a maior parte de qualquer monitor de verdade. As abas
+   quebravam em 2-3 linhas acima do conteúdo mesmo em desktop, empurrando
+   tudo pra baixo. Aqui, a partir de 1024px: o container ganha mais
+   largura e as mesmas abas (sem trocar o componente `Tabs`, que também é
+   usado em Relatório/Configurações) viram uma coluna lateral fixa — o
+   padrão recomendado para navegação com muitos itens em telas grandes,
+   em vez de uma barra horizontal que só cresce em linhas. Abaixo de
+   1024px (tablet/celular) nada muda: mesma barra de abas horizontal de
+   sempre. O `!important` é necessário porque `Tabs`/`Button` definem
+   `flex-wrap`/`justify-content`/`white-space` via style inline. */
+@media (min-width: 1024px) {
+  .gerencial-shell {
+    max-width: min(1400px, 96vw) !important;
+  }
+
+  .gerencial-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+  }
+
+  .gerencial-tabs-col {
+    flex: 0 0 220px;
+    position: sticky;
+    top: 24px;
+  }
+
+  .gerencial-tabs-col [role="tablist"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    flex-wrap: nowrap !important;
+    margin-top: 0 !important;
+  }
+
+  .gerencial-tabs-col [role="tab"] {
+    justify-content: flex-start !important;
+    text-align: left;
+    white-space: normal !important;
+    width: 100% !important;
+  }
+
+  .gerencial-content-col {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* ---------- PDV: layout e barra de carrinho no celular ----------
+
+   No computador o carrinho fica fixo ao lado da grade de produtos (duas
+   colunas lado a lado cabem bem). No celular essas duas colunas espremidas
+   ficavam ilegíveis, então aqui elas empilham: grade de produtos em cima,
+   carrinho completo embaixo, largura total nos dois casos.
+
+   Como o carrinho completo fica *depois* da grade, adicionar um produto no
+   fim da lista de compras exigiria rolar a tela toda pra ver o total
+   atualizado. A barra flutuante (.pdv-cart-bar) resolve isso: fica fixa no
+   rodapé mostrando itens + total sempre visíveis, e ao tocar rola até o
+   carrinho — sem duplicar nenhuma lógica de estado, só um scrollIntoView. */
+@media (max-width: 768px) {
+  .pdv-shell {
+    flex-direction: column !important;
+    padding: 16px !important;
+    padding-bottom: calc(var(--bottom-bar-h) + 24px) !important;
+    gap: 16px !important;
+  }
+
+  .pdv-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)) !important;
+  }
+}
+
+.pdv-cart-bar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .pdv-cart-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    height: var(--bottom-bar-h);
+    padding: 0 20px;
+    border-radius: var(--radius-lg, 16px);
+    background: var(--color-primary);
+    color: #fff;
+    font-family: var(--font-body);
+    font-weight: var(--weight-bold, 700);
+    font-size: 14px;
+    border: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    z-index: 20;
+    cursor: pointer;
+  }
+}
+
 /* ---------- PinPad: Animação e feedback visual de erro ---------- */
 @keyframes pin-shake {
   0%, 100% { transform: translateX(0); }
