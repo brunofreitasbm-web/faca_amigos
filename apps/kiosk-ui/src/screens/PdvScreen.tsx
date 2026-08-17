@@ -5,6 +5,7 @@ import type { Product } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
 import { CashPaymentPad } from "../components/CashPaymentPad.js";
+import { openTapCharge, savePendingTap } from "../lib/infinitepayTap.js";
 
 interface CartLine {
   product: Product;
@@ -75,6 +76,26 @@ export function PdvScreen() {
     }
   }
 
+  function handleTapCharge() {
+    if (!unit || !employee || cart.length === 0 || (method !== "CREDITO" && method !== "DEBITO")) return;
+    const orderId = crypto.randomUUID();
+    savePendingTap(orderId, {
+      kind: "pdv",
+      unitId: unit.id,
+      employeeId: employee.id,
+      method,
+      amountCents: totalCents,
+      items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
+    });
+    openTapCharge({
+      amountCents: totalCents,
+      method,
+      orderId,
+      handle: import.meta.env.VITE_INFINITEPAY_HANDLE as string | undefined,
+      docNumber: unit.cnpj ?? undefined,
+    });
+  }
+
   if (!unit) return null;
 
   return (
@@ -137,16 +158,29 @@ export function PdvScreen() {
         {method === "DINHEIRO" ? (
           <CashPaymentPad totalCents={totalCents} busy={busy || cart.length === 0 || hasOpenShift === false} onConfirm={() => confirm()} />
         ) : (
-          <Button
-            variant="primary"
-            fullWidth
-            loading={busy}
-            disabled={busy || cart.length === 0 || hasOpenShift === false}
-            onClick={confirm}
-            title="Confirmar a venda com o método selecionado"
-          >
-            Confirmar venda
-          </Button>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {(method === "CREDITO" || method === "DEBITO") && (
+              <Button
+                variant="secondary"
+                fullWidth
+                disabled={busy || cart.length === 0 || hasOpenShift === false}
+                onClick={handleTapCharge}
+                title="Cobrar por aproximação usando o celular/tablet como maquininha (InfiniteTap)"
+              >
+                📲 Cobrar com InfiniteTap
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              fullWidth
+              loading={busy}
+              disabled={busy || cart.length === 0 || hasOpenShift === false}
+              onClick={confirm}
+              title="Confirmar a venda com o método selecionado"
+            >
+              Confirmar venda
+            </Button>
+          </div>
         )}
       </Card>
     </div>

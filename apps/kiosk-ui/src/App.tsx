@@ -40,6 +40,8 @@ import { RelatorioScreen } from "./screens/RelatorioScreen.js";
 import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
 import { AniversariosScreen } from "./screens/AniversariosScreen.js";
 import { GerencialApp } from "./screens/gerencial/GerencialApp.js";
+import { TapReturnScreen } from "./screens/TapReturnScreen.js";
+import { parseTapReturn } from "./lib/infinitepayTap.js";
 import { ConnectDeviceModal } from "./components/ConnectDeviceModal.js";
 import { ConnectionStatusChip } from "./components/ConnectionStatusChip.js";
 import { InstallPwaBanner } from "./components/InstallPwaBanner.js";
@@ -246,6 +248,16 @@ export function App() {
   // Se nenhuma operação/módulo foi selecionado ainda, exibe a Tela Inicial de Seleção de Módulo
   if (!unit) {
     return <SelectModuleScreen />;
+  }
+
+  // Retorno do app InfinitePay depois de uma cobrança por aproximação
+  // (InfiniteTap, ver lib/infinitepayTap.ts). Precisa vir depois dos
+  // checks de employee/unit acima porque finaliza a venda via API — mas
+  // antes do resto porque não faz sentido decidir tela/módulo no meio de
+  // uma cobrança pendente de confirmação.
+  const tapReturn = parseTapReturn(window.location.search);
+  if (tapReturn) {
+    return <TapReturnScreen search={window.location.search} onDone={() => navigateToScreen("PAINEL")} />;
   }
 
   const ScreenComponent = SCREEN_COMPONENTS[screen];

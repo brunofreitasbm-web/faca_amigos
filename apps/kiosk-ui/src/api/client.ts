@@ -1560,7 +1560,12 @@ export const Api = {
       p_employee_id: body.employeeId,
       p_closed_at_ms: body.closedAtMs ?? null,
     }),
-  pdvOrder: (body: { unitId: string; employeeId: string; items: { productId: string; quantity: number }[]; payments: unknown[] }) =>
+  pdvOrder: (body: {
+    unitId: string;
+    employeeId: string;
+    items: { productId: string; quantity: number }[];
+    payments: { method: string; amountCents: number; nsu?: string; authorization?: string; pixTxid?: string }[];
+  }) =>
     callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_create_pdv_order", {
       p_unit_id: body.unitId,
       p_employee_id: body.employeeId,

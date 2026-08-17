@@ -7,6 +7,7 @@ import { money } from "../format.js";
 import { ReceiptPrintModal } from "./ReceiptPrintModal.js";
 import { CashPaymentPad } from "./CashPaymentPad.js";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
+import { openTapCharge, savePendingTap } from "../lib/infinitepayTap.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 type PaymentMethod = (typeof METHODS)[number];
@@ -171,6 +172,58 @@ export function CheckoutModal({
     }
   }
 
+  /**
+   * Cobrança por aproximação via InfiniteTap: sai para o app InfinitePay
+   * (mesmo aparelho) e só volta depois do pagamento — por isso os recibos
+   * são pré-montados aqui (falta só o `code`, que sai do fa_checkout depois
+   * que o TapReturnScreen confirmar) e guardados no localStorage via
+   * savePendingTap, já que o estado deste componente não sobrevive à saída
+   * de página. Só disponível fora do pagamento dividido (isSplit) — dividir
+   * uma cobrança em duas maquininhas complicaria demais o retorno pra valer
+   * a pena na primeira versão.
+   */
+  function handleTapCharge() {
+    if (!employee || !unit || isSplit || (method !== "CREDITO" && method !== "DEBITO")) return;
+    const orderId = crypto.randomUUID();
+    const nowStr = new Date().toLocaleString("pt-BR");
+    const receiptsBase = entries.map((e) => ({
+      title: "Comprovante de Saída",
+      unitName: unit.name,
+      unitAddress: unit.address ?? undefined,
+      unitPhone: unit.phone ?? undefined,
+      unitCnpj: unit.cnpj ?? undefined,
+      employeeName: employee.full_name,
+      dateTime: nowStr,
+      items: e.quote.lines.map((l) => ({ description: l.label, amountCents: l.cents })),
+      totalCents: e.quote.totalCents,
+      payments: [{ method, amountCents: e.quote.totalCents }],
+      customerInfo: {
+        childName: e.session.child_name_snapshot,
+        guardianName: e.session.guardian_name_snapshot,
+        phone: e.session.guardian_phone_snapshot,
+      },
+      footerNote: `Entrada ${new Date(e.session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} → Saída ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} (+${e.quote.timing.overMinutes}min)`,
+    }));
+
+    savePendingTap(orderId, {
+      kind: "checkout",
+      sessionIds: entries.map((e) => e.session.id),
+      employeeId: employee.id,
+      method,
+      amountCents: totalCents,
+      closedAtMs,
+      receiptsBase,
+    });
+
+    openTapCharge({
+      amountCents: totalCents,
+      method,
+      orderId,
+      handle: import.meta.env.VITE_INFINITEPAY_HANDLE as string | undefined,
+      docNumber: unit.cnpj ?? undefined,
+    });
+  }
+
   if (receipts.length > 0) {
     return (
       <>
@@ -277,10 +330,20 @@ export function CheckoutModal({
             </div>
           </>
         ) : (
-          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
             <Button variant="ghost" onClick={onClose} disabled={busy} title="Cancelar o fechamento sem cobrar">
               Cancelar
             </Button>
+            {!isSplit && (method === "CREDITO" || method === "DEBITO") && (
+              <Button
+                variant="secondary"
+                onClick={handleTapCharge}
+                disabled={busy || hasOpenShift === false || hasPausedSession}
+                title="Cobrar por aproximação usando o celular/tablet como maquininha (InfiniteTap)"
+              >
+                📲 Cobrar com InfiniteTap
+              </Button>
+            )}
             <Button
               variant="primary"
               onClick={() => confirm()}
