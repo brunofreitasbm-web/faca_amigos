@@ -179,6 +179,32 @@ export function RevenueByMethodChart({ data }: { data: { method: string; total_c
   );
 }
 
+/**
+ * Check-ins por hora do dia, uma barra por unidade quando há mais de uma
+ * (comparação lado a lado); `data` já vem pivotado (uma linha por hora,
+ * uma coluna por nome de unidade) — ver pivotCheckinsByHour em
+ * RelatorioScreen.tsx.
+ */
+export function CheckinsByHourChart({ data, unitNames }: { data: Record<string, number | string>[]; unitNames: string[] }) {
+  if (data.length === 0) return null;
+  return (
+    <ChartCard title="Check-ins por hora do dia">
+      <ResponsiveContainer width="100%" height={260}>
+        <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle, #f3f4f6)" vertical={false} />
+          <XAxis dataKey="hourLabel" stroke="var(--text-secondary, #9ca3af)" fontSize={12} tickLine={false} />
+          <YAxis stroke="var(--text-secondary, #9ca3af)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+          <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => [`${v} check-in(s)`, name]} />
+          {unitNames.length > 1 && <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />}
+          {unitNames.map((name, i) => (
+            <Bar key={name} dataKey={name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} maxBarSize={unitNames.length > 1 ? 12 : 24} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  );
+}
+
 export function AssetUsageChart({ data }: { data: { name: string; sessions_count: number }[] }) {
   if (data.length === 0) return null;
   return (

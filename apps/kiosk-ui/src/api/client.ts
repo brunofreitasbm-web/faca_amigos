@@ -807,6 +807,17 @@ export interface DailyVisits {
   business_date: string;
   sessions_count: number;
 }
+export interface CheckinsByHour {
+  unit_id: string;
+  unit_name: string;
+  hour: number;
+  count: number;
+}
+export interface TicketGoal {
+  unitId: string;
+  minTicketCents: number;
+  targetTicketCents: number;
+}
 export interface BirthdayChild {
   id: string;
   full_name: string;
@@ -2634,6 +2645,55 @@ export const Api = {
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([business_date, sessions_count]) => ({ business_date, sessions_count }));
   },
+  /**
+   * Check-ins por hora do dia, agrupado por unidade — hora local do
+   * navegador (mesmo padrão de reportVisits: agregação no cliente, sem
+   * RPC), já que checkin_at_ms é o mesmo instante real em qualquer
+   * fuso e as 3 unidades hoje operam no mesmo horário.
+   */
+  reportCheckinsByHour: async (unitId: string | null, from: string, to: string): Promise<CheckinsByHour[]> => {
+    let query = supabase()
+      .from("fa_kiosk_sessions")
+      .select("unit_id, checkin_at_ms, fa_kiosk_units(name)")
+      .gte("business_date", from)
+      .lte("business_date", to);
+    if (unitId) query = query.eq("unit_id", unitId);
+    const sessions = await unwrap<Record<string, unknown>[]>(query);
+    const map = new Map<string, { unit_id: string; unit_name: string; hour: number; count: number }>();
+    for (const s of sessions) {
+      const uid = s.unit_id as string;
+      const uname = ((s.fa_kiosk_units as { name?: string } | null)?.name) ?? "—";
+      const hour = new Date(s.checkin_at_ms as number).getHours();
+      const key = `${uid}:${hour}`;
+      const cur = map.get(key) ?? { unit_id: uid, unit_name: uname, hour, count: 0 };
+      cur.count += 1;
+      map.set(key, cur);
+    }
+    return [...map.values()].sort((a, b) => a.hour - b.hour || a.unit_name.localeCompare(b.unit_name));
+  },
+  /** Ticket médio de hoje (faturado / pedidos pagos) para o termômetro do Painel. */
+  todayTicketMedio: async (unitId: string, cutoffHour: number) => {
+    const rows = await unwrap<{ total_cents: number; orders_count: number; avg_cents: number }[]>(
+      supabase().rpc("fa_kiosk_today_ticket_medio", { p_unit_id: unitId, p_business_date: businessDateFor(Date.now(), cutoffHour) }),
+    );
+    const row = rows[0] ?? { total_cents: 0, orders_count: 0, avg_cents: 0 };
+    return { totalCents: row.total_cents, ordersCount: row.orders_count, avgCents: row.avg_cents };
+  },
+  /** Meta de Ticket Médio (mínimo/alvo) configurada pelo Owner para a unidade — null se ainda não configurada. */
+  ticketGoal: async (unitId: string): Promise<TicketGoal | null> => {
+    const rows = await unwrap<Record<string, unknown>[]>(
+      supabase().from("fa_kiosk_unit_ticket_goals").select("unit_id, min_ticket_cents, target_ticket_cents").eq("unit_id", unitId),
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return { unitId: row.unit_id as string, minTicketCents: row.min_ticket_cents as number, targetTicketCents: row.target_ticket_cents as number };
+  },
+  setTicketGoal: (unitId: string, minTicketCents: number, targetTicketCents: number) =>
+    unwrap(
+      supabase()
+        .from("fa_kiosk_unit_ticket_goals")
+        .upsert({ unit_id: unitId, min_ticket_cents: minTicketCents, target_ticket_cents: targetTicketCents, updated_at_ms: Date.now() }, { onConflict: "unit_id" }),
+    ),
   reportBirthdays: async (month?: number, day?: number) => {
     let query = supabase().from("fa_kiosk_children").select("id, full_name, birth_date");
     const children = await unwrap<Record<string, unknown>[]>(query);
