@@ -168,7 +168,7 @@ declare
   v_unit record;
   v_operador text;
 begin
-  select s.*, e.name as operador_name into v_shift
+  select s.*, e.full_name as operador_name into v_shift
     from fa_kiosk_shifts s left join fa_kiosk_employees e on e.id = s.opened_by_employee_id
     where s.id = p_shift_id;
   select * into v_unit from fa_kiosk_units where id = v_shift.unit_id;
@@ -202,7 +202,7 @@ declare
   v_pix_cents bigint;
   v_outros_cents bigint;
 begin
-  select s.*, e.name as operador_name into v_shift
+  select s.*, e.full_name as operador_name into v_shift
     from fa_kiosk_shifts s left join fa_kiosk_employees e on e.id = coalesce(s.closed_by_employee_id, s.opened_by_employee_id)
     where s.id = p_shift_id;
   select * into v_unit from fa_kiosk_units where id = v_shift.unit_id;

@@ -290,11 +290,32 @@ export function PainelScreen() {
     }
   }
 
+  function guardianKeyOf(entry: ActiveSessionEntry): string {
+    return entry.session.guardian_id ?? entry.session.guardian_name_snapshot ?? entry.session.id;
+  }
+
   function toggle(sessionId: string) {
+    const entry = entries.find((e) => e.session.id === sessionId);
+    if (!entry) return;
+    const guardianKey = guardianKeyOf(entry);
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(sessionId)) next.delete(sessionId);
-      else next.add(sessionId);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+        return next;
+      }
+      // Só permite empilhar mais de 1 card se todos forem do mesmo
+      // responsável (famílias com mais de uma criança) — misturar
+      // responsáveis diferentes num único fechamento não faz sentido.
+      if (next.size > 0) {
+        const firstSelected = entries.find((e) => next.has(e.session.id));
+        const sameGuardian = firstSelected ? guardianKeyOf(firstSelected) === guardianKey : true;
+        if (!sameGuardian) {
+          toast.error("Só dá para selecionar mais de uma sessão do mesmo responsável.");
+          return new Set([sessionId]);
+        }
+      }
+      next.add(sessionId);
       return next;
     });
   }

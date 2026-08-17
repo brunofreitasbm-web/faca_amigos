@@ -633,6 +633,7 @@ export interface ActiveSessionEntry {
     wristband_code?: string;
     /** Código curto impresso na pulseira e no recibo de guarda (11 caracteres). */
     access_code?: string | null;
+    guardian_id?: string;
     guardian_name_snapshot?: string;
     guardian_phone_snapshot?: string;
     child_birth_date?: string;
@@ -1106,6 +1107,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         asset_id: row.asset_id as string | null,
         wristband_code: row.wristband_code as string,
         access_code: (row.access_code as string | null) ?? null,
+        guardian_id: (row.guardian_id as string | null) ?? undefined,
         guardian_name_snapshot: (guardian?.full_name as string) ?? undefined,
         guardian_phone_snapshot: (guardian?.phone_e164 as string) ?? undefined,
         child_birth_date: (childRow?.birth_date as string) ?? undefined,
