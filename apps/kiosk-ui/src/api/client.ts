@@ -2301,6 +2301,13 @@ export const Api = {
     return unwrap<{ capability: string }[]>(supabase().from("fa_kiosk_my_capabilities").select("capability")).catch(() => []);
   },
 
+  /** Matriz completa papel→capacidade — Gerencial > Permissões, exige `config.rbac.write`. */
+  roleCapabilities: () =>
+    unwrap<{ role: Employee["role"]; capability: string }[]>(supabase().rpc("fa_config_list_role_capabilities")),
+  /** Troca o papel mínimo dono de uma capacidade — Gerencial > Permissões. */
+  setCapabilityRole: (capability: string, role: Employee["role"]) =>
+    unwrap(supabase().rpc("fa_config_set_capability_role", { p_capability: capability, p_role: role })),
+
   // --- Configurações: unidade, fiscal e termos de uso -----------------------
   // Todas passam por RPC `fa_config_*`, que checa fa_kiosk_can() no servidor
   // ANTES de tocar em qualquer linha e registra a alteração na trilha de

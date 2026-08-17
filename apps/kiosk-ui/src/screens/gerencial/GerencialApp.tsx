@@ -10,6 +10,7 @@ import { CuponsTab } from "./tabs/CuponsTab.js";
 import { FidelidadeTab } from "./tabs/FidelidadeTab.js";
 import { MetasTab } from "./tabs/MetasTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
+import { PermissoesTab } from "./tabs/PermissoesTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
 import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
 import { AberturaFechamentoTab } from "./tabs/AberturaFechamentoTab.js";
@@ -21,7 +22,7 @@ import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "COPILOT_IA", label: "✦ ZoeIA (Copilot)" },
@@ -32,6 +33,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "FIDELIDADE", label: "Fidelidade" },
   { value: "METAS", label: "Metas" },
   { value: "COLABORADORES", label: "Colaboradores" },
+  { value: "PERMISSOES", label: "Permissões" },
   { value: "CLIENTES", label: "Clientes" },
   { value: "TALENTOS", label: "Banco de Talentos" },
   { value: "FOLHA", label: "Folha de Pagamento" },
@@ -52,6 +54,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
   FIDELIDADE: "Recompensas automáticas para clientes recorrentes.",
   METAS: "Regras de bonificação da equipe quando a meta diária é batida. Meta de faturamento e horário de fechamento continuam por unidade, em Configurações.",
   COLABORADORES: "Cadastro único de toda a equipe — escolha em qual(is) unidade(s) cada colaborador atua.",
+  PERMISSOES: "Escolha o nível mínimo de acesso (Operador, Líder ou Owner) exigido para cada ação do sistema.",
   CLIENTES: "Base de dados unificada de responsáveis e crianças cadastradas em todas as unidades da rede — consulte histórico de visitas, CPF e contatos.",
   TALENTOS: "Candidaturas recebidas pelo formulário \"Venha Fazer Parte do Nosso Time\" da landing page — analise o currículo e atualize o status conforme a triagem avança.",
   FOLHA: "Extrato mensal de salários, dados bancários e fechamento da folha para conferência e exportação/Bradesco.",
@@ -120,6 +123,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "FIDELIDADE" && <FidelidadeTab />}
               {tab === "METAS" && <MetasTab />}
               {tab === "COLABORADORES" && <ColaboradoresTab />}
+              {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}
               {tab === "TALENTOS" && <BancoTalentosTab />}
               {tab === "FOLHA" && <FolhaPagamentoTab />}
