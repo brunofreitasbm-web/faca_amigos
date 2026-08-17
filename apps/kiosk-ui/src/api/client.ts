@@ -635,6 +635,7 @@ export interface CashMovement {
   reason: string | null;
   envelope_number: string | null;
   photo_url: string | null;
+  fundo_caixa_cents: number | null;
   employee_id: string;
   at_ms: number;
 }
@@ -648,6 +649,7 @@ export interface UnitShiftRow {
   closed_at_ms: number | null;
   opened_by_employee_id: string;
   closed_by_employee_id: string | null;
+  close_justifications_json: Record<string, string> | null;
 }
 
 export interface EnvelopeMovement {
@@ -657,6 +659,7 @@ export interface EnvelopeMovement {
   reason: string | null;
   envelope_number: string | null;
   photo_url: string | null;
+  fundo_caixa_cents: number | null;
   employee_id: string;
   at_ms: number;
   fa_kiosk_shifts: { unit_id: string }[];
@@ -1579,12 +1582,12 @@ export const Api = {
       p_employee_id: body.employeeId,
       p_opening_cash_cents: body.openingCashCents,
     }),
-  closeShift: (shiftId: string, body: { employeeId: string; declared: Record<string, number> }) =>
-    callResilient<{ expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number> }>(
+  closeShift: (shiftId: string, body: { employeeId: string; declared: Record<string, number>; justifications?: Record<string, string> }) =>
+    callResilient<{ expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number>; justifications: Record<string, string> }>(
       "fa_close_shift",
-      { p_shift_id: shiftId, p_employee_id: body.employeeId, p_declared: body.declared },
+      { p_shift_id: shiftId, p_employee_id: body.employeeId, p_declared: body.declared, p_justifications: body.justifications ?? {} },
     ),
-  cashMovement: (shiftId: string, body: { employeeId: string; kind: string; amountCents: number; reason?: string; envelopeNumber?: string; photoUrl?: string }) =>
+  cashMovement: (shiftId: string, body: { employeeId: string; kind: string; amountCents: number; reason?: string; envelopeNumber?: string; photoUrl?: string; fundoCaixaCents?: number }) =>
     callResilient("fa_record_cash_movement", {
       p_shift_id: shiftId,
       p_kind: body.kind,
@@ -1593,6 +1596,7 @@ export const Api = {
       p_employee_id: body.employeeId,
       p_envelope_number: body.envelopeNumber ?? null,
       p_photo_url: body.photoUrl ?? null,
+      p_fundo_caixa_cents: body.fundoCaixaCents ?? null,
     }),
   // Módulo FA — lançamento diário de locações/velocidade de atendimento
   // (CaixaScreen.tsx, card "Bonificação Diária & Locações"). Upsert por
@@ -1610,7 +1614,7 @@ export const Api = {
     unwrap<CashMovement[]>(
       supabase()
         .from("fa_kiosk_cash_movements")
-        .select("id, kind, amount_cents, reason, envelope_number, photo_url, employee_id, at_ms")
+        .select("id, kind, amount_cents, reason, envelope_number, photo_url, fundo_caixa_cents, employee_id, at_ms")
         .eq("shift_id", shiftId)
         .order("at_ms", { ascending: true }),
     ),
@@ -1636,7 +1640,7 @@ export const Api = {
   unitShifts: (unitId: string | null) => {
     let query = supabase()
       .from("fa_kiosk_shifts")
-      .select("id, unit_id, status, opening_cash_cents, opened_at_ms, closed_at_ms, opened_by_employee_id, closed_by_employee_id")
+      .select("id, unit_id, status, opening_cash_cents, opened_at_ms, closed_at_ms, opened_by_employee_id, closed_by_employee_id, close_justifications_json")
       .order("opened_at_ms", { ascending: false })
       .limit(100);
     if (unitId) query = query.eq("unit_id", unitId);
@@ -1647,7 +1651,7 @@ export const Api = {
   envelopeMovements: (unitId: string | null) => {
     let query = supabase()
       .from("fa_kiosk_cash_movements")
-      .select("id, shift_id, amount_cents, reason, envelope_number, photo_url, employee_id, at_ms, fa_kiosk_shifts!inner(unit_id)")
+      .select("id, shift_id, amount_cents, reason, envelope_number, photo_url, fundo_caixa_cents, employee_id, at_ms, fa_kiosk_shifts!inner(unit_id)")
       .eq("kind", "SANGRIA")
       .not("envelope_number", "is", null)
       .order("at_ms", { ascending: false })

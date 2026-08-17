@@ -92,6 +92,7 @@ export function AberturaFechamentoTab() {
                 <th style={{ padding: "8px" }}>Troco Inicial</th>
                 <th style={{ padding: "8px" }}>Fechamento</th>
                 <th style={{ padding: "8px" }}>Fechado por</th>
+                <th style={{ padding: "8px" }}>Justificativas</th>
               </tr>
             </thead>
             <tbody>
@@ -108,6 +109,15 @@ export function AberturaFechamentoTab() {
                   <td style={{ padding: "8px" }}>{money(s.opening_cash_cents)}</td>
                   <td style={{ padding: "8px" }}>{fmtDateTime(s.closed_at_ms)}</td>
                   <td style={{ padding: "8px" }}>{s.closed_by_employee_id ? employeeNames[s.closed_by_employee_id] ?? "—" : "—"}</td>
+                  <td style={{ padding: "8px", fontSize: "12px" }}>
+                    {s.close_justifications_json && Object.keys(s.close_justifications_json).length > 0
+                      ? Object.entries(s.close_justifications_json).map(([method, text]) => (
+                          <div key={method}>
+                            <strong>{method}:</strong> {text}
+                          </div>
+                        ))
+                      : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>
