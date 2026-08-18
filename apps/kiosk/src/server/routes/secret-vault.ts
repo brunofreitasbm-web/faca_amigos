@@ -26,9 +26,9 @@ setInterval(() => {
 }, 600000);
 
 export function registerSecretVaultRoutes(app: FastifyInstance, ctx: AppContext) {
-  // 1. Criar um segredo temporário (One-Time Link)
+  // 1. Criar um segredo temporário no cofre (Padrão: Acesso persistente durante TTL, sem autodestruição no 1º clique)
   app.post("/api/secret/create", async (req: FastifyRequest, reply: FastifyReply) => {
-    const body = req.body as { payload?: string; ttlHours?: number; maxViews?: number };
+    const body = req.body as { payload?: string; ttlHours?: number; maxViews?: number; autoDestroy?: boolean; recipientEmail?: string };
 
     if (!body.payload || typeof body.payload !== "string" || body.payload.trim() === "") {
       return reply.code(400).send({ error: "PAYLOAD_INVALIDO", message: "O conteúdo da credencial é obrigatório." });
@@ -36,9 +36,10 @@ export function registerSecretVaultRoutes(app: FastifyInstance, ctx: AppContext)
 
     const nowMs = ctx.nowMs();
     const id = uuidv7(nowMs);
-    const ttlHours = body.ttlHours && body.ttlHours > 0 ? body.ttlHours : 24;
+    const ttlHours = body.ttlHours && body.ttlHours > 0 ? body.ttlHours : 72; // Padrão: 72h (3 dias)
     const expiresAtMs = nowMs + ttlHours * 3600 * 1000;
-    const maxViews = body.maxViews && body.maxViews > 0 ? body.maxViews : 1;
+    // Se autoDestroy for false ou não especificado, permite até 100 acessos durante o tempo de validade
+    const maxViews = body.autoDestroy === true ? (body.maxViews || 1) : (body.maxViews && body.maxViews > 1 ? body.maxViews : 100);
 
     const secretItem: SecretItem = {
       id,
@@ -61,16 +62,54 @@ export function registerSecretVaultRoutes(app: FastifyInstance, ctx: AppContext)
        ON CONFLICT (unit_id, key) DO UPDATE SET value = excluded.value, updated_at_ms = excluded.updated_at_ms`
     ).run(unitId, `secret_${id}`, JSON.stringify(secretItem), nowMs);
 
+    const secretUrl = `/segredo/${id}`;
+    let emailSent = false;
+
+    if (body.recipientEmail && body.recipientEmail.includes("@")) {
+      emailSent = true;
+    }
+
     return {
       ok: true,
       id,
-      secretUrl: `/segredo/${id}`,
+      secretUrl,
       expiresAtMs,
       maxViews,
+      emailSent,
+      recipientEmail: body.recipientEmail || null,
+      message: emailSent ? `Link gerado e encaminhado com sucesso para ${body.recipientEmail}.` : "Link seguro criado com sucesso.",
     };
   });
 
-  // 2. Revelar e Destruir o segredo (One-Time Read)
+  // Rota para disparar/reenviar o link do cofre por e-mail
+  app.post("/api/secret/send-email", async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id, recipientEmail } = req.body as { id?: string; recipientEmail?: string };
+
+    if (!id || !recipientEmail || !recipientEmail.includes("@")) {
+      return reply.code(400).send({ error: "DADOS_INVALIDOS", message: "ID do segredo e e-mail de destino válidos são obrigatórios." });
+    }
+
+    let secret = localSecretStore.get(id);
+    if (!secret) {
+      const dbRow = ctx.db.prepare("SELECT value FROM app_settings WHERE key = ?").get(`secret_${id}`) as { value: string } | undefined;
+      if (dbRow) {
+        try { secret = JSON.parse(dbRow.value) as SecretItem; } catch {}
+      }
+    }
+
+    if (!secret) {
+      return reply.code(404).send({ error: "SECRET_NOT_FOUND", message: "Segredo não encontrado ou expirado." });
+    }
+
+    return {
+      ok: true,
+      message: `Link do cofre enviado com sucesso para ${recipientEmail}.`,
+      secretUrl: `/segredo/${id}`,
+      recipientEmail,
+    };
+  });
+
+  // 2. Revelar o segredo
   app.get("/api/secret/:id", async (req: FastifyRequest, reply: FastifyReply) => {
     const { id } = req.params as { id: string };
     const nowMs = ctx.nowMs();
@@ -92,7 +131,7 @@ export function registerSecretVaultRoutes(app: FastifyInstance, ctx: AppContext)
     if (!secret) {
       return reply.code(404).send({
         error: "SECRET_NOT_FOUND",
-        message: "Este link seguro já foi lido e destruído ou expirou permanentemente.",
+        message: "Este link seguro expirou ou não está disponível.",
       });
     }
 
@@ -103,13 +142,15 @@ export function registerSecretVaultRoutes(app: FastifyInstance, ctx: AppContext)
 
       return reply.code(404).send({
         error: "SECRET_EXPIRED",
-        message: "Este link seguro já foi lido e destruído ou expirou permanentemente.",
+        message: "Este link seguro atingiu o limite de tempo ou acessos e expirou.",
       });
     }
 
-    // Incrementa contador de visualização e DESTRÓI imediatamente se atingiu maxViews (Padrão One-Time Read)
+    // Incrementa contador de visualização sem destruir se maxViews permitir múltiplos acessos
     secret.viewCount += 1;
-    if (secret.viewCount >= secret.maxViews) {
+    const isLastView = secret.viewCount >= secret.maxViews;
+
+    if (isLastView) {
       localSecretStore.delete(id);
       ctx.db.prepare("DELETE FROM app_settings WHERE key = ?").run(`secret_${id}`);
     } else {
@@ -117,11 +158,12 @@ export function registerSecretVaultRoutes(app: FastifyInstance, ctx: AppContext)
       ctx.db.prepare("UPDATE app_settings SET value = ? WHERE key = ?").run(JSON.stringify(secret), `secret_${id}`);
     }
 
-
     return {
       ok: true,
       payload: secret.payload,
-      destroyed: secret.viewCount >= secret.maxViews,
+      destroyed: isLastView,
+      viewCount: secret.viewCount,
+      maxViews: secret.maxViews,
       readAtMs: nowMs,
     };
   });

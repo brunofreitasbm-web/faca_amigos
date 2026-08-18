@@ -98,28 +98,28 @@ export function SecretVaultReader({ secretId }: SecretVaultReaderProps) {
             Cofre Seguro de Credenciais
           </h2>
           <p style={{ color: "#6b7280", fontSize: "14px", margin: 0 }}>
-            Transmissão criptografada de chaves de API com autodestruição após a primeira leitura.
+            Transmissão criptografada de chaves de API da Integração com Shopping.
           </p>
         </div>
 
         {error && (
           <div style={{ padding: "20px", borderRadius: "12px", background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", textAlign: "center" }}>
-            <span style={{ fontSize: "32px", display: "block", marginBottom: "8px" }}>🗑️</span>
-            <strong style={{ fontSize: "16px" }}>Link Expirado ou Já Destruído</strong>
+            <span style={{ fontSize: "32px", display: "block", marginBottom: "8px" }}>⏰</span>
+            <strong style={{ fontSize: "16px" }}>Link Expirado ou Indisponível</strong>
             <p style={{ margin: "8px 0 0 0", fontSize: "13px", color: "#7f1d1d" }}>
-              Por medida de segurança (LGPD / ISO 27001), este link de leitura única foi permanentemente apagado dos nossos servidores.
+              Este link de acesso ao cofre atingiu seu tempo limite de validade. Caso precise de um novo link, solicite o reenvio diretamente para seu e-mail de desenvolvimento.
             </p>
           </div>
         )}
 
         {!payload && !error && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
-            <div style={{ padding: "12px 16px", borderRadius: "8px", background: "#fffbeb", border: "1px solid #fef3c7", color: "#b45309", fontSize: "13px", textAlign: "center" }}>
-              ⚠️ <strong>Atenção:</strong> Ao clicar no botão abaixo para revelar, a chave será <strong>permanentemente destruída do servidor</strong>. Copie e salve suas credenciais imediatamente.
+            <div style={{ padding: "12px 16px", borderRadius: "8px", background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e40af", fontSize: "13px", textAlign: "center" }}>
+              ℹ️ <strong>Link Permanente de Integração:</strong> Este link foi configurado para permanecer ativo durante o desenvolvimento da API sem autodestruir no primeiro clique.
             </div>
 
             <Button variant="primary" onClick={fetchSecret} disabled={loading} style={{ width: "100%", padding: "14px", fontSize: "16px" }}>
-              {loading ? "Descriptografando..." : "🔓 Revelar Credenciais (Leitura Única)"}
+              {loading ? "Descriptografando..." : "🔓 Revelar Credenciais da API"}
             </Button>
           </div>
         )}
@@ -127,7 +127,7 @@ export function SecretVaultReader({ secretId }: SecretVaultReaderProps) {
         {payload && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div style={{ padding: "12px 16px", borderRadius: "8px", background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46", fontSize: "13px", textAlign: "center" }}>
-              ✅ <strong>Credenciais Resgatadas com Sucesso!</strong> {destroyed && "O segredo foi destruído do servidor e este link expirou."}
+              ✅ <strong>Credenciais Resgatadas com Sucesso!</strong> Link ativo e reutilizável pela equipe técnica durante a integração.
             </div>
 
             <div style={{ position: "relative" }}>
