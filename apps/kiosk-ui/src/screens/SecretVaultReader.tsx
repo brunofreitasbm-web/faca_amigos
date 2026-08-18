@@ -31,9 +31,9 @@ export function SecretVaultReader({ secretId }: SecretVaultReaderProps) {
                   { nome: "Parque Circuito (L-143 / PSB-1346)", apiKey: "fa_shp_circuito_homolog_11e2f3g4h5" }
                 ],
                 endpoints: {
-                  health: "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/health",
-                  faturamento: "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/faturamento",
-                  vendas: "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/vendas"
+                  health: "https://app.institutofacaamigos.com.br/integracao/shopping/v1/health",
+                  faturamento: "https://app.institutofacaamigos.com.br/integracao/shopping/v1/faturamento",
+                  vendas: "https://app.institutofacaamigos.com.br/integracao/shopping/v1/vendas"
                 }
               },
               null,
@@ -60,9 +60,9 @@ export function SecretVaultReader({ secretId }: SecretVaultReaderProps) {
                 { nome: "Parque Circuito (L-143 / PSB-1346)", apiKey: "fa_shp_circuito_homolog_11e2f3g4h5" }
               ],
               endpoints: {
-                health: "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/health",
-                faturamento: "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/faturamento",
-                vendas: "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/vendas"
+                health: "https://app.institutofacaamigos.com.br/integracao/shopping/v1/health",
+                faturamento: "https://app.institutofacaamigos.com.br/integracao/shopping/v1/faturamento",
+                vendas: "https://app.institutofacaamigos.com.br/integracao/shopping/v1/vendas"
               }
             },
             null,
