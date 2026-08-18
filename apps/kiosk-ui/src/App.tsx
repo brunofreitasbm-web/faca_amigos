@@ -5,7 +5,6 @@ import {
   BrandLockup,
   SignInIcon,
   GridIcon,
-  QrCodeIcon,
   ShoppingCartIcon,
   WalletIcon,
   ClockIcon,
@@ -51,7 +50,9 @@ import { isElectronLocal } from "./pwa.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
   { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir a pulseira e o recibo de guarda", icon: <SignInIcon /> },
-  { value: "SAIDA", label: "Saída", help: "Liberar uma criança lendo o QR Code da pulseira ou do recibo de guarda pela câmera do celular", icon: <QrCodeIcon /> },
+  // Saída não fica na barra superior de propósito: o único caminho de
+  // liberação agora é o botão flutuante amarelo dentro do Painel (ver
+  // PainelScreen.tsx) — evita duas entradas concorrentes para a mesma ação.
   { value: "PAINEL", label: "Painel", help: "Ver todas as crianças que estão no espaço agora, quanto tempo já ficaram e fechar o atendimento (cobrar) quando forem embora", icon: <GridIcon /> },
   { value: "PDV", label: "PDV", help: "Vender produtos avulsos (loja/lanchonete), sem estar ligado a uma entrada", icon: <ShoppingCartIcon /> },
   { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento", icon: <WalletIcon /> },
