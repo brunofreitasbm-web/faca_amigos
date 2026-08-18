@@ -1,21 +1,55 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
-import type { BonusRule } from "../../../api/client.js";
+import type { BonusRule, TicketGoal } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { money } from "../../../format.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
+import { IfCan } from "../../../auth/RequireCapability.js";
+import { useAuth } from "../../../auth/AuthContext.js";
 
 /**
- * Regras de bonificação apenas — a meta diária de faturamento e o horário
- * de fechamento (também na aba "Meta" da Configurações por unidade) são
- * ajustes operacionais de cada terminal, não uma configuração macro, e por
- * isso ficaram de fora do Gerencial (ver plano).
+ * Regras de bonificação + meta de Ticket Médio (mínimo/alvo) por unidade.
+ * A meta diária de faturamento e o horário de fechamento (aba "Meta" da
+ * Configurações por unidade) continuam de fora daqui — são ajustes
+ * operacionais de cada terminal, não uma configuração macro (ver plano).
+ * Ticket Médio é diferente: é um benchmark estratégico do Owner sobre a
+ * unidade, por isso mora no Gerencial e só o Owner (capability
+ * metas.ticket.write) pode editar — Líder/Operador só enxergam o valor.
  */
 export function MetasTab() {
   const toast = useToast();
   const { units } = useAppState();
+  const { can } = useAuth();
+
+  const [ticketGoals, setTicketGoals] = useState<Record<string, { minReais: string; targetReais: string }>>({});
+  const [ticketBusyUnitId, setTicketBusyUnitId] = useState<string | null>(null);
+
+  function loadTicketGoals() {
+    Promise.all(units.map((u) => Api.ticketGoal(u.id).then((g): [string, TicketGoal | null] => [u.id, g]))).then((pairs) => {
+      const next: Record<string, { minReais: string; targetReais: string }> = {};
+      for (const [unitId, g] of pairs) {
+        next[unitId] = { minReais: ((g?.minTicketCents ?? 0) / 100).toFixed(2), targetReais: ((g?.targetTicketCents ?? 0) / 100).toFixed(2) };
+      }
+      setTicketGoals(next);
+    });
+  }
+  useEffect(loadTicketGoals, [units]);
+
+  async function saveTicketGoal(unitId: string) {
+    const g = ticketGoals[unitId];
+    if (!g) return;
+    setTicketBusyUnitId(unitId);
+    try {
+      await Api.setTicketGoal(unitId, Math.round(Number(g.minReais) * 100), Math.round(Number(g.targetReais) * 100));
+      toast.success("Meta de Ticket Médio salva.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a meta.");
+    } finally {
+      setTicketBusyUnitId(null);
+    }
+  }
 
   const [rules, setRules] = useState<BonusRule[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -77,6 +111,47 @@ export function MetasTab() {
 
   return (
     <div>
+      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <h2 title="Faixas que alimentam o termômetro de Ticket Médio no Painel de cada unidade">
+          Meta de Ticket Médio
+          {!can("metas.ticket.write") && <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> (só o Owner edita)</span>}
+        </h2>
+        {units.map((u) => {
+          const g = ticketGoals[u.id];
+          if (!g) return null;
+          return (
+            <div key={u.id} style={{ display: "flex", alignItems: "flex-end", gap: "12px", flexWrap: "wrap" }}>
+              <strong style={{ minWidth: "140px" }}>{u.name}</strong>
+              <IfCan capability="metas.ticket.write">
+                <div style={{ width: "140px" }}>
+                  <Input
+                    label="Mínimo (R$)"
+                    type="number"
+                    value={g.minReais}
+                    onChange={(e) => setTicketGoals((prev) => ({ ...prev, [u.id]: { ...g, minReais: e.target.value } }))}
+                  />
+                </div>
+                <div style={{ width: "140px" }}>
+                  <Input
+                    label="Alvo (R$)"
+                    type="number"
+                    value={g.targetReais}
+                    onChange={(e) => setTicketGoals((prev) => ({ ...prev, [u.id]: { ...g, targetReais: e.target.value } }))}
+                  />
+                </div>
+                <Button variant="primary" disabled={ticketBusyUnitId === u.id} onClick={() => saveTicketGoal(u.id)}>
+                  Salvar
+                </Button>
+              </IfCan>
+              {!can("metas.ticket.write") && (
+                <span style={{ fontSize: "14px" }}>
+                  Mínimo: {money(Math.round(Number(g.minReais) * 100))} · Alvo: {money(Math.round(Number(g.targetReais) * 100))}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </Card>
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 title="Recompensas para o colaborador quando a meta diária é batida">

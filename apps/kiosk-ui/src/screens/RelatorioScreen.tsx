@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, DateInput, Input, Select, Tabs, contrastRatio, HelpText, Button, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { AssetUsage, BirthdayChild, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, SessionAudit, ShiftSummary } from "../api/client.js";
+import type { AssetUsage, BirthdayChild, CheckinsByHour, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, SessionAudit, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { IfCan } from "../auth/RequireCapability.js";
 import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import { money } from "../format.js";
 import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
-import { AssetUsageChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
+import { AssetUsageChart, CheckinsByHourChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
 import { exportFrequenciaCsv } from "../lib/csvExport.js";
 
-type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
+type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 export type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
 
 export function isoDate(d: Date): string {
@@ -84,6 +84,7 @@ export function RelatorioScreen() {
     { value: "VENDAS", label: "Vendas" },
     { value: "PLANOS", label: "Planos vendidos" },
     { value: "VISITAS", label: "Visitas" },
+    { value: "CHECKINS_HORA", label: "Check-ins por hora" },
     { value: "SESSOES", label: "Sessões (auditoria)" },
     { value: "ANIVERSARIANTES", label: "Crianças (aniversário)" },
     { value: "TURNOS", label: "Movimentação de Caixa" },
@@ -95,6 +96,7 @@ export function RelatorioScreen() {
     VENDAS: "Quanto foi vendido em cada dia e por forma de pagamento, no período e origem escolhidos.",
     PLANOS: "Quantidade de cada plano vendido no período — incluindo dados importados do Safoplay quando selecionados.",
     VISITAS: "Quantas crianças entraram por dia no período e origem selecionados.",
+    CHECKINS_HORA: "Em que horário do dia as crianças mais chegam — ajuda a planejar escala de operadores.",
     SESSOES: "Registro de cada entrada individual — horário, criança, responsável que acompanhou e quem atendeu no balcão. Para consulta e rastreio posterior, inclusive para fins jurídicos.",
     ANIVERSARIANTES: "Lista de crianças cadastradas que fazem aniversário no mês selecionado.",
     TURNOS: "Histórico de turnos de caixa abertos e fechados nesta unidade.",
@@ -156,6 +158,7 @@ export function RelatorioScreen() {
         {tab === "VENDAS" && <VendasTab unitId={unit.id} from={from} to={to} />}
         {tab === "PLANOS" && <PlanosVendidosTab unitId={unit.id} from={from} to={to} />}
         {tab === "VISITAS" && <VisitasTab unitId={unit.id} from={from} to={to} />}
+        {tab === "CHECKINS_HORA" && <CheckinsPorHoraTab unitId={unit.id} from={from} to={to} />}
         {tab === "SESSOES" && <SessoesTab unitId={unit.id} from={from} to={to} />}
         {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
         {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
@@ -902,6 +905,75 @@ export function FrotaHeatmapTab({ unitId, from, to }: { unitId: string; from: st
         })}
         {usage.length === 0 && <p>Nenhum carrinho cadastrado para esta unidade.</p>}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Check-ins por hora do dia — quando unitId é null (visão Gerencial "Todas
+ * as unidades"), compara as unidades lado a lado na mesma hora em vez de
+ * somar tudo, porque o valor do relatório aqui é ver o pico de movimento
+ * de cada unidade, não um total agregado sem detalhe.
+ */
+export function CheckinsPorHoraTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
+  const [rows, setRows] = useState<CheckinsByHour[]>([]);
+
+  useEffect(() => {
+    Api.reportCheckinsByHour(unitId, from, to).then(setRows);
+  }, [unitId, from, to]);
+
+  const unitNames = [...new Set(rows.map((r) => r.unit_name))].sort();
+  const byHour = new Map<number, Record<string, number | string>>();
+  for (let h = 0; h < 24; h++) byHour.set(h, { hourLabel: `${String(h).padStart(2, "0")}h` });
+  for (const r of rows) {
+    const entry = byHour.get(r.hour);
+    if (entry) entry[r.unit_name] = r.count;
+  }
+  const chartData = [...byHour.values()];
+  const total = rows.reduce((sum, r) => sum + r.count, 0);
+  const peak = rows.reduce<CheckinsByHour | null>((best, r) => (r.count > (best?.count ?? 0) ? r : best), null);
+
+  return (
+    <div>
+      <Card style={{ padding: "16px", margin: "16px 0" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px" }}>Total de check-ins no período: {total}</h2>
+        {peak && (
+          <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>
+            Horário de pico: {String(peak.hour).padStart(2, "0")}h ({peak.count} check-in{peak.count === 1 ? "" : "s"}
+            {unitId === null ? ` — ${peak.unit_name}` : ""})
+          </p>
+        )}
+      </Card>
+      <div style={{ marginBottom: "16px" }}>
+        <CheckinsByHourChart data={chartData} unitNames={unitNames} />
+      </div>
+      <Card style={{ padding: "8px", overflowX: "auto" }}>
+        <table className="report-table">
+          <thead>
+            <tr>
+              <th>Hora</th>
+              {unitId === null && <th>Unidade</th>}
+              <th>Check-ins</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.unit_id}-${r.hour}`}>
+                <td>{String(r.hour).padStart(2, "0")}h</td>
+                {unitId === null && <td>{r.unit_name}</td>}
+                <td style={{ textAlign: "center" }}>{r.count}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={unitId === null ? 3 : 2} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                  Nenhum check-in encontrado para os filtros selecionados.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }

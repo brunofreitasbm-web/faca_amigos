@@ -71,6 +71,9 @@ export function PainelScreen() {
   const [pendingPauseReason, setPendingPauseReason] = useState<string>("");
   const [dailyGoalCents, setDailyGoalCents] = useState(0);
   const [todayRevenueCents, setTodayRevenueCents] = useState(0);
+  const [ticketMedioCents, setTicketMedioCents] = useState(0);
+  const [ticketMinCents, setTicketMinCents] = useState(0);
+  const [ticketTargetCents, setTicketTargetCents] = useState(0);
   const [entradaOpen, setEntradaOpen] = useState(false);
   const [preCheckinPrefill, setPreCheckinPrefill] = useState<PreCheckinPrefill | null>(null);
   const [pendingPreCheckins, setPendingPreCheckins] = useState<PreCheckinPrefill[]>([]);
@@ -169,13 +172,18 @@ export function PainelScreen() {
     let cancelled = false;
     async function poll() {
       try {
-        const [goal, revenue] = await Promise.all([
+        const [goal, revenue, ticketMedio, ticketGoal] = await Promise.all([
           Api.unitSetting(unit!.id, "daily_goal_cents"),
           Api.todayRevenue(unit!.id, unit!.business_day_cutoff_hour),
+          Api.todayTicketMedio(unit!.id, unit!.business_day_cutoff_hour),
+          Api.ticketGoal(unit!.id),
         ]);
         if (!cancelled) {
           setDailyGoalCents(Number(goal.value) || 0);
           setTodayRevenueCents(revenue.totalCents);
+          setTicketMedioCents(ticketMedio.avgCents);
+          setTicketMinCents(ticketGoal?.minTicketCents ?? 0);
+          setTicketTargetCents(ticketGoal?.targetTicketCents ?? 0);
         }
       } catch {
         // Meta é um extra informativo — se o backend ainda não tiver essas rotas (ex: servidor não reiniciado), o Painel segue funcionando sem o banner.
@@ -920,6 +928,35 @@ export function PainelScreen() {
               }}
             />
           </div>
+        </div>
+      )}
+
+      {ticketTargetCents > 0 && (
+        <div
+          title="Ticket médio de hoje comparado ao mínimo e ao alvo configurados pelo Owner em Gerencial → Metas"
+          style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
+          className="capacity-container"
+        >
+          {(() => {
+            const zoneColor =
+              ticketMedioCents < ticketMinCents
+                ? "var(--color-error)"
+                : ticketMedioCents < ticketTargetCents
+                  ? "var(--color-amber)"
+                  : "var(--color-success)";
+            const percent = Math.min(100, Math.round((ticketMedioCents / ticketTargetCents) * 100));
+            return (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "var(--text-muted)" }}>
+                  <span>🌡️ Ticket Médio hoje: {money(ticketMedioCents)} (mín {money(ticketMinCents)} / alvo {money(ticketTargetCents)})</span>
+                  <span style={{ color: zoneColor, fontWeight: "bold" }}>{percent}%</span>
+                </div>
+                <div className="capacity-bar-track">
+                  <div className="capacity-bar-fill" style={{ width: `${percent}%`, backgroundColor: zoneColor }} />
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 

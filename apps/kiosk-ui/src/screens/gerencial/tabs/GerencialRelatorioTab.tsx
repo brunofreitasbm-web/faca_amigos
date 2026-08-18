@@ -7,12 +7,13 @@ import {
   VendasTab,
   PlanosVendidosTab,
   VisitasTab,
+  CheckinsPorHoraTab,
   SessoesTab,
   FrotaHeatmapTab,
 } from "../../RelatorioScreen.js";
 import type { PeriodPreset } from "../../RelatorioScreen.js";
 
-type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "SESSOES" | "FROTA";
+type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "FROTA";
 
 /**
  * Mesma estrutura de abas do Relatório por unidade, só que com um filtro de
@@ -38,6 +39,7 @@ export function GerencialRelatorioTab() {
     { value: "VENDAS", label: "Vendas" },
     { value: "PLANOS", label: "Planos vendidos" },
     { value: "VISITAS", label: "Visitas" },
+    { value: "CHECKINS_HORA", label: "Check-ins por hora" },
     { value: "SESSOES", label: "Sessões (auditoria)" },
     ...(isQuiosque ? ([{ value: "FROTA" as const, label: "Frota (mapa de calor)" }] as const) : []),
   ];
@@ -90,6 +92,7 @@ export function GerencialRelatorioTab() {
         {tab === "VENDAS" && <VendasTab unitId={unitId} from={from} to={to} />}
         {tab === "PLANOS" && <PlanosVendidosTab unitId={unitId} from={from} to={to} />}
         {tab === "VISITAS" && <VisitasTab unitId={unitId} from={from} to={to} />}
+        {tab === "CHECKINS_HORA" && <CheckinsPorHoraTab unitId={unitId} from={from} to={to} />}
         {tab === "SESSOES" && <SessoesTab unitId={unitId} from={from} to={to} />}
         {tab === "FROTA" && isQuiosque && <FrotaHeatmapTab unitId={unitFilter} from={from} to={to} />}
       </div>
