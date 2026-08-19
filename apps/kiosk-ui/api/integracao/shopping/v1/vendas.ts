@@ -22,22 +22,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data, error } = await supabase
     .from("fa_kiosk_orders")
-    .select("id, created_at_ms, total_cents, status")
+    .select("id, created_at, closed_at_ms, total_cents, status")
     .eq("unit_id", targetUnitId)
     .gte("business_date", de)
     .lte("business_date", ate)
     .in("status", ["PAGA", "CANCELADA"])
-    .order("created_at_ms", { ascending: true });
+    .order("created_at", { ascending: true });
 
   if (error) {
     return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar vendas." });
   }
 
-  const orders = (data || []) as { id: string; created_at_ms: number; total_cents: number; status: string }[];
+  const orders = (data || []) as { id: string; created_at: string; closed_at_ms: number | null; total_cents: number; status: string }[];
 
   const vendas = orders.map((o) => ({
     idVenda: o.id,
-    dataHora: new Date(o.created_at_ms).toISOString(),
+    dataHora: new Date(o.closed_at_ms ?? o.created_at).toISOString(),
     valorCentavos: o.total_cents,
     cancelado: o.status === "CANCELADA",
     troca: false,

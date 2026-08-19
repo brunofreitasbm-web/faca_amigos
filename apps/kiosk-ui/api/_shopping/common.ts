@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 
 export interface ShoppingUnitInfo {
   unidadeId: string;
@@ -72,29 +73,41 @@ export async function authenticateShoppingRequest(
     return null;
   }
 
-  const { data: units, error } = await supabase
-    .from("fa_kiosk_units")
-    .select("id, kind, name, cnpj, razao_social, timezone");
+  const keyHash = createHash("sha256").update(token).digest("hex");
 
-  if (error || !units || units.length === 0) {
+  const { data: keyRow, error: keyError } = await supabase
+    .from("fa_shopping_api_keys")
+    .select("id, unit_id, scope, revoked_at")
+    .eq("key_hash", keyHash)
+    .maybeSingle();
+
+  if (keyError || !keyRow) {
     res.status(401).json({ error: "CHAVE_INVALIDA" });
     return null;
   }
 
-  const typedUnits = units as UnitRow[];
-
-  if (token.includes("circuito") || token.includes("quiosque")) {
-    return typedUnits.find(isCircuito) || typedUnits[0]!;
+  if (keyRow.revoked_at) {
+    res.status(401).json({ error: "CHAVE_REVOGADA" });
+    return null;
   }
 
-  if (token.includes("playground") || token.includes("loja")) {
-    return typedUnits.find((u) => !isCircuito(u)) || typedUnits[0]!;
+  if (keyRow.scope !== "FATURAMENTO_LEITURA") {
+    res.status(403).json({ error: "ESCOPO_INSUFICIENTE" });
+    return null;
   }
 
-  if (token.startsWith("fa_shp_") || token === "test-key" || token === "homolog-key") {
-    return typedUnits[0]!;
+  const { data: unit, error: unitError } = await supabase
+    .from("fa_kiosk_units")
+    .select("id, kind, name, cnpj, razao_social, timezone")
+    .eq("id", keyRow.unit_id)
+    .maybeSingle();
+
+  if (unitError || !unit) {
+    res.status(401).json({ error: "CHAVE_INVALIDA" });
+    return null;
   }
 
-  res.status(401).json({ error: "CHAVE_INVALIDA" });
-  return null;
+  void supabase.from("fa_shopping_api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id);
+
+  return unit as UnitRow;
 }
