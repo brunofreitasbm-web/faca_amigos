@@ -15,11 +15,16 @@ log.transports.console.level = false;
 
 let initialized = false;
 
+/** Quiosque fica em fullscreen rodando por dias sem fechar — sem um
+ * intervalo periódico, a única checagem é na abertura do app, então uma
+ * atualização publicada nunca é vista até o próximo reboot manual. */
+const PERIODIC_CHECK_INTERVAL_MS = 2 * 60 * 60 * 1000;
+
 /**
  * Dispara uma verificação (e, se houver versão nova, download em segundo
- * plano). Chamado na abertura do app e de novo antes de fechar — assim a
- * atualização baixada fica pronta e o autoInstallOnAppQuit instala no
- * fechamento seguinte, sem depender do intervalo de 4h que existia antes.
+ * plano). Chamado na abertura do app, periodicamente enquanto o app fica
+ * aberto, e de novo antes de fechar — assim a atualização baixada fica
+ * pronta e o autoInstallOnAppQuit instala no fechamento seguinte.
  */
 export function checkForUpdates(): void {
   if (!app.isPackaged) return;
@@ -82,4 +87,6 @@ export function initAutoUpdater(): void {
   // Verificação inicial na abertura do app (a de fechamento é disparada
   // por checkForUpdates() a partir do main.ts, no window-all-closed).
   checkForUpdates();
+
+  setInterval(checkForUpdates, PERIODIC_CHECK_INTERVAL_MS);
 }
