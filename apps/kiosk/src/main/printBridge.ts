@@ -1,4 +1,6 @@
 import { BrowserWindow } from "electron";
+import { existsSync, mkdirSync, writeFileSync, readdirSync, unlinkSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
 import { generateEscPosReceipt, generateEscPosCircuitoTermo, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
@@ -142,6 +144,82 @@ function printHtml(html: string, deviceName: string): Promise<void> {
   });
 }
 
+function saveHtmlToPdfBuffer(html: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
+    win
+      .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      .then(async () => {
+        try {
+          const pdfBuffer = await win.webContents.printToPDF({
+            printBackground: true,
+            margins: { marginType: "none" },
+          });
+          win.destroy();
+          resolve(pdfBuffer);
+        } catch (err) {
+          win.destroy();
+          reject(err);
+        }
+      })
+      .catch((err) => {
+        win.destroy();
+        reject(err);
+      });
+  });
+}
+
+/**
+ * Limpa cupons em PDF armazenados na pasta local e no banco de dados
+ * com tempo de vida superior a retentionDays (padrão: 10 dias).
+ */
+export async function cleanupExpiredPdfReceipts(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseClient?: any,
+  retentionDays = 10,
+): Promise<number> {
+  let cleanedCount = 0;
+  const now = Date.now();
+  const cutoffMs = now - retentionDays * 24 * 60 * 60 * 1000;
+  const pdfDir = join(process.cwd(), "storage", "cupons_pdf");
+
+  try {
+    if (existsSync(pdfDir)) {
+      const files = readdirSync(pdfDir);
+      for (const file of files) {
+        if (!file.endsWith(".pdf")) continue;
+        const filePath = join(pdfDir, file);
+        try {
+          const stat = statSync(filePath);
+          if (stat.mtimeMs < cutoffMs || stat.birthtimeMs < cutoffMs) {
+            unlinkSync(filePath);
+            cleanedCount++;
+            console.log(`[print-bridge] PDF de cupom expirado removido do disco (${retentionDays} dias): ${file}`);
+          }
+        } catch (err) {
+          console.warn(`[print-bridge] Erro ao excluir PDF expirado ${filePath}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[print-bridge] Erro na verificação de PDFs expirados:", err);
+  }
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.rpc("fa_kiosk_cleanup_expired_pdf_receipts", { days_retention: retentionDays });
+    } catch {
+      try {
+        await supabaseClient.from("fa_kiosk_print_jobs").delete().eq("status", "SAVED_PDF").lt("created_at_ms", cutoffMs);
+      } catch (e) {
+        console.warn("[print-bridge] Erro ao limpar registros de PDF no Supabase:", e);
+      }
+    }
+  }
+
+  return cleanedCount;
+}
+
 export interface PrintBridgeStartResult {
   started: boolean;
   reason?: string;
@@ -183,9 +261,53 @@ function isVirtualOrPdfPrinter(deviceName: string): boolean {
   return lower.includes("pdf") || lower.includes("xps") || lower.includes("virtual") || lower.includes("fax") || lower.includes("onenote");
 }
 
+  async function handleReceiptPdfFallback(job: PrintJobRow, originalError: string): Promise<void> {
+    const rawPayload = job.payload_json as unknown as ReceiptPrintPayload;
+    const trackingUrl = trackingUrlFor(rawPayload.accessCode);
+    const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
+    const html = await receiptHtml(payload);
+
+    const pdfBuffer = await saveHtmlToPdfBuffer(html);
+    const pdfDir = join(process.cwd(), "storage", "cupons_pdf");
+    if (!existsSync(pdfDir)) {
+      mkdirSync(pdfDir, { recursive: true });
+    }
+
+    const filename = `cupom_${job.id}_${Date.now()}.pdf`;
+    const filePath = join(pdfDir, filename);
+    writeFileSync(filePath, pdfBuffer);
+
+    const base64Data = pdfBuffer.toString("base64");
+    const pdfDataUrl = `data:application/pdf;base64,${base64Data}`;
+
+    await supabase
+      .from("fa_kiosk_print_jobs")
+      .update({
+        status: "SAVED_PDF",
+        error: `Impressora ausente ou indisponível (${originalError}). Salvo em PDF (retenção 10 dias).`,
+        pdf_path: filePath,
+        pdf_url: pdfDataUrl,
+        printed_at_ms: Date.now(),
+      })
+      .eq("id", job.id);
+
+    console.log(`[print-bridge] job ${job.id} (RECEIPT) salvo em PDF devido a impressora ausente/com erro: ${filePath}`);
+  }
+
   async function handleJob(job: PrintJobRow): Promise<void> {
     try {
-      const deviceName = await printerNameFor(job.unit_id, job.kind);
+      let deviceName: string | null = null;
+      try {
+        deviceName = await printerNameFor(job.unit_id, job.kind);
+      } catch {
+        deviceName = null;
+      }
+
+      if (!deviceName && job.kind === "RECEIPT") {
+        await handleReceiptPdfFallback(job, "Nenhuma impressora de cupom configurada");
+        return;
+      }
+
       if (!deviceName) {
         throw new Error(`Nenhuma impressora de ${job.kind === "WRISTBAND" ? "pulseira" : "cupom"} configurada (Configurações > Impressoras)`);
       }
@@ -246,10 +368,24 @@ function isVirtualOrPdfPrinter(deviceName: string): boolean {
       console.log(`[print-bridge] job ${job.id} (${job.kind}) impresso em "${deviceName}".`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (job.kind === "RECEIPT") {
+        try {
+          await handleReceiptPdfFallback(job, message);
+          return;
+        } catch (pdfErr) {
+          console.error(`[print-bridge] Falha no fallback para PDF do job ${job.id}:`, pdfErr);
+        }
+      }
       await supabase.from("fa_kiosk_print_jobs").update({ status: "FAILED", error: message }).eq("id", job.id);
       console.error(`[print-bridge] job ${job.id} (${job.kind}) falhou: ${message}`);
     }
   }
+
+  // Executa rotina de limpeza de cupons PDF com mais de 10 dias
+  void cleanupExpiredPdfReceipts(supabase, 10);
+  setInterval(() => {
+    void cleanupExpiredPdfReceipts(supabase, 10);
+  }, 12 * 60 * 60 * 1000);
 
   // Pega pedidos que chegaram antes deste terminal ligar (ex.: reiniciou
   // no meio do expediente) — a assinatura Realtime abaixo só pega INSERTs

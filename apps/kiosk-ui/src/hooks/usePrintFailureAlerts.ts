@@ -20,10 +20,20 @@ export function usePrintFailureAlerts(unitId: string | null | undefined): void {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "fa_kiosk_print_jobs", filter: `unit_id=eq.${unitId}` },
         (payload) => {
-          const row = payload.new as { status?: string; kind?: string; error?: string | null };
-          if (row.status !== "FAILED") return;
-          const label = row.kind === "WRISTBAND" ? "pulseira" : "recibo";
-          toast.error(`Falha ao imprimir ${label}: ${row.error ?? "erro desconhecido"}. Veja Configurações > Impressoras.`);
+          const row = payload.new as { status?: string; kind?: string; error?: string | null; pdf_url?: string | null };
+          if (row.status === "FAILED") {
+            const label = row.kind === "WRISTBAND" ? "pulseira" : "recibo";
+            toast.error(`Falha ao imprimir ${label}: ${row.error ?? "erro desconhecido"}. Veja Configurações > Impressoras.`);
+          } else if (row.status === "SAVED_PDF") {
+            toast.error(`Impressora de cupom indisponível. Cupom salvo em PDF (disponível por 10 dias).`);
+            if (row.pdf_url) {
+              window.dispatchEvent(
+                new CustomEvent("fa-open-pdf-receipt", {
+                  detail: { pdfUrl: row.pdf_url, error: row.error },
+                }),
+              );
+            }
+          }
         },
       )
       .subscribe();
