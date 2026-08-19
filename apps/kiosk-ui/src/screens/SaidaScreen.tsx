@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Input, Tag, HelpText, AsyncState } from "@facaamigos/ui";
 import { formatAccessCode } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
-import type { ActiveSessionEntry, ResolvedAccessCode } from "../api/client.js";
+import type { ActiveSessionEntry, ResolvedAccessCode, Package, Coupon } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
@@ -109,6 +109,17 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
 
   const [checkoutOffers, setCheckoutOffers] = useState<CheckoutOffer[]>([]);
   const [loadingCheckoutOffers, setLoadingCheckoutOffers] = useState(false);
+  const [checkoutPackages, setCheckoutPackages] = useState<Package[]>([]);
+  const [checkoutCoupons, setCheckoutCoupons] = useState<Coupon[]>([]);
+
+  // Catálogo real de pacotes e cupons desta unidade, para a ZoeIA só sugerir
+  // ofertas de retenção que existem de fato — nunca nomes inventados.
+  useEffect(() => {
+    if (!unit) return;
+    const activity = unit.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
+    Api.packages(unit.id, activity).then(setCheckoutPackages);
+    Api.coupons(unit.id).then(setCheckoutCoupons);
+  }, [unit?.id, unit?.kind]);
 
   useEffect(() => {
     if (!resolved?.sessionId || !entry || !unit) {
@@ -124,6 +135,16 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
       extraMinutes: entry.quote.timing.overMinutes,
       totalPaidCents: entry.quote.totalCents,
       unitName: unit.name,
+      availablePackages: checkoutPackages.map((p) => ({
+        id: p.id,
+        name: p.name,
+        priceCents: p.priceCents,
+        includedMinutes: p.includedMinutes,
+      })),
+      availableCoupons: checkoutCoupons.map((c) => ({
+        code: c.code,
+        discountText: c.kind === "DESCONTO_PCT" ? `${c.value}% OFF` : `R$ ${(c.value / 100).toFixed(2)} OFF`,
+      })),
     })
       .then((offers) => {
         if (active) setCheckoutOffers(offers);
@@ -135,7 +156,7 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
     return () => {
       active = false;
     };
-  }, [resolved?.sessionId, entry?.session.id, unit?.id]);
+  }, [resolved?.sessionId, entry?.session.id, unit?.id, checkoutPackages, checkoutCoupons]);
 
   function handleApplyCheckoutOffer(offer: CheckoutOffer) {
     toast.success(`Oferta "${offer.title}" recomendada ao responsável!`);

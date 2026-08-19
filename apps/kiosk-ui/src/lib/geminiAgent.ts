@@ -93,6 +93,8 @@ export interface CheckoutContext {
   totalPaidCents?: number;
   visitCount?: number;
   unitName?: string;
+  availablePackages?: Array<{ id: string; name: string; priceCents: number; includedMinutes: number }>;
+  availableCoupons?: Array<{ code: string; discountText?: string }>;
 }
 
 export interface GerencialInsight {
@@ -236,9 +238,15 @@ Responda EXCLUSIVAMENTE em formato JSON com o seguinte esquema:
   ]
 }`;
 
-  const plansText = ctx.availablePlans?.map((p) => `- ${p.name}: ${p.minutes}min por R$ ${(p.valueCents / 100).toFixed(2)}`).join("\n") || "Planos Padrão do Sistema";
-  const productsText = ctx.availableProducts?.map((p) => `- ${p.name}: R$ ${(p.priceCents / 100).toFixed(2)}`).join("\n") || "Meias Antiderrapantes e Bebidas";
-  const couponsText = ctx.availableCoupons?.map((c) => `- Código: ${c.code} (${c.discountText || "Desconto"})`).join("\n") || "Sem cupons adicionais";
+  const plansText = ctx.availablePlans?.length
+    ? ctx.availablePlans.map((p) => `- ${p.name}: ${p.minutes}min por R$ ${(p.valueCents / 100).toFixed(2)}`).join("\n")
+    : "Nenhum plano ativo cadastrado nesta unidade";
+  const productsText = ctx.availableProducts?.length
+    ? ctx.availableProducts.map((p) => `- ${p.name}: R$ ${(p.priceCents / 100).toFixed(2)}`).join("\n")
+    : "Nenhum produto ativo cadastrado nesta unidade";
+  const couponsText = ctx.availableCoupons?.length
+    ? ctx.availableCoupons.map((c) => `- Código: ${c.code} (${c.discountText || "Desconto"})`).join("\n")
+    : "Sem cupons adicionais";
 
   const prompt = `Contexto da Entrada na Unidade (${ctx.unitName || "Playground"}):
 - Criança: ${ctx.childName || "Criança"} (${ctx.childAge ? ctx.childAge + " anos" : "idade não inf."})
@@ -283,44 +291,59 @@ function getLocalCheckinFallback(ctx: CheckinContext): CheckinOffer[] {
   const selectedMinutes = ctx.selectedPlanMinutes || 30;
   const visitCount = ctx.visitCount || 1;
 
-  // Sugestão 1: Upgrade de Plano se selecionou plano curto
-  if (selectedMinutes <= 30) {
+  // Sugestão 1: Upgrade para o próximo plano cadastrado e ativo (por
+  // duração), estritamente entre os planos reais desta unidade — nunca um
+  // nome inventado.
+  const nextPlan = (ctx.availablePlans ?? [])
+    .filter((p) => p.minutes > selectedMinutes)
+    .sort((a, b) => a.minutes - b.minutes)[0];
+  if (nextPlan) {
     offers.push({
-      id: "up_1h",
-      title: "Upgrade para Plano 60 Minutos",
-      description: "As crianças costumam brincar mais de 45min. Garanta o valor promocional de 1h!",
+      id: "up_next_plan",
+      title: `Upgrade para ${nextPlan.name}`,
+      description: `As crianças costumam brincar por mais tempo. Garanta ${nextPlan.minutes}min por R$ ${(nextPlan.valueCents / 100).toFixed(2)}!`,
       badge: "✦ Sugestão IA",
       actionType: "UPGRADE_PLAN",
-      targetName: "60 Minutos",
-      reason: "O tempo médio de permanência na unidade é de 55 minutos.",
+      targetId: nextPlan.id,
+      targetName: nextPlan.name,
+      priceCents: nextPlan.valueCents,
+      reason: "Plano mais longo cadastrado e ativo nesta unidade, com melhor custo-benefício por minuto.",
     });
   }
 
-  // Sugestão 2: Meia Antiderrapante
-  const hasSocks = ctx.productsInCart?.some((p) => p.toLowerCase().includes("meia"));
-  if (!hasSocks) {
+  // Sugestão 2: um produto real, ativo e cadastrado nesta unidade que ainda
+  // não está no carrinho — preferindo itens de segurança (ex.: meia).
+  const cartLower = (ctx.productsInCart ?? []).map((p) => p.toLowerCase());
+  const candidateProducts = (ctx.availableProducts ?? []).filter(
+    (p) => !cartLower.some((c) => c.includes(p.name.toLowerCase())),
+  );
+  const suggestedProduct =
+    candidateProducts.find((p) => p.name.toLowerCase().includes("meia")) ?? candidateProducts[0];
+  if (suggestedProduct) {
     offers.push({
-      id: "add_socks",
-      title: "Adicionar Meia Antiderrapante",
-      description: "Meias oficiais com aderência para maior segurança nos brinquedos.",
+      id: "add_product",
+      title: `Adicionar ${suggestedProduct.name}`,
+      description: `Item disponível no cadastro desta unidade por R$ ${(suggestedProduct.priceCents / 100).toFixed(2)}.`,
       badge: "Item Essencial",
       actionType: "ADD_PRODUCT",
-      targetName: "Meia Antiderrapante",
-      priceCents: 1500,
-      reason: "Segurança reforçada e exigência para brinquedos com circuito alto.",
+      targetId: suggestedProduct.id,
+      targetName: suggestedProduct.name,
+      priceCents: suggestedProduct.priceCents,
+      reason: "Produto ativo e cadastrado no catálogo real desta unidade.",
     });
   }
 
-  // Sugestão 3: Pacote de Horas para clientes recorrentes
-  if (visitCount >= 2 && offers.length < 2) {
+  // Sugestão 3: um cupom real e ativo, para clientes recorrentes.
+  const coupon = (ctx.availableCoupons ?? [])[0];
+  if (visitCount >= 2 && coupon && offers.length < 2) {
     offers.push({
-      id: "vip_pack",
-      title: "Pacote Fidelidade 10 Horas",
-      description: "Cliente frequente! Economize até 35% por hora comprando o pacote promocional.",
+      id: "apply_coupon",
+      title: `Aplicar cupom ${coupon.code}`,
+      description: `Cliente frequente! Aproveite ${coupon.discountText ?? "o desconto"} cadastrado nesta unidade.`,
       badge: "Economia VIP",
       actionType: "APPLY_COUPON",
-      targetName: "PACOTE_VIP",
-      reason: "Cliente em sua visita #" + visitCount + ". Apresenta alto potencial de conversão.",
+      targetName: coupon.code,
+      reason: "Cliente em sua visita #" + visitCount + ". Cupom real e ativo cadastrado nesta unidade.",
     });
   }
 
@@ -332,6 +355,11 @@ function getLocalCheckinFallback(ctx: CheckinContext): CheckinOffer[] {
  */
 export async function generateCheckoutSuggestions(ctx: CheckoutContext): Promise<CheckoutOffer[]> {
   const systemInstruction = `Você é a ZoeIA, a especialista em fidelização e retenção do FaçaAmigos.
+REGRA ABSOLUTA E INEGOCIÁVEL:
+1. NUNCA invente pacotes, cupons ou promoções que não estejam cadastrados no sistema.
+2. Suas recomendações DEVEM ser baseadas estritamente nos Pacotes e Cupons REAIS cadastrados na unidade informada.
+3. Se o catálogo real não tiver um pacote ou cupom aplicável, não gere oferta desse tipo — não invente um.
+
 Gere ofertas humanas e estratégicas de checkout para acolher e fidelizar a família ao sair do parque.
 Responda EXCLUSIVAMENTE no formato JSON:
 {
@@ -341,17 +369,34 @@ Responda EXCLUSIVAMENTE no formato JSON:
       "title": "string curto chamativo",
       "description": "string com tom humano e convidativo",
       "badge": "string opcional (ex: Dica da ZoeIA, Fidelidade VIP)",
-      "actionType": "CONVERT_VIP_PACKAGE" | "OFFER_RETURN_COUPON" | "BOOK_EVENT",
+      "actionType": "CONVERT_VIP_PACKAGE" | "OFFER_RETURN_COUPON",
+      "targetName": "nome ou código EXATO do pacote ou cupom cadastrado no sistema",
       "reason": "string"
     }
   ]
 }`;
 
-  const prompt = `Contexto da Saída:
+  const packagesText = ctx.availablePackages?.length
+    ? ctx.availablePackages.map((p) => `- ${p.name}: ${p.includedMinutes}min por R$ ${(p.priceCents / 100).toFixed(2)}`).join("\n")
+    : "Nenhum pacote ativo cadastrado nesta unidade";
+  const couponsText = ctx.availableCoupons?.length
+    ? ctx.availableCoupons.map((c) => `- Código: ${c.code} (${c.discountText || "Desconto"})`).join("\n")
+    : "Sem cupons ativos cadastrados nesta unidade";
+
+  const prompt = `Contexto da Saída (${ctx.unitName || "Playground"}):
 - Criança: ${ctx.childName || "Criança"}
 - Permanência total: ${ctx.durationMinutes || 0} minutos (Excedente: ${ctx.extraMinutes || 0} min)
 - Valor pago acumulado: R$ ${((ctx.totalPaidCents || 0) / 100).toFixed(2)}
-- Visitas anteriores: ${ctx.visitCount || 1}`;
+- Visitas anteriores: ${ctx.visitCount || 1}
+
+CATÁLOGO REAL CADASTRADO NA UNIDADE:
+[PACOTES DISPONÍVEIS]
+${packagesText}
+
+[CUPONS DISPONÍVEIS]
+${couponsText}
+
+Com base SOMENTE neste catálogo real cadastrado, gere até 2 ofertas de retenção com excelente argumento de vendas.`;
 
   const rawJson = await callGemini(prompt, systemInstruction);
   if (rawJson) {
@@ -365,25 +410,44 @@ Responda EXCLUSIVAMENTE no formato JSON:
     }
   }
 
-  // Fallback Local de Checkout
-  return [
-    {
+  return getLocalCheckoutFallback(ctx);
+}
+
+/**
+ * Fallback local caso a API falhe ou não tenha chave configurada — monta as
+ * ofertas só a partir de pacotes/cupons reais, ativos e cadastrados na
+ * unidade, nunca com nome inventado.
+ */
+function getLocalCheckoutFallback(ctx: CheckoutContext): CheckoutOffer[] {
+  const offers: CheckoutOffer[] = [];
+
+  const coupon = (ctx.availableCoupons ?? [])[0];
+  if (coupon) {
+    offers.push({
       id: "checkout_return",
-      title: "Cupom 15% OFF na Próxima Visita",
-      description: "Ofereça este desconto para retorno até a próxima quinta-feira em dias de menor movimento.",
+      title: `Cupom ${coupon.code} na Próxima Visita`,
+      description: `Ofereça ${coupon.discountText ?? "este desconto"} cadastrado nesta unidade para estimular o retorno.`,
       badge: "Dica da ZoeIA",
       actionType: "OFFER_RETURN_COUPON",
-      reason: "Garante retorno rápido da família e estimula o movimento em dias úteis.",
-    },
-    {
+      targetId: coupon.code,
+      reason: "Cupom real e ativo cadastrado nesta unidade — garante retorno rápido da família.",
+    });
+  }
+
+  const bestPackage = (ctx.availablePackages ?? []).slice().sort((a, b) => b.includedMinutes - a.includedMinutes)[0];
+  if (bestPackage && offers.length < 2) {
+    offers.push({
       id: "checkout_package",
-      title: "Converter em Pacote Passaporte VIP",
-      description: "Abata parte do valor da sessão de hoje na adesão de um pacote de 10 horas.",
+      title: `Converter em ${bestPackage.name}`,
+      description: `Abata parte do valor da sessão de hoje na adesão do pacote de ${bestPackage.includedMinutes}min por R$ ${(bestPackage.priceCents / 100).toFixed(2)}.`,
       badge: "ZoeIA Indica",
       actionType: "CONVERT_VIP_PACKAGE",
-      reason: "Família acumulou mais de " + (ctx.durationMinutes || 45) + " minutos nesta visita.",
-    },
-  ];
+      targetId: bestPackage.id,
+      reason: "Família acumulou mais de " + (ctx.durationMinutes || 45) + " minutos nesta visita — pacote real e ativo cadastrado nesta unidade.",
+    });
+  }
+
+  return offers;
 }
 
 export interface OperatorPerformance {

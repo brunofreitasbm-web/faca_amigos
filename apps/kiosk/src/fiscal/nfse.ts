@@ -14,10 +14,10 @@ import type { ClaimedFiscalDoc } from "./claim.js";
  *     resolvido (mesma estratégia da NFC-e, que também está bloqueada
  *     aguardando a Fase 5/6 do SVRS).
  *
- * Depois de autorizar (simulado ou real), dispara o e-mail ao Responsável
- * via a Edge Function nfse-email-dispatch — é aqui, não na Edge Function,
- * porque só o worker sabe o instante exato em que o documento virou
- * AUTORIZADO.
+ * A entrega ao Responsável NÃO acontece aqui: depois de AUTORIZADO, o
+ * kiosk-ui mostra o botão "Enviar NFS-e por WhatsApp" (CheckoutModal),
+ * que abre o wa.me com o comprovante e registra o envio via
+ * fa_fiscal_mark_nfse_sent. Sem e-mail/Resend por decisão de produto.
  */
 
 async function reservarNumeroRps(supabase: SupabaseClient, doc: ClaimedFiscalDoc["doc"], unitId: string): Promise<number> {
@@ -57,16 +57,8 @@ export async function bloquearNfsePorFaltaDeTransporteReal(supabase: SupabaseCli
       status: "BLOQUEADO",
       last_error: "Transmissão real de NFS-e (prefeitura de Belém, sistema próprio) ainda não implementada: " +
         "layout/WSDL do webservice municipal pendente de confirmação. Rode com FACAAMIGOS_FISCAL_MODE=SIMULADO " +
-        "para validar a fila e o envio de e-mail.",
+        "para validar a fila e o envio por WhatsApp.",
       updated_at_ms: nowMs,
     })
     .eq("id", doc.id);
-}
-
-/** Dispara o e-mail ao Responsável — falha aqui vira log, nunca reabre o documento (a nota já foi emitida). */
-export async function dispararEmailNfse(supabase: SupabaseClient, fiscalDocId: string, onLog?: (message: string) => void): Promise<void> {
-  const { error } = await supabase.functions.invoke("nfse-email-dispatch", { body: { fiscalDocId } });
-  if (error) {
-    onLog?.(`[fiscal] nfse-email-dispatch falhou para documento ${fiscalDocId}: ${error.message}`);
-  }
 }

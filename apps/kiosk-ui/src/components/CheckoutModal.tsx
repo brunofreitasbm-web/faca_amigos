@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { ActiveSessionEntry } from "../api/client.js";
+import type { ActiveSessionEntry, FiscalDoc } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
 import { ReceiptPrintModal } from "./ReceiptPrintModal.js";
@@ -93,8 +93,14 @@ export function CheckoutModal({
   const [receipts, setReceipts] = useState<ReceiptPrintPayload[]>([]);
   const [hasOpenShift, setHasOpenShift] = useState<boolean | null>(null);
   const [paidOrderId, setPaidOrderId] = useState<string | null>(null);
+  const [paidOrderCode, setPaidOrderCode] = useState<string | null>(null);
   const [nfseEnabled, setNfseEnabled] = useState(false);
-  const [nfseState, setNfseState] = useState<"idle" | "enfileirando" | "enfileirado" | "erro">("idle");
+  // Fluxo da NFS-e: idle -> enfileirando -> aguardando (worker emite) ->
+  // autorizada (botão WhatsApp) | bloqueada | erro. Sem e-mail: a entrega
+  // ao Responsável é sempre pelo WhatsApp, via botão.
+  const [nfseState, setNfseState] = useState<"idle" | "enfileirando" | "aguardando" | "autorizada" | "bloqueada" | "erro">("idle");
+  const [nfseDoc, setNfseDoc] = useState<FiscalDoc | null>(null);
+  const [nfseSent, setNfseSent] = useState(false);
 
   useEffect(() => {
     if (!unit) return;
@@ -109,9 +115,85 @@ export function CheckoutModal({
     setNfseState("enfileirando");
     try {
       await Api.requestNfse(paidOrderId);
-      setNfseState("enfileirado");
+      setNfseState("aguardando");
     } catch {
       setNfseState("erro");
+    }
+  }
+
+  // Enquanto "aguardando", consulta a fila a cada 3s até o worker autorizar
+  // (ou bloquear). Desiste depois de ~2 min pra não deixar o operador preso.
+  useEffect(() => {
+    if (nfseState !== "aguardando" || !paidOrderId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const tick = async () => {
+      attempts += 1;
+      try {
+        const doc = await Api.nfseDocByOrder(paidOrderId);
+        if (cancelled) return;
+        if (doc?.status === "AUTORIZADO") {
+          setNfseDoc(doc);
+          setNfseSent(!!doc.guardian_whatsapp_sent_at_ms);
+          setNfseState("autorizada");
+          return;
+        }
+        if (doc && ["BLOQUEADO", "REJEITADO", "DENEGADO", "CANCELADO"].includes(doc.status)) {
+          setNfseDoc(doc);
+          setNfseState("bloqueada");
+          return;
+        }
+      } catch {
+        // rede oscilou — tenta de novo no próximo tick
+      }
+      if (attempts >= 40) setNfseState("erro");
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [nfseState, paidOrderId]);
+
+  function nfseWhatsAppMessage(doc: FiscalDoc): string {
+    const first = entries[0];
+    const guardianName = first?.session.guardian_name_snapshot ?? "Responsável";
+    const childName = first?.session.child_name_snapshot ?? "";
+    const orderCode = paidOrderCode ?? "";
+    const simulado = (doc.protocol_number ?? "").startsWith("SIMULADO");
+    const lines = [
+      `Olá, ${guardianName}! Segue o comprovante da Nota Fiscal de Serviço do atendimento${childName ? ` de ${childName}` : ""} no FaçaAmigos — Playground Inclusivo.`,
+      "",
+      `🏢 ${unit?.name ?? "FaçaAmigos"}${unit?.cnpj ? ` — CNPJ ${unit.cnpj}` : ""}`,
+      orderCode ? `🧾 Pedido: ${orderCode}` : null,
+      `📄 NFS-e nº ${doc.nfse_numero ?? doc.numero ?? "—"} / Série ${doc.serie ?? "—"}`,
+      `🔐 Código de Verificação de Autenticidade: ${doc.protocol_number ?? "—"}`,
+      `💰 Valor: ${money(doc.total_cents)}`,
+      "",
+      simulado
+        ? "⚠️ Comprovante gerado em ambiente de homologação/simulação — a emissão oficial junto à Prefeitura de Belém ainda depende da confirmação do layout do sistema municipal (NFSe-Prestador)."
+        : "✅ Confira a autenticidade desta NFSe no portal da NFSe de Belém, usando o Código de Verificação acima.",
+      "",
+      "Qualquer dúvida, é só responder por aqui. Obrigado! 💙",
+    ].filter((l): l is string => l !== null);
+    return lines.join("\n");
+  }
+
+  async function sendNfseWhatsApp() {
+    if (!nfseDoc) return;
+    const digits = (entries[0]?.session.guardian_phone_snapshot ?? "").replace(/\D/g, "");
+    if (!digits) {
+      setError("Responsável sem telefone cadastrado — não é possível enviar a nota pelo WhatsApp.");
+      return;
+    }
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(nfseWhatsAppMessage(nfseDoc))}`, "_blank");
+    try {
+      await Api.markNfseSent(nfseDoc.id);
+      setNfseSent(true);
+    } catch {
+      // A conversa já abriu; falhar o carimbo não pode travar o operador.
+      setNfseSent(true);
     }
   }
 
@@ -151,6 +233,7 @@ export function CheckoutModal({
       });
 
       setPaidOrderId(result.orderId);
+      setPaidOrderCode(result.orderCode ?? null);
       const nowStr = new Date().toLocaleString("pt-BR");
       setReceipts(
         entries.map((e) => ({
@@ -270,24 +353,53 @@ export function CheckoutModal({
         <p style={{ marginTop: 0 }}>Pagamento confirmado e cupom impresso.</p>
         <IfCan capability="nfse.emit">
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "12px 0" }}>
-            <Button
-              variant="secondary"
-              onClick={requestNfse}
-              loading={nfseState === "enfileirando"}
-              disabled={nfseState === "enfileirando" || nfseState === "enfileirado"}
-              title="Solicitar a Nota Fiscal de Serviço deste atendimento, enviada por e-mail ao Responsável"
-            >
-              🧾 Emitir Nota Fiscal Serviço
-            </Button>
-            {nfseState === "enfileirado" && (
-              <p style={{ color: "var(--color-success-text, #15803d)", fontSize: "13px", margin: 0 }}>
-                Nota fiscal solicitada — será enviada por e-mail ao Responsável em instantes.
+            {nfseState !== "autorizada" && nfseState !== "bloqueada" && (
+              <Button
+                variant="secondary"
+                onClick={requestNfse}
+                loading={nfseState === "enfileirando" || nfseState === "aguardando"}
+                disabled={nfseState === "enfileirando" || nfseState === "aguardando"}
+                title="Emitir a Nota Fiscal de Serviço deste atendimento (só se o Responsável fizer questão) — depois você envia pelo WhatsApp"
+              >
+                🧾 Emitir Nota Fiscal Serviço
+              </Button>
+            )}
+            {nfseState === "aguardando" && (
+              <p style={{ color: "var(--color-text-muted, #6b7280)", fontSize: "13px", margin: 0 }}>
+                Emitindo a nota… assim que ficar pronta aparece aqui o botão para enviar pelo WhatsApp.
+              </p>
+            )}
+            {nfseState === "autorizada" && nfseDoc && (
+              <>
+                <p style={{ color: "var(--color-success-text, #15803d)", fontSize: "13px", margin: 0 }}>
+                  NFS-e nº {nfseDoc.nfse_numero ?? nfseDoc.numero ?? "—"} emitida.
+                </p>
+                <Button
+                  variant={nfseSent ? "secondary" : "primary"}
+                  onClick={sendNfseWhatsApp}
+                  title="Abre o WhatsApp do Responsável com o comprovante da NFS-e já redigido"
+                >
+                  {nfseSent ? "📱 Reenviar NFS-e por WhatsApp" : "📱 Enviar NFS-e por WhatsApp"}
+                </Button>
+                {nfseSent && (
+                  <p style={{ color: "var(--color-text-muted, #6b7280)", fontSize: "13px", margin: 0 }}>
+                    Enviada ao Responsável pelo WhatsApp.
+                  </p>
+                )}
+              </>
+            )}
+            {nfseState === "bloqueada" && (
+              <p style={{ color: "var(--color-error-text)", fontSize: "13px", margin: 0 }}>
+                A nota não pôde ser emitida agora ({nfseDoc?.status ?? "bloqueada"}). O Owner pode acompanhar em Configurações → Fiscal.
               </p>
             )}
             {nfseState === "erro" && (
               <p style={{ color: "var(--color-error-text)", fontSize: "13px", margin: 0 }}>
-                Não foi possível solicitar a nota agora. Tente novamente ou peça ao Owner para checar a unidade.
+                Não foi possível concluir a emissão agora. Tente novamente ou peça ao Owner para checar a unidade.
               </p>
+            )}
+            {error && nfseState === "autorizada" && (
+              <p style={{ color: "var(--color-error-text)", fontSize: "13px", margin: 0 }}>{error}</p>
             )}
           </div>
         </IfCan>

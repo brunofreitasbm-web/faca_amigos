@@ -434,6 +434,9 @@ export interface FiscalDoc {
   reject_message: string | null;
   created_at_ms: number;
   authorized_at_ms: number | null;
+  /** NFS-e: número municipal (RPS -> NFS-e) e carimbo do envio por WhatsApp ao Responsável. */
+  nfse_numero?: string | null;
+  guardian_whatsapp_sent_at_ms?: number | null;
 }
 
 export interface ChildMatch {
@@ -1685,11 +1688,26 @@ export const Api = {
   /**
    * Pedido manual de NFS-e (botão "Emitir Nota Fiscal Serviço"), disparado
    * pelo Responsável — enfileira o documento em fa_kiosk_fiscal_docs; quem
-   * de fato emite e manda por e-mail é o worker do kiosk (apps/kiosk/src/
-   * fiscal). Idempotente: pedir de novo para o mesmo pedido devolve o
-   * mesmo documento.
+   * de fato emite é o worker do kiosk (apps/kiosk/src/fiscal). A entrega
+   * ao Responsável é por WhatsApp, pelo botão do CheckoutModal, depois que
+   * o documento vira AUTORIZADO (ver nfseDocByOrder + markNfseSent).
+   * Idempotente: pedir de novo para o mesmo pedido devolve o mesmo documento.
    */
   requestNfse: (orderId: string) => unwrap<{ fiscalDocId: string; status: string }>(supabase().rpc("fa_fiscal_request_nfse", { p_order_id: orderId })),
+  /** NFS-e do pedido (para o kiosk-ui acompanhar a fila até AUTORIZADO). */
+  nfseDocByOrder: (orderId: string) =>
+    unwrap<FiscalDoc | null>(
+      supabase()
+        .from("fa_kiosk_fiscal_docs")
+        .select("*")
+        .eq("order_id", orderId)
+        .eq("doc_type", "NFSE")
+        .neq("status", "DESCARTADO")
+        .maybeSingle(),
+    ),
+  /** Registra que a NFS-e foi enviada ao Responsável por WhatsApp (idempotente). */
+  markNfseSent: (fiscalDocId: string) =>
+    unwrap<{ fiscalDocId: string; sentAtMs: number }>(supabase().rpc("fa_fiscal_mark_nfse_sent", { p_fiscal_doc_id: fiscalDocId })),
   pdvOrder: (body: {
     unitId: string;
     employeeId: string;

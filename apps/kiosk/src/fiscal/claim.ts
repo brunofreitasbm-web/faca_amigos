@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { bloquearNfsePorFaltaDeTransporteReal, dispararEmailNfse, processarNfseSimulado } from "./nfse.js";
+import { bloquearNfsePorFaltaDeTransporteReal, processarNfseSimulado } from "./nfse.js";
 
 /**
  * Consumidor da fila `fa_kiosk_fiscal_docs` (Fase 3 do plano). Reivindica
@@ -97,7 +97,6 @@ export async function runFiscalClaimOnce(deps: ClaimDeps, limit = 5): Promise<nu
         if (deps.simulado) {
           await processarNfseSimulado(deps.supabase, item);
           deps.onLog?.(`[fiscal] NFS-e ${item.doc.id} (venda ${item.order.orderCode}) autorizada (SIMULADO).`);
-          await dispararEmailNfse(deps.supabase, item.doc.id, deps.onLog);
         } else {
           await bloquearNfsePorFaltaDeTransporteReal(deps.supabase, item.doc);
         }

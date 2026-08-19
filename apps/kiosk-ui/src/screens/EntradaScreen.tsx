@@ -130,6 +130,7 @@ export function EntradaScreen({
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [planId, setPlanId] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
@@ -258,6 +259,7 @@ export function EntradaScreen({
     setPlanId(null);
     Api.plans(unit.id, activity).then(setPlans);
     Api.packages(unit.id, activity).then(setPackages);
+    Api.products(unit.id).then(setProducts);
     Api.coupons(unit.id).then(setCoupons);
     if (activity === "CARRINHO") Api.assets(unit.id).then(setAssets);
   }, [unit, activity]);
@@ -513,6 +515,11 @@ export function EntradaScreen({
           valueCents: p.valueCents,
           minutes: planDurationMinutes(p),
         })),
+        availableProducts: products.map((p) => ({
+          id: p.id,
+          name: p.name,
+          priceCents: p.price_cents,
+        })),
         availableCoupons: eligibleCoupons.map((c) => ({
           code: c.code,
           discountText: c.kind === "DESCONTO_PCT" ? `${c.value}% OFF` : `R$ ${(c.value / 100).toFixed(2)} OFF`,
@@ -530,7 +537,7 @@ export function EntradaScreen({
       active = false;
       clearTimeout(timer);
     };
-  }, [matchedChild?.id, childName, selectedPlan?.id, guardianName, unit?.id, plans, eligibleCoupons]);
+  }, [matchedChild?.id, childName, selectedPlan?.id, guardianName, unit?.id, plans, products, eligibleCoupons]);
 
   function handleApplyGeminiOffer(offer: CheckinOffer) {
     if (offer.actionType === "UPGRADE_PLAN") {
