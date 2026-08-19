@@ -1,6 +1,18 @@
 {
   "rewrites": [
     {
+      "source": "/integracao/shopping/v1/health",
+      "destination": "/api/integracao/shopping/v1/health"
+    },
+    {
+      "source": "/integracao/shopping/v1/faturamento",
+      "destination": "/api/integracao/shopping/v1/faturamento"
+    },
+    {
+      "source": "/integracao/shopping/v1/vendas",
+      "destination": "/api/integracao/shopping/v1/vendas"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
