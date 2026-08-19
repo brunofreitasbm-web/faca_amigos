@@ -37,7 +37,7 @@
   <meta property="og:description"
     content="Carrinhos elétricos a partir de R$ 48, direto no piso do Parque Shopping Belém. Seu filho dirige, a equipe FaçaAmigos acompanha de perto.">
   <meta property="og:url" content="https://institutofacaamigos.com.br/playground/circuito.html">
-  <meta property="og:image" content="https://institutofacaamigos.com.br/playground/img/circuito-equipe.jpg">
+  <meta property="og:image" content="https://institutofacaamigos.com.br/playground/img/circuito-carrinhos.jpg">
   <meta property="og:locale" content="pt_BR">
 
   <!-- Twitter/X Card -->
@@ -45,7 +45,7 @@
   <meta name="twitter:title" content="FaçaAmigos Circuito — Carrinhos Elétricos no Parque Shopping Belém">
   <meta name="twitter:description"
     content="Carrinhos elétricos a partir de R$ 48, direto no piso do Parque Shopping Belém. Seu filho dirige, a equipe FaçaAmigos acompanha de perto.">
-  <meta name="twitter:image" content="https://institutofacaamigos.com.br/playground/img/circuito-equipe.jpg">
+  <meta name="twitter:image" content="https://institutofacaamigos.com.br/playground/img/circuito-carrinhos.jpg">
 
   <!-- Dados estruturados (Schema.org) -->
   <script type="application/ld+json">
@@ -53,7 +53,7 @@
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
   "name": "FaçaAmigos Circuito",
-  "image": "https://institutofacaamigos.com.br/playground/img/circuito-equipe.jpg",
+  "image": "https://institutofacaamigos.com.br/playground/img/circuito-carrinhos.jpg",
   "url": "https://institutofacaamigos.com.br/playground/circuito.html",
   "telephone": "+55 91 9234-7673",
   "priceRange": "$$",
@@ -485,7 +485,7 @@
       overflow: hidden;
       border: 8px solid #fff;
       box-shadow: var(--shadow-lg);
-      aspect-ratio: 4/4.6;
+      aspect-ratio: 4/3;
       transform: rotate(2deg);
       transition: transform var(--t-fast);
     }
@@ -512,6 +512,27 @@
       border-radius: 9999px;
       transform: rotate(-4deg);
       box-shadow: var(--shadow-sm);
+    }
+
+    /* Vídeo em destaque */
+    .video-frame {
+      max-width: 320px;
+      margin: 0 auto;
+      aspect-ratio: 9/16;
+      border-radius: 32px;
+      overflow: hidden;
+      border: 8px solid #fff;
+      box-shadow: var(--shadow-lg);
+      outline: 3px solid rgba(46, 207, 181, 0.35);
+      outline-offset: 4px;
+    }
+
+    .video-frame video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: var(--dark);
     }
 
     /* Bloco branco (o que é / vantagens) */
@@ -1017,13 +1038,37 @@
         </div>
       </div>
       <div class="hero-photo fx on">
-        <div class="frame"><img src="img/circuito-equipe.jpg" width="819" height="1024"
-            alt="Equipe e carrinhos elétricos do FaçaAmigos Circuito" loading="eager" fetchpriority="high"
-            decoding="async"></div>
+        <div class="frame"><img src="img/circuito-carrinhos.jpg" width="1200" height="900"
+            alt="Carrinhos elétricos Range Rover e Lamborghini Urus do FaçaAmigos Circuito" loading="eager"
+            fetchpriority="high" decoding="async"></div>
         <div class="stamp">rodando todos os dias!</div>
       </div>
     </div>
   </header>
+
+  <!-- VÍDEO EM DESTAQUE -->
+  <section class="sec video-feature" id="video" style="padding-top: 10px;">
+    <div class="wrap center fx">
+      <span class="eyebrow">Vídeo real do Circuito</span>
+      <h2 class="sec-title" style="font-size: clamp(1.7rem, 3.6vw, 2.4rem);">O Circuito rodando de verdade</h2>
+      <p class="sec-sub" style="margin-bottom: 30px;">Sem edição, sem exagero — é assim, no piso do Parque Shopping
+        Belém.</p>
+      <div class="video-frame">
+        <video src="img/circuito-video.mp4" controls playsinline preload="metadata"
+          aria-label="Vídeo do FaçaAmigos Circuito rodando no Parque Shopping Belém"></video>
+      </div>
+      <div style="margin-top: 30px;">
+        <a href="https://wa.me/559192347673?text=Oi!%20Vi%20o%20v%C3%ADdeo%20do%20Circuito%20e%20quero%20ir%20tamb%C3%A9m!"
+          target="_blank" rel="noopener" class="btn btn-wa">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.4-3c-.3-.4 0-.5.2-.7l.4-.5c.1-.2.2-.3.1-.5s-.6-1.5-.8-2-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4 5.3 5.3 0 0 0 3.2.7 2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z" />
+          </svg>
+          Quero ir também
+        </a>
+      </div>
+    </div>
+  </section>
 
   <!-- O QUE É -->
   <section class="sec white-block" id="sobre">
@@ -1104,9 +1149,10 @@
             alt="Quiosque interativo do FaçaAmigos Circuito" loading="lazy" decoding="async">
           <figcaption>Quiosque no piso do shopping</figcaption>
         </figure>
-        <figure><img src="img/circuito-equipe.jpg" width="819" height="1024"
-            alt="Equipe e carrinhos elétricos do FaçaAmigos Circuito" loading="lazy" decoding="async">
-          <figcaption>Equipe e carrinhos elétricos</figcaption>
+        <figure style="aspect-ratio: 4/3;"><img src="img/circuito-carrinhos.jpg" width="1200" height="900"
+            alt="Carrinhos elétricos Range Rover e Lamborghini Urus do FaçaAmigos Circuito" loading="lazy"
+            decoding="async">
+          <figcaption>Nossos carrinhos elétricos</figcaption>
         </figure>
       </div>
     </div>
