@@ -49,16 +49,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const orders = (ordersRes.data || []) as { id: string; business_date: string; status: string; total_cents: number }[];
-  const paidOrderIds = orders.filter((o) => o.status === "PAGA").map((o) => o.id);
   const businessDateByOrderId = new Map(orders.map((o) => [o.id, o.business_date]));
 
-  const [paymentsRes, itemsRes] =
-    paidOrderIds.length > 0
-      ? await Promise.all([
-          supabase.from("fa_kiosk_payments").select("order_id, amount_cents, method").in("order_id", paidOrderIds),
-          supabase.from("fa_kiosk_order_items").select("order_id, total_cents, item_nature").in("order_id", paidOrderIds),
-        ])
-      : [{ data: [], error: null }, { data: [], error: null }];
+  // Filtra via o relacionamento com fa_kiosk_orders em vez de um IN (...) com
+  // todos os ids de pedidos pagos: para períodos com centenas/milhares de
+  // pedidos, o IN gerava uma URL longa demais e o PostgREST rejeitava a
+  // consulta (500 ERRO_CONSULTA), mesmo com a query em si sendo válida.
+  const [paymentsRes, itemsRes] = await Promise.all([
+    supabase
+      .from("fa_kiosk_payments")
+      .select("order_id, amount_cents, method, fa_kiosk_orders!inner(unit_id, business_date, status)")
+      .eq("fa_kiosk_orders.unit_id", targetUnitId)
+      .eq("fa_kiosk_orders.status", "PAGA")
+      .gte("fa_kiosk_orders.business_date", de)
+      .lte("fa_kiosk_orders.business_date", ate),
+    supabase
+      .from("fa_kiosk_order_items")
+      .select("order_id, total_cents, item_nature, fa_kiosk_orders!inner(unit_id, business_date, status)")
+      .eq("fa_kiosk_orders.unit_id", targetUnitId)
+      .eq("fa_kiosk_orders.status", "PAGA")
+      .gte("fa_kiosk_orders.business_date", de)
+      .lte("fa_kiosk_orders.business_date", ate),
+  ]);
 
   if (paymentsRes.error || itemsRes.error) {
     return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar dados de faturamento." });
