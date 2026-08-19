@@ -33,6 +33,63 @@ export function checkForUpdates(): void {
   });
 }
 
+/**
+ * Versão "aguardável" de checkForUpdates(), usada só no fechamento do app
+ * (window-all-closed em main.ts).
+ *
+ * BUG que mantinha o quiosque preso na versão antiga mesmo abrindo e
+ * fechando várias vezes: o handler antigo chamava checkForUpdates() (que
+ * dispara checkForUpdatesAndNotify() sem aguardar) e, na sequência,
+ * chamava app.quit() de forma síncrona — o processo morria antes do
+ * download do instalador (~100 MB) terminar. Sem 'update-downloaded'
+ * disparado, autoInstallOnAppQuit não tem o que instalar, e o download
+ * parcial se perde a cada fechamento. Resultado: update nunca completa,
+ * não importa quantas vezes o app é reaberto.
+ *
+ * Esta função aguarda a verificação (e o download, se houver uma versão
+ * nova) terminar — via 'update-not-available', 'update-downloaded' ou
+ * 'error' — antes de resolver, com um timeout de segurança para o
+ * quiosque não travar fechando caso a rede esteja lenta/fora do ar.
+ */
+export function checkForUpdatesAndWait(timeoutMs = 5 * 60 * 1000): Promise<void> {
+  if (!app.isPackaged) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      autoUpdater.off("update-not-available", onSettle);
+      autoUpdater.off("update-downloaded", onSettle);
+      autoUpdater.off("error", onError);
+    };
+
+    const onSettle = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    const onError = (err: unknown) => {
+      log.warn("[auto-updater] Falha ao verificar/baixar atualização antes de fechar:", err);
+      onSettle();
+    };
+
+    timer = setTimeout(() => {
+      log.warn(`[auto-updater] Timeout de ${timeoutMs}ms aguardando atualização antes de fechar — prosseguindo com o fechamento.`);
+      onSettle();
+    }, timeoutMs);
+
+    autoUpdater.once("update-not-available", onSettle);
+    autoUpdater.once("update-downloaded", onSettle);
+    autoUpdater.once("error", onError);
+
+    void autoUpdater.checkForUpdates().catch(onError);
+  });
+}
+
 export function initAutoUpdater(): void {
   if (!app.isPackaged) {
     log.info("[auto-updater] Ignorado em ambiente de desenvolvimento.");

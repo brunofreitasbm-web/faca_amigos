@@ -9,7 +9,7 @@ import { loadOrCreateTls } from "../server/tls.js";
 import { startPrintBridge } from "./printBridge.js";
 import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
-import { initAutoUpdater, checkForUpdates } from "./autoUpdater.js";
+import { initAutoUpdater, checkForUpdatesAndWait } from "./autoUpdater.js";
 
 /**
  * O bundle é puro esbuild sem `dotenv` — sem isto, `apps/kiosk/.env`
@@ -258,7 +258,19 @@ if (isPrimaryInstance) {
   });
 
   app.on("window-all-closed", () => {
-    if (app.isPackaged) checkForUpdates();
-    if (process.platform !== "darwin") app.quit();
+    if (process.platform === "darwin") return;
+
+    // Antes o quiosque disparava checkForUpdates() (fire-and-forget) e
+    // chamava app.quit() logo em seguida — o processo morria antes do
+    // instalador (~100 MB) terminar de baixar, então autoInstallOnAppQuit
+    // nunca tinha nada pronto para instalar e o app ficava preso na
+    // versão antiga não importa quantas vezes fosse reaberto/fechado.
+    // Agora o fechamento aguarda a checagem (e o download, se houver
+    // atualização) terminar antes de encerrar o processo de fato.
+    if (app.isPackaged) {
+      void checkForUpdatesAndWait().finally(() => app.quit());
+    } else {
+      app.quit();
+    }
   });
 }
