@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authUnit = await authenticateShoppingRequest(supabase, req, res);
   if (!authUnit) return;
 
-  const { de, ate, formato = "json", unitId } = req.query as {
+  const { de, ate, formato = "json" } = req.query as {
     de?: string;
     ate?: string;
     formato?: string;
@@ -30,56 +30,104 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "PARAMETROS_INVALIDOS", message: "Parâmetros 'de' e 'ate' são obrigatórios" });
   }
 
-  const targetUnitId = unitId || authUnit.id;
-  const unitMeta = getShoppingUnitMetadata(
-    targetUnitId === authUnit.id
-      ? authUnit
-      : ((await supabase.from("fa_kiosk_units").select("id, kind, name, cnpj, razao_social, timezone").eq("id", targetUnitId).single()).data as any) || authUnit,
-  );
+  // O escopo da credencial prevalece sobre o parâmetro unitId
+  const targetUnitId = authUnit.id;
+  const unitMeta = getShoppingUnitMetadata(authUnit);
 
-  const ordersRes = await supabase
-    .from("fa_kiosk_orders")
-    .select("id, business_date, status, total_cents")
-    .eq("unit_id", targetUnitId)
-    .gte("business_date", de)
-    .lte("business_date", ate);
+  // 1. Busca TODAS as ordens no período sem truncamento de 1.000 registros (PostgREST default limit)
+  let orders: { id: string; business_date: string; status: string; total_cents: number }[] = [];
+  let from = 0;
+  const step = 1000;
 
-  if (ordersRes.error) {
-    return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar dados de faturamento." });
+  while (true) {
+    const ordersRes = await supabase
+      .from("fa_kiosk_orders")
+      .select("id, business_date, status, total_cents")
+      .eq("unit_id", targetUnitId)
+      .gte("business_date", de)
+      .lte("business_date", ate)
+      .range(from, from + step - 1);
+
+    if (ordersRes.error) {
+      return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar dados de faturamento." });
+    }
+
+    const chunk = (ordersRes.data || []) as { id: string; business_date: string; status: string; total_cents: number }[];
+    orders = orders.concat(chunk);
+    if (chunk.length < step) break;
+    from += step;
   }
 
-  const orders = (ordersRes.data || []) as { id: string; business_date: string; status: string; total_cents: number }[];
   const businessDateByOrderId = new Map(orders.map((o) => [o.id, o.business_date]));
 
-  // Filtra via o relacionamento com fa_kiosk_orders em vez de um IN (...) com
-  // todos os ids de pedidos pagos: para períodos com centenas/milhares de
-  // pedidos, o IN gerava uma URL longa demais e o PostgREST rejeitava a
-  // consulta (500 ERRO_CONSULTA), mesmo com a query em si sendo válida.
-  const [paymentsRes, itemsRes] = await Promise.all([
-    supabase
+  // 2. Busca TODOS os pagamentos sem truncamento
+  let payments: { order_id: string; amount_cents: number; method: string }[] = [];
+  from = 0;
+  while (true) {
+    const paymentsRes = await supabase
       .from("fa_kiosk_payments")
       .select("order_id, amount_cents, method, fa_kiosk_orders!inner(unit_id, business_date, status)")
       .eq("fa_kiosk_orders.unit_id", targetUnitId)
       .eq("fa_kiosk_orders.status", "PAGA")
       .gte("fa_kiosk_orders.business_date", de)
-      .lte("fa_kiosk_orders.business_date", ate),
-    supabase
+      .lte("fa_kiosk_orders.business_date", ate)
+      .range(from, from + step - 1);
+
+    if (paymentsRes.error) {
+      return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar dados de faturamento." });
+    }
+
+    const chunk = (paymentsRes.data || []) as { order_id: string; amount_cents: number; method: string }[];
+    payments = payments.concat(chunk);
+    if (chunk.length < step) break;
+    from += step;
+  }
+
+  // 3. Busca TODOS os itens sem truncamento
+  let items: { order_id: string; total_cents: number; item_nature: string }[] = [];
+  from = 0;
+  while (true) {
+    const itemsRes = await supabase
       .from("fa_kiosk_order_items")
       .select("order_id, total_cents, item_nature, fa_kiosk_orders!inner(unit_id, business_date, status)")
       .eq("fa_kiosk_orders.unit_id", targetUnitId)
       .eq("fa_kiosk_orders.status", "PAGA")
       .gte("fa_kiosk_orders.business_date", de)
-      .lte("fa_kiosk_orders.business_date", ate),
-  ]);
+      .lte("fa_kiosk_orders.business_date", ate)
+      .range(from, from + step - 1);
 
-  if (paymentsRes.error || itemsRes.error) {
-    return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar dados de faturamento." });
+    if (itemsRes.error) {
+      return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar dados de faturamento." });
+    }
+
+    const chunk = (itemsRes.data || []) as { order_id: string; total_cents: number; item_nature: string }[];
+    items = items.concat(chunk);
+    if (chunk.length < step) break;
+    from += step;
   }
 
-  const payments = (paymentsRes.data || []) as { order_id: string; amount_cents: number; method: string }[];
-  const items = (itemsRes.data || []) as { order_id: string; total_cents: number; item_nature: string }[];
-
+  // 4. Preenche todos os dias do intervalo de 'de' até 'ate' (garante que dias sem movimento apareçam com zeros)
   const daysMap = new Map<string, DayAggregate>();
+  const startDate = new Date(`${de}T00:00:00Z`);
+  const endDate = new Date(`${ate}T00:00:00Z`);
+
+  if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+    for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+      const dateStr = d.toISOString().split("T")[0]!;
+      daysMap.set(dateStr, {
+        data: dateStr,
+        brutoCentavos: 0,
+        descontosCentavos: 0,
+        liquidoCentavos: 0,
+        cancelamentosCentavos: 0,
+        quantidadeVendas: 0,
+        quantidadeCancelamentos: 0,
+        ticketMedioCentavos: 0,
+        porNatureza: { SERVICO: 0, PRODUTO: 0 },
+        porMeioPagamento: { DINHEIRO: 0, PIX: 0, CREDITO: 0, DEBITO: 0, VOUCHER: 0 },
+      });
+    }
+  }
 
   for (const o of orders) {
     if (o.status !== "PAGA" && o.status !== "CANCELADA") continue;

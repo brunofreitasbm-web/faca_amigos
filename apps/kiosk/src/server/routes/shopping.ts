@@ -110,7 +110,8 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
 
     const query = req.query as { de?: string; ate?: string; formato?: string; unitId?: string };
     const { de, ate, formato = "json" } = query;
-    const targetUnitId = query.unitId || defaultUnitId;
+    // O escopo da credencial prevalece sobre o parâmetro unitId
+    const targetUnitId = defaultUnitId;
 
     if (!de || !ate) {
       return reply.code(400).send({ error: "PARAMETROS_INVALIDOS", message: "Parâmetros 'de' e 'ate' são obrigatórios" });
@@ -171,6 +172,28 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
 
     const daysMap = new Map<string, any>();
 
+    // Preenche todos os dias do intervalo de 'de' até 'ate'
+    const startDate = new Date(`${de}T00:00:00Z`);
+    const endDate = new Date(`${ate}T00:00:00Z`);
+
+    if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+      for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+        const dateStr = d.toISOString().split("T")[0]!;
+        daysMap.set(dateStr, {
+          data: dateStr,
+          brutoCentavos: 0,
+          descontosCentavos: 0,
+          liquidoCentavos: 0,
+          cancelamentosCentavos: 0,
+          quantidadeVendas: 0,
+          quantidadeCancelamentos: 0,
+          ticketMedioCentavos: 0,
+          porNatureza: { SERVICO: 0, PRODUTO: 0 },
+          porMeioPagamento: { DINHEIRO: 0, PIX: 0, CREDITO: 0, DEBITO: 0, VOUCHER: 0 },
+        });
+      }
+    }
+
     for (const s of salesRows) {
       daysMap.set(s.business_date, {
         data: s.business_date,
@@ -200,7 +223,7 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
       }
     }
 
-    const diasList = Array.from(daysMap.values());
+    const diasList = Array.from(daysMap.values()).sort((a, b) => a.data.localeCompare(b.data));
 
     const periodoTotal = {
       dataInicial: de,
@@ -252,9 +275,9 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
     const defaultUnitId = authenticateShoppingRequest(ctx, req, reply);
     if (!defaultUnitId) return;
 
-    const query = req.query as { de?: string; ate?: string; unitId?: string };
-    const { de, ate } = query;
-    const targetUnitId = query.unitId || defaultUnitId;
+    const query = req.query as { de?: string; ate?: string; unitId?: string; pagina?: string; page?: string; limite?: string; limit?: string };
+    const { de, ate, pagina, page, limite, limit } = query;
+    const targetUnitId = defaultUnitId;
 
     if (!de || !ate) {
       return reply.code(400).send({ error: "PARAMETROS_INVALIDOS", message: "Parâmetros 'de' e 'ate' são obrigatórios" });
@@ -262,14 +285,37 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
 
     const unitMeta = getShoppingUnitMetadata(ctx, targetUnitId);
 
-    const orders = ctx.db
-      .prepare(
-        `SELECT id, created_at_ms, total_cents, status
-         FROM orders
-         WHERE unit_id = ? AND business_date BETWEEN ? AND ?
-         ORDER BY created_at_ms ASC`,
-      )
-      .all(targetUnitId, de, ate) as unknown as {
+    const pageNum = parseInt(pagina || page || "0", 10);
+    const pageSize = parseInt(limite || limit || "0", 10);
+
+    let sql = `SELECT id, created_at_ms, total_cents, status FROM orders WHERE unit_id = ? AND business_date BETWEEN ? AND ? ORDER BY created_at_ms ASC`;
+    let sqlParams: any[] = [targetUnitId, de, ate];
+
+    let paginacaoMeta: any = undefined;
+
+    if (pageNum > 0 || pageSize > 0) {
+      const actualPage = pageNum > 0 ? pageNum : 1;
+      const actualLimit = pageSize > 0 ? pageSize : 1000;
+      const offset = (actualPage - 1) * actualLimit;
+
+      const countRow = ctx.db
+        .prepare(`SELECT COUNT(*) as cnt FROM orders WHERE unit_id = ? AND business_date BETWEEN ? AND ?`)
+        .get(targetUnitId, de, ate) as { cnt: number } | undefined;
+
+      const totalRegistros = countRow?.cnt || 0;
+
+      sql += ` LIMIT ? OFFSET ?`;
+      sqlParams.push(actualLimit, offset);
+
+      paginacaoMeta = {
+        pagina: actualPage,
+        limite: actualLimit,
+        totalPaginas: Math.ceil(totalRegistros / actualLimit) || 1,
+        totalRegistros,
+      };
+    }
+
+    const orders = ctx.db.prepare(sql).all(...sqlParams) as unknown as {
       id: string;
       created_at_ms: number;
       total_cents: number;
@@ -287,7 +333,7 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
     const totalVendas = vendas.filter((v) => !v.cancelado).length;
     const brutoCentavos = vendas.filter((v) => !v.cancelado).reduce((acc, v) => acc + v.valorCentavos, 0);
 
-    return {
+    const responseBody: any = {
       layoutVersao: "1.0",
       loja: {
         unidadeId: unitMeta.unidadeId,
@@ -305,5 +351,11 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
       vendas,
       geradoEmMs: ctx.nowMs(),
     };
+
+    if (paginacaoMeta) {
+      responseBody.paginacao = paginacaoMeta;
+    }
+
+    return responseBody;
   });
 }
