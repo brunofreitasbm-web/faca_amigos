@@ -1424,6 +1424,68 @@ revoke execute on function fa_kiosk_audit_log_hash_chain() from public, anon, au
 -- Exclusão de veículos descontinuados: Fusca Amarelo e Jipe Rosa
 delete from fa_kiosk_assets where name in ('Fusca Amarelo', 'Jipe Rosa');
 
+-- =====================================================================
+-- Preenchimento e saneamento dos dados tributários dos produtos (NFC-e)
+-- para emissão automática de cupom fiscal na venda de mercadorias.
+-- =====================================================================
+
+update fa_kiosk_products
+set
+  ncm = '22011000',
+  cest = '0300500',
+  cfop = '5102',
+  csosn = '102',
+  origem = 0,
+  unidade_comercial = 'UN',
+  gtin = 'SEM GTIN',
+  pis_cst = '49',
+  cofins_cst = '49'
+where name ilike '%Água%' or name ilike '%Agua%';
+
+update fa_kiosk_products
+set
+  ncm = '61159500',
+  cfop = '5102',
+  csosn = '102',
+  origem = 0,
+  unidade_comercial = 'UN',
+  gtin = 'SEM GTIN',
+  pis_cst = '49',
+  cofins_cst = '49'
+where name ilike '%Meia%';
+
+update fa_kiosk_products
+set
+  ncm = '20098990',
+  cfop = '5102',
+  csosn = '102',
+  origem = 0,
+  unidade_comercial = 'UN',
+  gtin = 'SEM GTIN',
+  pis_cst = '49',
+  cofins_cst = '49'
+where name ilike '%Suco%';
+
+update fa_kiosk_products
+set
+  ncm = coalesce(nullif(ncm, ''), '95030099'),
+  cfop = coalesce(nullif(cfop, ''), '5102'),
+  csosn = coalesce(nullif(csosn, ''), '102'),
+  origem = coalesce(origem, 0),
+  unidade_comercial = coalesce(nullif(unidade_comercial, ''), 'UN'),
+  gtin = coalesce(nullif(gtin, ''), 'SEM GTIN'),
+  pis_cst = coalesce(nullif(pis_cst, ''), '49'),
+  cofins_cst = coalesce(nullif(cofins_cst, ''), '49')
+where ncm is null or length(ncm) != 8;
+
+update fa_kiosk_units
+set
+  nfce_qrcode_url_consulta = coalesce(nullif(nfce_qrcode_url_consulta, ''), 'http://www.sefa.pa.gov.br/nfce/consulta'),
+  nfce_serie = coalesce(nfce_serie, 1),
+  nfce_csc_id = coalesce(nullif(nfce_csc_id, ''), '000001')
+where nfce_qrcode_url_consulta is null or nfce_csc_id is null;
+
+
 
 
 

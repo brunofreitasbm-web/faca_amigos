@@ -2074,14 +2074,41 @@ function FiscalTab({ unitId }: { unitId: string }) {
   const nowMs = Date.now();
   const missingNcm = products.filter((p) => !p.ncm);
 
+  const isCnpjOk = !!form.cnpj && form.cnpj.length >= 14;
+  const isIeOk = !!form.inscricaoEstadual;
+  const isCscOk = !!form.nfceCscId;
+  const isFiscalEnabled = form.fiscalEnabled === "true";
+  const isTerminalActive = status.some((s) => nowMs - s.last_heartbeat_ms <= HEARTBEAT_STALE_MS);
+  const isAllReady = isCnpjOk && isIeOk && isCscOk && missingNcm.length === 0 && isTerminalActive && isFiscalEnabled;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      <Card style={{ padding: "16px" }}>
-        <HelpText>
-          Confira estes dados com seu contador antes de ligar a emissão. Nada aqui é segredo: o token do CSC e o
-          certificado A1 (.pfx) ficam só no cofre do PC do balcão, nunca no sistema.
+      <Card style={{ padding: "16px", borderLeft: isAllReady ? "4px solid var(--color-success, #10B981)" : "4px solid var(--color-warning, #F59E0B)" }}>
+        <h3 style={{ margin: "0 0 8px 0", fontSize: "16px", fontFamily: "var(--font-display)" }}>
+          {isAllReady ? "✅ Emissão de NFC-e 100% Pronta e Ativa" : "⚠️ Checklist para Emissão Automática de Cupom Fiscal"}
+        </h3>
+        <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", display: "flex", flexDirection: "column", gap: "4px" }}>
+          <li>
+            {isCnpjOk ? "✅" : "❌"} <strong>Emitente:</strong> CNPJ ({form.cnpj || "não informado"}) e Inscrição Estadual ({form.inscricaoEstadual || "não informada"}).
+          </li>
+          <li>
+            {isCscOk ? "✅" : "⚠️"} <strong>CSC:</strong> ID do CSC {isCscOk ? `(${form.nfceCscId})` : "pendente (obter na SEFA-PA)"}.
+          </li>
+          <li>
+            {missingNcm.length === 0 ? "✅" : "❌"} <strong>Produtos:</strong> {products.length - missingNcm.length}/{products.length} cadastrados com NCM correto.
+          </li>
+          <li>
+            {isTerminalActive ? "✅" : "⚠️"} <strong>Emissor no Balcão:</strong> {isTerminalActive ? "Terminal ativo e comunicando" : "Aguardando heartbeat do emissor local no PC do balcão"}.
+          </li>
+          <li>
+            {isFiscalEnabled ? "✅" : "ℹ️"} <strong>Chave NFC-e:</strong> {isFiscalEnabled ? "Ligada (emissão automática ativa nas vendas)" : "Desligada (chave geral)"}.
+          </li>
+        </ul>
+        <HelpText style={{ marginTop: "8px" }}>
+          Confira estes dados com seu contador antes de ligar a emissão em Produção. O token do CSC e o certificado A1 (.pfx) ficam no serviço local do PC do balcão.
         </HelpText>
       </Card>
+
 
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Emitente</h2>
