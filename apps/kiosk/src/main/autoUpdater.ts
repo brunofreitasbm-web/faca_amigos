@@ -24,12 +24,42 @@ export interface UpdateState {
 
 let currentUpdateState: UpdateState = {
   status: "idle",
-  version: app?.isPackaged && typeof app.getVersion === "function" ? app.getVersion() : "0.1.6-dev",
+  version: typeof app?.getVersion === "function" ? app.getVersion() : "dev",
 };
 
 let initialized = false;
 
 const PERIODIC_CHECK_INTERVAL_MS = 2 * 60 * 60 * 1000;
+
+// O quiosque fica ligado 24/7 — o autoInstallOnAppQuit sozinho nunca dispara
+// porque o app não é fechado no dia a dia. Sem uma janela de instalação
+// automática, a atualização baixada fica pendente para sempre e o terminal
+// "congela" na versão antiga (foi exatamente o que prendeu a loja na 0.1.5).
+// 03:30 é madrugada: loja fechada, nenhum check-in em andamento.
+const IDLE_INSTALL_HOUR = 3;
+const IDLE_INSTALL_MINUTE = 30;
+
+let idleInstallTimer: ReturnType<typeof setTimeout> | null = null;
+
+function msUntilNextIdleWindow(): number {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(IDLE_INSTALL_HOUR, IDLE_INSTALL_MINUTE, 0, 0);
+  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+function scheduleIdleInstall(version: string): void {
+  if (idleInstallTimer) clearTimeout(idleInstallTimer);
+  const delay = msUntilNextIdleWindow();
+  log?.info?.(
+    `[auto-updater] Instalação automática da versão ${version} agendada para daqui a ${Math.round(delay / 60000)} min (janela ociosa da madrugada).`,
+  );
+  idleInstallTimer = setTimeout(() => {
+    log?.info?.(`[auto-updater] Janela ociosa atingida — aplicando a versão ${version} agora.`);
+    applyUpdate();
+  }, delay);
+}
 
 function notifyWindows(state: UpdateState): void {
   currentUpdateState = state;
@@ -53,7 +83,10 @@ export function applyUpdate(): void {
     return;
   }
   log?.info?.("[auto-updater] quitAndInstall acionado pelo usuário/sistema.");
-  autoUpdater.quitAndInstall(false, true);
+  // isSilent: o terminal é um quiosque sem operador acompanhando — o NSIS
+  // nunca pode abrir janela de instalador. isForceRunAfter: o app precisa
+  // voltar sozinho depois da atualização (terminal sempre ligado).
+  autoUpdater.quitAndInstall(true, true);
 }
 
 export function checkForUpdates(): void {
@@ -150,6 +183,11 @@ export function initAutoUpdater(): void {
   autoUpdater.logger = log;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  // O feed é servido pelo CDN da Vercel, que não responde multipart/byteranges
+  // — toda tentativa de download diferencial falhava com erro de Content-Type
+  // e caía no download completo. Desliga direto e economiza o round-trip.
+  autoUpdater.disableDifferentialDownload = true;
+  autoUpdater.disableWebInstaller = true;
 
   autoUpdater.on("checking-for-update", () => {
     log.info("[auto-updater] Verificando se existem novas atualizações...");
@@ -199,6 +237,7 @@ export function initAutoUpdater(): void {
       version: info.version,
       progress: 100,
     });
+    scheduleIdleInstall(info.version);
   });
 
   checkForUpdates();

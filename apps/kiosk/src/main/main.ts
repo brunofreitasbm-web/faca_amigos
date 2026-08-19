@@ -9,7 +9,7 @@ import { loadOrCreateTls } from "../server/tls.js";
 import { startPrintBridge } from "./printBridge.js";
 import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
-import { initAutoUpdater, checkForUpdatesAndWait } from "./autoUpdater.js";
+import { initAutoUpdater, checkForUpdatesAndWait, getUpdateStatus, applyUpdate } from "./autoUpdater.js";
 
 /**
  * O bundle é puro esbuild sem `dotenv` — sem isto, `apps/kiosk/.env`
@@ -267,8 +267,22 @@ if (isPrimaryInstance) {
     // versão antiga não importa quantas vezes fosse reaberto/fechado.
     // Agora o fechamento aguarda a checagem (e o download, se houver
     // atualização) terminar antes de encerrar o processo de fato.
+    //
+    // Com atualização baixada, instala via quitAndInstall explícito em vez
+    // de confiar no autoInstallOnAppQuit: no ciclo 0.1.5→0.1.6 o app era
+    // reaberto segundos após o quit e a nova instância travava os arquivos
+    // em Program Files antes do instalador NSIS terminar — o terminal
+    // reabria ainda na versão antiga. quitAndInstall(true, true) fecha,
+    // instala em silêncio e é o PRÓPRIO instalador que reabre o app já
+    // atualizado, eliminando a corrida.
     if (app.isPackaged) {
-      void checkForUpdatesAndWait().finally(() => app.quit());
+      void checkForUpdatesAndWait().finally(() => {
+        if (getUpdateStatus().status === "downloaded") {
+          applyUpdate();
+        } else {
+          app.quit();
+        }
+      });
     } else {
       app.quit();
     }

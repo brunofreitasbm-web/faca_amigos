@@ -1801,13 +1801,25 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
 
 function SystemVersionCard() {
   const toast = useToast();
-  const [version, setVersion] = useState<string>("0.1.6");
+  // Sem valor hardcoded: um número fixo aqui fica defasado a cada release e
+  // faz o operador achar que o terminal "não atualizou" mesmo atualizado.
+  const [version, setVersion] = useState<string>("");
   const [updateState, setUpdateState] = useState<{ status: string; version?: string; progress?: number; error?: string }>({ status: "idle" });
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (window.facaamigos?.getAppVersion) {
       window.facaamigos.getAppVersion().then(setVersion);
+    } else {
+      // Tablets/PWA não têm o bridge do Electron — busca a versão real do
+      // terminal no servidor local em vez de exibir um número inventado.
+      fetch("/api/system/info")
+        .then((res) => res.json())
+        .then((data: { update?: { status: string; version?: string; progress?: number; error?: string } }) => {
+          if (data?.update?.version) setVersion(data.update.version);
+          if (data?.update) setUpdateState(data.update);
+        })
+        .catch(() => {});
     }
     if (window.facaamigos?.getUpdateStatus) {
       window.facaamigos.getUpdateStatus().then((s: unknown) => {
@@ -1858,7 +1870,7 @@ function SystemVersionCard() {
       <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Versão do Sistema & Atualização</h2>
       <div style={{ fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
         <span>Versão atual:</span>
-        <Tag color="var(--color-teal, #2ECFB5)">v{version}</Tag>
+        <Tag color="var(--color-teal, #2ECFB5)">{version ? `v${version}` : "—"}</Tag>
       </div>
       <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
         {updateState.status === "checking" && "🔎 Verificando se há novas atualizações..."}
