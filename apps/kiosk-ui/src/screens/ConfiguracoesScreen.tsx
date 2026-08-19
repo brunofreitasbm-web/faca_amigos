@@ -2300,14 +2300,20 @@ function FiscalTab({ unitId }: { unitId: string }) {
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>NFS-e — sessões de brincar</h2>
         <HelpText>
-          Nota de serviço (ISS, Prefeitura de Belém). O Responsável pode pedir a nota pelo botão "Emitir Nota
-          Fiscal Serviço" na tela de Saída — a transmissão de verdade à prefeitura ainda depende da confirmação do
-          layout do sistema próprio do município, então por enquanto o documento fica em modo simulado (registra o
-          pedido, reserva o número e manda o comprovante por e-mail, mas sem valor fiscal). Ligar a chave abaixo é
-          o que libera o botão para o Responsável pedir.
+          Nota de serviço (ISS, Prefeitura de Belém, Sistema Nacional NFS-e/ADN). O Responsável pode pedir a nota
+          pelo botão "Emitir Nota Fiscal Serviço" na tela de Saída, e o operador entrega pelo WhatsApp assim que
+          fica pronta. A transmissão real exige certificado A1 configurado abaixo, o convênio de Belém ativo no
+          Sistema Nacional e os campos preenchidos corretamente — sem isso, o documento fica em modo simulado
+          (registra o pedido e reserva o número, mas sem valor fiscal). Ligar a chave abaixo é o que libera o botão
+          para o Responsável pedir.
         </HelpText>
-        <Input label="Item da lista de serviços (LC 116)" value={form.nfseItemListaServico ?? ""} onChange={(e) => set("nfseItemListaServico", e.target.value)} />
-        <Input label="Código de tributação do município" value={form.nfseCodigoTributacaoMunicipio ?? ""} onChange={(e) => set("nfseCodigoTributacaoMunicipio", e.target.value)} />
+        <Input
+          label="Código de tributação nacional (cTribNac, 6 dígitos)"
+          placeholder="120501 — Parques de diversões, centros de lazer e congêneres"
+          value={form.nfseItemListaServico ?? ""}
+          onChange={(e) => set("nfseItemListaServico", e.target.value)}
+        />
+        <Input label="Código de tributação do município (opcional)" value={form.nfseCodigoTributacaoMunicipio ?? ""} onChange={(e) => set("nfseCodigoTributacaoMunicipio", e.target.value)} />
         <Input
           label="Alíquota de ISS (%)"
           type="number"

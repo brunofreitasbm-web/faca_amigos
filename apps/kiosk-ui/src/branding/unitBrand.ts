@@ -18,7 +18,6 @@ export interface UnitBrand {
   title: string;
   subtitle: string;
   location: string;
-  details: string;
   /** Cor da operação: tinge a faixa do timbre, o ponto da marca e a régua do cabeçalho. */
   accent: string;
   badge: "pink" | "teal" | "amber";
@@ -32,7 +31,6 @@ export const UNIT_BRANDS: UnitBrand[] = [
     title: "Playground (Parque Shopping)",
     subtitle: "Operação Loja — Brinquedoteca Física & Regulação Sensorial",
     location: "Parque Shopping Belém",
-    details: "Ambiente regulado com neuroarquitetura, mediação ABA, Cantinho da Calma e brinquedos adaptados.",
     accent: "var(--color-primary)",
     badge: "pink",
   },
@@ -43,7 +41,6 @@ export const UNIT_BRANDS: UnitBrand[] = [
     title: "Circuito (Parque Shopping)",
     subtitle: "Operação Quiosque — Pista & Carrinhos Elétricos",
     location: "Parque Shopping Belém",
-    details: "Pista de carrinhos elétricos no corredor principal, controle de frota e cotação por minutos.",
     accent: "var(--color-secondary)",
     badge: "teal",
   },
@@ -54,7 +51,6 @@ export const UNIT_BRANDS: UnitBrand[] = [
     title: "Playground (Bosque Grão-Pará)",
     subtitle: "Operação Loja — Brinquedoteca Física & Regulação Sensorial",
     location: "Shopping Bosque Grão-Pará",
-    details: "Unidade ampliada com espaço de socialização inclusiva para o público da região metropolitana.",
     accent: "var(--color-amber)",
     badge: "amber",
   },
@@ -65,7 +61,6 @@ const FALLBACK: Omit<UnitBrand, "operation" | "title"> = {
   icon: "📍",
   subtitle: "Operação",
   location: "",
-  details: "",
   accent: "var(--color-primary)",
   badge: "pink",
 };

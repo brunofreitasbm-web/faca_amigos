@@ -84,12 +84,8 @@ export function SelectModuleScreen() {
                 {meta.title}
               </h2>
 
-              <p style={{ fontSize: "14px", fontWeight: "bold", color: meta.accent, margin: "0 0 12px 0" }}>
+              <p style={{ fontSize: "14px", fontWeight: "bold", color: meta.accent, margin: "0 0 24px 0", flex: 1 }}>
                 {meta.subtitle}
-              </p>
-
-              <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 24px 0", flex: 1 }}>
-                {meta.details}
               </p>
 
               <Button

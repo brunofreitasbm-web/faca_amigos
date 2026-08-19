@@ -62,6 +62,52 @@ export function assinarXmlNfce(input: AssinarXmlNfceInput): string {
   return sig.getSignedXml();
 }
 
+const ALGORITMO_CANONICALIZACAO_DPS = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
+
+export interface AssinarXmlDpsInput {
+  /** XML da DPS ainda sem assinatura, contendo `<infDPS Id="DPS...">`. */
+  xml: string;
+  /** Id de 45 posições do infDPS (ver montarIdDps em dps-nacional-xml.ts) — vira `URI="#<idDps>"`. */
+  idDps: string;
+  /** Chave privada em PEM, já decifrada do `.pfx`. */
+  privateKeyPem: string;
+  /** Certificado do emitente em PEM (a folha da cadeia, não a raiz). */
+  certPem: string;
+}
+
+/**
+ * Assinatura XMLDSig da DPS (Modelo Nacional de NFS-e) — mesma dupla
+ * RSA-SHA1/SHA1 da NFC-e, mas com canonicalização C14N "pura" (não
+ * exclusiva), conforme o Manual de Contribuintes da Prefeitura de Belém
+ * (seção "Padrão de assinatura", 2026-08-19): a NFC-e usa `exc-c14n`, a
+ * DPS nacional usa `REC-xml-c14n-20010315` — as duas exigências não são
+ * intercambiáveis, daí a função separada em vez de reaproveitar
+ * `assinarXmlNfce` com um parâmetro a mais.
+ */
+export function assinarXmlDps(input: AssinarXmlDpsInput): string {
+  const sig = new SignedXml({
+    privateKey: input.privateKeyPem,
+    publicCert: input.certPem,
+    signatureAlgorithm: ALGORITMO_ASSINATURA,
+    canonicalizationAlgorithm: ALGORITMO_CANONICALIZACAO_DPS,
+  });
+
+  sig.addReference({
+    xpath: "//*[local-name(.)='infDPS']",
+    uri: input.idDps,
+    transforms: [TRANSFORM_ENVELOPED, ALGORITMO_CANONICALIZACAO_DPS],
+    digestAlgorithm: ALGORITMO_DIGEST,
+  });
+
+  // Assinatura envelopada, irmã de infDPS, dentro da tag raiz <DPS> — igual
+  // ao manual, seção "Regras Estruturais da Assinatura".
+  sig.computeSignature(input.xml, {
+    location: { reference: "//*[local-name(.)='infDPS']", action: "after" },
+  });
+
+  return sig.getSignedXml();
+}
+
 /**
  * Verifica uma assinatura já aplicada, usando o certificado público
  * informado. Usado nos testes (com um certificado autoassinado de teste) e,
