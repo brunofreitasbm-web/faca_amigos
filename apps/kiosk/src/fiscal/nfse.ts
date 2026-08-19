@@ -172,7 +172,10 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
     serieDps: doc.serie ?? "1",
     numeroDps: numero,
     codigoMunicipioIbge: unitFiscal.end_municipio_ibge,
-    prestador: { cnpj: unitFiscal.cnpj, inscricaoMunicipal: unitFiscal.inscricao_municipal },
+    // IM não é enviada: a Faça Amigos não tem registro complementar no CNC
+    // de Belém (confirmado 2026-08-19), e a RN #122 do Anexo I só permite
+    // IM quando esse registro existe.
+    prestador: { cnpj: unitFiscal.cnpj },
     tomador: { cpf: guardian.cpf, nome: guardian.full_name ?? "Responsável" },
     codigoTribNacional: unitFiscal.nfse_item_lista_servico,
     codigoTribMunicipal: unitFiscal.nfse_codigo_tributacao_municipio,
