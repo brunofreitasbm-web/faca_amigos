@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://institutofacaamigos.com.br/playground/sitemap.xml
+Sitemap: https://playground.institutofacaamigos.com.br/sitemap.xml
