@@ -1004,22 +1004,7 @@ export function PainelScreen() {
 
       {timelineFor && <SessionTimelineModal entry={timelineFor} onClose={() => setTimelineFor(null)} />}
 
-      {/* Saída fica isolada no canto OPOSTO ao de Entrada/PDV de propósito:
-          são ações opostas (uma abre atendimento, a outra fecha), e
-          empilhá-las juntas no mesmo canto é o desenho que mais convida ao
-          toque acidental no botão errado com a fila andando. */}
-      <div style={{ position: "fixed", bottom: "24px", left: "24px", zIndex: 90 }}>
-        <Button
-          variant="amber"
-          size="lg"
-          onClick={() => setSaidaOpen(true)}
-          title="Fazer saída sem sair do Painel"
-          aria-label="Fazer saída"
-          style={{ borderRadius: "9999px", width: "64px", height: "64px", fontSize: "26px", boxShadow: "var(--shadow-lg)", padding: 0 }}
-        >
-          <SignOutIcon />
-        </Button>
-      </div>
+
 
       {/* Botões flutuantes: Painel é a tela principal — Entrada e PDV abrem por cima, sem sair dele */}
       <div style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 90, display: "flex", flexDirection: "column", gap: "14px", alignItems: "flex-end" }}>
