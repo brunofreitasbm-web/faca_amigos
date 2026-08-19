@@ -57,10 +57,11 @@ export interface DpsInput {
   enderecoEvento: DpsEnderecoEvento;
   valorServico: number;
   /**
-   * Alíquota manual do ISS (%) — só preencher se o convênio de Belém no
-   * Sistema Nacional NÃO estiver "Ativo" (RN #429); com convênio ativo e
-   * sem retenção, o sistema nacional calcula sozinho e o campo deve ficar
-   * de fora. Ver ConfiguracoesScreen → NFS-e para a explicação ao Owner.
+   * Alíquota manual do ISS (%) — deixar de fora neste momento: o convênio
+   * de Belém no Sistema Nacional está "Ativo" (confirmado 2026-08-19), e
+   * com convênio ativo + sem retenção (RN #429) o sistema nacional calcula
+   * a alíquota sozinho. Só voltaria a ser necessário se o convênio saísse
+   * do ar.
    */
   aliquotaIssManual?: number | null;
 }
