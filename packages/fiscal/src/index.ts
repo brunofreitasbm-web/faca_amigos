@@ -6,4 +6,3 @@ export * from "./assinatura.js";
 export * from "./danfe-nfce.js";
 export * from "./nfce/transport.js";
 export * from "./dps-nacional-xml.js";
-export * from "./dps-nacional-transport.js";

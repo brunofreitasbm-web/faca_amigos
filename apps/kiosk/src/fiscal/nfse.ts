@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { assinarXmlDps, montarXmlDps, transmitirDps, type DpsInput } from "@facaamigos/fiscal";
+import { assinarXmlDps, montarXmlDps, type DpsInput } from "@facaamigos/fiscal";
+import { transmitirDps } from "@facaamigos/fiscal/dps-nacional-transport";
 import { extrairChaveECertificadoPem } from "./vault.js";
 import type { ClaimedFiscalDoc } from "./claim.js";
 
