@@ -2216,6 +2216,9 @@ export const Api = {
         p_severity: filters.severity ?? null,
         p_start_ms: filters.startMs ?? null,
         p_end_ms: filters.endMs ?? null,
+        // pede o teto da RPC (500) em vez do default (200): a tela detecta o corte
+        // comparando entries.length com esse mesmo teto e avisa o operador.
+        p_limit: 500,
       }),
     )) ?? [],
   /** Registra a liberação de contingência (recibo perdido / etiqueta danificada) antes de cobrar. */
