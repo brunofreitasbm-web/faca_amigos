@@ -262,5 +262,6 @@ As chamadas originadas pela plataforma Esphera / Napp são autorizadas pelos IPs
 
 ## 9. Contato técnico do FaçaAmigos
 
-[Seu nome] · [e-mail] · [telefone]
+Bruno Freitas · brunofreitasbm@gmail.com · (91) 98847-0999
+
 
