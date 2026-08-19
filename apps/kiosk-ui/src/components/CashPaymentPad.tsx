@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, Input } from "@facaamigos/ui";
 import { money } from "../format.js";
 
-const BANKNOTES_CENTS = [200, 500, 1000, 2000, 5000, 10000];
+const BANKNOTES_CENTS = [20000];
 
 interface CashPaymentPadProps {
   totalCents: number;
