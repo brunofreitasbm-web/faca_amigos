@@ -92,4 +92,19 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
       expect(venda.crianca).toBeUndefined();
     }
   });
+
+  it("suporta paginação com metadados no endpoint /vendas", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/integracao/shopping/v1/vendas?de=2026-03-01&ate=2026-03-31&pagina=1&limite=5",
+      headers: { authorization: "Bearer fa_shp_homolog_token" },
+    });
+    expect(res.statusCode).toBe(200);
+    const json = res.json();
+    expect(json.paginacao).toBeDefined();
+    expect(json.paginacao.pagina).toBe(1);
+    expect(json.paginacao.limite).toBe(5);
+    expect(json.paginacao.totalPaginas).toBeGreaterThanOrEqual(1);
+    expect(typeof json.paginacao.totalRegistros).toBe("number");
+  });
 });
