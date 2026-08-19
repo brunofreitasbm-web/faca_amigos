@@ -1,24 +1,60 @@
 // Publica uma nova versão do instalador do kiosk no feed do auto-updater
-// (Vercel, projeto "facaamigos-updates", domínio update.institutofacaamigos.com.br).
+// (Supabase Storage, bucket público "kiosk-updates").
 //
-// Fluxo: builda o instalador (pnpm dist:kiosk) -> copia os artefatos
-// (.exe, .blockmap, latest.yml) para a pasta do feed -> deploy via Vercel CLI.
+// Fluxo: builda o instalador (pnpm dist:kiosk) -> apaga versões antigas do
+// bucket -> sobe os artefatos (.exe, .blockmap, latest.yml).
+//
+// Requer FACAAMIGOS_SUPABASE_URL e FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY em
+// apps/kiosk/.env (mesma credencial já usada pelo print bridge local).
 //
 // Uso: pnpm release:kiosk
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, cpSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const kioskDir = join(root, "apps", "kiosk");
 const releaseDir = join(kioskDir, "release");
-const feedDir = join(root, "apps", "kiosk", "update-feed");
-const feedKioskDir = join(feedDir, "kiosk");
+const BUCKET = "kiosk-updates";
+const PREFIX = "kiosk";
 
 function run(cmd, cwd) {
   console.log(`\n$ ${cmd}`);
   execSync(cmd, { stdio: "inherit", cwd: cwd ?? root, shell: true });
+}
+
+function loadEnv(envPath) {
+  const env = {};
+  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
+    const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (match) env[match[1]] = match[2].trim();
+  }
+  return env;
+}
+
+const envPath = join(kioskDir, ".env");
+if (!existsSync(envPath)) throw new Error(`Não encontrei ${envPath}`);
+const env = loadEnv(envPath);
+const supabaseUrl = env.FACAAMIGOS_SUPABASE_URL;
+const serviceRoleKey = env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error("FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ausentes em apps/kiosk/.env");
+}
+
+async function storageFetch(path, options) {
+  const res = await fetch(`${supabaseUrl}/storage/v1${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      ...options.headers,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Storage ${options.method ?? "GET"} ${path} -> ${res.status}: ${await res.text()}`);
+  }
+  return res;
 }
 
 // 1. Build do instalador (workspace + kiosk-ui + ícones + electron-builder)
@@ -29,38 +65,47 @@ const latestYmlPath = join(releaseDir, "latest.yml");
 if (!existsSync(latestYmlPath)) {
   throw new Error(`latest.yml não encontrado em ${latestYmlPath} — build do electron-builder falhou?`);
 }
-const latestYml = readFileSync(latestYmlPath, "utf-8");
-const version = latestYml.match(/^version:\s*(\S+)/m)?.[1];
+const latestYmlContent = readFileSync(latestYmlPath, "utf-8");
+const version = latestYmlContent.match(/^version:\s*(\S+)/m)?.[1];
 if (!version) throw new Error("Não consegui extrair a versão de latest.yml");
 console.log(`\nVersão a publicar: ${version}`);
 
-// 3. Monta a pasta do feed estático (o que o Vercel vai servir em /kiosk/*)
-mkdirSync(feedKioskDir, { recursive: true });
-for (const file of [`FacaAmigos-Setup-${version}.exe`, `FacaAmigos-Setup-${version}.exe.blockmap`, "latest.yml"]) {
-  copyFileSync(join(releaseDir, file), join(feedKioskDir, file));
+// 3. Remove instaladores de versões antigas do bucket (o electron-updater só
+// precisa do mais recente; deixar os antigos só desperdiça espaço).
+console.log("\nListando arquivos antigos no bucket...");
+const listRes = await storageFetch(`/object/list/${BUCKET}`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ prefix: `${PREFIX}/`, limit: 100 }),
+});
+const existing = await listRes.json();
+const staleFiles = existing
+  .map((f) => f.name)
+  .filter((name) => name.endsWith(".exe") || name.endsWith(".exe.blockmap"));
+if (staleFiles.length > 0) {
+  console.log(`Removendo: ${staleFiles.join(", ")}`);
+  await storageFetch(`/object/${BUCKET}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: staleFiles.map((name) => `${PREFIX}/${name}`) }),
+  });
 }
 
-const vercelJsonPath = join(feedDir, "vercel.json");
-if (!existsSync(vercelJsonPath)) {
-  writeFileSync(
-    vercelJsonPath,
-    JSON.stringify(
-      {
-        headers: [
-          { source: "/kiosk/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=3600" }] },
-          // Regra mais específica por último: no cache do CDN sobrescreve o wildcard acima
-          // (Vercel aplica headers na ordem, a última regra que casar vence em conflito).
-          { source: "/kiosk/latest.yml", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] },
-        ],
-      },
-      null,
-      2,
-    ) + "\n",
-  );
+// 4. Sobe os artefatos novos (x-upsert sobrescreve se já existir)
+const uploads = [
+  { file: `FacaAmigos-Setup-${version}.exe`, contentType: "application/x-msdownload" },
+  { file: `FacaAmigos-Setup-${version}.exe.blockmap`, contentType: "application/octet-stream" },
+  { file: "latest.yml", contentType: "text/yaml" },
+];
+for (const { file, contentType } of uploads) {
+  console.log(`Enviando ${file}...`);
+  const body = readFileSync(join(releaseDir, file));
+  await storageFetch(`/object/${BUCKET}/${PREFIX}/${file}`, {
+    method: "POST",
+    headers: { "Content-Type": contentType, "x-upsert": "true" },
+    body,
+  });
 }
 
-// 4. Deploy via Vercel CLI (precisa estar logado: `npx vercel login`)
-run("npx vercel link --yes --project facaamigos-updates", feedDir);
-run("npx vercel --prod --yes", feedDir);
-
-console.log(`\n✅ Kiosk v${version} publicado em https://update.institutofacaamigos.com.br/kiosk/`);
+const feedUrl = `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${PREFIX}`;
+console.log(`\n✅ Kiosk v${version} publicado em ${feedUrl}/`);

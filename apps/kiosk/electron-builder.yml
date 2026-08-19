@@ -4,7 +4,9 @@ appId: br.com.facaamigos.kiosk
 productName: FacaAmigos
 publish:
   provider: generic
-  url: https://update.institutofacaamigos.com.br/kiosk
+  # Bucket público "kiosk-updates" no Supabase Storage (ver scripts/release-kiosk.mjs).
+  # Trocado do Vercel porque o instalador (~105MB) estoura o limite de 100MB/arquivo do plano.
+  url: https://ivjvpdzsfjdpyabbzzuj.supabase.co/storage/v1/object/public/kiosk-updates/kiosk
 extraMetadata:
   description: FaçaAmigos - AppGestão
 directories:
