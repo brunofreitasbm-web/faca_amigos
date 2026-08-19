@@ -1,18 +1,41 @@
 import { useEffect, useState } from "react";
 import { applyPwaUpdate, subscribePwaUpdate } from "../pwa.js";
 
+
 /**
- * Banner discreto e elegante exibido quando uma nova versão (deploy)
- * do aplicativo é detectada e baixada pelo Service Worker.
- *
- * Oferece a ação imediata "Atualizar Agora" para que o operador
- * recarregue o app sem perder sua sessão.
+ * Banner discreto e elegante exibido quando uma nova versão
+ * do aplicativo é detectada (via Electron AutoUpdater ou PWA Service Worker).
  */
 export function UpdatePwaBanner() {
   const [hasUpdate, setHasUpdate] = useState(false);
+  const [newVersion, setNewVersion] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
+    // 1. Inscrição para ambiente Electron
+    if (window.facaamigos?.onUpdateStatusChange) {
+      setIsElectron(true);
+      window.facaamigos.getUpdateStatus?.().then((status) => {
+        if (status?.status === "downloaded") {
+          setHasUpdate(true);
+          if (status.version) setNewVersion(status.version);
+        }
+      });
+
+      const unsubscribe = window.facaamigos.onUpdateStatusChange((data) => {
+        if (data?.status === "downloaded") {
+          setHasUpdate(true);
+          if (data.version) setNewVersion(data.version);
+        }
+      });
+
+      return () => {
+        unsubscribe();
+      };
+    }
+
+    // 2. Inscrição para ambiente PWA Web / Tablets
     return subscribePwaUpdate(() => {
       setHasUpdate(true);
     });
@@ -22,7 +45,11 @@ export function UpdatePwaBanner() {
 
   const handleUpdate = () => {
     setUpdating(true);
-    applyPwaUpdate();
+    if (isElectron && window.facaamigos?.applyUpdate) {
+      void window.facaamigos.applyUpdate();
+    } else {
+      applyPwaUpdate();
+    }
   };
 
   return (
@@ -66,9 +93,11 @@ export function UpdatePwaBanner() {
           🚀
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#FFFFFF" }}>Nova versão disponível</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#FFFFFF" }}>
+            {newVersion ? `Nova versão (${newVersion}) pronta` : "Nova versão disponível"}
+          </div>
           <div style={{ fontSize: 12, color: "#A1A1AA", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            Toque para atualizar o sistema instantaneamente
+            Toque para atualizar e reiniciar o sistema
           </div>
         </div>
       </div>
@@ -98,3 +127,4 @@ export function UpdatePwaBanner() {
     </div>
   );
 }
+

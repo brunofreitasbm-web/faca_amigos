@@ -1,9 +1,17 @@
-// A SPA fala com o servidor local por HTTP/WS, não por IPC — esta é a
-// única ponte: expõe a lista de impressoras instaladas no Windows deste
-// terminal para a tela de Configurações validar o nome digitado contra o
-// que o print bridge (rawPrint.ts/printBridge.ts) realmente vai usar.
 import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("facaamigos", {
   listPrinters: () => ipcRenderer.invoke("list-printers") as Promise<{ name: string }[]>,
+  getAppVersion: () => ipcRenderer.invoke("get-app-version") as Promise<string>,
+  getUpdateStatus: () => ipcRenderer.invoke("get-update-status") as Promise<unknown>,
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates") as Promise<unknown>,
+  applyUpdate: () => ipcRenderer.invoke("apply-update") as Promise<void>,
+  onUpdateStatusChange: (callback: (data: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => callback(data);
+    ipcRenderer.on("update-status-change", handler);
+    return () => {
+      ipcRenderer.removeListener("update-status-change", handler);
+    };
+  },
 });
+

@@ -1792,9 +1792,95 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
           </Card>
         </div>
       </div>
+
+      {/* VERSÃO E ATUALIZAÇÃO DO SISTEMA */}
+      <SystemVersionCard />
     </div>
   );
 }
+
+function SystemVersionCard() {
+  const toast = useToast();
+  const [version, setVersion] = useState<string>("0.1.6");
+  const [updateState, setUpdateState] = useState<{ status: string; version?: string; progress?: number; error?: string }>({ status: "idle" });
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    if (window.facaamigos?.getAppVersion) {
+      window.facaamigos.getAppVersion().then(setVersion);
+    }
+    if (window.facaamigos?.getUpdateStatus) {
+      window.facaamigos.getUpdateStatus().then((s: unknown) => {
+        if (s && typeof s === "object") setUpdateState(s as { status: string; version?: string; progress?: number; error?: string });
+      });
+    }
+    if (window.facaamigos?.onUpdateStatusChange) {
+      return window.facaamigos.onUpdateStatusChange((s: unknown) => {
+        if (s && typeof s === "object") setUpdateState(s as { status: string; version?: string; progress?: number; error?: string });
+      });
+    }
+  }, []);
+
+  async function handleCheck() {
+    setChecking(true);
+    try {
+      if (window.facaamigos?.checkForUpdates) {
+        const status = (await window.facaamigos.checkForUpdates()) as { status: string; version?: string; progress?: number; error?: string } | undefined;
+        if (status) setUpdateState(status);
+        toast.success("Verificação de atualização iniciada.");
+      } else {
+        const res = await fetch("/api/system/update/check", { method: "POST" });
+        const data = await res.json();
+        if (data.update) setUpdateState(data.update);
+        toast.success("Verificação iniciada.");
+      }
+    } catch {
+      toast.error("Não foi possível verificar atualizações.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function handleApply() {
+    try {
+      if (window.facaamigos?.applyUpdate) {
+        await window.facaamigos.applyUpdate();
+      } else {
+        await fetch("/api/system/update/apply", { method: "POST" });
+      }
+    } catch {
+      toast.error("Não foi possível reiniciar para atualizar.");
+    }
+  }
+
+  return (
+    <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+      <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Versão do Sistema & Atualização</h2>
+      <div style={{ fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+        <span>Versão atual:</span>
+        <Tag color="var(--color-teal, #2ECFB5)">v{version}</Tag>
+      </div>
+      <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+        {updateState.status === "checking" && "🔎 Verificando se há novas atualizações..."}
+        {updateState.status === "available" && `⏳ Baixando versão ${updateState.version ?? ""} (${updateState.progress ?? 0}%)...`}
+        {updateState.status === "downloaded" && `🚀 Nova versão ${updateState.version ?? ""} pronta para ser instalada!`}
+        {updateState.status === "error" && `⚠️ Status de atualização: ${updateState.error ?? "Erro ao verificar"}`}
+        {updateState.status === "idle" && "✅ O aplicativo está na versão mais recente."}
+      </div>
+      <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+        <Button variant="secondary" size="sm" loading={checking} onClick={handleCheck}>
+          🔄 Verificar Atualizações
+        </Button>
+        {updateState.status === "downloaded" && (
+          <Button variant="primary" size="sm" onClick={handleApply}>
+            🚀 Atualizar e Reiniciar Agora
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 
 // ---------------------------------------------------------------------------
 // Unidade

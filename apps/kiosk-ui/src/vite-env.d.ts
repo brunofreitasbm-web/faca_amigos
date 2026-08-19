@@ -11,5 +11,13 @@ declare const __BUILD_SHA__: string;
 interface Window {
   facaamigos?: {
     listPrinters: () => Promise<{ name: string }[]>;
+    getAppVersion: () => Promise<string>;
+    getUpdateStatus: () => Promise<{ status: string; version?: string; progress?: number; error?: string }>;
+    checkForUpdates: () => Promise<{ status: string; version?: string; progress?: number; error?: string }>;
+    applyUpdate: () => Promise<void>;
+    onUpdateStatusChange: (
+      callback: (data: { status: string; version?: string; progress?: number; error?: string }) => void
+    ) => () => void;
   };
 }
+
