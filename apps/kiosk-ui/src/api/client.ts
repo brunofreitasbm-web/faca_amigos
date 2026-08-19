@@ -405,6 +405,37 @@ export interface FiscalTerminalStatus {
   last_error: string | null;
 }
 
+export interface FiscalDoc {
+  id: string;
+  unit_id: string;
+  order_id: string;
+  doc_type: string;
+  environment: "HOMOLOGACAO" | "PRODUCAO";
+  serie: string | null;
+  numero: number | null;
+  access_key: string | null;
+  protocol_number: string | null;
+  status:
+    | "PENDENTE"
+    | "BLOQUEADO"
+    | "DESCARTADO"
+    | "ASSINADO"
+    | "TRANSMITIDO"
+    | "AUTORIZADO"
+    | "REJEITADO"
+    | "DENEGADO"
+    | "A_INUTILIZAR"
+    | "CONTINGENCIA_OFFLINE"
+    | "CANCELADO";
+  emission_type: "NORMAL" | "CONTINGENCIA_OFFLINE";
+  total_cents: number;
+  last_error: string | null;
+  reject_code: string | null;
+  reject_message: string | null;
+  created_at_ms: number;
+  authorized_at_ms: number | null;
+}
+
 export interface ChildMatch {
   id: string;
   full_name: string;
@@ -1651,18 +1682,47 @@ export const Api = {
       p_employee_id: body.employeeId,
       p_closed_at_ms: body.closedAtMs ?? null,
     }),
+  /**
+   * Pedido manual de NFS-e (botão "Emitir Nota Fiscal Serviço"), disparado
+   * pelo Responsável — enfileira o documento em fa_kiosk_fiscal_docs; quem
+   * de fato emite e manda por e-mail é o worker do kiosk (apps/kiosk/src/
+   * fiscal). Idempotente: pedir de novo para o mesmo pedido devolve o
+   * mesmo documento.
+   */
+  requestNfse: (orderId: string) => unwrap<{ fiscalDocId: string; status: string }>(supabase().rpc("fa_fiscal_request_nfse", { p_order_id: orderId })),
   pdvOrder: (body: {
     unitId: string;
     employeeId: string;
     items: { productId: string; quantity: number }[];
     payments: { method: string; amountCents: number; nsu?: string; authorization?: string; pixTxid?: string }[];
+    fiscalCpf?: string | null;
   }) =>
     callResilient<{ orderId: string; orderCode: string; totalCents: number }>("fa_create_pdv_order", {
       p_unit_id: body.unitId,
       p_employee_id: body.employeeId,
       p_items: body.items,
       p_payments: body.payments,
+      p_fiscal_cpf: body.fiscalCpf ?? null,
     }),
+
+  fiscalDocByOrder: (orderId: string) =>
+    unwrap<FiscalDoc | null>(
+      supabase()
+        .from("fa_kiosk_fiscal_docs")
+        .select("*")
+        .eq("order_id", orderId)
+        .maybeSingle(),
+    ),
+
+  fiscalDocs: (unitId: string, limit = 50) =>
+    unwrap<FiscalDoc[]>(
+      supabase()
+        .from("fa_kiosk_fiscal_docs")
+        .select("*")
+        .eq("unit_id", unitId)
+        .order("created_at_ms", { ascending: false })
+        .limit(limit),
+    ),
 
   openShift: (body: { unitId: string; employeeId: string; openingCashCents: number }) =>
     callResilient<{ id: string }>("fa_open_shift", {
@@ -2560,6 +2620,25 @@ export const Api = {
     ),
   updateUnitFiscal: (unitId: string, payload: Record<string, unknown>) =>
     unwrap(supabase().rpc("fa_config_update_unit_fiscal", { p_unit_id: unitId, p_payload: payload })),
+  /**
+   * Status do certificado A1 configurado para a unidade — nunca traz a
+   * senha (nem cifrada): a view fa_kiosk_fiscal_certificate_status já
+   * seleciona só o que é seguro mostrar no Gerencial.
+   */
+  fiscalCertificateStatus: (unitId: string) =>
+    unwrap<{ unit_id: string; subject_cn: string | null; issuer_cn: string | null; expires_at_ms: number | null; uploaded_at_ms: number } | null>(
+      supabase().from("fa_kiosk_fiscal_certificate_status").select("*").eq("unit_id", unitId).maybeSingle(),
+    ),
+  /**
+   * Upload do certificado A1 (.pfx) para transmissão de NFS-e. O arquivo
+   * e a senha só passam pela Edge Function nfse-certificate-upload, que
+   * cifra a senha e grava o .pfx num bucket privado — nunca tocam uma
+   * tabela legível pelo client. Ver comentário da function no repositório.
+   */
+  uploadFiscalCertificate: (unitId: string, pfxBase64: string, password: string, fileName?: string) =>
+    unwrap<{ ok: boolean }>(
+      supabase().functions.invoke("nfse-certificate-upload", { body: { unitId, pfxBase64, password, fileName } }),
+    ),
   productsFiscal: (unitId: string) =>
     unwrap<ProductFiscal[]>(
       supabase()

@@ -14,6 +14,7 @@
   "dependencies": {
     "@facaamigos/contracts": "workspace:*",
     "@facaamigos/domain": "workspace:*",
+    "@facaamigos/fiscal": "workspace:*",
     "@facaamigos/ui": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
     "@vladmandic/face-api": "^1.7.15",

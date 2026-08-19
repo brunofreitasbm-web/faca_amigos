@@ -8,6 +8,7 @@ import { ReceiptPrintModal } from "./ReceiptPrintModal.js";
 import { CashPaymentPad } from "./CashPaymentPad.js";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 import { openTapCharge, savePendingTap } from "../lib/infinitepayTap.js";
+import { IfCan } from "../auth/RequireCapability.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 type PaymentMethod = (typeof METHODS)[number];
@@ -91,11 +92,28 @@ export function CheckoutModal({
   const [error, setError] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<ReceiptPrintPayload[]>([]);
   const [hasOpenShift, setHasOpenShift] = useState<boolean | null>(null);
+  const [paidOrderId, setPaidOrderId] = useState<string | null>(null);
+  const [nfseEnabled, setNfseEnabled] = useState(false);
+  const [nfseState, setNfseState] = useState<"idle" | "enfileirando" | "enfileirado" | "erro">("idle");
 
   useEffect(() => {
     if (!unit) return;
     Api.currentShift(unit.id).then((shift) => setHasOpenShift(!!shift));
+    Api.unitFiscal(unit.id)
+      .then((fiscal) => setNfseEnabled(!!fiscal.nfse_enabled))
+      .catch(() => setNfseEnabled(false));
   }, [unit]);
+
+  async function requestNfse() {
+    if (!paidOrderId) return;
+    setNfseState("enfileirando");
+    try {
+      await Api.requestNfse(paidOrderId);
+      setNfseState("enfileirado");
+    } catch {
+      setNfseState("erro");
+    }
+  }
 
   const totalCents = entries.reduce((sum, e) => sum + e.quote.totalCents, 0);
   const isSplit = secondMethod !== null;
@@ -132,6 +150,7 @@ export function CheckoutModal({
         closedAtMs,
       });
 
+      setPaidOrderId(result.orderId);
       const nowStr = new Date().toLocaleString("pt-BR");
       setReceipts(
         entries.map((e) => ({
@@ -234,11 +253,50 @@ export function CheckoutModal({
             onClose={() => {
               const rest = receipts.filter((_, idx) => idx !== i);
               setReceipts(rest);
-              if (rest.length === 0) onDone();
+              // Cupom não fiscal já imprimiu sozinho, sem tela — se a unidade
+              // emite NFS-e, este é o único momento em que o operador vê algo
+              // clicável para pedir a nota; senão, fecha direto como sempre.
+              if (rest.length === 0 && !nfseEnabled) onDone();
             }}
           />
         ))}
       </>
+    );
+  }
+
+  if (paidOrderId && nfseEnabled) {
+    return (
+      <Modal title="Atendimento concluído" onClose={onDone} closeOnBackdrop={false} maxWidth="380px" zIndex={100}>
+        <p style={{ marginTop: 0 }}>Pagamento confirmado e cupom impresso.</p>
+        <IfCan capability="nfse.emit">
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "12px 0" }}>
+            <Button
+              variant="secondary"
+              onClick={requestNfse}
+              loading={nfseState === "enfileirando"}
+              disabled={nfseState === "enfileirando" || nfseState === "enfileirado"}
+              title="Solicitar a Nota Fiscal de Serviço deste atendimento, enviada por e-mail ao Responsável"
+            >
+              🧾 Emitir Nota Fiscal Serviço
+            </Button>
+            {nfseState === "enfileirado" && (
+              <p style={{ color: "var(--color-success-text, #15803d)", fontSize: "13px", margin: 0 }}>
+                Nota fiscal solicitada — será enviada por e-mail ao Responsável em instantes.
+              </p>
+            )}
+            {nfseState === "erro" && (
+              <p style={{ color: "var(--color-error-text)", fontSize: "13px", margin: 0 }}>
+                Não foi possível solicitar a nota agora. Tente novamente ou peça ao Owner para checar a unidade.
+              </p>
+            )}
+          </div>
+        </IfCan>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button variant="primary" onClick={onDone} title="Fechar">
+            Concluir
+          </Button>
+        </div>
+      </Modal>
     );
   }
 

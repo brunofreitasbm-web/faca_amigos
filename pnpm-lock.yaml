@@ -144,6 +144,9 @@ importers:
       '@facaamigos/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@facaamigos/fiscal':
+        specifier: workspace:*
+        version: link:../../packages/fiscal
       '@facaamigos/ui':
         specifier: workspace:*
         version: link:../../packages/ui

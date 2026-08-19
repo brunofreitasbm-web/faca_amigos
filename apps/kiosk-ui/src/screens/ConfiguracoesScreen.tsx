@@ -2092,6 +2092,36 @@ function FiscalTab({ unitId }: { unitId: string }) {
   const [products, setProducts] = useState<ProductFiscal[]>([]);
   const [status, setStatus] = useState<FiscalTerminalStatus[]>([]);
   const [saving, setSaving] = useState(false);
+  const [certStatus, setCertStatus] = useState<{ subject_cn: string | null; expires_at_ms: number | null; uploaded_at_ms: number } | null>(null);
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [certPassword, setCertPassword] = useState("");
+  const [certUploading, setCertUploading] = useState(false);
+
+  function loadCertStatus() {
+    Api.fiscalCertificateStatus(unitId)
+      .then(setCertStatus)
+      .catch(() => setCertStatus(null));
+  }
+
+  async function uploadCertificate() {
+    if (!certFile || !certPassword) return;
+    setCertUploading(true);
+    try {
+      const buffer = await certFile.arrayBuffer();
+      let binary = "";
+      new Uint8Array(buffer).forEach((b) => (binary += String.fromCharCode(b)));
+      const pfxBase64 = btoa(binary);
+      await Api.uploadFiscalCertificate(unitId, pfxBase64, certPassword, certFile.name);
+      toast.success("Certificado enviado e protegido com sucesso.");
+      setCertFile(null);
+      setCertPassword("");
+      loadCertStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar o certificado.");
+    } finally {
+      setCertUploading(false);
+    }
+  }
 
   function load() {
     Api.unitFiscal(unitId)
@@ -2137,6 +2167,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
       .catch(() => setStatus([]));
   }
   useEffect(load, [unitId]);
+  useEffect(loadCertStatus, [unitId]);
 
   function set(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -2257,8 +2288,11 @@ function FiscalTab({ unitId }: { unitId: string }) {
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>NFS-e — sessões de brincar</h2>
         <HelpText>
-          Nota de serviço (ISS, Prefeitura de Belém). Esta aba guarda o CADASTRO; a emissão automática ainda não
-          existe no sistema — ligar a chave abaixo registra a intenção e não emite nada por si só.
+          Nota de serviço (ISS, Prefeitura de Belém). O Responsável pode pedir a nota pelo botão "Emitir Nota
+          Fiscal Serviço" na tela de Saída — a transmissão de verdade à prefeitura ainda depende da confirmação do
+          layout do sistema próprio do município, então por enquanto o documento fica em modo simulado (registra o
+          pedido, reserva o número e manda o comprovante por e-mail, mas sem valor fiscal). Ligar a chave abaixo é
+          o que libera o botão para o Responsável pedir.
         </HelpText>
         <Input label="Item da lista de serviços (LC 116)" value={form.nfseItemListaServico ?? ""} onChange={(e) => set("nfseItemListaServico", e.target.value)} />
         <Input label="Código de tributação do município" value={form.nfseCodigoTributacaoMunicipio ?? ""} onChange={(e) => set("nfseCodigoTributacaoMunicipio", e.target.value)} />
@@ -2281,13 +2315,49 @@ function FiscalTab({ unitId }: { unitId: string }) {
         </Select>
         <Select label="Emissão de NFS-e" value={form.nfseEnabled ?? "false"} onChange={(e) => set("nfseEnabled", e.target.value)}>
           <option value="false">Desligada</option>
-          <option value="true">Ligada (quando a emissão existir)</option>
+          <option value="true">Ligada</option>
         </Select>
       </Card>
 
       <Button variant="primary" disabled={saving} onClick={save}>
         Salvar dados fiscais
       </Button>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Certificado digital A1 (NFS-e)</h2>
+        <HelpText>
+          Necessário para a transmissão real de NFS-e à prefeitura (ainda pendente de layout — ver aba acima). A
+          senha nunca fica salva em texto puro: é cifrada nesta função e só a Edge Function que emite a nota
+          consegue decifrá-la; o arquivo .pfx fica num espaço privado que o app nunca lê de volta.
+        </HelpText>
+        {certStatus ? (
+          <p style={{ margin: 0, fontSize: "13px" }}>
+            ✅ Certificado configurado em {new Date(certStatus.uploaded_at_ms).toLocaleDateString("pt-BR")}
+            {certStatus.expires_at_ms ? ` — válido até ${new Date(certStatus.expires_at_ms).toLocaleDateString("pt-BR")}` : ""}.
+          </p>
+        ) : (
+          <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Nenhum certificado configurado ainda.</p>
+        )}
+        <input
+          type="file"
+          accept=".pfx,.p12"
+          onChange={(e) => setCertFile(e.target.files?.[0] ?? null)}
+        />
+        <Input
+          label="Senha do certificado"
+          type="password"
+          value={certPassword}
+          onChange={(e) => setCertPassword(e.target.value)}
+        />
+        <Button
+          variant="secondary"
+          disabled={!certFile || !certPassword || certUploading}
+          loading={certUploading}
+          onClick={uploadCertificate}
+        >
+          Enviar certificado
+        </Button>
+      </Card>
 
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Tributação por produto</h2>

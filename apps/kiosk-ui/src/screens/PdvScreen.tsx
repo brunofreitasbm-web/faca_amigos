@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Button, Card, MinusIcon, HelpText } from "@facaamigos/ui";
+import { Button, Card, MinusIcon, HelpText, Input } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { Product } from "../api/client.js";
+import type { Product, FiscalDoc } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
 import { CashPaymentPad } from "../components/CashPaymentPad.js";
 import { openTapCharge, savePendingTap } from "../lib/infinitepayTap.js";
+import { NfceModal } from "../components/NfceModal.js";
 
 interface CartLine {
   product: Product;
@@ -14,22 +15,38 @@ interface CartLine {
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
+function formatCpfMask(val: string): string {
+  const digits = val.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
 export function PdvScreen() {
   const { unit, employee } = useAppState();
   const [products, setProducts] = useState<Product[]>([]);
   const [hasOpenShift, setHasOpenShift] = useState<boolean | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState<(typeof METHODS)[number]>("PIX");
+  const [fiscalCpf, setFiscalCpf] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showNfceModal, setShowNfceModal] = useState(false);
+  const [lastSaleDoc, setLastSaleDoc] = useState<{
+    doc: FiscalDoc | null;
+    orderCode: string;
+    items: Array<{ description: string; quantity: number; amountCents: number }>;
+    payments: Array<{ method: string; amountCents: number }>;
+    fiscalCpf: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!unit) return;
     Api.products(unit.id).then(setProducts);
     Api.currentShift(unit.id).then((shift) => setHasOpenShift(!!shift));
   }, [unit]);
-
 
   function addToCart(product: Product) {
     setCart((prev) => {
@@ -54,21 +71,36 @@ export function PdvScreen() {
     setBusy(true);
     setError(null);
     try {
+      const cleanCpf = fiscalCpf.replace(/\D/g, "");
+      const itemsSnapshot = cart.map((line) => ({
+        description: line.product.name,
+        quantity: line.quantity,
+        amountCents: line.product.price_cents * line.quantity,
+      }));
+
       const result = await Api.pdvOrder({
         unitId: unit.id,
         employeeId: employee.id,
         items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
         payments: [{ method, amountCents: totalCents }],
+        fiscalCpf: cleanCpf || null,
       });
+
       setSuccess(`Venda registrada! Código: ${result.orderCode}`);
       setCart([]);
-      // A venda já está feita — se só esta atualização de estoque falhar,
-      // a tela continua com o estoque antigo até a próxima ação; não é
-      // motivo pra reportar erro na venda que na verdade deu certo.
+      setFiscalCpf("");
       Api.products(unit.id).then(setProducts).catch(() => {});
+
+      const fiscalDoc = await Api.fiscalDocByOrder(result.orderId).catch(() => null);
+      setLastSaleDoc({
+        doc: fiscalDoc,
+        orderCode: result.orderCode,
+        items: itemsSnapshot,
+        payments: [{ method, amountCents: totalCents }],
+        fiscalCpf: cleanCpf || null,
+      });
+      setShowNfceModal(true);
     } catch (err) {
-      // Só o <p> abaixo (sem toast redundante): a mesma mensagem duas
-      // vezes — uma que some sozinha, outra que fica — não ajudava.
       const msg = err instanceof Error ? err.message : "Erro ao vender";
       setError(msg);
     } finally {
@@ -139,7 +171,17 @@ export function PdvScreen() {
           <span>{money(totalCents)}</span>
         </div>
 
-        <HelpText style={{ margin: "8px 0 0" }}>Escolha como o cliente vai pagar:</HelpText>
+        <div style={{ marginTop: "12px" }}>
+          <Input
+            label="CPF no Cupom Fiscal (opcional)"
+            placeholder="000.000.000-00"
+            value={fiscalCpf}
+            onChange={(e) => setFiscalCpf(formatCpfMask(e.target.value))}
+            maxLength={14}
+          />
+        </div>
+
+        <HelpText style={{ margin: "12px 0 0" }}>Escolha como o cliente vai pagar:</HelpText>
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "12px 0" }}>
           {METHODS.map((m) => (
             <Button key={m} variant={method === m ? "primary" : "secondary"} size="sm" onClick={() => setMethod(m)} title={`Pagar via ${m}`}>
@@ -155,7 +197,16 @@ export function PdvScreen() {
         )}
 
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
-        {success && <p style={{ color: "var(--color-teal-text)" }}>{success}</p>}
+        {success && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", margin: "8px 0" }}>
+            <p style={{ color: "var(--color-teal-text)", margin: 0 }}>{success}</p>
+            {lastSaleDoc && (
+              <Button variant="secondary" size="sm" onClick={() => setShowNfceModal(true)}>
+                📄 Ver / Imprimir Cupom NFC-e
+              </Button>
+            )}
+          </div>
+        )}
 
         {method === "DINHEIRO" ? (
           <CashPaymentPad totalCents={totalCents} busy={busy || cart.length === 0 || hasOpenShift === false} onConfirm={() => confirm()} />
@@ -199,6 +250,18 @@ export function PdvScreen() {
           <span>{money(totalCents)}</span>
           <span>Ver carrinho ▲</span>
         </button>
+      )}
+
+      {showNfceModal && lastSaleDoc && (
+        <NfceModal
+          doc={lastSaleDoc.doc}
+          unitName={unit.name}
+          orderCode={lastSaleDoc.orderCode}
+          items={lastSaleDoc.items}
+          payments={lastSaleDoc.payments}
+          fiscalCpf={lastSaleDoc.fiscalCpf}
+          onClose={() => setShowNfceModal(false)}
+        />
       )}
     </div>
   );
