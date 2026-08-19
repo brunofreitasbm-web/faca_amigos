@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { CashMovement, RevenueByMethod, Shift, ShiftSale } from "../api/client.js";
+import type { CashMovement, RevenueByMethod, Shift, ShiftSale, FiscalDoc } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useConfirm } from "../state/ConfirmContext.js";
 import { IfCan } from "../auth/RequireCapability.js";
 import { money } from "../format.js";
 import { OFFLINE_FLUSH_EVENT, OfflineQueuedError } from "../lib/supabase/offlineQueue.js";
 import type { OfflineFlushDetail } from "../lib/supabase/offlineQueue.js";
+import { NfceModal } from "../components/NfceModal.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
@@ -27,6 +28,19 @@ export function CaixaScreen() {
   const [movementKind, setMovementKind] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
   const [movementAmount, setMovementAmount] = useState("0");
   const [movementReason, setMovementReason] = useState("");
+  const [selectedSaleForNfce, setSelectedSaleForNfce] = useState<{
+    doc: FiscalDoc | null;
+    sale: ShiftSale;
+  } | null>(null);
+
+  async function openNfceForSale(sale: ShiftSale) {
+    try {
+      const doc = await Api.fiscalDocByOrder(sale.orderId).catch(() => null);
+      setSelectedSaleForNfce({ doc, sale });
+    } catch {
+      setSelectedSaleForNfce({ doc: null, sale });
+    }
+  }
 
   const [closing, setClosing] = useState(false);
   const [declared, setDeclared] = useState<Record<string, string>>({ DINHEIRO: "0", PIX: "0", CREDITO: "0", DEBITO: "0" });
@@ -295,23 +309,12 @@ export function CaixaScreen() {
 
   if (!unit || shift === undefined) return null;
 
-  if (shift === null) {
-    return (
-      <div style={{ maxWidth: "420px", margin: "60px auto", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno</h1>
-        <HelpText>
-          É preciso abrir o turno de caixa antes de vender no PDV ou fechar atendimentos. Informe quanto dinheiro
-          (em espécie) já está na gaveta para começar — normalmente o troco combinado com a gerência.
-        </HelpText>
-        <Input label="Fundo de Caixa (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
-        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
-        <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
-          Abrir turno
-        </Button>
-      </div>
-    );
-  }
-
+  // closeResult precisa ser checado ANTES de `shift === null`: o poll de 5s
+  // (useEffect acima) já busca de novo o turno assim que o fechamento é
+  // confirmado, e como o turno acabou de fechar `currentShift` volta null.
+  // Se o "Abrir turno" fosse checado primeiro, a tela de conferência
+  // (esperado x declarado x divergência) seria substituída por "Abrir
+  // turno" antes do operador conseguir ler — inclusive com divergência.
   if (closeResult) {
     return (
       <div style={{ maxWidth: "480px", margin: "40px auto" }}>
@@ -367,6 +370,23 @@ export function CaixaScreen() {
           style={{ marginTop: "16px" }}
         >
           Ir para novo turno
+        </Button>
+      </div>
+    );
+  }
+
+  if (shift === null) {
+    return (
+      <div style={{ maxWidth: "420px", margin: "60px auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno</h1>
+        <HelpText>
+          É preciso abrir o turno de caixa antes de vender no PDV ou fechar atendimentos. Informe quanto dinheiro
+          (em espécie) já está na gaveta para começar — normalmente o troco combinado com a gerência.
+        </HelpText>
+        <Input label="Fundo de Caixa (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
+        {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
+        <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
+          Abrir turno
         </Button>
       </div>
     );
@@ -512,6 +532,7 @@ export function CaixaScreen() {
                   <th style={{ padding: "6px 8px" }}>Pagamento</th>
                   <th style={{ padding: "6px 8px", textAlign: "right" }}>Desconto</th>
                   <th style={{ padding: "6px 8px", textAlign: "right" }}>Valor</th>
+                  <th style={{ padding: "6px 8px", textAlign: "center" }}>NFC-e</th>
                 </tr>
               </thead>
               <tbody>
@@ -532,6 +553,13 @@ export function CaixaScreen() {
                     <td style={{ padding: "6px 8px" }}>{s.method}</td>
                     <td style={{ padding: "6px 8px", textAlign: "right" }}>{s.discountCents > 0 ? `−${money(s.discountCents)}` : "—"}</td>
                     <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}>{money(s.amountCents)}</td>
+                    <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                      {s.kind === "PDV" && (
+                        <Button variant="ghost" size="sm" onClick={() => openNfceForSale(s)} title="Ver / Imprimir Cupom Fiscal NFC-e">
+                          📄 NFC-e
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -539,6 +567,17 @@ export function CaixaScreen() {
           </div>
         )}
       </Card>
+
+      {selectedSaleForNfce && (
+        <NfceModal
+          doc={selectedSaleForNfce.doc}
+          unitName={unit?.name ?? "FaçaAmigos"}
+          orderCode={selectedSaleForNfce.sale.orderCode ?? undefined}
+          items={[{ description: selectedSaleForNfce.sale.productsSummary ?? "Produtos PDV", quantity: 1, amountCents: selectedSaleForNfce.sale.amountCents }]}
+          payments={[{ method: selectedSaleForNfce.sale.method, amountCents: selectedSaleForNfce.sale.amountCents }]}
+          onClose={() => setSelectedSaleForNfce(null)}
+        />
+      )}
 
       {/* Sangria/suprimento tira e põe dinheiro na gaveta fora de uma venda —
           é a operação em que a diferença entre Operador e Líder tem

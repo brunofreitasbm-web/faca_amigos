@@ -13,14 +13,31 @@ with
     insert into fa_kiosk_units (kind, name) values ('LOJA', 'Playground (Bosque Grão-Pará)') returning id
   ),
   admin_user as (
+    -- confirmation_token/recovery_token/email_change_token_new/email_change
+    -- precisam ser '' (não NULL): o GoTrue lê essas colunas como string ao
+    -- carregar o usuário (ex.: admin.getUserById, chamado por login-pin), e
+    -- NULL aí quebra a leitura com "Database error loading user" — o login
+    -- por PIN falha para qualquer conta criada por este seed, mascarado
+    -- como "PIN incorreto" na tela (a causa real só aparece no log da
+    -- Edge Function).
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at
+      raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change
     ) values (
       '00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
       'admin-dev@kiosk.internal', crypt('000000', gen_salt('bf')), now(),
-      '{"provider":"email","providers":["email"]}', '{}', false, now(), now()
+      '{"provider":"email","providers":["email"]}', '{}', false, now(), now(),
+      '', '', '', ''
     ) returning id
+  ),
+  admin_identity as (
+    -- Sem uma linha em auth.identities, admin.getUserById também falha com
+    -- "Database error loading user" — o GoTrue espera pelo menos uma
+    -- identidade vinculada ao usuário, mesmo criado por INSERT direto.
+    insert into auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+    select gen_random_uuid(), id, jsonb_build_object('sub', id::text, 'email', 'admin-dev@kiosk.internal'), 'email', id::text, now(), now(), now()
+    from admin_user returning user_id
   ),
   admin_emp as (
     insert into fa_kiosk_employees (auth_user_id, full_name, role, active)
@@ -33,12 +50,19 @@ with
   admin2_user as (
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at
+      raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change
     ) values (
       '00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
       'admin2@kiosk.internal', crypt('000000', gen_salt('bf')), now(),
-      '{"provider":"email","providers":["email"]}', '{}', false, now(), now()
+      '{"provider":"email","providers":["email"]}', '{}', false, now(), now(),
+      '', '', '', ''
     ) returning id
+  ),
+  admin2_identity as (
+    insert into auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+    select gen_random_uuid(), id, jsonb_build_object('sub', id::text, 'email', 'admin2@kiosk.internal'), 'email', id::text, now(), now(), now()
+    from admin2_user returning user_id
   ),
   admin2_emp as (
     insert into fa_kiosk_employees (auth_user_id, full_name, role, active)
