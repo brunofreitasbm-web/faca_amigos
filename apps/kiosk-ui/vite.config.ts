@@ -1,6 +1,25 @@
+import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+
+// Versão exibida no badge discreto (VersionBadge.tsx): usa a mesma versão
+// do apps/kiosk (o número que de fato é bumpado a cada release, ver
+// scripts/release-kiosk.mjs) — kiosk-ui não tem versionamento próprio.
+const kioskPackageJson = fileURLToPath(new URL("../kiosk/package.json", import.meta.url));
+const appVersion = JSON.parse(readFileSync(kioskPackageJson, "utf-8")).version as string;
+
+function shortSha(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", { cwd: fileURLToPath(new URL(".", import.meta.url)) })
+      .toString()
+      .trim();
+  } catch {
+    return "dev";
+  }
+}
 
 // D1 do plano: mesma SPA para o Electron (127.0.0.1:7317) e para os
 // tablets da LAN. Em dev, o proxy evita CORS entre o Vite (5173) e o
@@ -11,6 +30,10 @@ import { VitePWA } from "vite-plugin-pwa";
 // origem local do Electron (127.0.0.1 é secure context e o SW congelaria
 // uma shell antiga no desktop após updates).
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __BUILD_SHA__: JSON.stringify(shortSha()),
+  },
   plugins: [
     react(),
     VitePWA({

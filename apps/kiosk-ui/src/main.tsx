@@ -8,6 +8,7 @@ import { AuthProvider } from "./auth/AuthContext.js";
 import { ToastProvider } from "./state/ToastContext.js";
 import { ConfirmProvider } from "./state/ConfirmContext.js";
 import { SystemStatusOverlay } from "./components/SystemStatusOverlay.js";
+import { VersionBadge } from "./components/VersionBadge.js";
 import { flushOfflineQueue } from "./lib/supabase/offlineQueue.js";
 import { setupPwa } from "./pwa.js";
 
@@ -42,6 +43,7 @@ createRoot(container).render(
             </AuthProvider>
           )}
           <SystemStatusOverlay />
+          <VersionBadge />
         </ConfirmProvider>
       </ToastProvider>
     </ErrorBoundary>
