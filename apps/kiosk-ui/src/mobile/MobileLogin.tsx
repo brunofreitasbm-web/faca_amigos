@@ -23,6 +23,7 @@ type Mode = { kind: "PICK" } | { kind: "PIN"; employee: LoginCandidate } | { kin
 function Splash() {
   return (
     <div style={{ flex: "none", padding: "48px 24px 8px", textAlign: "center" }}>
+      <img src="/favicon.png" alt="Faça Amigos" style={{ width: 64, height: 64, objectFit: "contain", marginBottom: 8 }} />
       <p style={{ margin: "0 0 4px", fontFamily: "var(--font-display)", fontSize: 22, color: "#F0196B" }}>Faça Amigos</p>
       <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted, #6C7682)" }}>
         Playground Inclusivo
