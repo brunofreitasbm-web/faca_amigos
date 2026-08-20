@@ -49,6 +49,7 @@ import { UpdatePwaBanner } from "./components/UpdatePwaBanner.js";
 import { GlobalPdfReceiptModalListener } from "./components/PdfReceiptModal.js";
 import { isElectronLocal } from "./pwa.js";
 import { MobileShell } from "./mobile/MobileShell.js";
+import { MobileScreenFrame } from "./mobile/MobileScreenFrame.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
@@ -300,6 +301,23 @@ export function App() {
         onTrocarModulo={handleChangeModule}
         onSair={handleLogout}
       />
+    );
+  }
+
+  // Saída e Caixa continuam sendo a MESMA SaidaScreen/CaixaScreen do
+  // balcão — não uma segunda implementação — só vestidas com a casca do
+  // modo celular em vez do cabeçalho de balcão (marca + menu hambúrguer).
+  // As demais telas de escape (Entrada completa, PDV, Ponto, Relatórios,
+  // Configurações) ainda caem no fallback abaixo, com o botão flutuante
+  // "Voltar ao modo celular" — ainda não vestidas.
+  if (mobile.active && (mobileEscape === "SAIDA" || mobileEscape === "CAIXA") && employee) {
+    const FramedComponent = SCREEN_COMPONENTS[mobileEscape];
+    return (
+      <MobileScreenFrame title={mobileEscape === "SAIDA" ? "Saída" : "Caixa"} onBack={() => setMobileEscape(null)}>
+        <RequireCapability capability={SCREEN_CAPABILITY[mobileEscape]}>
+          <FramedComponent />
+        </RequireCapability>
+      </MobileScreenFrame>
     );
   }
 

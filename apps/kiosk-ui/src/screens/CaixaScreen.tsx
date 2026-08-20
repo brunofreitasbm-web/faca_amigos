@@ -236,12 +236,24 @@ export function CaixaScreen() {
           inset: 0,
           backgroundColor: "rgba(0, 0, 0, 0.5)",
           display: "flex",
-          alignItems: "center",
+          alignItems: "safe center",
           justifyContent: "center",
+          overflowY: "auto",
+          padding: "24px",
           zIndex: 9999,
         }}
       >
-        <Card style={{ width: "90%", maxWidth: "450px", padding: "24px", borderRadius: "16px", background: "var(--surface-card)" }}>
+        <Card
+          style={{
+            width: "90%",
+            maxWidth: "450px",
+            maxHeight: "calc(100dvh - 48px)",
+            overflowY: "auto",
+            padding: "24px",
+            borderRadius: "16px",
+            background: "var(--surface-card)",
+          }}
+        >
           <h2 style={{ marginTop: 0, fontSize: "20px" }}>✉️ Registrar Envelope (Sangria)</h2>
           <HelpText style={{ marginBottom: "16px" }}>
             Registre a retirada de valores em espécie com o número do envelope correspondente.
@@ -328,6 +340,7 @@ export function CaixaScreen() {
             valores em dinheiro sem textAlign nenhum (também padrão,
             mas "left"), então título e número nunca ficavam um sobre o
             outro nesta tabela de conferência de caixa. */}
+        <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -364,6 +377,7 @@ export function CaixaScreen() {
             })}
           </tbody>
         </table>
+        </div>
         <Button
           variant="primary"
           onClick={() => { setCloseResult(null); setClosing(false); setCloseJustifications({}); refresh(); }}
@@ -407,6 +421,7 @@ export function CaixaScreen() {
           diferença aparece destacada depois de confirmar.
         </HelpText>
         <p>Digite o que foi contado por método (o sistema já mostra o esperado ao lado — sem fechamento cego):</p>
+        <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -457,6 +472,7 @@ export function CaixaScreen() {
             })}
           </tbody>
         </table>
+        </div>
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         {pendingCloseKey && (
           <p style={{ color: "var(--color-amber)" }}>
@@ -483,7 +499,7 @@ export function CaixaScreen() {
   return (
     <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
       {renderEnvelopeModal()}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
         <div>
           <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Caixa</h1>
           <HelpText>
@@ -591,7 +607,7 @@ export function CaixaScreen() {
           Use esta seção sempre que dinheiro sair ou entrar na gaveta fora de uma venda — por exemplo, retirar para
           levar ao banco (Sangria) ou colocar troco extra (Suprimento).
         </HelpText>
-        <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
           <Button
             variant={movementKind === "SANGRIA" ? "primary" : "secondary"}
             size="sm"
