@@ -2,7 +2,12 @@ import { useState } from "react";
 import type { Unit } from "../api/client.js";
 import { GerencialApp } from "../screens/gerencial/GerencialApp.js";
 import { MobileGerencialHome } from "./MobileGerencialHome.js";
+import { MobileUnitDetail } from "./MobileUnitDetail.js";
+import { MobileRelatorios } from "./MobileRelatorios.js";
+import { MobileEquipe } from "./MobileEquipe.js";
 import "./mobile.css";
+
+type View = { kind: "HOME" } | { kind: "UNIT"; unit: Unit } | { kind: "RELATORIOS" } | { kind: "EQUIPE" } | { kind: "FULL" };
 
 /**
  * Entrada do Owner no modo celular.
@@ -15,15 +20,28 @@ import "./mobile.css";
  * por isso ele é renderizado tal como é no balcão, sem embrulho.
  *
  * O que faltava era a PRIMEIRA tela: hoje, entrar em Gerencial cai direto
- * na aba Planos, sem nenhum resumo. Esta home mostra as 3 operações juntas
- * primeiro; "Abrir painel administrativo completo" é quem leva ao console
- * de verdade.
+ * na aba Planos, sem nenhum resumo. Esta home mostra as 3 operações
+ * juntas primeiro, com três destinos nativos (detalhe de unidade,
+ * relatórios, equipe) e um caminho pro console completo quando o Owner
+ * precisa mexer em cadastro de verdade.
  */
 export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; onExit: () => void; onLogout: () => void | Promise<void> }) {
-  const [showFull, setShowFull] = useState(false);
+  const [view, setView] = useState<View>({ kind: "HOME" });
 
-  if (showFull) {
+  if (view.kind === "FULL") {
     return <GerencialApp onExit={onExit} onLogout={onLogout} />;
+  }
+
+  if (view.kind === "UNIT") {
+    return <MobileUnitDetail unit={view.unit} onBack={() => setView({ kind: "HOME" })} />;
+  }
+
+  if (view.kind === "RELATORIOS") {
+    return <MobileRelatorios units={units} onBack={() => setView({ kind: "HOME" })} />;
+  }
+
+  if (view.kind === "EQUIPE") {
+    return <MobileEquipe units={units} onBack={() => setView({ kind: "HOME" })} />;
   }
 
   return (
@@ -35,7 +53,13 @@ export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; on
           </button>
           <span className="m-title-sm m-grow">Gerencial</span>
         </div>
-        <MobileGerencialHome units={units} onAbrirPainelCompleto={() => setShowFull(true)} />
+        <MobileGerencialHome
+          units={units}
+          onAbrirPainelCompleto={() => setView({ kind: "FULL" })}
+          onAbrirUnidade={(unit) => setView({ kind: "UNIT", unit })}
+          onAbrirRelatorios={() => setView({ kind: "RELATORIOS" })}
+          onAbrirEquipe={() => setView({ kind: "EQUIPE" })}
+        />
       </div>
     </div>
   );

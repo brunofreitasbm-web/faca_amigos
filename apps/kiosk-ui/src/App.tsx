@@ -325,7 +325,7 @@ export function App() {
   // caro possível. As demais telas de escape (Entrada completa, PDV,
   // Relatórios, Configurações) ainda caem no fallback abaixo, com o botão
   // flutuante "Voltar ao modo celular" — ainda não vestidas.
-  const MOBILE_FRAMED_TITLE: Partial<Record<Screen, string>> = { SAIDA: "Saída", CAIXA: "Caixa", PONTO: "Ponto" };
+  const MOBILE_FRAMED_TITLE: Partial<Record<Screen, string>> = { SAIDA: "Saída", CAIXA: "Caixa", PONTO: "Ponto", PDV: "PDV" };
   if (mobile.active && mobileEscape != null && mobileEscape in MOBILE_FRAMED_TITLE && employee) {
     const FramedComponent = SCREEN_COMPONENTS[mobileEscape];
     return (

@@ -8,6 +8,7 @@ import { InstallPwaBanner } from "../components/InstallPwaBanner.js";
 import { UpdatePwaBanner } from "../components/UpdatePwaBanner.js";
 import { MobileHome } from "./MobileHome.js";
 import { MobileCheckin } from "./MobileCheckin.js";
+import { MobileCheckinCircuito } from "./MobileCheckinCircuito.js";
 import { MobilePainel } from "./MobilePainel.js";
 import { MobilePedidosTempo } from "./MobilePedidosTempo.js";
 import "./mobile.css";
@@ -66,11 +67,10 @@ export function MobileShell({
 
   const activeCount = status === "ready" ? entries.length : null;
 
-  // No Circuito (quiosque) a entrada exige escolher o carrinho/pelúcia que
-  // vai com a criança — e "escolher o ativo" é justamente o passo que o
-  // check-in de 3 toques não tem. Em vez de fingir que tem, o botão abre a
-  // tela completa, que sabe listar os ativos livres e os em manutenção.
-  const entradaPrecisaDeAtivo = unit.kind === "QUIOSQUE";
+  // No Circuito (quiosque) a entrada exige escolher o veículo — o passo
+  // extra que MobileCheckinCircuito resolve (busca → veículo → checklist +
+  // plano/pacote), reaproveitando o mesmo fa_checkin de sempre.
+  const isQuiosque = unit.kind === "QUIOSQUE";
 
   function abrirCompleta(screen: EscapeScreen, reason?: string) {
     if (reason) toast.success(reason);
@@ -92,25 +92,25 @@ export function MobileShell({
               <button type="button" className="m-round" aria-label="Voltar" onClick={() => setView("TURNO")}>
                 ‹
               </button>
-              <span className="m-title-sm m-grow">Nova entrada</span>
+              <span className="m-title-sm m-grow">{isQuiosque ? "Nova sessão" : "Nova entrada"}</span>
             </div>
-            <MobileCheckin
-              unitId={unit.id}
-              employeeId={employeeId}
-              onEscape={(screen, reason) => abrirCompleta(screen, reason)}
-              onDone={() => void refetch()}
-            />
+            {isQuiosque ? (
+              <MobileCheckinCircuito unitId={unit.id} employeeId={employeeId} onDone={() => void refetch()} />
+            ) : (
+              <MobileCheckin
+                unitId={unit.id}
+                employeeId={employeeId}
+                onEscape={(screen, reason) => abrirCompleta(screen, reason)}
+                onDone={() => void refetch()}
+              />
+            )}
           </>
         ) : view === "TURNO" ? (
           <MobileHome
             unit={unit}
             employeeName={employeeName}
             activeCount={activeCount}
-            onNovaEntrada={() =>
-              entradaPrecisaDeAtivo
-                ? abrirCompleta("ENTRADA", "No Circuito a entrada precisa da escolha do carrinho.")
-                : setView("CHECKIN")
-            }
+            onNovaEntrada={() => setView("CHECKIN")}
             onAbrirTela={(screen) => abrirCompleta(screen)}
             pendingRenewalsCount={pendingRenewals.size}
             onAbrirPedidos={() => setView("PEDIDOS")}
@@ -126,7 +126,7 @@ export function MobileShell({
             <MobilePedidosTempo entries={entries} pending={pendingRenewals} employeeId={employeeId} />
           </>
         ) : view === "PAINEL" ? (
-          <MobilePainel unitId={unit.id} onLiberarSaida={() => abrirCompleta("SAIDA")} />
+          <MobilePainel unitId={unit.id} isQuiosque={isQuiosque} onLiberarSaida={() => abrirCompleta("SAIDA")} />
         ) : (
           <MobileMais
             unitName={unit.name}

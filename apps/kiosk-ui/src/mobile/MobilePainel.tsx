@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RevealPin } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { ActiveSessionEntry } from "../api/client.js";
+import type { ActiveSessionEntry, Asset } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { useToast } from "../state/ToastContext.js";
@@ -40,12 +40,36 @@ function urgency(entry: ActiveSessionEntry): { color: string; status: string } {
   return { color: "#1D8273", status: `Restam ${leftMin} min` };
 }
 
-export function MobilePainel({ unitId, onLiberarSaida }: { unitId: string; onLiberarSaida: () => void }) {
+export function MobilePainel({
+  unitId,
+  isQuiosque,
+  onLiberarSaida,
+}: {
+  unitId: string;
+  /** Circuito: acrescenta a seção "Frota" depois da lista, com o status de cada veículo. */
+  isQuiosque?: boolean;
+  onLiberarSaida: () => void;
+}) {
   const { entries, status, errorMessage, refetch } = useActiveSessions(unitId);
   const { can } = useAuth();
   const toast = useToast();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fleet, setFleet] = useState<Asset[]>([]);
+
+  useEffect(() => {
+    if (!isQuiosque) return;
+    let alive = true;
+    function load() {
+      Api.assets(unitId).then((rows) => alive && setFleet(rows)).catch(() => {});
+    }
+    load();
+    const interval = setInterval(load, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
+  }, [unitId, isQuiosque]);
 
   const selected = entries.find((e) => e.session.id === selectedId) ?? null;
 
@@ -157,6 +181,33 @@ export function MobilePainel({ unitId, onLiberarSaida }: { unitId: string; onLib
             );
           })}
         </div>
+
+        {isQuiosque && (
+          <>
+            <p className="m-eyebrow" style={{ margin: "22px 0 10px" }}>
+              Frota
+            </p>
+            <div className="m-stack" style={{ gap: 8 }}>
+              {fleet.map((v) => {
+                const statusLabel = v.status === "DISPONIVEL" ? "Disponível" : v.status === "EM_USO" ? "Em uso" : "Manutenção";
+                const statusColor = v.status === "DISPONIVEL" ? "#1A8454" : v.status === "EM_USO" ? "#996D18" : "#E61E1E";
+                return (
+                  <div
+                    key={v.id}
+                    className="m-row"
+                    style={{ justifyContent: "space-between", background: "var(--surface-card)", border: "1px solid var(--color-gray-200)", borderRadius: 16, padding: "11px 14px" }}
+                  >
+                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{v.emoji} {v.name}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: statusColor }}>{statusLabel}</span>
+                  </div>
+                );
+              })}
+              {fleet.length === 0 && (
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Nenhum veículo cadastrado.</p>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {selected && (

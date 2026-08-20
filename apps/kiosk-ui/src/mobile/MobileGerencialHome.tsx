@@ -19,7 +19,19 @@ import { money } from "../format.js";
  * faturamento diário por unidade. Inventar um número ali seria decidir
  * fictício numa tela que o Owner usa para decisão real.
  */
-export function MobileGerencialHome({ units, onAbrirPainelCompleto }: { units: Unit[]; onAbrirPainelCompleto: () => void }) {
+export function MobileGerencialHome({
+  units,
+  onAbrirPainelCompleto,
+  onAbrirUnidade,
+  onAbrirRelatorios,
+  onAbrirEquipe,
+}: {
+  units: Unit[];
+  onAbrirPainelCompleto: () => void;
+  onAbrirUnidade: (unit: Unit) => void;
+  onAbrirRelatorios: () => void;
+  onAbrirEquipe: () => void;
+}) {
   const [revenueByUnit, setRevenueByUnit] = useState<Record<string, number>>({});
   const [insideByUnit, setInsideByUnit] = useState<Record<string, number>>({});
   const [cashStatus, setCashStatus] = useState<UnitCashStatus[]>([]);
@@ -91,10 +103,12 @@ export function MobileGerencialHome({ units, onAbrirPainelCompleto }: { units: U
           const inside = insideByUnit[u.id];
 
           return (
-            <div
+            <button
               key={u.id}
-              className="m-card"
-              style={{ borderTop: `5px solid ${brand.accent}`, borderRadius: 20, padding: "15px 16px" }}
+              type="button"
+              className="m-tap m-card"
+              onClick={() => onAbrirUnidade(u)}
+              style={{ borderTop: `5px solid ${brand.accent}`, borderRadius: 20, padding: "15px 16px", width: "100%", font: "inherit", textAlign: "left" }}
             >
               <div className="m-row" style={{ justifyContent: "space-between", gap: 10 }}>
                 <span style={{ fontSize: 15.5, fontWeight: 800 }}>
@@ -139,7 +153,7 @@ export function MobileGerencialHome({ units, onAbrirPainelCompleto }: { units: U
                   {money(envelope.pending_cents)} em {envelope.pending_count} envelope(s) aguardando recolhimento
                 </p>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -148,11 +162,20 @@ export function MobileGerencialHome({ units, onAbrirPainelCompleto }: { units: U
         <p style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Carregando os números das 3 operações…</p>
       )}
 
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 22 }}>
+        <button type="button" className="m-pill" onClick={onAbrirRelatorios}>
+          Relatórios / fechamento
+        </button>
+        <button type="button" className="m-pill" onClick={onAbrirEquipe}>
+          Equipe hoje
+        </button>
+      </div>
+
       <button
         type="button"
         className="m-cta"
         onClick={onAbrirPainelCompleto}
-        style={{ marginTop: 24, background: "var(--color-dark, #1A3F35)" }}
+        style={{ marginTop: 12, background: "var(--color-dark, #1A3F35)" }}
       >
         Abrir painel administrativo completo
       </button>
