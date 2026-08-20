@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Unit } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
+import { usePendingRenewals } from "../api/renewalRequests.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { useToast } from "../state/ToastContext.js";
 import { InstallPwaBanner } from "../components/InstallPwaBanner.js";
@@ -8,12 +9,13 @@ import { UpdatePwaBanner } from "../components/UpdatePwaBanner.js";
 import { MobileHome } from "./MobileHome.js";
 import { MobileCheckin } from "./MobileCheckin.js";
 import { MobilePainel } from "./MobilePainel.js";
+import { MobilePedidosTempo } from "./MobilePedidosTempo.js";
 import "./mobile.css";
 
 export type EscapeScreen = "ENTRADA" | "SAIDA" | "PAINEL" | "CAIXA" | "PONTO" | "PDV" | "RELATORIO" | "CONFIGURACOES";
 
 type Tab = "TURNO" | "PAINEL" | "MAIS";
-type View = Tab | "CHECKIN";
+type View = Tab | "CHECKIN" | "PEDIDOS";
 
 /**
  * Casca mobile do operador.
@@ -46,13 +48,17 @@ export function MobileShell({
   const toast = useToast();
   const [view, setView] = useState<View>("TURNO");
   const { entries, status, refetch } = useActiveSessions(unit.id);
+  // Mesma fila que já existe no badge do Painel de balcão (PainelScreen.tsx)
+  // — reaproveita as sessões já carregadas acima, sem abrir uma segunda
+  // assinatura Realtime só para isto.
+  const pendingRenewals = usePendingRenewals(entries.map((e) => e.session.id));
 
-  // O gesto/botão "voltar" do Android fecha o check-in em vez de sair do
-  // app — sem isto o operador perde o atendimento no meio ao tocar por
-  // reflexo. Só empilha estado enquanto há para onde voltar.
+  // O gesto/botão "voltar" do Android fecha o check-in/pedidos em vez de
+  // sair do app — sem isto o operador perde o lugar ao tocar por reflexo.
+  // Só empilha estado enquanto há para onde voltar.
   useEffect(() => {
-    if (view !== "CHECKIN") return;
-    history.pushState({ mobileShell: "CHECKIN" }, "");
+    if (view !== "CHECKIN" && view !== "PEDIDOS") return;
+    history.pushState({ mobileShell: view }, "");
     const onPop = () => setView("TURNO");
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -106,7 +112,19 @@ export function MobileShell({
                 : setView("CHECKIN")
             }
             onAbrirTela={(screen) => abrirCompleta(screen)}
+            pendingRenewalsCount={pendingRenewals.size}
+            onAbrirPedidos={() => setView("PEDIDOS")}
           />
+        ) : view === "PEDIDOS" ? (
+          <>
+            <div className="m-navbar">
+              <button type="button" className="m-round" aria-label="Voltar" onClick={() => setView("TURNO")}>
+                ‹
+              </button>
+              <span className="m-title-sm m-grow">Pedidos de tempo</span>
+            </div>
+            <MobilePedidosTempo entries={entries} pending={pendingRenewals} employeeId={employeeId} />
+          </>
         ) : view === "PAINEL" ? (
           <MobilePainel unitId={unit.id} onLiberarSaida={() => abrirCompleta("SAIDA")} />
         ) : (
@@ -129,7 +147,7 @@ export function MobileShell({
         <InstallPwaBanner />
         <UpdatePwaBanner />
 
-        {view !== "CHECKIN" && (
+        {view !== "CHECKIN" && view !== "PEDIDOS" && (
           <nav className="m-tabbar" aria-label="Seções">
             {tabs
               .filter((t) => t.show)

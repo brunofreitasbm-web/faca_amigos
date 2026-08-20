@@ -28,12 +28,16 @@ export function MobileHome({
   activeCount,
   onNovaEntrada,
   onAbrirTela,
+  pendingRenewalsCount,
+  onAbrirPedidos,
 }: {
   unit: Unit;
   employeeName: string;
   activeCount: number | null;
   onNovaEntrada: () => void;
   onAbrirTela: (screen: "SAIDA" | "CAIXA" | "PONTO") => void;
+  pendingRenewalsCount: number;
+  onAbrirPedidos: () => void;
 }) {
   const { can } = useAuth();
   const [pendentes, setPendentes] = useState<number | null>(null);
@@ -118,6 +122,33 @@ export function MobileHome({
             <span aria-hidden="true" style={{ fontSize: 22, color: "rgba(255,255,255,.9)", flex: "none" }}>
               ›
             </span>
+          </button>
+        )}
+
+        {pendingRenewalsCount > 0 && (
+          <button
+            type="button"
+            className="m-tap"
+            onClick={onAbrirPedidos}
+            style={{
+              marginTop: 10,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "var(--surface-card)",
+              border: "2px solid var(--color-teal)",
+              borderRadius: 20,
+              padding: "14px 16px",
+              font: "inherit",
+              textAlign: "left",
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 20 }}>📱</span>
+            <span className="m-grow" style={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.35 }}>
+              {pendingRenewalsCount === 1 ? "1 pedido de mais tempo" : `${pendingRenewalsCount} pedidos de mais tempo`}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#1D8273", flex: "none" }}>Ver</span>
           </button>
         )}
 

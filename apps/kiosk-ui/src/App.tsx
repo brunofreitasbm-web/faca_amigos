@@ -51,6 +51,7 @@ import { isElectronLocal } from "./pwa.js";
 import { MobileShell } from "./mobile/MobileShell.js";
 import { MobileScreenFrame } from "./mobile/MobileScreenFrame.js";
 import { MobileGerencial } from "./mobile/MobileGerencial.js";
+import { MobileLogin } from "./mobile/MobileLogin.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
@@ -265,7 +266,10 @@ export function App() {
     return <div style={{ padding: "80px", textAlign: "center", color: "var(--text-muted)" }}>Carregando…</div>;
   }
 
-  if (!employee) return <LoginScreen />;
+  // Login por PIN não tem valor de negócio pra divergir entre versões —
+  // MobileLogin usa exatamente os mesmos useAppState()/Api.employeesForLogin
+  // de LoginScreen, só com a casca do modo celular.
+  if (!employee) return mobile.active ? <MobileLogin /> : <LoginScreen />;
 
   // Modo Gerencial: fora do contexto das 3 unidades, é onde o Owner configura
   // o que vale para várias unidades de uma vez e vê relatórios cross-unit.
@@ -311,16 +315,21 @@ export function App() {
     );
   }
 
-  // Saída e Caixa continuam sendo a MESMA SaidaScreen/CaixaScreen do
-  // balcão — não uma segunda implementação — só vestidas com a casca do
-  // modo celular em vez do cabeçalho de balcão (marca + menu hambúrguer).
-  // As demais telas de escape (Entrada completa, PDV, Ponto, Relatórios,
-  // Configurações) ainda caem no fallback abaixo, com o botão flutuante
-  // "Voltar ao modo celular" — ainda não vestidas.
-  if (mobile.active && (mobileEscape === "SAIDA" || mobileEscape === "CAIXA") && employee) {
+  // Saída, Caixa e Ponto continuam sendo a MESMA SaidaScreen/CaixaScreen/
+  // PontoScreen do balcão — não uma segunda implementação — só vestidas com
+  // a casca do modo celular em vez do cabeçalho de balcão (marca + menu
+  // hambúrguer). Ponto entrou nesse grupo (e não foi reconstruído do zero)
+  // porque é registro legal de jornada (Portaria MTP 671/2021) com câmera
+  // de reconhecimento facial e conferência de geolocalização — o tipo de
+  // tela onde uma segunda implementação diverge da primeira do jeito mais
+  // caro possível. As demais telas de escape (Entrada completa, PDV,
+  // Relatórios, Configurações) ainda caem no fallback abaixo, com o botão
+  // flutuante "Voltar ao modo celular" — ainda não vestidas.
+  const MOBILE_FRAMED_TITLE: Partial<Record<Screen, string>> = { SAIDA: "Saída", CAIXA: "Caixa", PONTO: "Ponto" };
+  if (mobile.active && mobileEscape != null && mobileEscape in MOBILE_FRAMED_TITLE && employee) {
     const FramedComponent = SCREEN_COMPONENTS[mobileEscape];
     return (
-      <MobileScreenFrame title={mobileEscape === "SAIDA" ? "Saída" : "Caixa"} onBack={() => setMobileEscape(null)}>
+      <MobileScreenFrame title={MOBILE_FRAMED_TITLE[mobileEscape]!} onBack={() => setMobileEscape(null)}>
         <RequireCapability capability={SCREEN_CAPABILITY[mobileEscape]}>
           <FramedComponent />
         </RequireCapability>
