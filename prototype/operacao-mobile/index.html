@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Operacao FA">
+<title>Operação FaçaAmigos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;500;600;700;800;900&display=swap">
+
+</head>
+<body>
+<style>
+:root{
+  --pink:#F0196B; --pink-ink:#C8155A; --teal:#2ECFB5; --teal-ink:#1D8273;
+  --amber:#C99020; --amber-ink:#996D18; --yellow:#FFE234; --orange:#FF7A00;
+  --dark:#1A3F35; --ink:#3A4149; --muted:#5A636E; --soft:#6C7682;
+  --line:#E8EAEC; --line-2:#CDD1D6; --bg:#F5F6F7; --card:#FFFFFF;
+  --green:#28C880; --green-ink:#1A8454; --red:#E61E1E;
+  --gradient-ring:conic-gradient(from 200deg,#A020EE 0%,#F0196B 20%,#FF7A00 50%,#FFD700 75%,#FF7A00 85%,#F0196B 95%,#A020EE 100%);
+  --gradient-brand:linear-gradient(135deg,#F0196B 0%,#FF7A00 50%,#FFE234 100%);
+  --color-bg-app:#FFFFFF;
+  --r-card:24px; --r-pill:9999px;
+  --pad-t:env(safe-area-inset-top,0px);
+  --pad-b:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;padding:0}
+body{
+  background:#DFE3E6;
+  font-family:'Nunito',system-ui,-apple-system,sans-serif;
+  color:var(--dark);
+  overscroll-behavior:none;
+  -webkit-font-smoothing:antialiased;
+}
+@media (prefers-color-scheme:dark){body{background:#20262B}}
+
+/* ---- shell: full-bleed no celular, coluna centrada no tablet/desktop ---- */
+#shell{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+}
+#app{
+  position:relative;width:100%;height:100%;max-width:100%;
+  background:var(--bg);display:flex;flex-direction:column;overflow:hidden;
+}
+@media (min-width:700px){
+  #shell{padding:24px}
+  #app{
+    max-width:430px;height:min(100%,920px);
+    border-radius:34px;box-shadow:0 18px 60px rgba(0,0,0,.28);
+    border:1px solid rgba(0,0,0,.10);
+  }
+}
+
+/* ---- barra de status ---- */
+.statusbar{
+  flex:none;background:#fff;padding-top:var(--pad-t);
+  height:calc(40px + var(--pad-t));
+  display:flex;align-items:center;justify-content:space-between;padding-left:24px;padding-right:24px;
+}
+.statusbar b{font:800 15px 'Nunito',sans-serif;color:var(--dark)}
+.statusbar span{font:600 12px 'Nunito',sans-serif;color:var(--soft)}
+
+/* ---- corpo rolável ---- */
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.scroll::-webkit-scrollbar{width:0;height:0}
+
+/* ---- tipografia ---- */
+.h1{margin:0;font-family:'Fredoka One',cursive;font-size:25px;line-height:1.2;color:var(--dark)}
+.h2{margin:0;font-family:'Fredoka One',cursive;font-size:21px;line-height:1.2;color:var(--dark)}
+.eyebrow{margin:0;font:800 11.5px 'Nunito',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--soft)}
+.sub{margin:0;font:600 13px 'Nunito',sans-serif;color:var(--soft)}
+
+/* ---- topo de página ---- */
+.appbar{
+  flex:none;background:#fff;border-bottom:1px solid var(--line);
+  padding:10px 20px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.navbar{
+  flex:none;height:56px;padding:0 16px;display:flex;align-items:center;gap:12px;
+  background:#fff;border-bottom:1px solid var(--line);
+}
+.back{
+  width:40px;height:40px;border:none;border-radius:50%;background:var(--bg);
+  color:var(--dark);font-size:22px;line-height:1;flex:none;cursor:pointer;
+}
+.avatar{
+  width:44px;height:44px;border-radius:50%;background:var(--bg);display:flex;
+  align-items:center;justify-content:center;font:800 15px 'Nunito',sans-serif;color:var(--teal-ink);flex:none;
+}
+
+/* ---- cartões / controles ---- */
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r-card);padding:16px 18px}
+.tap{cursor:pointer;transition:transform 120ms ease, box-shadow 160ms ease;user-select:none}
+.tap:active{transform:scale(.975)}
+@media (hover:hover){.tap:hover{box-shadow:0 4px 16px rgba(0,0,0,.10)}}
+.cta{
+  display:block;width:100%;border:none;border-radius:var(--r-pill);padding:17px;
+  font-family:'Fredoka One',cursive;font-size:19px;line-height:1.2;cursor:pointer;
+}
+.pill{border-radius:var(--r-pill);padding:14px;text-align:center;font:800 14px 'Nunito',sans-serif;
+  background:var(--bg);border:1px solid var(--line);color:var(--dark);cursor:pointer}
+.input{
+  width:100%;background:transparent;border:none;outline:none;
+  font:600 16px 'Nunito',sans-serif;color:var(--dark);min-width:0;
+}
+.field{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:13px 14px;
+  font:600 15px 'Nunito',sans-serif;color:var(--dark)}
+.flabel{margin:0 0 6px;font:800 12px 'Nunito',sans-serif;color:var(--dark)}
+
+/* ---- tab bar ---- */
+.tabbar{
+  flex:none;display:flex;background:#fff;border-top:1px solid var(--line);
+  padding:10px 8px calc(14px + var(--pad-b));
+}
+.tabbar button{
+  flex:1;background:none;border:none;padding:6px 2px;cursor:pointer;
+  font:600 12px 'Nunito',sans-serif;color:var(--soft);
+}
+.tabbar button.on{font-weight:800;color:var(--pink-ink)}
+
+/* ---- círculos da marca (CircleButton do DS) ---- */
+.ring{
+  width:90px;height:90px;border-radius:50%;background:var(--gradient-ring);
+  display:flex;align-items:center;justify-content:center;padding:3px;flex:none;
+}
+.ring>i{width:82px;height:82px;border-radius:50%;background:var(--color-bg-app);
+  display:flex;align-items:center;justify-content:center;padding:3px}
+.ring>i>i{width:76px;height:76px;border-radius:50%;display:block}
+
+@keyframes fa-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.8)}}
+.pulse{animation:fa-pulse 1.6s infinite}
+
+/* ---- bottom sheet ---- */
+.sheet{
+  position:absolute;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
+  border-radius:28px 28px 0 0;padding:20px 20px calc(26px + var(--pad-b));
+  box-shadow:0 -16px 48px rgba(0,0,0,.16);animation:sheet-up 220ms cubic-bezier(.34,1.3,.64,1);
+}
+@keyframes sheet-up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+
+.stack{display:flex;flex-direction:column}
+.row{display:flex;align-items:center}
+.grow{flex:1;min-width:0}
+.trunc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* a interface é deliberadamente light-only (o design é "light mode em tudo");
+   só o fundo fora da coluna do app acompanha o tema do visualizador. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+button:focus-visible,[data-a]:focus-visible,input:focus-visible{outline:3px solid #C8155A;outline-offset:2px;border-radius:12px}
+.toast{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:calc(90px + var(--pad-b));
+  background:var(--dark);color:#fff;font:800 13px 'Nunito',sans-serif;
+  padding:12px 18px;border-radius:9999px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.28);
+  animation:sheet-up 200ms ease;
+}
+</style>
+
+<div id="shell"><div id="app"></div></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ===== PWA / mobile meta (injetado: o wrapper controla o <head>) ===== */
+[["apple-mobile-web-app-capable","yes"],
+ ["mobile-web-app-capable","yes"],
+ ["apple-mobile-web-app-status-bar-style","default"],
+ ["apple-mobile-web-app-title","Operacao FA"],
+ ["theme-color","#FFFFFF"],
+ ["color-scheme","light"]].forEach(function(m){
+  var el=document.createElement("meta"); el.name=m[0]; el.content=m[1]; document.head.appendChild(el);
+});
+(function(){
+  var vp=document.querySelector('meta[name="viewport"]');
+  if(!vp){vp=document.createElement("meta");vp.name="viewport";document.head.appendChild(vp);}
+  vp.content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1";
+})();
+
+/* ===== dados (do documento de design) ===== */
+var PENDENTES=2, META_PCT=68;
+
+var PRE_LIST=[
+  {initials:"LG",name:"Luiza e Gabriel Moreira",detail:"2 crianças · plano 1 hora"},
+  {initials:"PS",name:"Pedro Salgado",detail:"1 criança · plano 30 min"},
+  {initials:"IR",name:"Isis Rocha",detail:"1 criança · pacote 5 visitas"}
+].slice(0,PENDENTES);
+
+var CHILDREN=[
+  {name:"Ana Beatriz Ramos",initials:"AB",detail:"6 anos · resp. Juliana Ramos · (91) 98232-4410",tag:"Última visita 12/08 · Sensível a Ruído Alto",care:"Sensível a Ruído Alto · Usa Abafador · Preferência pelo Cantinho da Calma"},
+  {name:"Anael Costa Pinheiro",initials:"AC",detail:"4 anos · resp. Marcos Pinheiro · (91) 99114-2087",tag:"Última visita 03/08",care:"Nenhum cuidado registrado na última visita"},
+  {name:"Mariana Alves",initials:"MA",detail:"8 anos · resp. Patrícia Alves · (91) 98800-1276",tag:"Saldo de banco de horas: 40 min",care:"Alergia Alimentar / Cuidados Especializados"},
+  {name:"Bento Nogueira",initials:"BN",detail:"5 anos · resp. Rafael Nogueira · (91) 99621-3355",tag:"Última visita 27/07",care:"Necessidade de Pausas Sensoriais Frequentes"}
+];
+
+var PLAN_LIST=[
+  {name:"30 minutos",note:"cabe até o fechamento",price:"R$ 45",dot:"#2ECFB5"},
+  {name:"60 minutos",note:"mais vendido no sábado",price:"R$ 70",dot:"#F0196B"},
+  {name:"2 horas",note:"gera contrato de guarda",price:"R$ 110",dot:"#C99020"},
+  {name:"Pacote 5 visitas",note:"300 min · validade 90 dias",price:"R$ 290",dot:"#FF7A00"}
+];
+
+var SESSION_DATA=[
+  {name:"Sofia Menezes",detail:"Plano 60 min · pulseira 8F2-1C",elapsed:47,total:60},
+  {name:"Théo Baptista",detail:"Plano 30 min · pulseira 3K9-7A",elapsed:28,total:30},
+  {name:"Lorena Farias",detail:"Plano 2 h · pulseira 1B4-9Q",elapsed:132,total:120},
+  {name:"Davi Queiroz",detail:"Pacote 5 visitas · pulseira 6H1-2Z",elapsed:12,total:60},
+  {name:"Cecília Tavares",detail:"Plano 60 min · pausada (banheiro)",elapsed:39,total:60}
+];
+
+var SENSORY=["Sensível a Ruído Alto","Usa Abafador","Acompanhante / Mediador 1:1","Preferência pelo Cantinho da Calma","Alergia Alimentar / Cuidados Especializados","Aversão a Texturas / Toque","Sensibilidade à Luz ou Estímulos Visuais","Dificuldade com Mudança de Rotina","Comunicação Não-verbal / Uso de Figuras (CAA)","Evita Contato Físico Inesperado","Necessidade de Pausas Sensoriais Frequentes"];
+
+var RENEWALS=[
+  {minutes:15,price:"R$ 30",note:"um tempinho a mais"},
+  {minutes:30,price:"R$ 48",note:"a mais escolhida"},
+  {minutes:60,price:"R$ 96",note:"mais uma hora inteira"}
+];
+
+var TAB_DEFS=[
+  {key:"planos",label:"Planos",hint:"Permanência avulsa desta visita. Só o que ainda cabe até o fechamento aparece aqui."},
+  {key:"pacotes",label:"Pacotes",hint:"Saldo de minutos com validade, usado em qualquer unidade. Excedente cobrado por minuto."},
+  {key:"sessoes",label:"Sessões",hint:"Circuito — tempo de pista com carrinho elétrico ou pelúcia, acompanhado pela equipe."},
+  {key:"locacoes",label:"Locações",hint:"Escolha o ativo que vai com a criança. Indisponível não pode ser selecionado."}
+];
+
+var OFFER_SETS={
+  planos:[
+    {name:"30 minutos",note:"avulso · excedente R$ 3/min",price:"R$ 45",unit:"por criança",tag:"Cabe até o fechamento",tagColor:"#1A8454",dot:"#2ECFB5",cents:4500},
+    {name:"1 hora",note:"avulso · excedente R$ 3/min",price:"R$ 70",unit:"por criança",tag:"Mais vendido no sábado",tagColor:"#C8155A",dot:"#F0196B",cents:7000},
+    {name:"2 horas",note:"avulso · gera contrato de guarda",price:"R$ 110",unit:"por criança",tag:"Imprime o contrato junto com a pulseira",tagColor:"#996D18",dot:"#C99020",cents:11000},
+    {name:"Dia livre",note:"entra e sai até as 22h",price:"R$ 180",unit:"por criança",tag:"Só com responsável no shopping",tagColor:"#5A636E",dot:"#FF7A00",cents:18000}
+  ],
+  pacotes:[
+    {name:"Pacote 5 visitas",note:"300 min · validade 90 dias · excedente R$ 2,50/min",price:"R$ 290",unit:"R$ 58/visita",tag:"Economia de R$ 60 sobre o avulso",tagColor:"#1A8454",dot:"#2ECFB5",cents:29000},
+    {name:"Pacote 10 visitas",note:"600 min · validade 120 dias · excedente R$ 2/min",price:"R$ 540",unit:"R$ 54/visita",tag:"Vale nas 3 operações",tagColor:"#1A8454",dot:"#F0196B",cents:54000},
+    {name:"Mensal ilimitado",note:"30 dias · 2h por dia · excedente R$ 2/min",price:"R$ 690",unit:"por criança",tag:"Oferecer a quem já veio 4 vezes no mês",tagColor:"#996D18",dot:"#C99020",cents:69000}
+  ],
+  sessoes:[
+    {name:"Volta de carrinho",note:"1 volta na pista · acompanhada",price:"R$ 20",unit:"por volta",tag:"Fila atual: 2 crianças",tagColor:"#996D18",dot:"#2ECFB5",cents:2000},
+    {name:"Sessão 10 min",note:"carrinho elétrico · pista livre",price:"R$ 35",unit:"por sessão",tag:"Mais pedida no Circuito",tagColor:"#C8155A",dot:"#F0196B",cents:3500},
+    {name:"Sessão 20 min",note:"carrinho elétrico · pista livre",price:"R$ 60",unit:"por sessão",tag:"Troca de ativo permitida na metade",tagColor:"#5A636E",dot:"#C99020",cents:6000},
+    {name:"Sessão pelúcia 15 min",note:"para os menores de 4 anos",price:"R$ 30",unit:"por sessão",tag:"Sem pedal — empurrada pelo responsável",tagColor:"#5A636E",dot:"#FF7A00",cents:3000}
+  ],
+  locacoes:[
+    {name:"Carro vermelho · 03",note:"odômetro 128 h · revisado 12/08",price:"livre",unit:"disponível",tag:"Pode entrar agora",tagColor:"#1A8454",dot:"#2ECFB5",cents:0},
+    {name:"Carro azul · 07",note:"odômetro 96 h · em uso por Théo",price:"12 min",unit:"em uso",tag:"Libera em 12 minutos",tagColor:"#996D18",dot:"#C99020",cents:0,disabled:true},
+    {name:"Pelúcia unicórnio · 02",note:"odômetro 54 h · bateria 80%",price:"livre",unit:"disponível",tag:"Pode entrar agora",tagColor:"#1A8454",dot:"#F0196B",cents:0},
+    {name:"Carro branco · 01",note:"odômetro 210 h · troca de bateria",price:"—",unit:"manutenção",tag:"Fora de operação hoje",tagColor:"#E61E1E",dot:"#CDD1D6",cents:0,disabled:true}
+  ]
+};
+
+var UNITS=[
+  {name:"Playground",place:"Parque Shopping Belém",badge:"Loja",accent:"#F0196B",accentText:"#C8155A",inside:"14/40",revenue:"R$ 2.310",meta:"74%",metaColor:"#1A8454",barWidth:"74%",alert:"2 crianças saindo em 5 min",alertColor:"#996D18"},
+  {name:"Circuito",place:"Parque Shopping Belém",badge:"Quiosque",accent:"#2ECFB5",accentText:"#1D8273",inside:"9/16",revenue:"R$ 1.140",meta:"58%",metaColor:"#996D18",barWidth:"58%",alert:"Caixa ainda não fechou o turno da manhã",alertColor:"#E61E1E"},
+  {name:"Playground",place:"Shopping Bosque Grão-Pará",badge:"Loja",accent:"#C99020",accentText:"#996D18",inside:"8/40",revenue:"R$ 730",meta:"41%",metaColor:"#E61E1E",barWidth:"41%",alert:"Movimento 30% abaixo do sábado passado",alertColor:"#E61E1E"}
+];
+
+var CIRCLES=[
+  {label:"Entrada",color:"#F0196B",act:"nova-entrada"},
+  {label:"Painel",color:"#2ECFB5",act:"tab-painel"},
+  {label:"Saída",color:"#FFE234",act:"nao-implementado",arg:"Liberar saída lê o QR da pulseira — não faz parte deste protótipo"},
+  {label:"Caixa",color:"#C99020",act:"nao-implementado",arg:"Caixa não faz parte deste protótipo"},
+  {label:"Ponto",color:"#1A3F35",act:"nao-implementado",arg:"Ponto não faz parte deste protótipo"},
+  {label:"Relatório",color:"#FF7A00",act:"tab-gerencial"}
+];
+
+/* ===== estado ===== */
+var S={
+  tab:"turno", stack:["home"],
+  query:"", picked:null, plan:null, step:"busca",
+  selected:null, nd:true, tags:["Sensível a Ruído Alto","Usa Abafador"],
+  renew:30, cadTab:"planos", offer:null, aviso:false, toast:null, now:Date.now()
+};
+var TOAST_T=null;
+function toast(msg){ S.toast=msg; clearTimeout(TOAST_T); TOAST_T=setTimeout(function(){S.toast=null;render();},2400); render(); }
+
+/* ===== utils ===== */
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}
+function secs(){ return String((60-Math.floor((S.now/1000)%60))%60).padStart(2,"0"); }
+function clockNow(){ var d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function go(name){ S.stack.push(name); render(); }
+function back(){ if(S.stack.length>1){S.stack.pop();} render(); }
+function setTab(t){ S.tab=t; S.stack=[({turno:"home",painel:"painel",gerencial:"gerencial",mais:"mais"})[t]]; render(); }
+function current(){ return S.stack[S.stack.length-1]; }
+function resetCheckin(){ S.step="busca"; S.picked=null; S.plan=null; S.query=""; }
+function sessions(){
+  var sc=secs();
+  return SESSION_DATA.map(function(s){
+    var mins=s.elapsed, left=s.total-mins, over=left<0;
+    return {
+      name:s.name, detail:s.detail,
+      clock: mins>=60 ? (Math.floor(mins/60)+"h"+String(mins%60).padStart(2,"0")) : (mins+":"+sc),
+      total: s.total>=60 ? (s.total/60+"h") : (s.total+" min"),
+      status: over ? ("Excedente de "+(-left)+" min — cobrar na saída") : (left<=5 ? ("Sai em "+left+" min") : ("Restam "+left+" min")),
+      color: over ? "#C8155A" : (left<=5 ? "#996D18" : "#1D8273")
+    };
+  });
+}
+
+/* ===== blocos reutilizáveis ===== */
+function statusbar(right){
+  return '<div class="statusbar"><b>'+clockNow()+'</b><span>'+esc(right)+'</span></div>';
+}
+function navbar(title,rightText){
+  return '<div class="navbar">'+
+    '<button class="back" data-a="back" aria-label="Voltar">‹</button>'+
+    '<span style="font-family:\'Fredoka One\',cursive;font-size:20px;line-height:1.15;color:var(--dark)" class="trunc grow">'+esc(title)+'</span>'+
+    (rightText?'<span style="font:800 12px \'Nunito\',sans-serif;color:var(--soft);flex:none">'+esc(rightText)+'</span>':'')+
+  '</div>';
+}
+function tabbar(){
+  var items=[["turno","Turno"],["painel","Painel"],["gerencial","Gerencial"],["mais","Mais"]];
+  return '<nav class="tabbar">'+items.map(function(it){
+    return '<button data-a="tab:'+it[0]+'" class="'+(S.tab===it[0]?"on":"")+'">'+it[1]+'</button>';
+  }).join("")+'</nav>';
+}
+function circleBtn(color){
+  return '<div class="ring"><i><i style="background:'+color+'"></i></i></div>';
+}
+function notImpl(msg){ return ' data-a="msg" data-msg="'+esc(msg)+'"'; }
+
+/* ===== 1a — Home: fila do turno ===== */
+function scHome(){
+  return statusbar("Playground · Parque")+
+  '<div class="appbar">'+
+    '<div><p class="h1">Turno de Maria</p><p class="sub" style="margin-top:4px">Caixa aberto 09:52 · R$ 1.240</p></div>'+
+    '<div class="avatar" style="color:var(--teal-ink)">MA</div>'+
+  '</div>'+
+  '<div class="scroll" style="padding:16px 20px 20px">'+
+    '<div style="background:var(--gradient-brand);border-radius:24px;padding:2px">'+
+      '<div style="background:#fff;border-radius:22px;padding:14px 16px">'+
+        '<p style="margin:0 0 2px;font:800 11.5px \'Nunito\',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--amber-ink)">Aguardando no balcão</p>'+
+        '<p style="margin:0 0 12px;font-family:\'Fredoka One\',cursive;font-size:30px;line-height:1.15;color:var(--dark)">'+PENDENTES+' pré-cadastros</p>'+
+        '<div class="stack" style="gap:10px">'+
+        PRE_LIST.map(function(p){
+          return '<div class="row tap" data-a="nova-entrada" style="gap:12px;background:var(--bg);border-radius:16px;padding:11px 12px">'+
+            '<div style="width:36px;height:36px;border-radius:50%;background:var(--pink);display:flex;align-items:center;justify-content:center;font:800 13px \'Nunito\',sans-serif;color:#fff;flex:none">'+esc(p.initials)+'</div>'+
+            '<div class="grow"><p class="trunc" style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--dark)">'+esc(p.name)+'</p>'+
+            '<p class="trunc" style="margin:2px 0 0;font:600 12px \'Nunito\',sans-serif;color:var(--soft)">'+esc(p.detail)+'</p></div>'+
+            '<span style="font:800 12px \'Nunito\',sans-serif;color:var(--teal-ink);flex:none">Confirmar ›</span>'+
+          '</div>';
+        }).join("")+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="row" style="gap:12px;margin-top:14px">'+
+      '<div class="card grow" style="border-radius:20px;padding:14px"><p class="sub" style="font-weight:600;font-size:12px">Dentro agora</p>'+
+      '<p style="margin:4px 0 0;font-family:\'Fredoka One\',cursive;font-size:28px;line-height:1.15;color:var(--teal-ink)">14<span style="font-size:15px;color:var(--soft)">/40</span></p></div>'+
+      '<div class="card grow" style="border-radius:20px;padding:14px"><p class="sub" style="font-weight:600;font-size:12px">Meta do dia</p>'+
+      '<p style="margin:4px 0 0;font-family:\'Fredoka One\',cursive;font-size:28px;line-height:1.15;color:var(--amber-ink)">'+META_PCT+'%</p></div>'+
+    '</div>'+
+
+    '<p class="eyebrow" style="margin:18px 0 10px">Ações do balcão</p>'+
+    '<div class="row tap" data-a="nova-entrada" style="gap:14px;background:var(--pink);border-radius:20px;padding:16px 20px">'+
+      '<span class="grow" style="font-family:\'Fredoka One\',cursive;font-size:21px;line-height:1.2;color:#fff">Nova entrada</span>'+
+      '<span style="font:800 13px \'Nunito\',sans-serif;color:rgba(255,255,255,.85);flex:none">3 toques</span>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">'+
+      [["Liberar saída","ler QR da pulseira","Leitura de QR da pulseira — não faz parte deste protótipo"],
+       ["Pedidos de tempo","2 pedidos abertos","Pedidos de tempo — veja o Painel ao vivo para a renovação"],
+       ["Caixa","fechar turno 18:00","Caixa não faz parte deste protótipo"],
+       ["Ponto","intervalo pendente","Ponto não faz parte deste protótipo"]].map(function(a){
+        return '<div class="card tap" style="border-radius:20px;padding:13px 16px;min-height:56px;display:flex;flex-direction:column;justify-content:center"'+notImpl(a[2])+'>'+
+          '<p style="margin:0;font:800 15.5px \'Nunito\',sans-serif;color:var(--dark)">'+a[0]+'</p>'+
+          '<p style="margin:2px 0 0;font:600 12px \'Nunito\',sans-serif;color:var(--soft)">'+a[1]+'</p></div>';
+      }).join("")+
+    '</div>'+
+  '</div>'+
+  tabbar();
+}
+
+/* ===== 1b — Home: círculos da marca ===== */
+function scCirculos(){
+  return statusbar("Playground · Parque")+
+  '<div style="padding:14px 24px 18px;flex:none;background:#fff;border-bottom:1px solid var(--line)">'+
+    '<p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:28px;line-height:1.2;color:var(--dark)">Bom dia, Maria!</p>'+
+    '<p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:28px;line-height:1.2;color:var(--pink)">o que vamos fazer?</p>'+
+  '</div>'+
+  '<div class="scroll" style="padding:16px 20px 24px">'+
+    '<div class="card">'+
+      '<div class="row" style="align-items:baseline;justify-content:space-between;gap:12px">'+
+        '<div><p class="sub" style="font-weight:600;font-size:12px">Dentro agora</p>'+
+        '<p style="margin:3px 0 0;font-family:\'Fredoka One\',cursive;font-size:26px;line-height:1.15;color:var(--teal-ink)">14 crianças</p></div>'+
+        '<div style="text-align:right"><p class="sub" style="font-weight:600;font-size:12px">Sai em 5 min</p>'+
+        '<p style="margin:3px 0 0;font-family:\'Fredoka One\',cursive;font-size:26px;line-height:1.15;color:var(--amber-ink)">2</p></div>'+
+      '</div>'+
+      '<div style="margin-top:14px;height:8px;border-radius:9999px;background:var(--bg);overflow:hidden"><div style="width:35%;height:100%;background:var(--teal);border-radius:9999px"></div></div>'+
+    '</div>'+
+    '<div style="margin-top:26px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px 0;justify-items:center">'+
+    CIRCLES.map(function(c){
+      var attr = c.act==="nao-implementado" ? notImpl(c.arg) : ' data-a="'+c.act+'"';
+      return '<div class="tap" style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px"'+attr+'>'+
+        circleBtn(c.color)+
+        '<span style="font:600 14px/1.2 \'Nunito\',sans-serif;color:var(--dark);text-align:center">'+c.label+'</span></div>';
+    }).join("")+
+    '</div>'+
+    '<div class="row tap" data-a="nova-entrada" style="margin-top:26px;gap:12px;background:#fff;border-radius:20px;padding:14px 16px;border:2px solid var(--yellow)">'+
+      '<div class="pulse" style="width:10px;height:10px;border-radius:50%;background:var(--amber);flex:none"></div>'+
+      '<p class="grow" style="margin:0;font:800 13.5px/1.35 \'Nunito\',sans-serif;color:var(--dark)">'+PENDENTES+' famílias já preencheram o cadastro</p>'+
+      '<span style="font:800 13px \'Nunito\',sans-serif;color:var(--amber-ink);flex:none">Ver</span>'+
+    '</div>'+
+  '</div>'+
+  tabbar();
+}
+
+/* ===== 1c — Check-in em 3 toques ===== */
+function scCheckin(){
+  var q=S.query.trim().toLowerCase();
+  var matched = q ? CHILDREN.filter(function(c){return c.name.toLowerCase().indexOf(q)>=0;}) : CHILDREN.slice(0,3);
+  var stepLabel = S.step==="busca" ? "1 de 3" : S.step==="plano" ? "2 de 3" : "concluído";
+  var out = statusbar("Playground · Parque") + navbar("Nova entrada", stepLabel);
+
+  if(S.step==="busca"){
+    out += '<div class="scroll" style="padding:14px 20px 22px;display:flex;flex-direction:column">'+
+      '<div class="row" style="background:#fff;border:1px solid var(--line);border-radius:16px;padding:13px 15px;gap:10px">'+
+        '<span style="font-size:17px;color:var(--soft)">⌕</span>'+
+        '<input id="q" class="input" value="'+esc(S.query)+'" placeholder="Nome, CPF ou telefone" autocomplete="off" enterkeyhint="search">'+
+      '</div>'+
+      '<p class="eyebrow" style="margin:14px 0 10px">'+(q?(matched.length+" resultado(s)"):"Atendidas recentemente")+'</p>'+
+      '<div class="stack" style="gap:10px">'+
+      (matched.length? matched.map(function(c){
+        var i=CHILDREN.indexOf(c);
+        return '<div class="row tap" data-a="pick-child:'+i+'" style="gap:12px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px">'+
+          '<div style="width:46px;height:46px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font:800 15px \'Nunito\',sans-serif;color:var(--teal-ink);flex:none">'+esc(c.initials)+'</div>'+
+          '<div class="grow"><p style="margin:0;font:800 15.5px \'Nunito\',sans-serif;color:var(--dark)">'+esc(c.name)+'</p>'+
+          '<p style="margin:3px 0 0;font:600 12.5px/1.4 \'Nunito\',sans-serif;color:var(--soft)">'+esc(c.detail)+'</p>'+
+          '<p style="margin:6px 0 0;font:800 11.5px/1.35 \'Nunito\',sans-serif;color:var(--amber-ink)">'+esc(c.tag)+'</p></div>'+
+          '<span style="font-size:20px;color:var(--line-2);flex:none">›</span></div>';
+      }).join("") : '<p style="margin:0;font:600 13.5px/1.5 \'Nunito\',sans-serif;color:var(--soft)">Ninguém com esse nome. Se a criança é nova mesmo, abra o cadastro completo abaixo.</p>')+
+      '</div>'+
+      '<div style="margin-top:24px">'+
+        '<div class="tap" data-a="go:cadastro" style="border:2px dashed var(--line-2);border-radius:20px;padding:16px;text-align:center;background:#fff">'+
+          '<p style="margin:0 0 4px;font:800 15px \'Nunito\',sans-serif;color:var(--dark)">Criança nova</p>'+
+          '<p style="margin:0;font:600 12.5px/1.45 \'Nunito\',sans-serif;color:var(--soft)">Abre o cadastro completo — só quando ela realmente não existe</p>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  if(S.step==="plano"){
+    var p=S.picked;
+    out += '<div class="scroll" style="padding:14px 20px 22px">'+
+      '<div class="row" style="background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px;gap:12px">'+
+        '<div style="width:46px;height:46px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font:800 15px \'Nunito\',sans-serif;color:var(--teal-ink);flex:none">'+esc(p.initials)+'</div>'+
+        '<div class="grow"><p style="margin:0;font:800 15.5px \'Nunito\',sans-serif;color:var(--dark)">'+esc(p.name)+'</p>'+
+        '<p style="margin:3px 0 0;font:600 12.5px/1.4 \'Nunito\',sans-serif;color:var(--soft)">'+esc(p.detail)+'</p></div>'+
+        '<span class="tap" data-a="reset-checkin" style="font:800 12px \'Nunito\',sans-serif;color:var(--pink-ink);flex:none">Trocar</span>'+
+      '</div>'+
+      '<div style="margin-top:12px;background:rgba(46,207,181,.12);border:1px solid rgba(46,207,181,.45);border-radius:16px;padding:12px 14px">'+
+        '<p style="margin:0;font:800 13px \'Nunito\',sans-serif;color:var(--teal-ink)">Cuidados da última visita já vieram</p>'+
+        '<p style="margin:4px 0 0;font:600 12.5px/1.5 \'Nunito\',sans-serif;color:var(--muted)">'+esc(p.care)+'</p>'+
+      '</div>'+
+      '<p class="eyebrow" style="margin:18px 0 10px">Escolha o plano</p>'+
+      '<div class="stack" style="gap:10px">'+
+      PLAN_LIST.map(function(pl,i){
+        var on=S.plan===pl.name;
+        return '<div class="row tap" data-a="pick-plan:'+i+'" style="gap:14px;border-radius:20px;padding:15px;background:'+(on?"rgba(240,25,107,0.08)":"#fff")+';border:2px solid '+(on?"#F0196B":"#E8EAEC")+'">'+
+          '<div style="width:12px;height:12px;border-radius:50%;flex:none;background:'+pl.dot+'"></div>'+
+          '<div class="grow"><p style="margin:0;font:800 16.5px \'Nunito\',sans-serif;color:var(--dark)">'+esc(pl.name)+'</p>'+
+          '<p style="margin:3px 0 0;font:600 12.5px \'Nunito\',sans-serif;color:var(--soft)">'+esc(pl.note)+'</p></div>'+
+          '<p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:21px;line-height:1.15;color:var(--dark);flex:none">'+esc(pl.price)+'</p></div>';
+      }).join("")+
+      '</div>'+
+      '<div style="margin-top:22px">'+
+        '<button class="cta" data-a="confirm-checkin" style="background:'+(S.plan?"#F0196B":"#E8EAEC")+';color:'+(S.plan?"#FFFFFF":"#6C7682")+'">'+(S.plan?"Confirmar entrada":"Escolha um plano")+'</button>'+
+        '<p style="margin:9px 0 0;text-align:center;font:600 11.5px/1.4 \'Nunito\',sans-serif;color:var(--soft)">Pulseira e recibo de guarda saem juntos, na mesma transação</p>'+
+      '</div>'+
+    '</div>';
+  }
+
+  if(S.step==="pronto"){
+    out += '<div class="scroll" style="padding:14px 20px 22px">'+
+      '<div style="margin-top:14px;text-align:center">'+
+        '<div style="width:72px;height:72px;border-radius:50%;background:rgba(40,200,128,.14);border:2px solid var(--green);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--green-ink)">✓</div>'+
+        '<p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:28px;line-height:1.2;color:var(--dark)">Entrada confirmada</p>'+
+        '<p style="margin:6px 0 0;font:600 14px \'Nunito\',sans-serif;color:var(--soft)">'+esc(S.picked?S.picked.name:"")+' · '+esc(S.plan||"")+'</p>'+
+      '</div>'+
+      '<div class="row" style="margin-top:22px;gap:12px">'+
+        '<div class="card grow" style="border-radius:20px;padding:16px;text-align:center"><p class="sub" style="font-weight:600;font-size:12px">Código</p>'+
+        '<p style="margin:6px 0 0;font-family:\'Fredoka One\',cursive;font-size:24px;line-height:1.15;color:var(--teal-ink);letter-spacing:.06em">4F7-2K</p></div>'+
+        '<div class="card grow" style="border-radius:20px;padding:16px;text-align:center"><p class="sub" style="font-weight:600;font-size:12px">PIN de saída</p>'+
+        '<p style="margin:6px 0 0;font-family:\'Fredoka One\',cursive;font-size:24px;line-height:1.15;color:var(--amber-ink);letter-spacing:.06em">8172</p></div>'+
+      '</div>'+
+      '<div class="card" style="margin-top:12px;border-radius:20px;padding:15px 17px">'+
+        '<p style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--dark)">Impressão enfileirada</p>'+
+        '<p style="margin:4px 0 0;font:400 12.5px/1.55 \'Nunito\',sans-serif;color:var(--muted)">Pulseira da criança + recibo de guarda dos pais. Se o check-in gravou, as duas saíram.</p>'+
+      '</div>'+
+      '<div style="margin-top:12px;background:rgba(255,122,0,.10);border:1px solid rgba(255,122,0,.4);border-radius:20px;padding:15px 17px">'+
+        '<p style="margin:0;font:800 14px \'Nunito\',sans-serif;color:#B35400">Oferecer água por R$ 5?</p>'+
+        '<p style="margin:4px 0 0;font:600 12.5px/1.45 \'Nunito\',sans-serif;color:var(--muted)">Plano acima de 60 min — mesma regra do cross-sell da Entrada</p>'+
+      '</div>'+
+      '<div style="margin-top:24px;display:flex;flex-direction:column;gap:14px">'+
+        '<button class="cta" data-a="reset-checkin" style="background:var(--pink);color:#fff">Próxima família</button>'+
+        '<p class="tap" data-a="go:responsavel" style="margin:0;text-align:center;font:800 13px \'Nunito\',sans-serif;color:var(--pink-ink)">Mostrar QR de acompanhamento</p>'+
+      '</div>'+
+    '</div>';
+  }
+  return out;
+}
+
+/* ===== 1d — Painel ao vivo ===== */
+function scPainel(){
+  var list=sessions();
+  var sel = S.selected==null ? null : list[S.selected];
+  return statusbar("ao vivo")+
+  '<div class="appbar" style="align-items:baseline">'+
+    '<p class="h1">Quem está dentro</p>'+
+    '<p style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--teal-ink);flex:none">14/40</p>'+
+  '</div>'+
+  '<div class="scroll" style="padding:16px 20px '+(sel?"280px":"20px")+'">'+
+    '<div class="stack" style="gap:10px">'+
+    list.map(function(s,i){
+      return '<div class="row tap" data-a="select-session:'+i+'" style="background:#fff;border:1px solid var(--line);border-radius:20px;padding:13px 15px;border-left:5px solid '+s.color+';gap:12px">'+
+        '<div class="grow"><p style="margin:0;font:800 15.5px \'Nunito\',sans-serif;color:var(--dark)">'+esc(s.name)+'</p>'+
+        '<p style="margin:3px 0 0;font:600 12.5px \'Nunito\',sans-serif;color:var(--soft)">'+esc(s.detail)+'</p>'+
+        '<p style="margin:5px 0 0;font:800 11.5px/1.35 \'Nunito\',sans-serif;color:'+s.color+'">'+esc(s.status)+'</p></div>'+
+        '<div style="text-align:right;flex:none"><p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:22px;line-height:1.15;color:'+s.color+'">'+s.clock+'</p>'+
+        '<p style="margin:4px 0 0;font:600 11px \'Nunito\',sans-serif;color:var(--soft)">de '+s.total+'</p></div></div>';
+    }).join("")+
+    '</div>'+
+  '</div>'+
+  (sel?
+    '<div class="sheet">'+
+      '<div class="row" style="justify-content:space-between;gap:12px;margin-bottom:12px">'+
+        '<p class="h2 trunc grow">'+esc(sel.name)+'</p>'+
+        '<span class="tap" data-a="clear-session" style="font:800 13px \'Nunito\',sans-serif;color:var(--soft);flex:none">Fechar</span>'+
+      '</div>'+
+      '<p style="margin:0 0 16px;font:600 13px/1.5 \'Nunito\',sans-serif;color:var(--muted)">'+esc(sel.detail+" · "+sel.status)+'</p>'+
+      '<div class="stack" style="gap:10px">'+
+        '<div class="row tap" style="gap:12px;background:var(--yellow);border-radius:9999px;padding:16px 22px"'+notImpl("Liberar saída pede o PIN e imprime o recibo — não faz parte deste protótipo")+'>'+
+          '<span class="grow" style="font-family:\'Fredoka One\',cursive;font-size:18px;line-height:1.2;color:var(--dark)">Liberar saída</span>'+
+          '<span style="font:800 14px \'Nunito\',sans-serif;color:rgba(26,63,53,.65);flex:none">PIN + recibo</span>'+
+        '</div>'+
+        '<div class="row" style="gap:10px">'+
+          '<div class="pill grow tap"'+notImpl("Pausa registrada (simulação)")+'>Pausar</div>'+
+          '<div class="pill grow tap"'+notImpl("Ocorrência registrada (simulação)")+'>Ocorrência</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>' : '')+
+  tabbar();
+}
+
+/* ===== 2a — Acompanhamento do responsável ===== */
+function scResponsavel(){
+  var on=S.aviso;
+  var out = statusbar("Playground · Parque")+navbar("Acompanhamento","sem login")+
+  '<div class="scroll" style="padding:0 0 24px">'+
+    '<div style="padding:14px 24px 0;background:#fff">'+
+      '<p style="margin:0;font:700 11px \'Nunito\',sans-serif;letter-spacing:.15em;text-transform:uppercase;color:var(--teal-ink)">Faça Amigos · Playground Inclusivo</p>'+
+      '<p style="margin:10px 0 16px;font-family:\'Fredoka One\',cursive;font-size:26px;line-height:1.2;color:var(--dark)">Sofia está se divertindo na Zona de Calmaria.</p>'+
+    '</div>'+
+    '<div style="padding:14px 24px 18px;display:flex;justify-content:center;background:#fff;border-bottom:1px solid var(--line)">'+
+      '<div style="width:182px;height:182px;border-radius:50%;background:var(--gradient-ring);padding:5px;display:flex;align-items:center;justify-content:center">'+
+        '<div style="width:172px;height:172px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center">'+
+          '<p style="margin:0;font:600 12px \'Nunito\',sans-serif;color:var(--soft)">brincando há</p>'+
+          '<p style="margin:4px 0 0;font-family:\'Fredoka One\',cursive;font-size:42px;line-height:1.1;color:var(--dark)">47:'+secs()+'</p>'+
+          '<p style="margin:8px 0 0;font:800 13px \'Nunito\',sans-serif;color:var(--amber-ink)">restam 13 minutos</p>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="padding:16px 20px 0">'+
+      '<div class="tap" data-a="toggle-aviso" style="border-radius:24px;padding:'+(on?"14px 16px":"18px")+';background:'+(on?"rgba(46,207,181,0.14)":"#FFFFFF")+';border:2px solid var(--teal);box-shadow:0 2px 10px rgba(46,207,181,.18)">'+
+      (on?
+        '<div class="row" style="gap:12px">'+
+          '<div style="width:26px;height:26px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font:800 14px \'Nunito\',sans-serif;color:#fff;flex:none">✓</div>'+
+          '<p class="grow" style="margin:0;font:800 13.5px/1.35 \'Nunito\',sans-serif;color:var(--dark)">Aviso ligado — te chamo quando faltarem 5 min</p>'+
+          '<span style="font:800 12px \'Nunito\',sans-serif;color:var(--teal-ink);flex:none">Desligar</span>'+
+        '</div>'
+        :
+        '<div><p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:20px;line-height:1.25;color:var(--dark)">Quer que eu te avise?</p>'+
+        '<p style="margin:6px 0 14px;font:400 13px/1.55 \'Nunito\',sans-serif;color:var(--muted)">Te aviso no celular quando faltarem 5 minutos, mesmo com o app fechado. Sem susto na hora da saída.</p>'+
+        '<div style="border-radius:9999px;padding:15px;text-align:center;background:var(--teal)"><span style="font-family:\'Fredoka One\',cursive;font-size:17px;line-height:1.2;color:#fff">Me avise quando faltarem 5 min</span></div></div>')+
+      '</div>'+
+    '</div>'+
+    '<div style="padding:12px 20px 0">'+
+      '<div class="card">'+
+        '<p style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--dark)">A equipe está com ela</p>'+
+        '<p style="margin:6px 0 0;font:400 13px/1.6 \'Nunito\',sans-serif;color:var(--muted)">Abafador entregue na entrada · pausa sensorial às 10:18 · educadora Marina acompanhando.</p>'+
+      '</div>'+
+    '</div>';
+
+  if(on){
+    out += '<div style="padding:16px 20px 0">'+
+      '<p style="margin:0 0 4px;font-family:\'Fredoka One\',cursive;font-size:20px;line-height:1.2;color:var(--dark)">Quer mais um tempinho?</p>'+
+      '<p style="margin:0 0 12px;font:400 13px/1.55 \'Nunito\',sans-serif;color:var(--muted)">Dá para estender daqui mesmo, sem ir até o balcão. A gente cuida do resto.</p>'+
+      '<div class="row" style="gap:10px;align-items:stretch">'+
+      RENEWALS.map(function(r){
+        var sel=S.renew===r.minutes;
+        return '<div class="grow tap" data-a="pick-renew:'+r.minutes+'" style="border-radius:20px;padding:11px 8px;text-align:center;background:'+(sel?"rgba(46,207,181,0.12)":"#FFFFFF")+';border:2px solid '+(sel?"#2ECFB5":"#E8EAEC")+'">'+
+          '<p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:20px;line-height:1.15;color:var(--dark)">+'+r.minutes+' min</p>'+
+          '<p style="margin:4px 0 0;font:800 13px \'Nunito\',sans-serif;color:var(--teal-ink)">'+r.price+'</p>'+
+          '<p style="margin:4px 0 0;font:600 10.5px/1.3 \'Nunito\',sans-serif;color:var(--soft)">'+esc(r.note)+'</p></div>';
+      }).join("")+
+      '</div>'+
+      '<button class="cta" style="margin-top:12px;background:var(--pink);color:#fff"'+notImpl("Renovação enviada para o caixa (simulação)")+'>Quero +'+S.renew+' minutos</button>'+
+    '</div>';
+  }
+  return out+'</div>';
+}
+
+/* ===== 2b — Home do gerente ===== */
+function scGerencial(){
+  return statusbar("Gerencial · ao vivo")+
+  '<div style="padding:10px 20px 16px;flex:none;background:#fff;border-bottom:1px solid var(--line)">'+
+    '<div class="row" style="justify-content:space-between">'+
+      '<div><p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:24px;line-height:1.2;color:var(--dark)">Hoje, nas 3</p>'+
+      '<p class="sub" style="margin-top:3px">sábado, 19/08 · '+clockNow()+'</p></div>'+
+      '<div class="avatar" style="color:var(--pink-ink)">RN</div>'+
+    '</div>'+
+    '<div class="row" style="margin-top:14px;gap:10px">'+
+      [["Receita","R$ 4.180","var(--dark)"],["Meta",META_PCT+"%","var(--amber-ink)"],["Dentro","31","var(--teal-ink)"]].map(function(k){
+        return '<div class="grow" style="background:var(--bg);border-radius:20px;padding:14px">'+
+          '<p style="margin:0;font:600 11.5px \'Nunito\',sans-serif;color:var(--soft)">'+k[0]+'</p>'+
+          '<p style="margin:3px 0 0;font-family:\'Fredoka One\',cursive;font-size:22px;line-height:1.15;color:'+k[2]+'">'+k[1]+'</p></div>';
+      }).join("")+
+    '</div>'+
+  '</div>'+
+  '<div class="scroll" style="padding:16px 20px 20px;display:flex;flex-direction:column;gap:12px">'+
+    '<p class="eyebrow">Operações</p>'+
+    UNITS.map(function(u){
+      return '<div class="card tap" style="box-shadow:0 1px 4px rgba(0,0,0,.05);border-top:6px solid '+u.accent+'"'+notImpl("Tela da unidade "+u.name+" — próximo passo do design")+'>'+
+        '<div class="row" style="align-items:baseline;justify-content:space-between;gap:10px">'+
+          '<p style="margin:0;font:800 16px/1.25 \'Nunito\',sans-serif;color:var(--dark)">'+u.name+'</p>'+
+          '<p style="margin:0;font:800 12px \'Nunito\',sans-serif;color:'+u.accentText+';flex:none">'+u.badge+'</p></div>'+
+        '<p style="margin:4px 0 12px;font:600 12px \'Nunito\',sans-serif;color:var(--soft)">'+esc(u.place)+'</p>'+
+        '<div class="row" style="gap:16px">'+
+          '<div><p style="margin:0;font:600 11px \'Nunito\',sans-serif;color:var(--soft)">Dentro</p><p style="margin:2px 0 0;font-family:\'Fredoka One\',cursive;font-size:20px;line-height:1.15;color:var(--dark)">'+u.inside+'</p></div>'+
+          '<div><p style="margin:0;font:600 11px \'Nunito\',sans-serif;color:var(--soft)">Receita</p><p style="margin:2px 0 0;font-family:\'Fredoka One\',cursive;font-size:20px;line-height:1.15;color:var(--dark)">'+u.revenue+'</p></div>'+
+          '<div style="margin-left:auto;text-align:right"><p style="margin:0;font:600 11px \'Nunito\',sans-serif;color:var(--soft)">Meta</p><p style="margin:2px 0 0;font-family:\'Fredoka One\',cursive;font-size:20px;line-height:1.15;color:'+u.metaColor+'">'+u.meta+'</p></div>'+
+        '</div>'+
+        '<div style="margin-top:12px;height:8px;border-radius:9999px;background:var(--bg);overflow:hidden"><div style="height:100%;border-radius:9999px;width:'+u.barWidth+';background:'+u.accent+'"></div></div>'+
+        '<p style="margin:12px 0 0;font:700 12px/1.45 \'Nunito\',sans-serif;color:'+u.alertColor+'">'+esc(u.alert)+'</p></div>';
+    }).join("")+
+    '<div class="card">'+
+      '<p style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--dark)">Precisa da sua decisão</p>'+
+      '<p style="margin:6px 0 0;font:400 13px/1.6 \'Nunito\',sans-serif;color:var(--muted)">Cupom AGOSTO50 vence hoje · 2 colaboradores sem rosto cadastrado · fechamento de caixa do Circuito com R$ 12 de diferença ontem.</p>'+
+    '</div>'+
+  '</div>'+
+  tabbar();
+}
+
+/* ===== 2c — Cadastro de criança nova ===== */
+function scCadastro(){
+  var out = statusbar("Playground · Parque")+navbar("Criança nova","1 de 3")+
+  '<div class="scroll" style="padding:16px 20px 20px;display:flex;flex-direction:column;gap:12px">'+
+    '<div class="card row" style="gap:14px">'+
+      '<div style="width:64px;height:64px;border-radius:50%;background:var(--bg);border:2px dashed var(--line-2);display:flex;align-items:center;justify-content:center;flex:none;font:800 11px \'Nunito\',sans-serif;color:var(--soft)">foto</div>'+
+      '<div class="grow"><p style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--dark)">Foto da criança</p>'+
+      '<p style="margin:4px 0 0;font:400 12.5px/1.5 \'Nunito\',sans-serif;color:var(--muted)">Opcional. Ajuda a equipe a reconhecer na pista e a conferir na saída.</p></div>'+
+    '</div>'+
+    '<div class="card" style="display:flex;flex-direction:column;gap:12px">'+
+      '<div><p class="flabel">Nome da criança</p><div class="field">Helena Braga Correia</div></div>'+
+      '<div><p class="flabel">Nascimento</p><div class="field">14/03/2020</div></div>'+
+    '</div>'+
+    '<div class="card" style="display:flex;flex-direction:column;gap:12px">'+
+      '<p class="eyebrow" style="letter-spacing:.12em">Responsável</p>'+
+      '<div><p class="flabel">Nome completo</p><div class="field">Camila Braga Correia</div></div>'+
+      '<div class="row" style="gap:12px">'+
+        '<div class="grow"><p class="flabel">CPF</p><div class="field">742.118.330-05</div></div>'+
+        '<div class="grow"><p class="flabel">Telefone</p><div class="field">(91) 98455-2210</div></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="row tap" data-a="toggle-nd" style="gap:12px">'+
+        '<div style="width:26px;height:26px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font:800 15px \'Nunito\',sans-serif;color:#fff;background:'+(S.nd?"#F0196B":"#FFFFFF")+';border:2px solid '+(S.nd?"#F0196B":"#CDD1D6")+'">'+(S.nd?"✓":"")+'</div>'+
+        '<div class="grow"><p style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--dark)">Criança neurodivergente</p>'+
+        '<p style="margin:3px 0 0;font:400 12.5px/1.45 \'Nunito\',sans-serif;color:var(--muted)">Marque para registrar os cuidados. Fica salvo e volta pronto na próxima visita.</p></div>'+
+      '</div>';
+  if(S.nd){
+    out += '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">'+
+      '<p style="margin:0 0 10px;font:800 12px \'Nunito\',sans-serif;color:var(--dark)">Cuidados inclusivos — toque nos que se aplicam</p>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:8px">'+
+      SENSORY.map(function(t,i){
+        var on=S.tags.indexOf(t)>=0;
+        return '<div class="tap" data-a="toggle-tag:'+i+'" style="border-radius:9999px;padding:9px 14px;font:700 12.5px \'Nunito\',sans-serif;background:'+(on?"rgba(240,25,107,0.10)":"#F5F6F7")+';border:1.5px solid '+(on?"#F0196B":"#E8EAEC")+';color:'+(on?"#C8155A":"#5A636E")+'">'+esc(t)+'</div>';
+      }).join("")+
+      '</div>'+
+      '<p style="margin:12px 0 6px;font:800 12px \'Nunito\',sans-serif;color:var(--dark)">Observação da família</p>'+
+      '<div class="field" style="font:400 13.5px/1.5 \'Nunito\',sans-serif;color:var(--muted);min-height:56px">Prefere entrar antes da música alta. A mãe fica na praça de alimentação.</div>'+
+    '</div>';
+  }
+  out += '</div></div>'+
+  '<div style="flex:none;padding:14px 20px calc(22px + var(--pad-b));background:#fff;border-top:1px solid var(--line)">'+
+    '<button class="cta" data-a="go:planos2d" style="background:var(--pink);color:#fff">Salvar e escolher o plano</button>'+
+    '<p style="margin:9px 0 0;text-align:center;font:600 11.5px/1.4 \'Nunito\',sans-serif;color:var(--soft)">'+
+      (S.nd? (S.tags.length+" cuidado(s) marcado(s) — voltam prontos na próxima visita") : "O cadastro fica salvo: a próxima visita cabe em 3 toques")+
+    '</p>'+
+  '</div>';
+  return out;
+}
+
+/* ===== 2d — Escolha de plano (catálogo completo) ===== */
+function scPlanos(){
+  var list=OFFER_SETS[S.cadTab]||[];
+  var chosen=list.filter(function(o){return o.name===S.offer;})[0]||null;
+  var hint=(TAB_DEFS.filter(function(t){return t.key===S.cadTab;})[0]||TAB_DEFS[0]).hint;
+  return statusbar("Playground · Parque")+navbar("Escolha o plano","2 de 3")+
+  '<div style="padding:0 20px 12px;flex:none;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px">'+
+    '<div style="width:38px;height:38px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font:800 13px \'Nunito\',sans-serif;color:var(--teal-ink);flex:none">HB</div>'+
+    '<div class="grow"><p class="trunc" style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--dark)">Helena Braga Correia · 6 anos</p>'+
+    '<p style="margin:2px 0 0;font:600 12px \'Nunito\',sans-serif;color:var(--soft)">Fecha às 22h · cabem até 12h20 de permanência</p></div>'+
+  '</div>'+
+  '<div style="padding:12px 20px 0;flex:none;display:flex;gap:6px">'+
+  TAB_DEFS.map(function(t){
+    var on=S.cadTab===t.key;
+    return '<div class="grow tap" data-a="cad-tab:'+t.key+'" style="text-align:center;border-radius:9999px;padding:9px 4px;font:800 12px \'Nunito\',sans-serif;background:'+(on?"#F0196B":"#FFFFFF")+';color:'+(on?"#FFFFFF":"#5A636E")+';border:1.5px solid '+(on?"#F0196B":"#E8EAEC")+'">'+t.label+'</div>';
+  }).join("")+
+  '</div>'+
+  '<p style="margin:12px 20px 0;flex:none;font:400 12.5px/1.5 \'Nunito\',sans-serif;color:var(--muted)">'+esc(hint)+'</p>'+
+  '<div class="scroll" style="padding:12px 20px 16px;display:flex;flex-direction:column;gap:10px">'+
+  list.map(function(o,i){
+    var on=S.offer===o.name;
+    return '<div class="'+(o.disabled?"":"tap")+'" data-a="pick-offer:'+i+'" style="border-radius:20px;padding:15px 16px;background:'+(o.disabled?"#F5F6F7":(on?"rgba(240,25,107,0.08)":"#FFFFFF"))+';border:2px solid '+(on?"#F0196B":"#E8EAEC")+';opacity:'+(o.disabled?".62":"1")+'">'+
+      '<div class="row" style="align-items:flex-start;gap:12px">'+
+        '<div style="width:12px;height:12px;border-radius:50%;margin-top:5px;flex:none;background:'+o.dot+'"></div>'+
+        '<div class="grow"><p style="margin:0;font:800 16.5px/1.25 \'Nunito\',sans-serif;color:var(--dark)">'+esc(o.name)+'</p>'+
+        '<p style="margin:3px 0 0;font:600 12.5px/1.45 \'Nunito\',sans-serif;color:var(--soft)">'+esc(o.note)+'</p></div>'+
+        '<div style="text-align:right;flex:none"><p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:21px;line-height:1.15;color:var(--dark)">'+esc(o.price)+'</p>'+
+        '<p style="margin:3px 0 0;font:700 11px \'Nunito\',sans-serif;color:var(--soft)">'+esc(o.unit)+'</p></div>'+
+      '</div>'+
+      '<p style="margin:10px 0 0;font:800 11.5px/1.4 \'Nunito\',sans-serif;color:'+o.tagColor+'">'+esc(o.tag)+'</p></div>';
+  }).join("")+
+    '<div class="row tap" style="border-radius:20px;padding:14px 16px;background:#fff;border:1px dashed var(--line-2);gap:12px"'+notImpl("Cupom AGOSTO50 aplicado (simulação)")+'>'+
+      '<p class="grow" style="margin:0;font:800 14px \'Nunito\',sans-serif;color:var(--dark)">Aplicar cupom</p>'+
+      '<span style="font:800 12px \'Nunito\',sans-serif;color:var(--pink-ink);flex:none">AGOSTO50 ›</span>'+
+    '</div>'+
+  '</div>'+
+  '<div style="flex:none;padding:14px 20px calc(22px + var(--pad-b));background:#fff;border-top:1px solid var(--line)">'+
+    '<div class="row" style="align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px">'+
+      '<p class="grow" style="margin:0;font:600 13px/1.35 \'Nunito\',sans-serif;color:var(--muted)">'+(chosen?esc(chosen.name):"Nada escolhido ainda")+'</p>'+
+      '<p style="margin:0;font-family:\'Fredoka One\',cursive;font-size:22px;line-height:1.15;color:var(--dark);flex:none">'+(chosen?(chosen.cents>0?("R$ "+(chosen.cents/100).toFixed(0)):"sem custo"):"—")+'</p>'+
+    '</div>'+
+    '<button class="cta" data-a="confirm-offer" style="background:'+(chosen?"#F0196B":"#E8EAEC")+';color:'+(chosen?"#FFFFFF":"#6C7682")+'">'+(chosen?"Confirmar entrada":"Escolha uma opção")+'</button>'+
+  '</div>';
+}
+
+/* ===== Mais ===== */
+function scMais(){
+  var links=[
+    ["Home — círculos da marca","Alternativa 1b: mesmo vocabulário do app público","go:circulos"],
+    ["Cadastro de criança nova","Tela 2c — cuidados inclusivos","go:cadastro"],
+    ["Catálogo completo de planos","Tela 2d — planos, pacotes, sessões e locações","go:planos2d"],
+    ["Acompanhamento do responsável","Tela 2a — abre pelo QR do check-in, sem login","go:responsavel"],
+    ["Por que este app","A proposta, em uma tela","go:sobre"]
+  ];
+  return statusbar("Protótipo")+
+  '<div class="appbar"><p class="h1">Mais</p></div>'+
+  '<div class="scroll" style="padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px">'+
+    '<p class="eyebrow">Telas do protótipo</p>'+
+    links.map(function(l){
+      return '<div class="card row tap" data-a="'+l[2]+'" style="gap:12px">'+
+        '<div class="grow"><p style="margin:0;font:800 15.5px \'Nunito\',sans-serif;color:var(--dark)">'+l[0]+'</p>'+
+        '<p style="margin:3px 0 0;font:600 12.5px/1.4 \'Nunito\',sans-serif;color:var(--soft)">'+l[1]+'</p></div>'+
+        '<span style="font-size:20px;color:var(--line-2);flex:none">›</span></div>';
+    }).join("")+
+    '<p class="eyebrow" style="margin-top:12px">Fora deste protótipo</p>'+
+    '<div class="card"><p style="margin:0;font:600 13px/1.6 \'Nunito\',sans-serif;color:var(--muted)">Caixa, Ponto e a leitura de QR da pulseira aparecem nas telas como destino, mas ainda não foram desenhados. Os dados são fictícios — nada aqui grava no Supabase.</p></div>'+
+  '</div>'+
+  tabbar();
+}
+
+/* ===== Sobre a proposta ===== */
+function scSobre(){
+  var problemas=[
+    ["Uma fila, um terminal","Entrada, Painel, Caixa e Ponto vivem todos no mesmo aparelho. Duas famílias chegando juntas viram espera, não atendimento paralelo."],
+    ["Pré-cadastro que ninguém vê","O responsável já preenche tudo pelo QR de Acesso Rápido, mas o pré-cadastro só aparece dentro de um card do Painel. Se o operador não olhar, ele digita de novo o que já estava pronto."],
+    ["Tempo corre no Painel","Quem está em pista não vê o cronômetro. A renovação vira interrupção: alguém precisa voltar ao totem para descobrir que faltavam 5 minutos."]
+  ];
+  var respostas=[
+    ["1 · Segundo terminal no celular","Mesmo login, mesmas capacidades, mesmas RPCs. Dois atendimentos ao mesmo tempo sem comprar hardware."],
+    ["2 · Pré-cadastro em primeiro plano","A fila de quem já preencheu abre o app. Confirmar é conferir e tocar — o formulário completo só aparece para criança realmente nova."],
+    ["3 · Três toques, sem exceção","Busca única → plano → confirmar. O plano continua exigindo toque explícito: é o campo que define o preço."],
+    ["4 · Cronômetro que avisa","Painel ao vivo no bolso e o responsável acompanhando pelo próprio celular. O alerta chega antes do excedente."]
+  ];
+  return statusbar("Protótipo")+navbar("Por que este app","")+
+  '<div class="scroll" style="padding:20px 20px 28px">'+
+    '<p style="margin:0 0 6px;font:800 11px/1 \'Nunito\',sans-serif;letter-spacing:.15em;text-transform:uppercase;color:var(--pink-ink)">Proposta de melhoria</p>'+
+    '<h1 style="margin:0 0 10px;font-family:\'Fredoka One\',cursive;font-size:30px;line-height:1.08;color:var(--dark)">O sistema no bolso de quem atende</h1>'+
+    '<p style="margin:0 0 24px;font:400 14.5px/1.65 \'Nunito\',sans-serif;color:var(--ink)">O kiosk-ui já resolve o atendimento no balcão. O que ele não resolve é o operador estar longe do totem — e é aí que a fila para. A proposta é um app mobile que carrega só as sete ações que acontecem com a família na frente do colaborador, e não uma segunda cópia do sistema inteiro.</p>'+
+    '<div class="stack" style="gap:18px">'+
+    problemas.map(function(p){
+      return '<div style="border-top:4px solid #E83030;padding-top:12px">'+
+        '<p style="margin:0 0 6px;font:800 15px/1.3 \'Nunito\',sans-serif;color:var(--dark)">'+p[0]+'</p>'+
+        '<p style="margin:0;font:400 13.5px/1.6 \'Nunito\',sans-serif;color:var(--muted)">'+p[1]+'</p></div>';
+    }).join("")+
+    '</div>'+
+    '<div style="height:1px;background:rgba(0,0,0,.08);margin:26px 0"></div>'+
+    '<div class="stack" style="gap:18px">'+
+    respostas.map(function(r){
+      return '<div><p style="margin:0 0 6px;font:800 15px/1.3 \'Nunito\',sans-serif;color:var(--pink-ink)">'+r[0]+'</p>'+
+        '<p style="margin:0;font:400 13.5px/1.6 \'Nunito\',sans-serif;color:var(--muted)">'+r[1]+'</p></div>';
+    }).join("")+
+    '</div>'+
+  '</div>';
+}
+
+/* ===== router ===== */
+var SCREENS={
+  home:scHome, circulos:scCirculos, checkin:scCheckin, painel:scPainel,
+  responsavel:scResponsavel, gerencial:scGerencial, cadastro:scCadastro,
+  planos2d:scPlanos, mais:scMais, sobre:scSobre
+};
+
+var root=document.getElementById("app");
+var LAST_SCREEN=null;
+function render(){
+  var name=current();
+  var fn=SCREENS[name]||scHome;
+  var focusEl=document.activeElement;
+  var keepFocus = focusEl && focusEl.id==="q";
+  var caret = keepFocus ? focusEl.selectionStart : null;
+  var prev=root.querySelector(".scroll");
+  var scrollTop = (prev && name===LAST_SCREEN) ? prev.scrollTop : 0;
+
+  root.innerHTML = fn() + (S.toast? '<div class="toast">'+esc(S.toast)+'</div>' : '');
+  LAST_SCREEN=name;
+  var sc=root.querySelector(".scroll");
+  if(sc && scrollTop) sc.scrollTop=scrollTop;
+
+  var q=document.getElementById("q");
+  if(q){
+    q.addEventListener("input",function(e){ S.query=e.target.value; render(); });
+    if(keepFocus){ q.focus(); try{ q.setSelectionRange(caret,caret); }catch(err){} }
+  }
+}
+
+root.addEventListener("click",function(e){
+  var el=e.target.closest("[data-a]");
+  if(!el) return;
+  var a=el.getAttribute("data-a");
+  var i=a.indexOf(":");
+  var cmd = i<0 ? a : a.slice(0,i);
+  var arg = i<0 ? null : a.slice(i+1);
+
+  switch(cmd){
+    case "back": back(); break;
+    case "tab": setTab(arg); break;
+    case "tab-painel": setTab("painel"); break;
+    case "tab-gerencial": setTab("gerencial"); break;
+    case "go": go(arg); break;
+    case "nova-entrada": resetCheckin(); go("checkin"); break;
+    case "pick-child": S.picked=CHILDREN[+arg]; S.step="plano"; render(); break;
+    case "pick-plan": S.plan=PLAN_LIST[+arg].name; render(); break;
+    case "confirm-checkin": if(S.plan){ S.step="pronto"; render(); } else { toast("Escolha um plano para continuar"); } break;
+    case "reset-checkin": resetCheckin(); render(); break;
+    case "select-session": S.selected=+arg; render(); break;
+    case "clear-session": S.selected=null; render(); break;
+    case "toggle-aviso": S.aviso=!S.aviso; render(); break;
+    case "pick-renew": S.renew=+arg; render(); break;
+    case "toggle-nd": S.nd=!S.nd; render(); break;
+    case "toggle-tag": {
+      var t=SENSORY[+arg];
+      var k=S.tags.indexOf(t);
+      if(k>=0) S.tags.splice(k,1); else S.tags.push(t);
+      render(); break;
+    }
+    case "cad-tab": S.cadTab=arg; S.offer=null; render(); break;
+    case "pick-offer": {
+      var o=(OFFER_SETS[S.cadTab]||[])[+arg];
+      if(o && !o.disabled){ S.offer=o.name; render(); }
+      break;
+    }
+    case "confirm-offer": {
+      var list=OFFER_SETS[S.cadTab]||[];
+      var ch=list.filter(function(x){return x.name===S.offer;})[0];
+      if(!ch){ toast("Escolha uma opção"); break; }
+      S.picked=S.picked||{name:"Helena Braga Correia",initials:"HB",detail:"6 anos · resp. Camila Braga Correia",care:"Cuidados marcados no cadastro"};
+      S.plan=ch.name; S.step="pronto";
+      S.stack=["home","checkin"]; render(); break;
+    }
+    case "msg": toast(el.getAttribute("data-msg")||""); break;
+  }
+});
+
+/* voltar do Android / gesto de voltar */
+window.addEventListener("popstate",function(){ if(S.stack.length>1){ back(); history.pushState(null,"",location.href); } });
+try{ history.pushState(null,"",location.href); }catch(err){}
+
+setInterval(function(){ S.now=Date.now(); if(["painel","responsavel"].indexOf(current())>=0) render(); },1000);
+
+render();
+})();
+</script>
+
+</body>
+</html>

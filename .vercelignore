@@ -1,0 +1,51 @@
+# O que NÃO sobe no deploy da Vercel.
+#
+# A raiz deste repositório não é só código: ela guarda o material de
+# operação do FaçaAmigos (vídeos de treinamento, POPs em PDF, fotos de
+# produto, contrato social). Sem esta lista o `vercel deploy` empacota
+# tudo — 600+ MB — e falha no limite de 100 MB por arquivo antes mesmo de
+# começar o build.
+#
+# Regra: os padrões abaixo são todos ANCORADOS na raiz (barra inicial).
+# Nada dentro de apps/ ou packages/ é excluído por engano — inclusive
+# apps/kiosk-ui/public/models/*.bin (face-api) e public/icons/*.png (PWA),
+# que o build precisa e que um `*.png` solto derrubaria.
+
+# ── Mídia e documentos de operação (raiz) ──
+/*.mp4
+/*.mov
+/*.jpeg
+/*.jpg
+/*.png
+/*.pdf
+/*.gsheet
+/*.gdoc
+/*.html
+/*.md
+/*.txt
+
+# ── Pastas de material e protótipo, não de build ──
+/Branding/
+/Documentação CNPJ/
+/FAixas/
+/Faça Amigos Circuito/
+/POP 01 — Operação e PDV — FaçaAmigos/
+/facaamigos-landing-publicar-v2/
+/prototype/
+/supabase/
+
+# ── Instaladores do Electron ──
+# apps/kiosk/release guarda os .exe empacotados (o FacaAmigos-Setup tem
+# ~100 MB cada e o win-unpacked, 195 MB) — sozinhos eles estouram o limite
+# de 100 MB por arquivo da Vercel. apps/kiosk continua subindo: o
+# vite.config.ts do kiosk-ui lê a versão de ../kiosk/package.json.
+/apps/kiosk/release/
+/apps/kiosk/dist/
+/apps/kiosk/out/
+
+# ── Artefatos locais ──
+node_modules
+.turbo
+dist
+*.tsbuildinfo
+/.claude/

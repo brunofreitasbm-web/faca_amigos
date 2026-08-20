@@ -48,6 +48,8 @@ import { InstallPwaBanner } from "./components/InstallPwaBanner.js";
 import { UpdatePwaBanner } from "./components/UpdatePwaBanner.js";
 import { GlobalPdfReceiptModalListener } from "./components/PdfReceiptModal.js";
 import { isElectronLocal } from "./pwa.js";
+import { MobileShell } from "./mobile/MobileShell.js";
+import { useMobileShell } from "./mobile/useMobileShell.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
   { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir a pulseira e o recibo de guarda", icon: <SignInIcon /> },
@@ -83,12 +85,23 @@ export function App() {
   const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // Casca mobile: no celular o operador entra por ela, e `mobileEscape`
+  // guarda a tela completa que ele pediu de dentro dela (Saída, Caixa…).
+  // Enquanto for null, quem manda no celular é a casca.
+  const mobile = useMobileShell();
+  const [mobileEscape, setMobileEscape] = useState<Screen | null>(null);
 
   function navigateToScreen(newScreen: Screen) {
     if (newScreen === screen) return;
     setScreenHistory((prev) => [...prev, screen].slice(-20));
     setScreen(newScreen);
   }
+
+  // Sair da casca mobile para uma tela completa é uma navegação normal do
+  // app — só que decidida lá dentro.
+  useEffect(() => {
+    if (mobileEscape) setScreen(mobileEscape);
+  }, [mobileEscape]);
 
   // Cada módulo/unidade selecionado sempre abre direto no Painel (tela principal do sistema).
   useEffect(() => {
@@ -273,6 +286,23 @@ export function App() {
     return <TapReturnScreen search={window.location.search} onDone={() => navigateToScreen("PAINEL")} />;
   }
 
+  // Celular: a casca mobile é a porta de entrada. Só sai dela quando o
+  // próprio operador pede uma tela completa (mobileEscape) ou desliga o
+  // modo para este aparelho (mobile.active).
+  if (mobile.active && mobileEscape === null && employee) {
+    return (
+      <MobileShell
+        unit={unit}
+        employeeName={employee.full_name}
+        employeeId={employee.id}
+        onAbrirTelaCompleta={(s) => setMobileEscape(s)}
+        onUsarVersaoCompleta={mobile.useFullVersion}
+        onTrocarModulo={handleChangeModule}
+        onSair={handleLogout}
+      />
+    );
+  }
+
   const ScreenComponent = SCREEN_COMPONENTS[screen];
   const brand = unitBrandFor(unit.name);
 
@@ -281,6 +311,36 @@ export function App() {
       {/* Régua da operação: a faixa de cor mais persistente da tela, para
           o operador saber em que unidade está sem precisar ler nada. */}
       <div style={{ flexShrink: 0, height: "3px", background: brand.accent }} />
+
+      {/* Volta para a casca mobile depois de um desvio para a tela completa.
+          Sem isto o operador que tocou em "Saída" no celular fica preso nas
+          telas de balcão até fechar o app. */}
+      {mobile.active && mobileEscape !== null && (
+        <button
+          type="button"
+          onClick={() => setMobileEscape(null)}
+          style={{
+            position: "fixed",
+            left: "50%",
+            transform: "translateX(-50%)",
+            bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+            zIndex: 60,
+            border: "none",
+            borderRadius: "9999px",
+            padding: "12px 20px",
+            minHeight: "44px",
+            background: "var(--color-dark)",
+            color: "#fff",
+            font: "inherit",
+            fontSize: "13px",
+            fontWeight: 800,
+            boxShadow: "0 8px 24px rgba(0,0,0,.28)",
+            cursor: "pointer",
+          }}
+        >
+          ‹ Voltar ao modo celular
+        </button>
+      )}
 
       <header
         style={{
