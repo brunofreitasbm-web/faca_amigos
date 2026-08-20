@@ -5,7 +5,7 @@ equipe técnica da administração do shopping.
 
 | Operação         | FaçaAmigos — Playground & Parque Circuito (mesmo CNPJ, contratos distintos)|
 | Sistema          | Sistema de gestão e caixa próprio (offline-first, servidor local na loja) |
-| Versão do layout | 1.1                                                                       |
+| Versão do layout | 1.0                                                                       |
 | Protocolo        | HTTPS · REST · JSON (ou CSV)                                              |
 | Autenticação     | Chave de API estática, por escopo de unidade                              |
 | Escopo concedido | `FATURAMENTO_LEITURA` — somente leitura, dados por unidade                |
@@ -81,8 +81,8 @@ Se a chave for emitida vinculada a uma loja, o parâmetro `unitId` é ignorado
   "loja": {
     "unidadeId": "018bcfe5-6800-790d-b959-c3de7ede5578",
     "nome": "FaçaAmigos (Parque Shopping)",
-    "cnpj": "12345678000195",
-    "razaoSocial": "FaçaAmigos Entretenimento Infantil LTDA",
+    "cnpj": "66318630000117",
+    "razaoSocial": "FAÇA AMIGOS BRINQUEDOTECA LTDA",
     "luc": "L-142",
     "codigoLojista": "PSB-1316",
     "timezone": "America/Belem",
@@ -141,7 +141,7 @@ português.
 
 ```
 data;cnpj;luc;codigo_lojista;bruto;descontos;liquido;cancelamentos;qtd_vendas;qtd_cancelamentos;ticket_medio;servico;produto;dinheiro;pix;credito;debito;voucher
-2026-03-01;12345678000195;L-142;PSB-1316;1860,00;60,00;1800,00;0,00;31;0;58,06;1650,00;150,00;120,00;780,00;620,00;280,00;0,00
+2026-03-01;66318630000117;L-142;PSB-1316;1860,00;60,00;1800,00;0,00;31;0;58,06;1650,00;150,00;120,00;780,00;620,00;280,00;0,00
 ```
 
 ### 3.2. Consulta venda a venda (granularidade por item / anonimizada)
@@ -162,7 +162,7 @@ Retorna a listagem individual de vendas sem nenhum dado pessoal do cliente/crian
   "layoutVersao": "1.0",
   "loja": {
     "unidadeId": "018bcfe5-6800-790d-b959-c3de7ede5578",
-    "cnpj": "12345678000195",
+    "cnpj": "66318630000117",
     "luc": "L-142",
     "codigoLojista": "PSB-1316"
   },
@@ -234,23 +234,29 @@ configuração — é um parâmetro, não uma regra fixa do sistema.
 
 A interface transmite apenas totais consolidados ou listagem operacional de transações (`idVenda`, `dataHora`, `valorCentavos`, `cancelado`, `troca`). Nenhum dado de qualificação pessoal de criança, responsável, telefone, CPF ou colaborador é exposto por esta API.
 
-## 7. Exemplo de chamada cURL (Homologação & Produção)
+## 7. URL base e exemplos de chamada cURL (Homologação & Produção)
+
+> **URL base:** `https://app.institutofacaamigos.com.br` — mesmo domínio da
+> aplicação FaçaAmigos (não há subdomínio `api.` ou `api-homolog.` dedicado;
+> as rotas `/integracao/shopping/v1/*` são publicadas nesse mesmo host).
+> Homologação e produção usam a mesma URL base — o que muda é a chave de
+> API enviada em cada ambiente.
 
 ### Health Check (Validação inicial de credencial)
 ```bash
-curl -X GET "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/health" \
+curl -X GET "https://app.institutofacaamigos.com.br/integracao/shopping/v1/health" \
   -H "Authorization: Bearer fa_shp_homolog_sampletoken123"
 ```
 
 ### Consulta de faturamento agregado por dia
 ```bash
-curl -X GET "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/faturamento?de=2026-03-01&ate=2026-03-31" \
+curl -X GET "https://app.institutofacaamigos.com.br/integracao/shopping/v1/faturamento?de=2026-03-01&ate=2026-03-31" \
   -H "X-API-Key: fa_shp_homolog_sampletoken123"
 ```
 
 ### Consulta de faturamento venda a venda
 ```bash
-curl -X GET "https://api-homolog.facaamigos.com.br/integracao/shopping/v1/vendas?de=2026-03-01&ate=2026-03-31" \
+curl -X GET "https://app.institutofacaamigos.com.br/integracao/shopping/v1/vendas?de=2026-03-01&ate=2026-03-31" \
   -H "Authorization: Bearer fa_shp_homolog_sampletoken123"
 ```
 
