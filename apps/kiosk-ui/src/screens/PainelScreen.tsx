@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText } from "@facaamigos/ui";
+import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan, Asset } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
@@ -616,6 +616,11 @@ export function PainelScreen() {
                         <span>📱 QR Code</span>
                       </button>
                     </span>
+                    {session.exit_pin && (
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", margin: "2px 0" }}>
+                        <RevealPin pin={session.exit_pin} label="PIN de saída" />
+                      </span>
+                    )}
                     {asset && <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Carrinho: {asset.name}</span>}
                     {plan && (
                       <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>

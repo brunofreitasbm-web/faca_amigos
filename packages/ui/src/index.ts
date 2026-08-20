@@ -11,6 +11,7 @@ export * from "./components/BrandLockup.js";
 export * from "./components/AsyncState.js";
 export * from "./components/HelpText.js";
 export * from "./components/Modal.js";
+export * from "./components/RevealPin.js";
 export * from "./components/Tabs.js";
 export * from "./tokens/contrast.js";
 export * from "./icons/index.js";
