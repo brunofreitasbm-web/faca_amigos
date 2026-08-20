@@ -3,6 +3,8 @@ import type { Unit } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { useToast } from "../state/ToastContext.js";
+import { InstallPwaBanner } from "../components/InstallPwaBanner.js";
+import { UpdatePwaBanner } from "../components/UpdatePwaBanner.js";
 import { MobileHome } from "./MobileHome.js";
 import { MobileCheckin } from "./MobileCheckin.js";
 import { MobilePainel } from "./MobilePainel.js";
@@ -117,6 +119,15 @@ export function MobileShell({
             onSair={onSair}
           />
         )}
+
+        {/* Os dois banners vivem no rodapé da casca de balcão (App.tsx), que
+            a casca mobile substitui inteira no celular — sem repeti-los aqui,
+            justamente quem mais precisa deles nunca os veria: é o
+            InstallPwaBanner que ensina a botar o app na tela inicial (o
+            "Adicionar à Tela de Início" do iOS não tem prompt programático),
+            e o UpdatePwaBanner que avisa da versão nova. */}
+        <InstallPwaBanner />
+        <UpdatePwaBanner />
 
         {view !== "CHECKIN" && (
           <nav className="m-tabbar" aria-label="Seções">
