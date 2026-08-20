@@ -25,7 +25,7 @@ import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import { EspelhoPontoModal } from "../components/EspelhoPontoModal.js";
-import { isPushSupported, subscribeToPush, getExistingPushSubscription, pushSubscriptionToKeys } from "../lib/push.js";
+import { isPushSupported, subscribeToPush, getExistingPushSubscription, pushSubscriptionToKeys, OWNER_PUSH_STORAGE_KEY } from "../lib/push.js";
 import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/WristbandQRCode.js";
 import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
 import { money } from "../format.js";
@@ -165,13 +165,44 @@ function NotificacoesTab() {
 
   async function refresh() {
     if (!supported) return;
-    const existing = await getExistingPushSubscription();
-    const keys = existing ? pushSubscriptionToKeys(existing) : null;
-    if (!keys) {
-      setSubscribed(false);
-      return;
+
+    const locallyEnabled = localStorage.getItem(OWNER_PUSH_STORAGE_KEY) === "true";
+
+    try {
+      let existing = await getExistingPushSubscription();
+      let keys = existing ? pushSubscriptionToKeys(existing) : null;
+
+      // Se ativado localmente e permissão concedida, mas a inscrição push expirou ou perdeu do SW, tenta renovar
+      if (!keys && locallyEnabled && "Notification" in window && Notification.permission === "granted") {
+        try {
+          const newSub = await subscribeToPush();
+          keys = newSub ? pushSubscriptionToKeys(newSub) : null;
+        } catch {
+          // ignora erro de auto-renovação silenciosa em segundo plano
+        }
+      }
+
+      if (!keys) {
+        setSubscribed(false);
+        return;
+      }
+
+      const isSubscribedOnServer = await Api.ownerPushIsSubscribed(keys.endpoint).catch(() => false);
+
+      if (isSubscribedOnServer) {
+        setSubscribed(true);
+        localStorage.setItem(OWNER_PUSH_STORAGE_KEY, "true");
+      } else if (locallyEnabled) {
+        // Se ativado localmente mas perdeu no servidor (ex: troca de sessão), re-cadastra
+        await Api.ownerPushSubscribe(keys.endpoint, keys.p256dh, keys.auth).catch(() => {});
+        setSubscribed(true);
+        localStorage.setItem(OWNER_PUSH_STORAGE_KEY, "true");
+      } else {
+        setSubscribed(false);
+      }
+    } catch {
+      setSubscribed(locallyEnabled);
     }
-    setSubscribed(await Api.ownerPushIsSubscribed(keys.endpoint).catch(() => false));
   }
   useEffect(() => {
     refresh();
@@ -187,6 +218,7 @@ function NotificacoesTab() {
         return;
       }
       await Api.ownerPushSubscribe(keys.endpoint, keys.p256dh, keys.auth);
+      localStorage.setItem(OWNER_PUSH_STORAGE_KEY, "true");
       toast.success("Notificações ativadas neste dispositivo.");
       setSubscribed(true);
     } catch (err) {
@@ -202,6 +234,7 @@ function NotificacoesTab() {
       const existing = await getExistingPushSubscription();
       const keys = existing ? pushSubscriptionToKeys(existing) : null;
       if (keys) await Api.ownerPushUnsubscribe(keys.endpoint);
+      localStorage.removeItem(OWNER_PUSH_STORAGE_KEY);
       toast.success("Notificações desativadas neste dispositivo.");
       setSubscribed(false);
     } catch (err) {
@@ -216,7 +249,7 @@ function NotificacoesTab() {
       <h2>Relatórios automáticos por notificação</h2>
       <HelpText>
         Com isto ativado, este dispositivo (exclusivo para perfil Owner) recebe automaticamente: <strong>Abertura de unidade</strong> (ao abrir o caixa),{" "}
-        <strong>Visão Geral Diária às 19h</strong> (meta, faturamento do dia, total de sessões/locações e ticket médio) e{" "}
+        <strong>Visão Geral Diária às 17h e 20h</strong> (meta, faturamento do dia, total de sessões/locações e ticket médio) e{" "}
         <strong>Fechamento</strong> (faturamento total, meta do dia, quantidade de sessões/locações, fundo de caixa e valor em envelope).
       </HelpText>
       {!supported ? (
@@ -224,6 +257,8 @@ function NotificacoesTab() {
           Este navegador/dispositivo não suporta notificações push (no Electron local, ou fora do modo instalado no iOS,
           isso é esperado).
         </Tag>
+      ) : subscribed === null ? (
+        <Tag color="var(--color-neutral-500, #888888)">Verificando estado das notificações...</Tag>
       ) : subscribed ? (
         <>
           <Tag color="var(--color-teal, #2ECFB5)">Ativado neste dispositivo</Tag>

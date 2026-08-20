@@ -48,6 +48,8 @@ import { InstallPwaBanner } from "./components/InstallPwaBanner.js";
 import { UpdatePwaBanner } from "./components/UpdatePwaBanner.js";
 import { GlobalPdfReceiptModalListener } from "./components/PdfReceiptModal.js";
 import { isElectronLocal } from "./pwa.js";
+import { ensureOwnerPushSubscription } from "./lib/push.js";
+import { Api } from "./api/client.js";
 import { MobileShell } from "./mobile/MobileShell.js";
 import { MobileScreenFrame } from "./mobile/MobileScreenFrame.js";
 import { MobileGerencial } from "./mobile/MobileGerencial.js";
@@ -93,6 +95,14 @@ export function App() {
   // Enquanto for null, quem manda no celular é a casca.
   const mobile = useMobileShell();
   const [mobileEscape, setMobileEscape] = useState<Screen | null>(null);
+
+  // Se for colaborador com perfil Owner e tiver as notificações ativas no dispositivo (localStorage),
+  // revalida a inscrição Web Push com o Supabase automaticamente ao carregar o aplicativo.
+  useEffect(() => {
+    if (employee && (employee.role === "ADMIN" || can("notificacoes.owner_push"))) {
+      ensureOwnerPushSubscription(Api).catch(() => {});
+    }
+  }, [employee, can]);
 
   function navigateToScreen(newScreen: Screen) {
     if (newScreen === screen) return;

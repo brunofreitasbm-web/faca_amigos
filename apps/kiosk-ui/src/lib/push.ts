@@ -6,6 +6,8 @@
  */
 const VAPID_PUBLIC_KEY = "BJhjx5DI70O6oFStbFYAlrCWwMmrg098IfyJh2CVsbQsAc-4WTRCAvo4TDNbem3xCk4IhxDMYSiJNNGCD_7KYnY";
 
+export const OWNER_PUSH_STORAGE_KEY = "fa_owner_push_enabled";
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -39,6 +41,17 @@ export async function getExistingPushSubscription(): Promise<PushSubscription | 
 /** Reaproveita inscrição existente ou cria uma nova — nunca duplica no navegador. */
 export async function subscribeToPush(): Promise<PushSubscription | null> {
   if (!isPushSupported()) return null;
+  if ("Notification" in window) {
+    if (Notification.permission === "denied") {
+      throw new Error("As notificações estão bloqueadas nas configurações do seu navegador/dispositivo.");
+    }
+    if (Notification.permission === "default") {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        throw new Error("Permissão para enviar notificações não foi concedida.");
+      }
+    }
+  }
   const existing = await getExistingPushSubscription();
   if (existing) return existing;
   const registration = await navigator.serviceWorker.ready;
@@ -55,3 +68,35 @@ export function pushSubscriptionToKeys(sub: PushSubscription): { endpoint: strin
   if (!json.endpoint || !p256dh || !auth) return null;
   return { endpoint: json.endpoint, p256dh, auth };
 }
+
+/**
+ * Garante que se o Owner ativou notificações neste dispositivo (salvo em localStorage),
+ * a inscrição Web Push seja revalidada/renovada automaticamente junto ao Supabase.
+ */
+export async function ensureOwnerPushSubscription(api: {
+  ownerPushIsSubscribed: (endpoint: string) => Promise<boolean>;
+  ownerPushSubscribe: (endpoint: string, p256dh: string, auth: string) => Promise<void>;
+}): Promise<boolean> {
+  if (!isPushSupported()) return false;
+  const locallyEnabled = localStorage.getItem(OWNER_PUSH_STORAGE_KEY) === "true";
+  if (!locallyEnabled) return false;
+  if (!("Notification" in window) || Notification.permission !== "granted") return false;
+
+  try {
+    let sub = await getExistingPushSubscription();
+    if (!sub) {
+      sub = await subscribeToPush();
+    }
+    const keys = sub ? pushSubscriptionToKeys(sub) : null;
+    if (!keys) return false;
+
+    const isSubscribed = await api.ownerPushIsSubscribed(keys.endpoint).catch(() => false);
+    if (!isSubscribed) {
+      await api.ownerPushSubscribe(keys.endpoint, keys.p256dh, keys.auth);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
