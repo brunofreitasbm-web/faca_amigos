@@ -50,6 +50,7 @@ import { GlobalPdfReceiptModalListener } from "./components/PdfReceiptModal.js";
 import { isElectronLocal } from "./pwa.js";
 import { MobileShell } from "./mobile/MobileShell.js";
 import { MobileScreenFrame } from "./mobile/MobileScreenFrame.js";
+import { MobileGerencial } from "./mobile/MobileGerencial.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
@@ -79,7 +80,7 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
 };
 
 export function App() {
-  const { unit, setUnitId, gerencial, setGerencial, employee, logout, restoring } = useAppState();
+  const { units, unit, setUnitId, gerencial, setGerencial, employee, logout, restoring } = useAppState();
   const { can, loading: loadingCapabilities } = useAuth();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
@@ -268,7 +269,13 @@ export function App() {
 
   // Modo Gerencial: fora do contexto das 3 unidades, é onde o Owner configura
   // o que vale para várias unidades de uma vez e vê relatórios cross-unit.
+  // No celular a porta de entrada é a home "as 3 operações numa tela"
+  // (MobileGerencial), não o console de 21 abas direto — ver o comentário
+  // em mobile/MobileGerencial.tsx.
   if (gerencial) {
+    if (mobile.active) {
+      return <MobileGerencial units={units} onExit={() => setGerencial(false)} onLogout={handleLogout} />;
+    }
     return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
   }
 
