@@ -215,9 +215,9 @@ function NotificacoesTab() {
     <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
       <h2>Relatórios automáticos por notificação</h2>
       <HelpText>
-        Com isto ativado, este dispositivo recebe automaticamente: <strong>Abertura</strong> (ao abrir o caixa),{" "}
-        <strong>Acompanhamento</strong> às 17h e 20h (ticket médio, faturamento e visitas do dia) e{" "}
-        <strong>Fechamento</strong> (fundo de caixa, envelope e faturamento por forma de pagamento).
+        Com isto ativado, este dispositivo (exclusivo para perfil Owner) recebe automaticamente: <strong>Abertura de unidade</strong> (ao abrir o caixa),{" "}
+        <strong>Visão Geral Diária às 19h</strong> (meta, faturamento do dia, total de sessões/locações e ticket médio) e{" "}
+        <strong>Fechamento</strong> (faturamento total, meta do dia, quantidade de sessões/locações, fundo de caixa e valor em envelope).
       </HelpText>
       {!supported ? (
         <Tag color="var(--color-orange, #FF7A00)">
