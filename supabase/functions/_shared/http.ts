@@ -13,6 +13,9 @@ const FALLBACK_ORIGINS = [
   "http://localhost:4173",
   "https://kiosk-ui.vercel.app",
   "https://app.institutofacaamigos.com.br",
+  "https://institutofacaamigos.com.br",
+  "https://www.institutofacaamigos.com.br",
+  "http://127.0.0.1:5500",
   // App Electron do quiosque (apps/kiosk): a SPA é servida pelo Fastify
   // local em 127.0.0.1:7317 e chama estas functions direto do renderer —
   // sem essa origem aqui, o navegador bloqueia a resposta (CORS) e o
