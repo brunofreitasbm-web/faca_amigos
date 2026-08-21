@@ -2145,7 +2145,13 @@
               '<p style="color:var(--ink-soft); font-weight:600; font-size:0.95rem;">Obrigado pelo interesse em fazer parte do FaçaAmigos. Nosso time de RH vai analisar seu currículo e entrar em contato.</p></div>';
           })
           .catch(function (err) {
-            errorBox.textContent = err.message || 'Não foi possível enviar sua candidatura. Tente novamente.';
+            var errorMsg = err.message || '';
+            if (errorMsg.toLowerCase().includes('failed to fetch')) {
+              errorMsg = 'Não foi possível enviar seu currículo no momento. Verifique sua conexão e tente novamente.';
+            } else {
+              errorMsg = errorMsg || 'Não foi possível enviar sua candidatura. Tente novamente.';
+            }
+            errorBox.textContent = errorMsg;
             errorBox.style.display = 'block';
             submitBtn.disabled = false;
             submitBtn.textContent = 'Enviar candidatura';
