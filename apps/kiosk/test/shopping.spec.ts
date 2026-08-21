@@ -43,11 +43,11 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     expect(apiKeyRes.json().ok).toBe(true);
   });
 
-  it("diferencia unidades no mesmo CNPJ (Playground LUC L-142 vs Circuito LUC L-143)", async () => {
+  it("diferencia unidades no mesmo CNPJ com chaves de produção (Playground LUC L-142 vs Circuito LUC L-143)", async () => {
     const playgroundRes = await app.inject({
       method: "GET",
       url: "/integracao/shopping/v1/faturamento?de=2026-03-01&ate=2026-03-31",
-      headers: { authorization: "Bearer fa_shp_playground_token" },
+      headers: { authorization: "Bearer fa_shp_prod_playground_9a8f7e6d" },
     });
     expect(playgroundRes.statusCode).toBe(200);
     const pgData = playgroundRes.json();
@@ -57,7 +57,7 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     const circuitoRes = await app.inject({
       method: "GET",
       url: "/integracao/shopping/v1/faturamento?de=2026-03-01&ate=2026-03-31",
-      headers: { authorization: "Bearer fa_shp_circuito_token" },
+      headers: { "x-api-key": "fa_shp_prod_circuito_3b2c1a0f" },
     });
     expect(circuitoRes.statusCode).toBe(200);
     const circData = circuitoRes.json();
