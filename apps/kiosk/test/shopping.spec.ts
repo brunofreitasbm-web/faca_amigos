@@ -71,8 +71,8 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     const { resolveShoppingUnitLUC } = await import("../src/server/routes/shopping.js");
     expect(resolveShoppingUnitLUC("PSB01003")).toBe("PSB01003");
     expect(resolveShoppingUnitLUC("PSBQF122")).toBe("PSBQF122");
-    expect(resolveShoppingUnitLUC("L-142")).toBe("PSB01003");
-    expect(resolveShoppingUnitLUC("L-143")).toBe("PSBQF122");
+    expect(resolveShoppingUnitLUC("L-142")).toBe("PSBQF122");
+    expect(resolveShoppingUnitLUC("L-143")).toBe("PSB01003");
   });
 
   it("retorna o endpoint de vendas item a item sem dados pessoais (LGPD compliant)", async () => {

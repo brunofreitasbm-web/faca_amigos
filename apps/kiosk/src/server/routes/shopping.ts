@@ -26,10 +26,10 @@ export function resolveShoppingUnitLUC(value?: string | null, fallbackIsCircuito
   const compact = normalized.replace(/\s+/g, "").replace(/-/g, "").toUpperCase();
 
   if (compact === "L142") {
-    return "PSB01003";
+    return "PSBQF122";
   }
   if (compact === "L143") {
-    return "PSBQF122";
+    return "PSB01003";
   }
   if (compact === "PSB01003" || compact === "PSB1316") {
     return "PSB01003";
