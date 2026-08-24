@@ -43,7 +43,7 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     expect(apiKeyRes.json().ok).toBe(true);
   });
 
-  it("diferencia unidades no mesmo CNPJ com chaves de produção (Playground LUC L-142 vs Circuito LUC L-143)", async () => {
+  it("diferencia unidades no mesmo CNPJ com chaves de produção (Playground LUC PSB01003 vs Circuito LUC PSBQF122)", async () => {
     const playgroundRes = await app.inject({
       method: "GET",
       url: "/integracao/shopping/v1/faturamento?de=2026-03-01&ate=2026-03-31",
@@ -51,7 +51,7 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     });
     expect(playgroundRes.statusCode).toBe(200);
     const pgData = playgroundRes.json();
-    expect(pgData.loja.luc).toBe("L-142");
+    expect(pgData.loja.luc).toBe("PSB01003");
     expect(pgData.loja.codigoLojista).toBe("PSB-1316");
 
     const circuitoRes = await app.inject({
@@ -61,10 +61,18 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     });
     expect(circuitoRes.statusCode).toBe(200);
     const circData = circuitoRes.json();
-    expect(circData.loja.luc).toBe("L-143");
+    expect(circData.loja.luc).toBe("PSBQF122");
     expect(circData.loja.codigoLojista).toBe("PSB-1346");
     // Mesmo CNPJ para ambas as operações no mesmo shopping
     expect(pgData.loja.cnpj).toBe(circData.loja.cnpj);
+  });
+
+  it("normaliza as LUCs internas para o padrão oficial da API", async () => {
+    const { resolveShoppingUnitLUC } = await import("../src/server/routes/shopping.js");
+    expect(resolveShoppingUnitLUC("PSB01003")).toBe("PSB01003");
+    expect(resolveShoppingUnitLUC("PSBQF122")).toBe("PSBQF122");
+    expect(resolveShoppingUnitLUC("L-142")).toBe("PSB01003");
+    expect(resolveShoppingUnitLUC("L-143")).toBe("PSBQF122");
   });
 
   it("retorna o endpoint de vendas item a item sem dados pessoais (LGPD compliant)", async () => {

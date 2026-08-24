@@ -14,8 +14,43 @@ export interface ShoppingUnitInfo {
 }
 
 /**
+  Normaliza as LUCs internas e oficiais do painel para o padrão usado na API do shopping.
+  As LUCs oficiais da operação internas são PSB01003 e PSBQF122.
+ */
+export function resolveShoppingUnitLUC(value?: string | null, fallbackIsCircuito = false): string {
+  const normalized = (value ?? "").trim();
+  if (!normalized) {
+    return fallbackIsCircuito ? "PSBQF122" : "PSB01003";
+  }
+
+  const compact = normalized.replace(/\s+/g, "").replace(/-/g, "").toUpperCase();
+
+  if (compact === "L142") {
+    return "PSB01003";
+  }
+  if (compact === "L143") {
+    return "PSBQF122";
+  }
+  if (compact === "PSB01003" || compact === "PSB1316") {
+    return "PSB01003";
+  }
+  if (compact === "PSBQF122" || compact === "PSB1346") {
+    return "PSBQF122";
+  }
+
+  const apiMap: Record<string, string> = {
+    PLAYGROUND: "PSB01003",
+    CIRCUITO: "PSBQF122",
+    PARQUECIRCUITO: "PSBQF122",
+    PARQUECIRCUITOQUIOSQUE: "PSBQF122",
+  };
+
+  return apiMap[compact] ?? (fallbackIsCircuito ? "PSBQF122" : "PSB01003");
+}
+
+/**
   Retorna as informações da unidade com suporte a multi-unidade no mesmo CNPJ.
-  Playground (LUC L-142 / PSB-1316) vs Parque Circuito (LUC L-143 / PSB-1346).
+  Playground (LUC PSB01003 / PSB-1316) vs Parque Circuito (LUC PSBQF122 / PSB-1346).
  */
 export function getShoppingUnitMetadata(ctx: AppContext, unitId: string): ShoppingUnitInfo {
   const unit = getUnit(ctx.db, unitId);
@@ -25,10 +60,11 @@ export function getShoppingUnitMetadata(ctx: AppContext, unitId: string): Shoppi
   const razaoSocial = getAppSetting(ctx.db, unitId, "razaoSocial") || "FaçaAmigos Entretenimento Infantil LTDA";
   
   // Distinção de LUC e Código de Lojista para negócios distintos no mesmo Shopping (mesmo CNPJ, contratos diferentes)
-  const defaultLuc = isCircuito ? "L-143" : "L-142";
+  const defaultLuc = isCircuito ? "PSBQF122" : "PSB01003";
   const defaultCodigo = isCircuito ? "PSB-1346" : "PSB-1316";
 
-  const luc = getAppSetting(ctx.db, unitId, "luc") || defaultLuc;
+  const lucSetting = getAppSetting(ctx.db, unitId, "luc") || getAppSetting(ctx.db, unitId, "LUC");
+  const luc = resolveShoppingUnitLUC(lucSetting ?? defaultLuc, isCircuito);
   const codigoLojista = getAppSetting(ctx.db, unitId, "codigo_lojista") || defaultCodigo;
 
   return {

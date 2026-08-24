@@ -35,7 +35,7 @@ function isCircuito(unit: UnitRow): boolean {
 }
 
 // LUC e Código de Lojista ainda não têm coluna própria em fa_kiosk_units;
-// mesmos valores fixos por unidade que o backend local antigo usava.
+// as LUCs oficiais da operação seguem os identificadores internos do shopping.
 export function getShoppingUnitMetadata(unit: UnitRow): ShoppingUnitInfo {
   const circuito = isCircuito(unit);
   return {
@@ -43,7 +43,7 @@ export function getShoppingUnitMetadata(unit: UnitRow): ShoppingUnitInfo {
     nome: unit.name || (circuito ? "FaçaAmigos (Parque Shopping - Circuito)" : "FaçaAmigos (Parque Shopping - Playground)"),
     cnpj: unit.cnpj || "66318630000117",
     razaoSocial: unit.razao_social || "FAÇA AMIGOS BRINQUEDOTECA LTDA",
-    luc: circuito ? "L-143" : "L-142",
+    luc: circuito ? "PSBQF122" : "PSB01003",
     codigoLojista: circuito ? "PSB-1346" : "PSB-1316",
     timezone: unit.timezone || "America/Belem",
   };
