@@ -15,6 +15,7 @@
     "typecheck": "turbo run typecheck",
     "icons": "node scripts/generate-icons.mjs",
     "dist:kiosk": "turbo run build --filter=@facaamigos/kiosk... --filter=@facaamigos/kiosk-ui... && pnpm icons && pnpm --filter @facaamigos/kiosk dist",
+    "dist:kiosk:store": "turbo run build --filter=@facaamigos/kiosk... --filter=@facaamigos/kiosk-ui... && pnpm icons && pnpm --filter @facaamigos/kiosk dist:store",
     "release:kiosk": "node scripts/release-kiosk.mjs",
     "release:all": "node scripts/release-all.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",

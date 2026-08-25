@@ -32,8 +32,32 @@ win:
   target:
     - target: nsis
       arch: [x64]
+    # appx (MSIX): pacote para a Microsoft Store. Só builda em Windows
+    # (electron-builder usa makeappx.exe/makepri.exe, que não existem em
+    # Linux/Mac) — use `pnpm dist:kiosk:store` numa máquina/CI Windows.
+    - target: appx
+      arch: [x64]
   icon: build/icon.ico
   artifactName: FacaAmigos-Setup-${version}.${ext}
+# Identidade do pacote MSIX. identityName/publisher têm que ser IDÊNTICOS
+# aos valores reservados no Partner Center (Página do produto > Identidade
+# do app) — sem isso o `pnpm dist:kiosk:store` builda um pacote que a Store
+# rejeita na submissão. Ver passo a passo no fim deste arquivo/README.
+appx:
+  identityName: SUBSTITUIR_PELO_IDENTITY_NAME_DO_PARTNER_CENTER
+  publisher: CN=SUBSTITUIR_PELO_PUBLISHER_ID_DO_PARTNER_CENTER
+  publisherDisplayName: SUBSTITUIR_PELO_NOME_DA_PUBLICADORA
+  applicationId: FacaAmigosKiosk
+  displayName: FaçaAmigos
+  backgroundColor: "#F0196B"
+  languages:
+    - pt-br
+  showNameOnTiles: true
+  # Sem isto, app.setLoginItemSettings({ openAtLogin: true }) (ver main.ts)
+  # não funciona dentro de um pacote MSIX — apps Store não podem se
+  # registrar direto no Run do registro; precisam da StartupTask
+  # declarada no appxmanifest. Esta flag adiciona a extensão automaticamente.
+  addAutoLaunchExtension: true
 nsis:
   oneClick: true
   # perMachine + elevação: necessário para o installer.nsh abrir a porta

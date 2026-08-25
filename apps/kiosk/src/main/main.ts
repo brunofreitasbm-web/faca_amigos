@@ -174,7 +174,13 @@ if (isPrimaryInstance) {
     // em dev isso registraria o binário do node_modules).
     if (app.isPackaged) {
       app.setLoginItemSettings({ openAtLogin: true });
-      initAutoUpdater();
+      // Pacote MSIX (Microsoft Store): a Store proíbe apps de baixar e
+      // instalar seus próprios binários por fora dela — quem atualiza é a
+      // própria Store. `process.windowsStore` só é true quando o app roda
+      // empacotado como appx/MSIX (ver electron-builder.yml).
+      if (!process.windowsStore) {
+        initAutoUpdater();
+      }
     }
 
     // Sem isso, qualquer falha em startLocalServer/createWindow (porta
@@ -275,7 +281,7 @@ if (isPrimaryInstance) {
     // reabria ainda na versão antiga. quitAndInstall(true, true) fecha,
     // instala em silêncio e é o PRÓPRIO instalador que reabre o app já
     // atualizado, eliminando a corrida.
-    if (app.isPackaged) {
+    if (app.isPackaged && !process.windowsStore) {
       void checkForUpdatesAndWait().finally(() => {
         if (getUpdateStatus().status === "downloaded") {
           applyUpdate();
