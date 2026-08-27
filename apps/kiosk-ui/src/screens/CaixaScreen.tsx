@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input, HelpText, Modal } from "@facaamigos/ui";
+import { Button, Card, Input, HelpText, Modal, Tag } from "@facaamigos/ui";
+import { formatCpf, isValidCpf } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
 import type { CashMovement, RevenueByMethod, Shift, ShiftSale, FiscalDoc } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -37,6 +38,9 @@ export function CaixaScreen() {
   const [nfseLoadingMap, setNfseLoadingMap] = useState<Record<string, boolean>>({});
   const [whatsappPhoneModal, setWhatsappPhoneModal] = useState<{ sale: ShiftSale; doc: FiscalDoc } | null>(null);
   const [customWhatsappPhone, setCustomWhatsappPhone] = useState("");
+  const [nfseErrorModal, setNfseErrorModal] = useState<{ sale: ShiftSale; doc: FiscalDoc } | null>(null);
+  const [cpfInputModal, setCpfInputModal] = useState("");
+  const [cpfUpdating, setCpfUpdating] = useState(false);
 
   async function loadNfseDocsForSales(salesList: ShiftSale[]) {
     const sessionSales = salesList.filter((s) => s.kind === "SESSAO");
@@ -701,9 +705,26 @@ export function CaixaScreen() {
                         if (doc && ["BLOQUEADO", "REJEITADO", "DENEGADO", "CANCELADO"].includes(doc.status)) {
                           return (
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-                              <span style={{ fontSize: "11px", color: "var(--error-color, #ef4444)", fontWeight: "bold" }}>
-                                ❌ {doc.status}
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNfseErrorModal({ sale: s, doc });
+                                  setCpfInputModal(s.guardianCpf ? formatCpf(s.guardianCpf) : "");
+                                }}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  padding: 0,
+                                  fontSize: "11px",
+                                  color: "var(--error-color, #ef4444)",
+                                  fontWeight: "bold",
+                                  textDecoration: "underline",
+                                }}
+                                title="Clique para ver o motivo detalhado do erro"
+                              >
+                                ❌ {doc.status} (Motivo)
+                              </button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -769,6 +790,88 @@ export function CaixaScreen() {
                 onClick={() => handleSendNfseWhatsapp(whatsappPhoneModal.sale, whatsappPhoneModal.doc, customWhatsappPhone)}
               >
                 📱 Abrir WhatsApp
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {nfseErrorModal && (
+        <Modal
+          title={`❌ Detalhes da Falha na NFS-e ${nfseErrorModal.sale.orderCode ? `(#${nfseErrorModal.sale.orderCode})` : ""}`}
+          onClose={() => setNfseErrorModal(null)}
+          maxWidth="520px"
+        >
+          <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div style={{ background: "#FEE2E2", color: "#991B1B", padding: "12px 14px", borderRadius: "10px", fontSize: "13px" }}>
+              <strong>Motivo do bloqueio / rejeição:</strong>
+              <p style={{ margin: "4px 0 0 0", fontWeight: 500, lineHeight: "1.4" }}>
+                {nfseErrorModal.doc.last_error || nfseErrorModal.doc.reject_message || "Documento fiscal bloqueado sem motivo especificado."}
+              </p>
+            </div>
+
+            <div style={{ background: "var(--surface-sunken)", padding: "12px 14px", borderRadius: "10px", fontSize: "13px" }}>
+              <div><strong>Responsável:</strong> {nfseErrorModal.sale.guardianName ?? "Não especificado"}</div>
+              <div><strong>CPF Atual no Cadastro:</strong> {nfseErrorModal.sale.guardianCpf ? formatCpf(nfseErrorModal.sale.guardianCpf) : "⚠️ Sem CPF cadastrado"}</div>
+            </div>
+
+            {nfseErrorModal.sale.guardianId && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-card)", border: "1px solid var(--border-subtle)", padding: "14px", borderRadius: "12px" }}>
+                <strong style={{ fontSize: "13px" }}>✏️ Cadastrar/Atualizar CPF do Responsável:</strong>
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  Digite o CPF correto abaixo para atualizar o cadastro e tentar a emissão novamente:
+                </span>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <Input
+                    placeholder="000.000.000-00"
+                    inputMode="numeric"
+                    value={cpfInputModal}
+                    onChange={(e) => setCpfInputModal(formatCpf(e.target.value))}
+                    style={{ flex: 1, minWidth: "180px" }}
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={cpfUpdating}
+                    disabled={cpfUpdating || !isValidCpf(cpfInputModal)}
+                    onClick={async () => {
+                      if (!nfseErrorModal.sale.guardianId) return;
+                      setCpfUpdating(true);
+                      try {
+                        await Api.updateGuardianCpf(nfseErrorModal.sale.guardianId, cpfInputModal);
+                        const updatedSale = { ...nfseErrorModal.sale, guardianCpf: cpfInputModal };
+                        setNfseErrorModal(null);
+                        await handleEmitNfse(updatedSale);
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : "Erro ao atualizar CPF";
+                        alert(msg);
+                      } finally {
+                        setCpfUpdating(false);
+                      }
+                    }}
+                  >
+                    💾 Salvar CPF e Reemitir
+                  </Button>
+                </div>
+                {cpfInputModal.length === 14 && !isValidCpf(cpfInputModal) && (
+                  <Tag color="var(--color-error)">CPF inválido</Tag>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+              <Button variant="ghost" onClick={() => setNfseErrorModal(null)}>
+                Fechar
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const sale = nfseErrorModal.sale;
+                  setNfseErrorModal(null);
+                  handleEmitNfse(sale);
+                }}
+              >
+                🔄 Tentar Emissão Novamente
               </Button>
             </div>
           </div>

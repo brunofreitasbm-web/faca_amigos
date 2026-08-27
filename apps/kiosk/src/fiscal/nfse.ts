@@ -140,7 +140,8 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
     .eq("id", session.guardian_id)
     .maybeSingle<{ cpf: string | null; full_name: string | null }>();
   if (guardianError || !guardian?.cpf) {
-    await bloquear(supabase, doc.id, "Responsável sem CPF cadastrado — obrigatório como tomador da DPS.");
+    const nameStr = guardian?.full_name ? `'${guardian.full_name}' ` : "";
+    await bloquear(supabase, doc.id, `Responsável ${nameStr}sem CPF cadastrado — obrigatório como tomador da DPS.`);
     return;
   }
 

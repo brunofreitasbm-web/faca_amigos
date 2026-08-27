@@ -78,7 +78,7 @@ export interface JobApplication {
   desired_area: string;
   opportunity_type: "ESTAGIO" | "REMUNERADO" | "BOLSA";
   resume_path: string;
-  status: "NOVO" | "EM_ANALISE" | "CONTATADO" | "ARQUIVADO";
+  status: "NOVO" | "LIDO" | "ESPERA" | "ENTREVISTA" | "EM_ANALISE" | "CONTATADO" | "ARQUIVADO";
   created_at_ms: number;
 }
 
@@ -770,8 +770,10 @@ export interface ShiftSale {
   amountCents: number;
   discountCents: number;
   childNames: string;
+  guardianId?: string | null;
   guardianName: string | null;
   guardianPhone?: string | null;
+  guardianCpf?: string | null;
   productsSummary: string | null;
 }
 
@@ -1200,18 +1202,24 @@ export const Api = {
         .from("fa_kiosk_units")
         .select("id, kind, name, business_day_cutoff_hour, address, phone, cnpj, timezone, latitude, longitude, geofence_radius_m"),
     ),
-  employees: () =>
-    unwrap<Employee[]>(
+  employees: async (unitId?: string): Promise<Employee[]> => {
+    const employees = await unwrap<Employee[]>(
       supabase()
         .from("fa_kiosk_employees")
-        // face_descriptor de propósito FORA desta lista: é a lista ampla usada
-        // pra montar o seletor de nomes no quiosque, e o vetor biométrico não
-        // deve viajar pra tela de ninguém além do próprio dono — ver
-        // Api.myFaceDescriptor(), que busca só o registro do chamador.
-        .select("id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active, face_enrolled_photo_path")
+        .select(
+          "id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active, face_enrolled_photo_path",
+        )
         .eq("active", true)
         .order("full_name"),
-    ),
+    );
+    if (!unitId) return employees;
+    const links = await unwrap<{ employee_id: string }[]>(
+      supabase().from("fa_kiosk_employee_units").select("employee_id").eq("unit_id", unitId),
+    );
+    if (links.length === 0) return employees;
+    const linkedEmployeeIds = new Set(links.map((l) => l.employee_id));
+    return employees.filter((e) => linkedEmployeeIds.has(e.id));
+  },
   /** Descriptor facial do PRÓPRIO colaborador autenticado, pra comparar no cliente antes de bater o ponto. */
   myFaceDescriptor: async (employeeId: string): Promise<number[] | null> => {
     const row = await unwrap<{ face_descriptor: number[] | null }>(
@@ -1712,6 +1720,13 @@ export const Api = {
   /** Registra que a NFS-e foi enviada ao Responsável por WhatsApp (idempotente). */
   markNfseSent: (fiscalDocId: string) =>
     unwrap<{ fiscalDocId: string; sentAtMs: number }>(supabase().rpc("fa_fiscal_mark_nfse_sent", { p_fiscal_doc_id: fiscalDocId })),
+  /** Atualiza o CPF do responsável no cadastro (usado no Caixa para destravar notas com CPF ausente). */
+  updateGuardianCpf: async (guardianId: string, cpf: string): Promise<void> => {
+    const cleanCpf = cpf.replace(/\D/g, "");
+    if (cleanCpf.length !== 11) throw new Error("CPF deve conter 11 dígitos numéricos.");
+    const { error } = await supabase().from("fa_kiosk_guardians").update({ cpf: cleanCpf }).eq("id", guardianId);
+    if (error) throw new Error(`Erro ao atualizar CPF: ${error.message}`);
+  },
   pdvOrder: (body: {
     unitId: string;
     employeeId: string;
@@ -1913,7 +1928,7 @@ export const Api = {
     const guardians =
       guardianIds.length === 0
         ? []
-        : await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164").in("id", guardianIds));
+        : await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164, cpf").in("id", guardianIds));
 
     const sessionById = new Map(sessions.map((s) => [s.id as string, s]));
     const guardianById = new Map(guardians.map((g) => [g.id as string, g]));
@@ -1935,7 +1950,8 @@ export const Api = {
         const uniqueSessionIds = [...new Set(orderItems.map((i) => i.session_id as string | null).filter((id): id is string => Boolean(id)))];
         const sessionsForOrder = uniqueSessionIds.map((id) => sessionById.get(id)).filter((s): s is Record<string, unknown> => Boolean(s));
         const childNames = sessionsForOrder.map((s) => s.child_name_snapshot as string).join(", ");
-        const firstGuardian = sessionsForOrder[0] ? guardianById.get(sessionsForOrder[0].guardian_id as string) : undefined;
+        const firstSession = sessionsForOrder[0];
+        const firstGuardian = firstSession ? guardianById.get(firstSession.guardian_id as string) : undefined;
         const discountCents = sessionsForOrder.reduce((sum, s) => sum + ((s.coupon_discount_cents as number) ?? 0), 0);
         return {
           orderId,
@@ -1946,8 +1962,10 @@ export const Api = {
           amountCents: order.total_cents as number,
           discountCents,
           childNames: childNames || "—",
+          guardianId: (firstGuardian?.id as string) ?? (firstSession?.guardian_id as string) ?? null,
           guardianName: (firstGuardian?.full_name as string) ?? null,
           guardianPhone: (firstGuardian?.phone_e164 as string | undefined) ?? null,
+          guardianCpf: (firstGuardian?.cpf as string | undefined) ?? null,
           productsSummary: null,
         };
       }
@@ -2873,24 +2891,44 @@ export const Api = {
       return { id: a.id as string, name: a.name as string, emoji: a.emoji as string, color: a.color as string, ...usage };
     }) as AssetUsage[];
   },
-  reportPonto: async (fromMs: number, toMs: number) => {
-    const rows = await unwrap<Record<string, unknown>[]>(
-      supabase()
-        .from("fa_kiosk_ponto_records")
-        .select("employee_id, kind, at_ms, nsr, fa_kiosk_employees!employee_id(full_name, weekly_hours_contracted)")
-        .gte("at_ms", fromMs)
-        .lte("at_ms", toMs)
-        .order("at_ms", { ascending: false }),
-    );
-    return rows.map((r) => ({
-      employee_id: r.employee_id as string,
-      full_name: (r.fa_kiosk_employees as unknown as { full_name: string; weekly_hours_contracted: number | null } | null)?.full_name ?? "—",
-      weekly_hours_contracted:
-        (r.fa_kiosk_employees as unknown as { full_name: string; weekly_hours_contracted: number | null } | null)?.weekly_hours_contracted ?? null,
-      kind: r.kind as string,
-      at_ms: r.at_ms as number,
-      nsr: r.nsr as number,
-    })) as FolhaPontoRow[];
+  reportPonto: async (fromMs: number, toMs: number, unitId?: string | null) => {
+    let query = supabase()
+      .from("fa_kiosk_ponto_records")
+      .select("employee_id, unit_id, kind, at_ms, nsr")
+      .gte("at_ms", fromMs)
+      .lte("at_ms", toMs)
+      .order("at_ms", { ascending: false });
+
+    if (unitId) {
+      query = query.eq("unit_id", unitId);
+    }
+
+    const pontoRows = await unwrap<Record<string, unknown>[]>(query);
+    if (pontoRows.length === 0) return [] as FolhaPontoRow[];
+
+    const employeeIds = [...new Set(pontoRows.map((r) => r.employee_id as string).filter(Boolean))];
+    const employees = employeeIds.length === 0
+      ? []
+      : await unwrap<Record<string, unknown>[]>(
+          supabase()
+            .from("fa_kiosk_employees")
+            .select("id, full_name, weekly_hours_contracted")
+            .in("id", employeeIds),
+        );
+
+    const empMap = new Map(employees.map((e) => [e.id as string, e]));
+
+    return pontoRows.map((r) => {
+      const emp = empMap.get(r.employee_id as string);
+      return {
+        employee_id: r.employee_id as string,
+        full_name: (emp?.full_name as string) ?? "Colaborador",
+        weekly_hours_contracted: (emp?.weekly_hours_contracted as number | null) ?? null,
+        kind: r.kind as string,
+        at_ms: r.at_ms as number,
+        nsr: r.nsr as number,
+      } satisfies FolhaPontoRow;
+    });
   },
   reportSessions: async (unitId: string | null, from: string, to: string) => {
     let sessionsQuery = supabase()

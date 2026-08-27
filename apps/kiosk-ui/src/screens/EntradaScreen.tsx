@@ -786,36 +786,67 @@ export function EntradaScreen({
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>1. Quem é a criança</h2>
 
         {matchedChild ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              padding: "12px 14px",
-              border: "2px solid var(--color-teal)",
-              borderRadius: "14px",
-              background: "rgba(29, 155, 132, 0.06)",
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ flex: 1, minWidth: "200px" }}>
-              <strong style={{ fontSize: "17px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                {childName}
-                {matchedChild?.is_vip && (
-                  <Badge variant="vip" title={`${matchedChild.visits_in_window} visitas nos últimos 30 dias`}>
-                    ★ VIP
-                  </Badge>
-                )}
-              </strong>
-              <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-                {guardianName}
-                {phone ? ` · ${phone}` : ""}
-                {cpf ? ` · ${cpf}` : ""}
-              </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "var(--surface-sunken)",
+                padding: "14px 18px",
+                borderRadius: "14px",
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <strong style={{ fontSize: "17px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  {childName}
+                  {matchedChild?.is_vip && (
+                    <Badge variant="vip" title={`${matchedChild.visits_in_window} visitas nos últimos 30 dias`}>
+                      ★ VIP
+                    </Badge>
+                  )}
+                </strong>
+                <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                  {guardianName}
+                  {phone ? ` · ${phone}` : ""}
+                  {cpf ? ` · ${cpf}` : " · ⚠️ Sem CPF registrado"}
+                </span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => resetForNextChild(false)} title="Buscar outra criança">
+                Trocar
+              </Button>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => resetForNextChild(false)} title="Buscar outra criança">
-              Trocar
-            </Button>
+
+            {!isValidCpf(cpf) && (
+              <div
+                style={{
+                  padding: "12px 16px",
+                  background: "#FEF3C7",
+                  color: "#92400E",
+                  borderRadius: "12px",
+                  border: "1px solid #F59E0B",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}
+              >
+                <strong style={{ fontSize: "13px" }}>⚠️ CPF do Responsável Obrigatório (NFS-e):</strong>
+                <span style={{ fontSize: "12px" }}>
+                  O cadastro de <strong>{guardianName || "Responsável"}</strong> está sem CPF. Informe o CPF abaixo para continuar com o check-in:
+                </span>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <Input
+                    placeholder="000.000.000-00"
+                    inputMode="numeric"
+                    value={cpf}
+                    onChange={(e) => setCpf(formatCpf(e.target.value))}
+                    style={{ maxWidth: "260px" }}
+                  />
+                  {cpf.length === 14 && !isValidCpf(cpf) && <Tag color="var(--color-error)">CPF inválido</Tag>}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ position: "relative" }}>

@@ -12,6 +12,9 @@ const OPPORTUNITY_LABEL: Record<JobApplication["opportunity_type"], string> = {
 
 const STATUS_LABEL: Record<JobApplication["status"], string> = {
   NOVO: "Novo",
+  LIDO: "Lido",
+  ESPERA: "Em espera",
+  ENTREVISTA: "Agendar entrevista",
   EM_ANALISE: "Em análise",
   CONTATADO: "Contatado",
   ARQUIVADO: "Arquivado",
@@ -19,25 +22,28 @@ const STATUS_LABEL: Record<JobApplication["status"], string> = {
 
 const STATUS_BADGE_VARIANT: Record<JobApplication["status"], "teal" | "amber" | "neutral"> = {
   NOVO: "teal",
+  LIDO: "teal",
+  ESPERA: "amber",
+  ENTREVISTA: "teal",
   EM_ANALISE: "amber",
   CONTATADO: "teal",
   ARQUIVADO: "neutral",
 };
 
-const STATUS_OPTIONS: JobApplication["status"][] = ["NOVO", "EM_ANALISE", "CONTATADO", "ARQUIVADO"];
+const STATUS_OPTIONS: JobApplication["status"][] = [
+  "NOVO",
+  "LIDO",
+  "ESPERA",
+  "ENTREVISTA",
+  "EM_ANALISE",
+  "CONTATADO",
+  "ARQUIVADO",
+];
 
 /**
  * Banco de Talentos — candidaturas recebidas pelo formulário "Venha Fazer
  * Parte do Nosso Time" da landing page (Edge Function
  * job-application-webhook), triadas aqui pelo RH (Owner).
- *
- * Mora no Gerencial (não mais num módulo por unidade) porque a candidatura
- * não pertence a nenhuma unidade específica — é cadastro único, como
- * Colaboradores e Folha de Pagamento ao lado.
- *
- * O currículo fica num bucket privado (`curriculos`): o link de download é
- * gerado sob demanda no clique via signed URL de 60s (Api.jobApplicationResumeUrl),
- * nunca guardado em cache — o mesmo motivo do bucket não ter getPublicUrl.
  */
 export function BancoTalentosTab() {
   const toast = useToast();
@@ -83,7 +89,7 @@ export function BancoTalentosTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--text-secondary)" }}>Status:</span>
+          <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--text-secondary)" }}>Filtrar por Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as JobApplication["status"] | "TODOS")}
@@ -97,7 +103,7 @@ export function BancoTalentosTab() {
               fontWeight: "bold",
             }}
           >
-            <option value="TODOS">Todos</option>
+            <option value="TODOS">Todos os Status</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
                 {STATUS_LABEL[s]}
@@ -115,7 +121,7 @@ export function BancoTalentosTab() {
         </Card>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
         {visibleItems.map((item) => (
           <Card key={item.id} style={{ padding: "20px", borderRadius: "16px", border: "1px solid var(--border-subtle)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
@@ -133,6 +139,34 @@ export function BancoTalentosTab() {
             {item.course && (
               <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>🎓 {item.course}</p>
             )}
+
+            {/* Checkboxes de Status Rápido */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", padding: "10px 12px", background: "var(--surface-sunken)", borderRadius: "10px", margin: "10px 0" }}>
+              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={item.status === "LIDO"}
+                  onChange={() => handleStatusChange(item, item.status === "LIDO" ? "NOVO" : "LIDO")}
+                />
+                Lido
+              </label>
+              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={item.status === "ESPERA"}
+                  onChange={() => handleStatusChange(item, item.status === "ESPERA" ? "NOVO" : "ESPERA")}
+                />
+                Espera
+              </label>
+              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={item.status === "ENTREVISTA"}
+                  onChange={() => handleStatusChange(item, item.status === "ENTREVISTA" ? "NOVO" : "ENTREVISTA")}
+                />
+                Agendar entrevista
+              </label>
+            </div>
 
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "12px" }}>
               <Button variant="secondary" size="sm" onClick={() => handleOpenResume(item)}>

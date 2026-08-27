@@ -55,8 +55,8 @@ export function PontoScreen() {
   const geofenceRadiusM = unit?.geofence_radius_m ?? null;
 
   useEffect(() => {
-    Api.employees().then(setEmployees);
-  }, []);
+    Api.employees(unit?.id).then(setEmployees);
+  }, [unit?.id]);
 
   useEffect(() => {
     if (!authedAs) return;

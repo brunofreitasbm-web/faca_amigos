@@ -772,13 +772,22 @@ function formatDurationMs(ms: number): string {
 }
 
 function PontoTab({ from, to }: { from: string; to: string }) {
+  const { unit } = useAppState();
   const [rows, setRows] = useState<FolhaPontoRow[]>([]);
 
   useEffect(() => {
-    const fromMs = new Date(from).getTime();
-    const toMs = new Date(to).getTime() + 86_400_000;
-    Api.reportPonto(fromMs, toMs).then(setRows);
-  }, [from, to]);
+    const fParts = from.split("-").map((v) => Number(v) || 0);
+    const tParts = to.split("-").map((v) => Number(v) || 0);
+    const fY = fParts[0] || 2026;
+    const fM = fParts[1] || 1;
+    const fD = fParts[2] || 1;
+    const tY = tParts[0] || 2026;
+    const tM = tParts[1] || 1;
+    const tD = tParts[2] || 1;
+    const fromMs = new Date(fY, fM - 1, fD, 0, 0, 0, 0).getTime();
+    const toMs = new Date(tY, tM - 1, tD, 23, 59, 59, 999).getTime();
+    Api.reportPonto(fromMs, toMs, unit?.id).then(setRows).catch(() => setRows([]));
+  }, [from, to, unit?.id]);
 
   const dailySummaries = summarizeDailyHours(rows);
 
