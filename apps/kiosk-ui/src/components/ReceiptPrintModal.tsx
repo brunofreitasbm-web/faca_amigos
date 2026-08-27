@@ -49,8 +49,8 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
           <title>Cupom Não Fiscal — FaçaAmigos</title>
           <style>
             @page { size: 80mm auto; margin: 0; }
-            html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
-            pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
+            html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; text-align: center; }
+            pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; text-align: center; }
           </style>
         </head>
         <body>

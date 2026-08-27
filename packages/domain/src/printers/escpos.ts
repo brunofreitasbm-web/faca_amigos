@@ -57,6 +57,62 @@ export interface ReceiptPrintPayload {
 
 const WIDTH = 42;
 
+/**
+ * Codifica uma string em bytes da tabela de caracteres CP860 (Português),
+ * suportada nativamente por impressoras térmicas ESC/POS (Epson, Elgin, Bematech, Apptech, etc.).
+ * Converte acentos e cedilhas para bytes single-byte (0x80-0xFF) em vez de UTF-8 (0xC3 0xXX),
+ * evitando a corrupção de caracteres (ex: FA|Ç A, CH|digo, sa|ida).
+ */
+export function encodeCp860(str: string): number[] {
+  const cp860Map: Record<string, number> = {
+    "Ç": 0x80,
+    "ü": 0x81,
+    "é": 0x82,
+    "â": 0x83,
+    "ã": 0x84,
+    "à": 0x85,
+    "ç": 0x87,
+    "ê": 0x88,
+    "ô": 0x93,
+    "õ": 0x9d,
+    "Á": 0x8f,
+    "Ã": 0x8e,
+    "É": 0x90,
+    "Ê": 0x90,
+    "Í": 0x92,
+    "Ó": 0x97,
+    "Õ": 0x9e,
+    "Ú": 0x99,
+    "á": 0xa0,
+    "í": 0xa1,
+    "ó": 0xa2,
+    "ú": 0xa3,
+    "ñ": 0xa4,
+    "Ñ": 0xa5,
+    "À": 0x85,
+    "Â": 0x83,
+    "Ô": 0x93,
+  };
+
+  const bytes: number[] = [];
+  // Substitui caractere de ponto central (·) por traço (-) para evitar o glifo ™ na impressora
+  const sanitized = str.replace(/·/g, "-");
+
+  for (let i = 0; i < sanitized.length; i++) {
+    const ch = sanitized[i]!;
+    const code = ch.charCodeAt(0);
+    if (code <= 0x7f) {
+      bytes.push(code);
+    } else if (cp860Map[ch] !== undefined) {
+      bytes.push(cp860Map[ch]!);
+    } else {
+      const norm = ch.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      bytes.push(norm.charCodeAt(0) <= 0x7f ? norm.charCodeAt(0) : 0x3f);
+    }
+  }
+  return bytes;
+}
+
 function centerText(str: string, width = WIDTH): string {
   if (str.length >= width) return str.slice(0, width);
   const left = Math.floor((width - str.length) / 2);
@@ -81,7 +137,7 @@ function bytesToHex(bytes: number[]): string {
 }
 
 function textToHex(str: string): string {
-  return bytesToHex(Array.from(new TextEncoder().encode(str)));
+  return bytesToHex(encodeCp860(str));
 }
 
 /**
@@ -155,16 +211,15 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   lines.push(centerText(payload.unitName.toUpperCase()));
   lines.push(divider);
   lines.push(centerText(`*** ${payload.title.toUpperCase()} ***`));
-  if (payload.code) lines.push(`Código: ${payload.code}`);
-  lines.push(payload.employeeName ? `${dateTime} · ${payload.employeeName}` : dateTime);
+  if (payload.code) lines.push(centerText(`Código: ${payload.code}`));
+  lines.push(centerText(payload.employeeName ? `${dateTime} - ${payload.employeeName}` : dateTime));
   lines.push(subDivider);
 
   if (isGuardReceipt) {
-    // Compacto de propósito: o código de saída precisa ser achado rápido,
-    // mas sem página inteira de espaço em branco ao redor.
-    lines.push(`Código de saída: ${formatAccessCode(payload.accessCode)}`);
-    if (payload.exitPin) lines.push(`PIN rápido (Saída): ${payload.exitPin}`);
-    lines.push("Apresente este recibo na saída");
+    // Compacto e centralizado no papel de 80mm
+    lines.push(centerText(`Código de saída: ${formatAccessCode(payload.accessCode)}`));
+    if (payload.exitPin) lines.push(centerText(`PIN rápido (Saída): ${payload.exitPin}`));
+    lines.push(centerText("Apresente este recibo na saída"));
     lines.push(subDivider);
   }
 
@@ -184,27 +239,24 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
 
   if (payload.customerInfo) {
     const c = payload.customerInfo;
-    const nameLine = [c.childName, c.guardianName ? `Resp: ${c.guardianName}` : null].filter(Boolean).join(" · ");
-    // wrap() em vez de push direto: nome+responsável ou nascimento+CPF podem
-    // passar dos 42 caracteres da bobina — aqui a linha quebra em duas em vez
-    // de estourar a largura física do papel.
-    for (const line of wrap(nameLine)) lines.push(line);
+    const nameLine = [c.childName, c.guardianName ? `Resp: ${c.guardianName}` : null].filter(Boolean).join(" - ");
+    for (const line of wrap(nameLine)) lines.push(centerText(line));
     const idLine = [c.childBirthDate ? `Nascimento: ${c.childBirthDate}` : null, c.guardianCpf ? `CPF: ${c.guardianCpf}` : null]
       .filter(Boolean)
-      .join(" · ");
-    for (const line of wrap(idLine)) lines.push(line);
+      .join(" - ");
+    for (const line of wrap(idLine)) lines.push(centerText(line));
     lines.push(subDivider);
   }
 
   if (isGuardReceipt) {
-    if (payload.planName) lines.push(`Plano: ${payload.planName}`);
-    if (payload.entryTime) lines.push(`Entrada: ${payload.entryTime}`);
-    if (payload.expectedExitTime) lines.push(`Saída prevista: ${payload.expectedExitTime}`);
+    if (payload.planName) lines.push(centerText(`Plano: ${payload.planName}`));
+    if (payload.entryTime) lines.push(centerText(`Entrada: ${payload.entryTime}`));
+    if (payload.expectedExitTime) lines.push(centerText(`Saída prevista: ${payload.expectedExitTime}`));
     lines.push(subDivider);
 
     if (payload.careNotes) {
-      lines.push("CUIDADOS INFORMADOS PELO RESPONSÁVEL:");
-      for (const line of wrap(payload.careNotes)) lines.push(line);
+      lines.push(centerText("CUIDADOS INFORMADOS PELO RESPONSÁVEL:"));
+      for (const line of wrap(payload.careNotes)) lines.push(centerText(line));
       lines.push(subDivider);
     }
   }
@@ -229,10 +281,9 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
       : null;
 
   if (isGuardReceipt) {
-    // No check-in nada foi cobrado ainda: o valor do plano é uma previsão, e
-    // imprimir "TOTAL" aqui já fez pai achar que tinha pago na entrada.
+    // No check-in nada foi cobrado ainda: o valor do plano é uma previsão
     lines.push(moneyLine("PREVISTO (pagar na saída):", payload.totalCents));
-    lines.push("Tempo excedente é cobrado à parte.");
+    lines.push(centerText("Tempo excedente é cobrado à parte."));
   } else if (singlePayment) {
     lines.push(moneyLine(`TOTAL (${singlePayment.method}):`, payload.totalCents));
   } else {
@@ -241,10 +292,10 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
 
   if (!singlePayment && payload.payments && payload.payments.length > 0) {
     lines.push(subDivider);
-    lines.push("PAGAMENTO:");
+    lines.push(centerText("PAGAMENTO:"));
     for (const p of payload.payments) {
       const pVal = (p.amountCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      lines.push(` - ${p.method.padEnd(16, " ")} R$ ${pVal.padStart(11, " ")}`);
+      lines.push(centerText(`${p.method}: R$ ${pVal}`));
     }
   }
 
@@ -253,7 +304,7 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
     lines.push(centerText("RETIRADA"));
     lines.push(subDivider);
     for (const line of wrap("Mediante leitura do QR (deste recibo ou da pulseira) ou documento com foto do responsável cadastrado.")) {
-      lines.push(line);
+      lines.push(centerText(line));
     }
   }
 
@@ -282,14 +333,14 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
 
   const text = lines.join("\n");
 
-  // Bytes de inicialização ESC/POS (ESC @), alinhamento (ESC a 1), avanço de 3 linhas (ESC d 3) e corte automático (GS V 66 0)
-  const hexHeader = "1b401b6101"; // ESC @, ESC a 1
-  const hexFeed = "1b6403"; // ESC d 3 (avança 3 linhas de papel antes da guilhotina)
-  const hexCut = "1d564200"; // GS V 66 0 (corte automático de papel)
+  // Bytes de inicialização ESC/POS (ESC @), seleção CP860 (ESC t 3), alinhamento (ESC a 1), avanço de 3 linhas (ESC d 3) e corte automático (GS V 66 0)
+  const hexHeader = "1b401b74031b6101"; // ESC @, ESC t 3 (CP860 Português), ESC a 1 (Centralizado)
+  const hexFeed = "1b6403"; // ESC d 3
+  const hexCut = "1d564200"; // GS V 66 0
 
   // Quando há QR de acompanhamento, os bytes do comando de QR entram no meio
-  // do stream, no lugar exato onde a URL apareceria como texto — o resto do
-  // recibo (regras de retirada, itens, rodapé) segue normal depois dele.
+  // do stream ESC/POS — text/lines seguem só como transcrição legível
+  // (preview na tela e fallback HTML), o QR em si é comando de impressora.
   let hexBody: string;
   if (qrInsertAt >= 0 && payload.trackingUrl) {
     const before = lines.slice(0, qrInsertAt).join("\n") + "\n";
@@ -320,19 +371,19 @@ export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { tex
   lines.push(centerText("*** TERMO DE RESPONSABILIDADE ***"));
   lines.push(centerText("(VIA RETIDA PELA UNIDADE)"));
   lines.push(subDivider);
-  lines.push(`Data/Hora: ${dateTime}`);
-  if (payload.accessCode) lines.push(`Código de Saída: ${formatAccessCode(payload.accessCode)}`);
+  lines.push(centerText(`Data/Hora: ${dateTime}`));
+  if (payload.accessCode) lines.push(centerText(`Código de Saída: ${formatAccessCode(payload.accessCode)}`));
   if (payload.customerInfo) {
     const c = payload.customerInfo;
-    if (c.childName) lines.push(`Criança: ${c.childName}`);
-    if (c.guardianName) lines.push(`Responsável: ${c.guardianName}`);
-    if (c.guardianCpf) lines.push(`CPF Responsável: ${c.guardianCpf}`);
-    if (c.phone) lines.push(`Telefone: ${c.phone}`);
+    if (c.childName) lines.push(centerText(`Criança: ${c.childName}`));
+    if (c.guardianName) lines.push(centerText(`Responsável: ${c.guardianName}`));
+    if (c.guardianCpf) lines.push(centerText(`CPF Responsável: ${c.guardianCpf}`));
+    if (c.phone) lines.push(centerText(`Telefone: ${c.phone}`));
   }
-  if (payload.planName) lines.push(`Plano: ${payload.planName}`);
-  if (payload.assetName) lines.push(`Veículo/Pelúcia: ${payload.assetName}`);
+  if (payload.planName) lines.push(centerText(`Plano: ${payload.planName}`));
+  if (payload.assetName) lines.push(centerText(`Veículo/Pelúcia: ${payload.assetName}`));
   lines.push(subDivider);
-  lines.push("DECLARAÇÃO E REGRAS DE USO:");
+  lines.push(centerText("DECLARAÇÃO E REGRAS DE USO:"));
   const declaracaoClausulas = [
     "1. Declaro ter recebido orientações sobre o uso correto e seguro dos miniveículos/pelúcias elétricas e assumo integral responsabilidade pela supervisão da criança durante toda a permanência no circuito.",
     "2. Declaro ser maior de idade e responsável legal pela criança acima identificada, e que quaisquer danos físicos causados por ela a terceiros (outras crianças, visitantes, funcionários) ou a mobiliário, estrutura e bens do shopping/estabelecimento durante o uso do circuito são de minha inteira e exclusiva responsabilidade, cabendo a mim o ressarcimento integral dos prejuízos.",
@@ -340,7 +391,7 @@ export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { tex
     "4. Estou ciente de que o descumprimento das orientações da equipe, o uso indevido do equipamento ou a ultrapassagem dos limites de peso/idade recomendados isentam integralmente o Faça Amigos de responsabilidade por quaisquer consequências.",
   ];
   for (const clausula of declaracaoClausulas) {
-    for (const line of wrap(clausula)) lines.push(line);
+    for (const line of wrap(clausula)) lines.push(centerText(line));
     lines.push("");
   }
   lines.push(subDivider);
@@ -353,7 +404,7 @@ export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { tex
   lines.push("");
 
   const text = lines.join("\n");
-  const hexHeader = "1b401b6101"; // ESC @, ESC a 1
+  const hexHeader = "1b401b74031b6101"; // ESC @, ESC t 3 (CP860 Português), ESC a 1 (Centralizado)
   const hexFeed = "1b6403"; // ESC d 3
   const hexCut = "1d564200"; // GS V 66 0
 

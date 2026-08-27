@@ -90,8 +90,8 @@ async function receiptHtml(payload: ReceiptPrintPayload): Promise<string> {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 80mm auto; margin: 0; }
-      html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
-      pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
+      html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; text-align: center; }
+      pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; text-align: center; }
       .qr { display: flex; flex-direction: column; align-items: center; margin: 2mm 0 3mm 0; }
       .qr svg { width: 34mm; height: 34mm; }
       .qr-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 1mm; }
@@ -104,8 +104,8 @@ async function circuitoTermoHtml(payload: ReceiptPrintPayload): Promise<string> 
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 80mm auto; margin: 0; }
-      html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; }
-      pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; }
+      html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; text-align: center; }
+      pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; text-align: center; }
     </style></head><body><pre>${esc}</pre></body></html>`;
 }
 

@@ -35,7 +35,7 @@ describe("recibo de guarda / Check-in (via dos pais, impressa no check-in)", () 
   });
 
   it("identifica a crianca e quem a entregou, para valer como prova da guarda", () => {
-    expect(text).toContain("Helena Souza · Resp: Maria Souza");
+    expect(text).toContain("Helena Souza - Resp: Maria Souza");
     // Nascimento + CPF juntos podem passar de 42 colunas — aqui quebram em duas linhas, mas sem perder dado nenhum.
     expect(text).toContain("Nascimento: 12/03/2019");
     expect(text).toContain("CPF:");
