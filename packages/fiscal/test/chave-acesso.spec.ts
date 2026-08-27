@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calcularDigitoVerificadorModulo11,
   formatarChaveAcessoEmGrupos,
+  gerarChaveAcessoNfceOuFallback,
   montarChaveAcesso,
   montarChaveAcessoSemDv,
   validarChaveAcesso,
@@ -81,4 +82,17 @@ describe("formatarChaveAcessoEmGrupos", () => {
     expect(groups.every((g) => g.length === 4)).toBe(true);
     expect(groups.join("")).toBe(chave);
   });
+
+  it("gerarChaveAcessoNfceOuFallback gera chave de 44 dígitos válida com Módulo 11 SEFAZ-PA", () => {
+    const chave = gerarChaveAcessoNfceOuFallback({
+      emissaoData: new Date("2026-08-27"),
+      cnpj: "12345678000199",
+      serie: 1,
+      numero: 10,
+    });
+    expect(chave).toHaveLength(44);
+    expect(chave.startsWith("15")).toBe(true);
+    expect(validarChaveAcesso(chave)).toBe(true);
+  });
 });
+

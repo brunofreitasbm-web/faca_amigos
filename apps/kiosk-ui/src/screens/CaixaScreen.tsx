@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input, HelpText } from "@facaamigos/ui";
+import { Button, Card, Input, HelpText, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { CashMovement, RevenueByMethod, Shift, ShiftSale, FiscalDoc } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -32,6 +32,96 @@ export function CaixaScreen() {
     doc: FiscalDoc | null;
     sale: ShiftSale;
   } | null>(null);
+
+  const [nfseDocsMap, setNfseDocsMap] = useState<Record<string, FiscalDoc | null>>({});
+  const [nfseLoadingMap, setNfseLoadingMap] = useState<Record<string, boolean>>({});
+  const [whatsappPhoneModal, setWhatsappPhoneModal] = useState<{ sale: ShiftSale; doc: FiscalDoc } | null>(null);
+  const [customWhatsappPhone, setCustomWhatsappPhone] = useState("");
+
+  async function loadNfseDocsForSales(salesList: ShiftSale[]) {
+    const sessionSales = salesList.filter((s) => s.kind === "SESSAO");
+    if (sessionSales.length === 0) return;
+    const docs: Record<string, FiscalDoc | null> = {};
+    await Promise.all(
+      sessionSales.map(async (s) => {
+        const doc = await Api.nfseDocByOrder(s.orderId).catch(() => null);
+        if (doc) {
+          docs[s.orderId] = doc;
+        }
+      })
+    );
+    setNfseDocsMap((prev) => ({ ...prev, ...docs }));
+  }
+
+  async function handleEmitNfse(sale: ShiftSale) {
+    setNfseLoadingMap((prev) => ({ ...prev, [sale.orderId]: true }));
+    try {
+      await Api.requestNfse(sale.orderId);
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts += 1;
+        const doc = await Api.nfseDocByOrder(sale.orderId).catch(() => null);
+        if (doc) {
+          setNfseDocsMap((prev) => ({ ...prev, [sale.orderId]: doc }));
+          if (doc.status === "AUTORIZADO" || ["BLOQUEADO", "REJEITADO", "DENEGADO", "CANCELADO"].includes(doc.status)) {
+            clearInterval(interval);
+            setNfseLoadingMap((prev) => ({ ...prev, [sale.orderId]: false }));
+          }
+        }
+        if (attempts >= 10) {
+          clearInterval(interval);
+          setNfseLoadingMap((prev) => ({ ...prev, [sale.orderId]: false }));
+        }
+      }, 2000);
+    } catch {
+      alert("Não foi possível solicitar a emissão da NFS-e. Tente novamente.");
+      setNfseLoadingMap((prev) => ({ ...prev, [sale.orderId]: false }));
+    }
+  }
+
+  async function handleSendNfseWhatsapp(sale: ShiftSale, doc: FiscalDoc, overridePhone?: string) {
+    const phone = overridePhone ?? sale.guardianPhone;
+    if (!phone || !phone.trim()) {
+      setWhatsappPhoneModal({ sale, doc });
+      setCustomWhatsappPhone("");
+      return;
+    }
+
+    const digits = phone.replace(/\D/g, "");
+    const fullPhone = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+
+    const respStr = sale.guardianName ? `Olá, ${sale.guardianName}! ` : "Olá! ";
+    const valStr = money(doc.total_cents ?? sale.amountCents);
+    const numStr = doc.nfse_numero ?? doc.numero ?? "—";
+    const serieStr = doc.serie ?? "1";
+
+    const messageLines = [
+      `${respStr}Segue a sua Nota Fiscal de Serviços Eletrônica (NFS-e) emitida pelo FaçaAmigos:`,
+      ``,
+      `📄 NFS-e nº ${numStr} / Série ${serieStr}`,
+      `Valor: ${valStr}`,
+      doc.access_key ? `Chave: ${doc.access_key}` : null,
+      ``,
+      `Agradecemos a sua visita e ficamos à disposição! 🎈`,
+    ].filter((l): l is string => l !== null);
+
+    const text = encodeURIComponent(messageLines.join("\n"));
+    window.open(`https://wa.me/${fullPhone}?text=${text}`, "_blank");
+
+    try {
+      await Api.markNfseSent(doc.id);
+      setNfseDocsMap((prev) => ({
+        ...prev,
+        [sale.orderId]: { ...doc, guardian_whatsapp_sent_at_ms: Date.now() },
+      }));
+    } catch {
+      // ignore
+    }
+
+    if (whatsappPhoneModal) {
+      setWhatsappPhoneModal(null);
+    }
+  }
 
   async function openNfceForSale(sale: ShiftSale) {
     try {
@@ -111,7 +201,9 @@ export function CaixaScreen() {
       if (current) {
         setMovements(await Api.cashMovements(current.id));
         setRevenue(await Api.revenueByMethod(current.id));
-        setSales(await Api.shiftSales(current.id));
+        const fetchedSales = await Api.shiftSales(current.id);
+        setSales(fetchedSales);
+        loadNfseDocsForSales(fetchedSales);
       }
       setRefreshError(false);
     } catch {
@@ -548,7 +640,7 @@ export function CaixaScreen() {
                   <th style={{ padding: "6px 8px" }}>Pagamento</th>
                   <th style={{ padding: "6px 8px", textAlign: "right" }}>Desconto</th>
                   <th style={{ padding: "6px 8px", textAlign: "right" }}>Valor</th>
-                  <th style={{ padding: "6px 8px", textAlign: "center" }}>NFC-e</th>
+                  <th style={{ padding: "6px 8px", textAlign: "center" }}>Doc. Fiscal</th>
                 </tr>
               </thead>
               <tbody>
@@ -575,6 +667,66 @@ export function CaixaScreen() {
                           📄 NFC-e
                         </Button>
                       )}
+                      {s.kind === "SESSAO" && (() => {
+                        const doc = nfseDocsMap[s.orderId];
+                        const isLoading = !!nfseLoadingMap[s.orderId] || (doc && ["PENDENTE", "ASSINADO", "TRANSMITIDO"].includes(doc.status));
+
+                        if (isLoading) {
+                          return (
+                            <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "500" }}>
+                              ⏳ Emitindo...
+                            </span>
+                          );
+                        }
+
+                        if (doc?.status === "AUTORIZADO") {
+                          const wasSent = !!doc.guardian_whatsapp_sent_at_ms;
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                              <span style={{ fontSize: "11px", color: "var(--success-color, #10b981)", fontWeight: "bold" }}>
+                                ✅ NFS-e nº {doc.nfse_numero ?? doc.numero ?? "—"}
+                              </span>
+                              <Button
+                                variant={wasSent ? "ghost" : "primary"}
+                                size="sm"
+                                onClick={() => handleSendNfseWhatsapp(s, doc)}
+                                title="Enviar NFS-e por WhatsApp ao responsável"
+                              >
+                                📱 {wasSent ? "Reenviar Whats" : "Enviar Whats"}
+                              </Button>
+                            </div>
+                          );
+                        }
+
+                        if (doc && ["BLOQUEADO", "REJEITADO", "DENEGADO", "CANCELADO"].includes(doc.status)) {
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                              <span style={{ fontSize: "11px", color: "var(--error-color, #ef4444)", fontWeight: "bold" }}>
+                                ❌ {doc.status}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEmitNfse(s)}
+                                title="Tentar emitir NFS-e novamente"
+                              >
+                                🔄 Tentar Novamente
+                              </Button>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleEmitNfse(s)}
+                            title="Emitir Nota Fiscal de Serviço (NFS-e) sob demanda"
+                          >
+                            🧾 Emitir NFS-e
+                          </Button>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
@@ -593,6 +745,34 @@ export function CaixaScreen() {
           payments={[{ method: selectedSaleForNfce.sale.method, amountCents: selectedSaleForNfce.sale.amountCents }]}
           onClose={() => setSelectedSaleForNfce(null)}
         />
+      )}
+
+      {whatsappPhoneModal && (
+        <Modal title="Enviar NFS-e por WhatsApp" onClose={() => setWhatsappPhoneModal(null)}>
+          <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+            <p style={{ margin: 0, fontSize: "14px" }}>
+              Informe o número de WhatsApp do responsável (<strong>{whatsappPhoneModal.sale.guardianName ?? "Responsável"}</strong>) para enviar o comprovante:
+            </p>
+            <Input
+              label="Telefone / WhatsApp"
+              placeholder="(11) 99999-9999"
+              value={customWhatsappPhone}
+              onChange={(e) => setCustomWhatsappPhone(e.target.value)}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+              <Button variant="ghost" onClick={() => setWhatsappPhoneModal(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!customWhatsappPhone.trim()}
+                onClick={() => handleSendNfseWhatsapp(whatsappPhoneModal.sale, whatsappPhoneModal.doc, customWhatsappPhone)}
+              >
+                📱 Abrir WhatsApp
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Sangria/suprimento tira e põe dinheiro na gaveta fora de uma venda —

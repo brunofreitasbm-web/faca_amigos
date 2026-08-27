@@ -61,5 +61,5 @@ update fa_kiosk_units
 set
   nfce_qrcode_url_consulta = coalesce(nullif(nfce_qrcode_url_consulta, ''), 'http://www.sefa.pa.gov.br/nfce/consulta'),
   nfce_serie = coalesce(nfce_serie, 1),
-  nfce_csc_id = coalesce(nullif(nfce_csc_id, ''), '000001')
+  nfce_csc_id = coalesce(nullif(nfce_csc_id, ''), '000002')
 where nfce_qrcode_url_consulta is null or nfce_csc_id is null;

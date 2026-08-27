@@ -771,6 +771,7 @@ export interface ShiftSale {
   discountCents: number;
   childNames: string;
   guardianName: string | null;
+  guardianPhone?: string | null;
   productsSummary: string | null;
 }
 
@@ -1912,7 +1913,7 @@ export const Api = {
     const guardians =
       guardianIds.length === 0
         ? []
-        : await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name").in("id", guardianIds));
+        : await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164").in("id", guardianIds));
 
     const sessionById = new Map(sessions.map((s) => [s.id as string, s]));
     const guardianById = new Map(guardians.map((g) => [g.id as string, g]));
@@ -1946,6 +1947,7 @@ export const Api = {
           discountCents,
           childNames: childNames || "—",
           guardianName: (firstGuardian?.full_name as string) ?? null,
+          guardianPhone: (firstGuardian?.phone_e164 as string | undefined) ?? null,
           productsSummary: null,
         };
       }

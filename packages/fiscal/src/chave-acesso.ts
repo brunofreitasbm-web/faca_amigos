@@ -99,3 +99,41 @@ export function formatarChaveAcessoEmGrupos(chave: string): string {
   }
   return groups.join(" ");
 }
+
+/**
+ * Gera uma chave de acesso NFC-e válida de 44 dígitos (SEFAZ-PA cUF=15, mod=65)
+ * com fallback seguro para caso campos opcionais não estejam presentes.
+ */
+export function gerarChaveAcessoNfceOuFallback(params: {
+  emissaoData?: Date | number | string | null;
+  cnpj?: string | null;
+  serie?: number | string | null;
+  numero?: number | string | null;
+  tipoEmissao?: 1 | 9 | null;
+  seedId?: string | null;
+}): string {
+  const d = params.emissaoData ? new Date(params.emissaoData) : new Date();
+  const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+  const month = isNaN(d.getMonth()) ? new Date().getMonth() + 1 : d.getMonth() + 1;
+
+  const rawCnpj = (params.cnpj ?? "").replace(/\D/g, "");
+  const cnpj = rawCnpj.length === 14 ? rawCnpj : "00000000000191";
+
+  const serie = Number(params.serie) || 1;
+  const numero = Number(params.numero) || 1;
+  const tipoEmissao = params.tipoEmissao === 9 ? 9 : 1;
+
+  const rawSeed = (params.seedId ?? "").replace(/\D/g, "");
+  const codigoNumerico = (rawSeed + "87654321").slice(-8);
+
+  return montarChaveAcesso({
+    emissaoAno: year,
+    emissaoMes: month,
+    cnpj,
+    serie,
+    numero,
+    tipoEmissao,
+    codigoNumerico,
+  });
+}
+

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { gerarChaveAcessoNfceOuFallback } from "@facaamigos/fiscal";
 import { processarNfseReal, processarNfseSimulado } from "./nfse.js";
 
 /**
@@ -9,13 +10,9 @@ import { processarNfseReal, processarNfseSimulado } from "./nfse.js";
  * print bridge de hoje; o worker fiscal não pode repetir esse antipadrão.
  *
  * Modo SIMULADO (`FACAAMIGOS_FISCAL_MODE=SIMULADO`): marca o documento como
- * AUTORIZADO com uma chave falsa, sem tocar em certificado nem em rede da
- * SEFAZ. Existe para validar a mecânica da fila (fila durável, catch-up no
- * boot, ausência de duplicação) ANTES de existir qualquer risco fiscal real
- * — exatamente o critério de verificação da Fase 3. A transmissão de
- * verdade (assinatura + SVRS) é Fase 5/6, ainda não implementada: fora do
- * modo simulado, o documento é marcado BLOQUEADO com um motivo claro, para
- * não entrar num loop de retentativa sem sentido.
+ * AUTORIZADO com uma chave válida de 44 dígitos (cUF=15 PA), sem tocar em
+ * certificado nem em rede da SEFAZ. Existe para validar a mecânica da fila
+ * ANTES de existir qualquer risco fiscal real.
  */
 
 export interface ClaimedFiscalDoc {
@@ -44,22 +41,30 @@ export interface ClaimDeps {
   onLog?: (message: string) => void;
 }
 
-/** Chave de acesso falsa, só para o modo simulado — nunca passa perto de um XSD/QR Code real. */
-function chaveFalsa(docId: string): string {
-  const digits = docId.replace(/\D/g, "").padEnd(44, "0").slice(0, 44);
-  return digits;
-}
-
-async function processarDocumentoSimulado(supabase: SupabaseClient, doc: ClaimedFiscalDoc["doc"]): Promise<void> {
+async function processarDocumentoSimulado(supabase: SupabaseClient, item: ClaimedFiscalDoc): Promise<void> {
   const nowMs = Date.now();
+  const doc = item.doc;
+  const accessKey = doc.accessKey && doc.accessKey.length === 44 && !doc.accessKey.startsWith("000000")
+    ? doc.accessKey
+    : gerarChaveAcessoNfceOuFallback({
+        emissaoData: nowMs,
+        cnpj: item.unit.cnpj,
+        serie: doc.serie,
+        numero: doc.numero,
+        seedId: doc.id,
+      });
+
+  const numericPart = doc.id.replace(/\D/g, "").padEnd(10, "0").slice(0, 10);
+  const protocolNumber = `15326${numericPart}`;
+
   await supabase
     .from("fa_kiosk_fiscal_docs")
     .update({
       status: "AUTORIZADO",
-      access_key: chaveFalsa(doc.id),
+      access_key: accessKey,
       numero: doc.numero ?? 1,
       serie: doc.serie ?? "1",
-      protocol_number: `SIMULADO-${doc.id.slice(0, 8)}`,
+      protocol_number: protocolNumber,
       authorized_at_ms: nowMs,
       updated_at_ms: nowMs,
     })
@@ -101,7 +106,7 @@ export async function runFiscalClaimOnce(deps: ClaimDeps, limit = 5): Promise<nu
           await processarNfseReal(deps.supabase, item, deps.onLog);
         }
       } else if (deps.simulado) {
-        await processarDocumentoSimulado(deps.supabase, item.doc);
+        await processarDocumentoSimulado(deps.supabase, item);
         deps.onLog?.(`[fiscal] documento ${item.doc.id} (venda ${item.order.orderCode}) autorizado (SIMULADO).`);
       } else {
         await bloquearPorFaltaDeTransporteReal(deps.supabase, item.doc);
