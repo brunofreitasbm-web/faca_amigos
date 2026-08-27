@@ -3,9 +3,11 @@ import {
   assinarXmlNfce,
   gerarChaveAcessoNfceOuFallback,
   montarXmlNfce,
-  SvrsNfceTransport,
   type DocumentoFiscalInput,
 } from "@facaamigos/fiscal";
+// Fora do barrel principal (`@facaamigos/fiscal`) de propósito — usa
+// `node:https`, e o kiosk-ui (bundle de navegador) importa esse pacote.
+import { SvrsNfceTransport } from "@facaamigos/fiscal/svrs-transport";
 import { processarNfseReal, processarNfseSimulado } from "./nfse.js";
 import { extrairChaveECertificadoPem, readCredentials, type CofreCrypto } from "./vault.js";
 
