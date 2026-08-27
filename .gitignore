@@ -9,7 +9,13 @@ supabase/.branches/
 node_modules/
 .pnpm-store/
 dist/
+# apps/kiosk/build/ é majoritariamente gerado (icon.ico via `pnpm icons`),
+# mas installer.nsh é código-fonte do instalador (regra de firewall da
+# porta 7317, ver electron-builder.yml) e precisa ficar versionado.
 build/
+!apps/kiosk/build/
+apps/kiosk/build/*
+!apps/kiosk/build/installer.nsh
 out/
 release/
 .turbo/
