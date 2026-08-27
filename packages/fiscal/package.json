@@ -8,7 +8,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./dps-nacional-transport": "./src/dps-nacional-transport.ts"
+    "./dps-nacional-transport": "./src/dps-nacional-transport.ts",
+    "./svrs-transport": "./src/nfce/svrs-transport.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
