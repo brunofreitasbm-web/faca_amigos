@@ -7,6 +7,7 @@ import { buildApp } from "../server/app.js";
 import { seedDevData } from "../server/seed-dev.js";
 import { loadOrCreateTls } from "../server/tls.js";
 import { startPrintBridge } from "./printBridge.js";
+import { listWindowsPrinters } from "./listPrinters.js";
 import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
 import { initAutoUpdater, checkForUpdatesAndWait, getUpdateStatus, applyUpdate } from "./autoUpdater.js";
@@ -209,7 +210,28 @@ if (isPrimaryInstance) {
       });
     }
 
-    const mainWindow = createWindow(protocol, splash);
+    // Fonte da verdade para a tela Configurações > Impressoras validar o
+    // nome digitado: o print bridge usa esse mesmo nome literal em
+    // OpenPrinterA/webContents.print, então um typo aqui é impressão
+    // silenciosamente falhando sem nada na fila do Windows.
+    //
+    // Registrado antes de createWindow/loadURL para não deixar a SPA
+    // invocar "list-printers" antes do handler existir (o preload injeta a
+    // função na primeira carga, então uma renderização rápida podia chegar
+    // aqui primeiro e cair no catch como "nenhuma impressora encontrada").
+    //
+    // getPrintersAsync() sozinho (backend de impressão do Chromium) pode
+    // voltar vazio mesmo com uma impressora instalada e funcionando em
+    // outros programas — combinamos com um fallback via `Get-Printer`
+    // (spooler do Windows, mesma família de API que a impressão RAW usa em
+    // rawPrint.ts) para pegar impressoras que só aparecem em um dos dois.
+    // eslint-disable-next-line prefer-const -- atribuída logo abaixo antes de qualquer chamada IPC poder disparar; `const` exigiria inverter a ordem e reabrir a race que este comentário evita.
+    let mainWindow: BrowserWindow;
+    ipcMain.handle("list-printers", async () => {
+      return listWindowsPrinters(() => mainWindow.webContents.getPrintersAsync());
+    });
+
+    mainWindow = createWindow(protocol, splash);
 
     // Sem isto, a ponte de impressão falhava só com um console.warn: o
     // terminal parecia funcionar normalmente, mas nenhuma pulseira/recibo
@@ -224,19 +246,6 @@ if (isPrimaryInstance) {
         buttons: ["OK"],
       });
     }
-
-    // Fonte da verdade para a tela Configurações > Impressoras validar o
-    // nome digitado: o print bridge usa esse mesmo nome literal em
-    // OpenPrinterA/webContents.print, então um typo aqui é impressão
-    // silenciosamente falhando sem nada na fila do Windows.
-    ipcMain.handle("list-printers", async () => {
-      try {
-        return await mainWindow.webContents.getPrintersAsync();
-      } catch (err) {
-        console.error("[main] falha ao listar impressoras instaladas:", err);
-        return [];
-      }
-    });
 
     // Emissão fiscal (Fase 3 do plano): try/catch explícito e captura de
     // rejeições não tratadas — um erro aqui NUNCA pode derrubar a impressão

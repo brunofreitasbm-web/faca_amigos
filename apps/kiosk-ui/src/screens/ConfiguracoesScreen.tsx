@@ -1593,7 +1593,25 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       .finally(() => setLoadingPrinters(false));
   }
 
-  useEffect(refreshPrinters, []);
+  // Logo depois do login do Windows (app abre sozinho, openAtLogin), o
+  // spooler de impressão ou uma impressora de rede podem ainda não estar
+  // prontos no instante exato em que esta tela monta — sem isto, a única
+  // saída era o operador perceber e clicar em "Buscar novamente" à mão.
+  // Tenta de novo automaticamente algumas vezes só enquanto a lista volta
+  // vazia, sem incomodar quando já achou alguma impressora.
+  useEffect(() => {
+    refreshPrinters();
+    const retryDelaysMs = [2000, 5000, 10000];
+    const timers = retryDelaysMs.map((delay) =>
+      setTimeout(() => {
+        setInstalledPrinters((current) => {
+          if (current && current.length === 0) refreshPrinters();
+          return current;
+        });
+      }, delay),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   const printerApiAvailable = typeof window.facaamigos?.listPrinters === "function";
 
