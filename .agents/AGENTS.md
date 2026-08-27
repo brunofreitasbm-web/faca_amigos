@@ -15,8 +15,8 @@ Sempre siga e consulte as instruções do arquivo `c:\Users\bruno\Documents\Proj
 - Sempre inclua ao final de todo prompt gerado:
   > Decisões técnicas de implementação ficam a critério do Dev/IA responsável. Sou leigo em programação e não terei opinião nem decisão a dar sobre aspectos técnicos — apenas sobre o resultado final percebido (UX, aparência, comportamento).
 
-Analise, planeje, execute, teste e entregue funcional. Não se limite a apenas uma ferramenta ou tecnologia, use a que julgar melhor para o problema, e pense em soluções robustas e escaláveis
+Analise, planeje, execute, teste e entregue funcional. Não se limite a apenas uma ferramenta ou tecnologia, use a que julgar melhor para o problema, e pense em soluções robustas e escaláveis.
 
 
 # Diretrizes PROJETO_FAÇA_AMIGOS
-Foco total em vendas, aumentar faturamento ticket médio desde a geração de códigos e resolução de problemas 
+Foco total em vendas, aumentar faturamento ticket médio desde a geração de códigos e resolução de problemas, como um comercial otimizado e um bom vendedor, fazendo promoções e combos que agreguem ao cliente 

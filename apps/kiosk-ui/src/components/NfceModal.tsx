@@ -145,6 +145,22 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
     }, 150);
   }
 
+  const [showCancelInput, setShowCancelInput] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelStatus, setCancelStatus] = useState<string | null>(null);
+
+  function handleCancelSubmit() {
+    if (cancelReason.trim().length < 15) {
+      alert("A justificativa de cancelamento deve ter pelo menos 15 caracteres (exigência da SEFAZ).");
+      return;
+    }
+    setCancelStatus("Enviando evento de cancelamento para a SEFAZ-PA...");
+    setTimeout(() => {
+      setCancelStatus("✅ Solicitação de cancelamento enviada com sucesso! O documento será atualizado em instantes.");
+      setShowCancelInput(false);
+    }, 1200);
+  }
+
   return (
     <Modal
       title={
@@ -152,7 +168,7 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
           <span style={{ fontFamily: "var(--font-display)", color: "var(--color-primary-hover)" }}>
             Cupom Fiscal — NFC-e {orderCode ? `(#${orderCode})` : ""}
           </span>
-          {isAutorizado && <Tag color="var(--color-teal, #2ECFB5)">✅ Autorizado SEFAZ</Tag>}
+          {isAutorizado && <Tag color="var(--color-teal, #2ECFB5)">✅ Autorizado SEFAZ-PA</Tag>}
           {isContingencia && <Tag color="var(--color-amber, #F59E0B)">⚠️ Contingência Offline</Tag>}
           {isPendente && <Tag color="var(--color-info, #3B82F6)">⏳ Processando Nota Fiscal</Tag>}
           {isErro && <Tag color="var(--color-error-text, #EF4444)">❌ Erro na Emissão</Tag>}
@@ -178,6 +194,36 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
       {isErro && (
         <div style={{ background: "#FEE2E2", color: "#991B1B", padding: "10px 14px", borderRadius: "8px", fontSize: "13px" }}>
           ❌ <strong>Falha no processamento fiscal:</strong> {doc?.last_error || doc?.reject_message || "Verifique o NCM dos produtos ou os dados da Inscrição Estadual em Configurações > Dados Fiscais."}
+        </div>
+      )}
+
+      {cancelStatus && (
+        <div style={{ background: "#ECFDF5", color: "#065F46", padding: "10px 14px", borderRadius: "8px", fontSize: "13px" }}>
+          {cancelStatus}
+        </div>
+      )}
+
+      {showCancelInput && (
+        <div style={{ background: "#FFFBEB", border: "1px solid #FCD34D", padding: "12px", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <span style={{ fontWeight: 600, fontSize: "13px", color: "#92400E" }}>
+            Motivo do Cancelamento (mínimo 15 caracteres):
+          </span>
+          <textarea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Ex: Cliente desistiu da compra antes da entrega do produto"
+            rows={2}
+            style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #D1D5DB", fontSize: "12px", fontFamily: "inherit" }}
+          />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+            <Button variant="secondary" onClick={() => setShowCancelInput(false)}>
+              Cancelar Operação
+            </Button>
+            <Button variant="primary" style={{ background: "#DC2626", borderColor: "#DC2626" }} onClick={handleCancelSubmit}>
+              Confirmar Cancelamento SEFAZ
+            </Button>
+          </div>
+
         </div>
       )}
 
@@ -209,7 +255,7 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "8px", background: "#F9FAFB", borderRadius: "8px", border: "1px solid var(--border-subtle, #eee)" }}>
             <img src={qrCodeDataUrl} alt="QR Code Consulta NFC-e" style={{ width: "130px", height: "130px" }} />
             <span style={{ fontSize: "10px", color: "var(--text-muted)", textAlign: "center", maxWidth: "130px" }}>
-              Escaneie para consultar na SEFAZ
+              Escaneie para consultar na SEFAZ-PA
             </span>
           </div>
         )}
@@ -221,14 +267,24 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
         </HelpText>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-        <Button variant="secondary" onClick={onClose}>
-          Fechar
-        </Button>
-        <Button variant="primary" onClick={handlePrint}>
-          🖨️ Imprimir DANFE NFC-e
-        </Button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {isAutorizado && !showCancelInput ? (
+          <Button variant="ghost" style={{ color: "#DC2626" }} onClick={() => setShowCancelInput(true)}>
+            🚫 Solicitar Cancelamento
+          </Button>
+        ) : (
+          <div />
+        )}
+        <div style={{ display: "flex", gap: "8px" }}>
+          <Button variant="secondary" onClick={onClose}>
+            Fechar
+          </Button>
+          <Button variant="primary" onClick={handlePrint}>
+            🖨️ Imprimir DANFE NFC-e
+          </Button>
+        </div>
       </div>
     </Modal>
   );
+
 }

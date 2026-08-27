@@ -149,7 +149,23 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
     body: { unitId: unit.id },
   });
   if (certError || !certData) {
-    await bloquear(supabase, doc.id, `Certificado A1 não disponível: ${certError?.message ?? "não configurado em Configurações → Fiscal"}.`);
+    let detail = certError?.message ?? "não configurado em Configurações → Fiscal";
+    if (certError && "context" in certError && (certError as any).context instanceof Response) {
+      try {
+        const bodyText = await (certError as any).context.clone().text();
+        try {
+          const parsed = JSON.parse(bodyText);
+          if (parsed?.error) detail = parsed.error;
+          else if (parsed?.message) detail = parsed.message;
+          else if (bodyText) detail = `HTTP ${(certError as any).context.status}: ${bodyText}`;
+        } catch {
+          if (bodyText) detail = `HTTP ${(certError as any).context.status}: ${bodyText}`;
+        }
+      } catch {
+        // mantém a mensagem de erro padrão se a leitura do corpo falhar
+      }
+    }
+    await bloquear(supabase, doc.id, `Certificado A1 não disponível: ${detail}.`);
     return;
   }
 

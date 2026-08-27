@@ -337,7 +337,7 @@ export interface Product {
 
 /**
  * Dados fiscais do emitente. NFC-e (modelo 65, mercadoria, autorizada pela
- * SVRS desde que a SEFA-PA desativou os webservices próprios) e o CADASTRO
+ * SEFAZ-PA) e o CADASTRO de NFS-e (serviço, ISS, Prefeitura de Belém) — a emissão
  * de NFS-e (serviço, ISS, Prefeitura de Belém) — a emissão de NFS-e está
  * fora de escopo, ver migration 20260807000004.
  *
@@ -1000,7 +1000,25 @@ function loyaltyRuleFromRow(row: Record<string, unknown>): LoyaltyRule {
 
 async function unwrap<T>(promise: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T> {
   const { data, error } = await promise;
-  if (error) throw new Error(error.message);
+  if (error) {
+    let detail = error.message;
+    if ("context" in error && (error as any).context instanceof Response) {
+      try {
+        const text = await (error as any).context.clone().text();
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed?.error) detail = parsed.error;
+          else if (parsed?.message) detail = parsed.message;
+          else if (text) detail = `HTTP ${(error as any).context.status}: ${text}`;
+        } catch {
+          if (text) detail = `HTTP ${(error as any).context.status}: ${text}`;
+        }
+      } catch {
+        // mantém a mensagem original
+      }
+    }
+    throw new Error(detail);
+  }
   return data as T;
 }
 

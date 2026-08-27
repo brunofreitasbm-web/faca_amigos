@@ -5,4 +5,6 @@ export * from "./qrcode-nfce.js";
 export * from "./assinatura.js";
 export * from "./danfe-nfce.js";
 export * from "./nfce/transport.js";
+export * from "./nfce/svrs-transport.js";
 export * from "./dps-nacional-xml.js";
+export * from "./eventos-xml.js";

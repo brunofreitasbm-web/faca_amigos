@@ -2306,9 +2306,9 @@ function FiscalTab({ unitId }: { unitId: string }) {
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>NFC-e — venda de produtos</h2>
         <HelpText>
-          Nota de mercadoria (modelo 65). No Pará a autorização é feita pela SVRS desde que a SEFA-PA desativou os
-          webservices próprios — o que continua estadual é a inscrição, o credenciamento e o CSC.
+          Nota de mercadoria (modelo 65) autorizada na SEFAZ-PA (Pará). A inscrição estadual, o credenciamento e o CSC são emitidos diretamente no portal da SEFA-PA.
         </HelpText>
+
         <Select label="Ambiente" value={form.fiscalAmbiente ?? "HOMOLOGACAO"} onChange={(e) => set("fiscalAmbiente", e.target.value)}>
           <option value="HOMOLOGACAO">Homologação (teste, sem valor fiscal)</option>
           <option value="PRODUCAO">Produção (nota válida)</option>

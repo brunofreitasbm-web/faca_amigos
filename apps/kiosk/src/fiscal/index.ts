@@ -63,7 +63,17 @@ export function startFiscalWorker(userDataPath: string): void {
     try {
       let claimed: number;
       do {
-        claimed = await runFiscalClaimOnce({ supabase, terminalId, simulado, onLog: log }, 5);
+        claimed = await runFiscalClaimOnce(
+          {
+            supabase,
+            terminalId,
+            simulado,
+            userDataPath,
+            crypto: electronSafeStorageCrypto(),
+            onLog: log,
+          },
+          5,
+        );
       } while (claimed > 0);
     } finally {
       processing = false;
