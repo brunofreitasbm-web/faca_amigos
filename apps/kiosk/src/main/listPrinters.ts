@@ -16,13 +16,26 @@ function listPrintersViaPowerShell(): Promise<string[]> {
       resolve([]);
       return;
     }
+    const psScript = `
+      [Console]::OutputEncoding = [System.Text.Encoding]::UTF8;
+      $printers = @()
+      try {
+        $printers = (Get-Printer | Select-Object -ExpandProperty Name)
+      } catch {}
+      if (-not $printers -or $printers.Count -eq 0) {
+        try {
+          $printers = (Get-CimInstance Win32_Printer | Select-Object -ExpandProperty Name)
+        } catch {}
+      }
+      $printers -join "\`n"
+    `;
     execFile(
       "powershell.exe",
-      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "(Get-Printer | Select-Object -ExpandProperty Name) -join \"`n\""],
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript],
       { timeout: 10_000 },
       (err, stdout) => {
         if (err) {
-          console.warn("[main] fallback Get-Printer falhou ao listar impressoras:", err);
+          console.warn("[main] fallback Get-Printer/Win32_Printer falhou ao listar impressoras:", err);
           resolve([]);
           return;
         }

@@ -157,11 +157,7 @@ export function MobilePainel({
                   <p style={{ margin: "3px 0 0", fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>
                     {entry.plan.name} · pulseira {entry.session.access_code ?? entry.session.wristband_code ?? "—"}
                   </p>
-                  {entry.session.exit_pin && (
-                    <p style={{ margin: "3px 0 0", fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>
-                      <RevealPin pin={entry.session.exit_pin} label="PIN de saída" />
-                    </p>
-                  )}
+
                   <p style={{ margin: "5px 0 0", fontSize: 11.5, fontWeight: 800, lineHeight: 1.35, color: u.color }}>
                     {u.status}
                   </p>

@@ -6,6 +6,7 @@ import WebSocket from "ws";
 import { generateEscPosReceipt, generateEscPosCircuitoTermo, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import type { ReceiptPrintPayload, WristbandPrintPayload } from "@facaamigos/domain";
 import { printRawWindows } from "./rawPrint.js";
+import { listWindowsPrinters } from "./listPrinters.js";
 
 interface PrintJobRow {
   id: string;
@@ -256,10 +257,34 @@ export function startPrintBridge(): PrintBridgeStartResult {
     return (data?.value as string | undefined) ?? null;
   }
 
-function isVirtualOrPdfPrinter(deviceName: string): boolean {
-  const lower = deviceName.toLowerCase();
-  return lower.includes("pdf") || lower.includes("xps") || lower.includes("virtual") || lower.includes("fax") || lower.includes("onenote");
-}
+  function isVirtualOrPdfPrinter(deviceName: string): boolean {
+    const lower = deviceName.toLowerCase();
+    return lower.includes("pdf") || lower.includes("xps") || lower.includes("virtual") || lower.includes("fax") || lower.includes("onenote");
+  }
+
+  async function resolvePrinterDeviceName(unitId: string, kind: PrintJobRow["kind"]): Promise<string | null> {
+    const configured = await printerNameFor(unitId, kind);
+    const win = BrowserWindow.getAllWindows()[0];
+    const installed = await listWindowsPrinters(() => (win ? win.webContents.getPrintersAsync() : Promise.resolve([])));
+    const installedNames = installed.map((p) => p.name);
+
+    if (configured && configured.trim()) {
+      const trimmed = configured.trim();
+      const exact = installedNames.find((n) => n === trimmed);
+      if (exact) return exact;
+      const caseIns = installedNames.find((n) => n.toLowerCase() === trimmed.toLowerCase());
+      if (caseIns) return caseIns;
+      const partial = installedNames.find(
+        (n) => n.toLowerCase().includes(trimmed.toLowerCase()) || trimmed.toLowerCase().includes(n.toLowerCase()),
+      );
+      if (partial) return partial;
+    }
+
+    const physical = installedNames.find((n) => !isVirtualOrPdfPrinter(n));
+    if (physical) return physical;
+
+    return configured || installedNames[0] || null;
+  }
 
   async function handleReceiptPdfFallback(job: PrintJobRow, originalError: string): Promise<void> {
     const rawPayload = job.payload_json as unknown as ReceiptPrintPayload;
@@ -298,7 +323,7 @@ function isVirtualOrPdfPrinter(deviceName: string): boolean {
     try {
       let deviceName: string | null = null;
       try {
-        deviceName = await printerNameFor(job.unit_id, job.kind);
+        deviceName = await resolvePrinterDeviceName(job.unit_id, job.kind);
       } catch {
         deviceName = null;
       }
@@ -332,10 +357,10 @@ function isVirtualOrPdfPrinter(deviceName: string): boolean {
         const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
         const isCircuito =
           Boolean(payload.accessCode) &&
-          payload.activity !== "PLAYGROUND" &&
           (payload.activity === "CARRINHO" ||
             /circuito/i.test(payload.unitName) ||
-            Boolean(payload.assetName));
+            Boolean(payload.assetName) ||
+            payload.activity !== "PLAYGROUND");
 
         if (isVirtualOrPdf) {
           const html = await receiptHtml(payload);

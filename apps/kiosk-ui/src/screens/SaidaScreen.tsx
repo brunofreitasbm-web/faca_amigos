@@ -326,10 +326,10 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
           gap: "8px",
         }}
       >
-        <strong style={{ fontSize: "14px" }}>Câmera não leu? Digite o PIN de saída</strong>
+        <strong style={{ fontSize: "14px" }}>Câmera não leu? Digite o código da pulseira</strong>
         <HelpText>
-          O PIN de 4 dígitos está no recibo de guarda, ao lado do QR. Também aceita o código completo da pulseira (ex.:{" "}
-          {formatAccessCode("K7M2P9QX3B7")}), se for mais rápido ler ele.
+          Digite o código impresso na pulseira ou recibo (ex.:{" "}
+          {formatAccessCode("K7M2P9QX3B7")}) para consultar a criança.
         </HelpText>
         <div style={{ display: "flex", gap: "8px" }}>
           <Input
