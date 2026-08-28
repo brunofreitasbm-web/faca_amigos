@@ -54,35 +54,60 @@ async function processarNfceReal(supabase: SupabaseClient, deps: ClaimDeps, item
   const nowMs = Date.now();
   const doc = item.doc;
 
-  if (!deps.userDataPath || !deps.crypto) {
-    await supabase
-      .from("fa_kiosk_fiscal_docs")
-      .update({
-        status: "BLOQUEADO",
-        last_error: "Cofre fiscal indisponível no terminal. Instale o certificado A1 ou rode em modo SIMULADO.",
-        updated_at_ms: nowMs,
-      })
-      .eq("id", doc.id);
-    return;
+  let pfxBuffer: Buffer | null = null;
+  let password = "";
+
+  // 1. Tenta carregar do cofre local do terminal (se configurado neste dispositivo)
+  if (deps.userDataPath && deps.crypto) {
+    const creds = readCredentials({ userDataPath: deps.userDataPath, crypto: deps.crypto });
+    if (creds) {
+      pfxBuffer = creds.pfxBuffer;
+      password = creds.password;
+    }
   }
 
-  const creds = readCredentials({ userDataPath: deps.userDataPath, crypto: deps.crypto });
-  if (!creds) {
-    await supabase
-      .from("fa_kiosk_fiscal_docs")
-      .update({
-        status: "BLOQUEADO",
-        last_error: "Certificado digital A1 (.pfx) não instalado no cofre deste terminal. Instale nas Configurações.",
-        updated_at_ms: nowMs,
-      })
-      .eq("id", doc.id);
-    return;
+  // 2. Se não encontrou no disco local, busca via Edge Function do Supabase (upload feito via Painel Gerencial)
+  if (!pfxBuffer) {
+    const { data: certData, error: certError } = await supabase.functions.invoke<{ pfxBase64: string; password: string }>(
+      "nfse-certificate-fetch",
+      { body: { unitId: item.unit.id } }
+    );
+    if (certData?.pfxBase64 && certData?.password) {
+      pfxBuffer = Buffer.from(certData.pfxBase64, "base64");
+      password = certData.password;
+    } else {
+      let detail = certError?.message ?? "não configurado em Configurações → Fiscal";
+      if (certError && "context" in certError && (certError as any).context instanceof Response) {
+        try {
+          const bodyText = await (certError as any).context.clone().text();
+          try {
+            const parsed = JSON.parse(bodyText);
+            if (parsed?.error) detail = parsed.error;
+            else if (parsed?.message) detail = parsed.message;
+            else if (bodyText) detail = `HTTP ${(certError as any).context.status}: ${bodyText}`;
+          } catch {
+            if (bodyText) detail = `HTTP ${(certError as any).context.status}: ${bodyText}`;
+          }
+        } catch {
+          // ignora falha de leitura do corpo
+        }
+      }
+      await supabase
+        .from("fa_kiosk_fiscal_docs")
+        .update({
+          status: "BLOQUEADO",
+          last_error: `Certificado digital A1 (.pfx) não disponível para esta unidade: ${detail}. Instale no terminal ou faça upload em Configurações.`,
+          updated_at_ms: nowMs,
+        })
+        .eq("id", doc.id);
+      return;
+    }
   }
 
   let certPem: string;
   let privateKeyPem: string;
   try {
-    const pem = extrairChaveECertificadoPem(creds.pfxBuffer, creds.password);
+    const pem = extrairChaveECertificadoPem(pfxBuffer, password);
     certPem = pem.certPem;
     privateKeyPem = pem.privateKeyPem;
   } catch (err) {
