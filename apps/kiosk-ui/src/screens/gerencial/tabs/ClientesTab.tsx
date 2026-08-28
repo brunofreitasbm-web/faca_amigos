@@ -5,10 +5,19 @@ import type { GerencialCliente, Unit } from "../../../api/client.js";
 import { formatPhoneBr, dateBrFromIso } from "@facaamigos/domain";
 import { useConfirm } from "../../../state/ConfirmContext.js";
 import { useToast } from "../../../state/ToastContext.js";
+import { useAuth } from "../../../auth/AuthContext.js";
+
+/** Estado editável de um filho dentro do modal — só existe enquanto `editing` é true. */
+interface ChildDraft {
+  id: string;
+  fullName: string;
+  birthDate: string; // yyyy-mm-dd, formato do <input type="date">
+}
 
 export function ClientesTab() {
   const confirm = useConfirm();
   const toast = useToast();
+  const { can } = useAuth();
   const [search, setSearch] = useState("");
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
   const [units, setUnits] = useState<Unit[]>([]);
@@ -17,6 +26,53 @@ export function ClientesTab() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCliente, setSelectedCliente] = useState<GerencialCliente | null>(null);
   const [resetting, setResetting] = useState(false);
+
+  // Edição de Responsável/Crianças no modal de detalhes — só existe enquanto
+  // o modal está aberto, por isso vive fora do objeto `selectedCliente`.
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [guardianDraft, setGuardianDraft] = useState({ fullName: "", phoneE164: "", cpf: "", email: "" });
+  const [childrenDraft, setChildrenDraft] = useState<ChildDraft[]>([]);
+
+  function startEditing(c: GerencialCliente) {
+    setGuardianDraft({
+      fullName: c.guardian_name,
+      phoneE164: c.phone_e164 ?? "",
+      cpf: c.cpf ?? "",
+      email: c.email ?? "",
+    });
+    setChildrenDraft((c.children ?? []).map((ch) => ({ id: ch.id, fullName: ch.fullName, birthDate: ch.birthDate ?? "" })));
+    setEditing(true);
+  }
+
+  function cancelEditing() {
+    setEditing(false);
+  }
+
+  async function saveEditing() {
+    if (!selectedCliente) return;
+    setSaving(true);
+    try {
+      await Api.updateGerencialGuardian({
+        guardianId: selectedCliente.guardian_id,
+        fullName: guardianDraft.fullName,
+        phoneE164: guardianDraft.phoneE164,
+        cpf: guardianDraft.cpf,
+        email: guardianDraft.email,
+      });
+      for (const ch of childrenDraft) {
+        await Api.updateGerencialChild({ childId: ch.id, fullName: ch.fullName, birthDate: ch.birthDate });
+      }
+      toast.success("Dados atualizados.");
+      setEditing(false);
+      setSelectedCliente(null);
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar as alterações.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     Api.units().then(setUnits).catch(() => setUnits([]));
