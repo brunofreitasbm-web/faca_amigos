@@ -77,8 +77,8 @@ export function BancoTalentosTab() {
       await Api.updateJobApplicationStatus(item.id, status);
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status } : i)));
       toast.success(`Status atualizado para '${STATUS_LABEL[status]}'.`);
-    } catch {
-      toast.error("Não foi possível atualizar o status.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível atualizar o status.");
     } finally {
       setBusyId(null);
     }

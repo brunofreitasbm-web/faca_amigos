@@ -1904,8 +1904,22 @@ export const Api = {
         .select("id, full_name, email, phone, course, desired_area, opportunity_type, resume_path, status, created_at_ms")
         .order("created_at_ms", { ascending: false }),
     ),
-  updateJobApplicationStatus: (id: string, status: JobApplication["status"]) =>
-    unwrap<null>(supabase().from("fa_kiosk_job_applications").update({ status }).eq("id", id)),
+  updateJobApplicationStatus: async (id: string, status: JobApplication["status"]) => {
+    const rpcRes = await supabase().rpc("fa_update_job_application_status", { p_id: id, p_status: status });
+    if (!rpcRes.error) {
+      return rpcRes.data;
+    }
+    const { data, error } = await supabase()
+      .from("fa_kiosk_job_applications")
+      .update({ status })
+      .eq("id", id)
+      .select("id, status");
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) {
+      throw new Error("Não foi possível atualizar o status: verifique suas permissões no Banco de Talentos.");
+    }
+    return data[0];
+  },
   // Bucket privado `curriculos` — link assinado de 60s, gerado sob demanda
   // no clique (nunca guardado), já que getPublicUrl não funciona em bucket
   // privado e a policy de select do Storage já exige talentos.read.
