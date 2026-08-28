@@ -18,7 +18,10 @@ import { request } from "node:https";
 
 const HOST_HOMOLOGACAO = "sefin.producaorestrita.nfse.gov.br";
 const HOST_PRODUCAO = "sefin.nfse.gov.br";
-const PATH_DPS = "/SefinNacional/nfse";
+const CANDIDATE_PATHS = [
+  "/API/SefinNacional/nfse",
+  "/SefinNacional/nfse",
+];
 
 export interface TransmitirDpsInput {
   /** DPS já assinada (XMLDSig), pronta para envio. */
@@ -55,31 +58,47 @@ export async function transmitirDps(input: TransmitirDpsInput): Promise<Transmit
   const dpsXmlGZipB64 = gzipSync(Buffer.from(input.xmlAssinado, "utf-8")).toString("base64");
   const body = JSON.stringify({ dpsXmlGZipB64 });
 
-  const { status, raw } = await new Promise<{ status: number; raw: string }>((resolve, reject) => {
-    const req = request(
-      {
-        host,
-        path: PATH_DPS,
-        method: "POST",
-        cert: input.certPem,
-        key: input.privateKeyPem,
-        timeout: input.timeoutMs ?? 30_000,
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(body),
+  let lastStatus = 0;
+  let lastRaw = "";
+
+  for (const path of CANDIDATE_PATHS) {
+    const { status, raw } = await new Promise<{ status: number; raw: string }>((resolve, reject) => {
+      const req = request(
+        {
+          host,
+          path,
+          method: "POST",
+          cert: input.certPem,
+          key: input.privateKeyPem,
+          timeout: input.timeoutMs ?? 30_000,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(body),
+          },
         },
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, raw: Buffer.concat(chunks).toString("utf-8") }));
-      },
-    );
-    req.on("timeout", () => req.destroy(new Error("Tempo esgotado ao transmitir a DPS ao Sistema Nacional NFS-e (ADN).")));
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, raw: Buffer.concat(chunks).toString("utf-8") }));
+        },
+      );
+      req.on("timeout", () => req.destroy(new Error("Tempo esgotado ao transmitir a DPS ao Sistema Nacional NFS-e (ADN).")));
+      req.on("error", reject);
+      req.write(body);
+      req.end();
+    });
+
+    lastStatus = status;
+    lastRaw = raw;
+
+    // Se não for 404, não tenta a próxima rota candidata
+    if (status !== 404) {
+      break;
+    }
+  }
+
+  const status = lastStatus;
+  const raw = lastRaw;
 
   let parsed: Record<string, unknown> | null = null;
   try {
