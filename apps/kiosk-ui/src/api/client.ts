@@ -243,6 +243,8 @@ export interface GeneralOnboardingCompleteInput {
   phone?: string;
   birthDate?: string;
   pin: string;
+  faceDescriptor?: number[];
+  facePhotoBase64?: string;
 }
 
 export interface NewEmployeeInput {

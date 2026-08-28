@@ -25,6 +25,8 @@ interface CompleteBody {
   phone?: string;
   birthDate?: string;
   pin: string;
+  faceDescriptor?: number[];
+  facePhotoBase64?: string;
 }
 
 function randomInternalPassword(): string {
@@ -108,10 +110,43 @@ Deno.serve(async (req) => {
 
   await adminClient.from("fa_kiosk_employee_units").insert({ employee_id: employeeRow.id, unit_id: result.unitId });
 
+  if (Array.isArray(body.faceDescriptor) && body.faceDescriptor.length > 0 && body.facePhotoBase64) {
+    try {
+      const cleanBase64 = body.facePhotoBase64.replace(/^data:image\/\w+;base64,/, "");
+      const binaryStr = atob(cleanBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const photoPath = `${employeeRow.id}/enroll-${Date.now()}.jpg`;
+      const { error: uploadError } = await adminClient.storage
+        .from("ponto-fotos")
+        .upload(photoPath, bytes, { contentType: "image/jpeg", upsert: true });
+
+      if (!uploadError) {
+        await adminClient
+          .from("fa_kiosk_employees")
+          .update({
+            face_descriptor: body.faceDescriptor,
+            face_enrolled_photo_path: photoPath,
+          })
+          .eq("id", employeeRow.id);
+
+        await adminClient.from("fa_kiosk_audit_log").insert({
+          action: "FACE_ENROLLED",
+          severity: "ALERTA",
+          details_json: { employeeId: employeeRow.id, source: "GENERAL_ONBOARDING" },
+        });
+      }
+    } catch (e) {
+      console.warn("Falha ao salvar biometria no onboarding geral:", e);
+    }
+  }
+
   await adminClient.from("fa_kiosk_audit_log").insert({
     action: "CONFIG_EMPLOYEE_GENERAL_INVITE_COMPLETE",
     severity: "ALERTA",
-    details_json: { employeeId: employeeRow.id, unitId: result.unitId },
+    details_json: { employeeId: employeeRow.id, unitId: result.unitId, faceEnrolled: Boolean(body.faceDescriptor) },
   });
 
   return jsonResponse(req, { id: employeeRow.id });
