@@ -196,6 +196,32 @@ async function processarNfceReal(supabase: SupabaseClient, deps: ClaimDeps, item
         last_error: null,
       })
       .eq("id", doc.id);
+
+    try {
+      await supabase.from("fa_kiosk_print_jobs").insert({
+        unit_id: item.unit.id,
+        kind: "RECEIPT",
+        payload_json: {
+          title: "DANFE NFC-e SIMPLIFICADO",
+          unitName: item.unit.cnpj ? `CNPJ: ${item.unit.cnpj}` : "FAÇA AMIGOS",
+          code: item.order.orderCode,
+          dateTime: new Date(nowMs).toLocaleString("pt-BR"),
+          items: (item.items as Array<Record<string, unknown>>).map((it) => ({
+            description: String(it.description ?? it.name ?? "Item"),
+            quantity: Number(it.quantity ?? 1),
+            amountCents: Number(it.totalCents ?? 0),
+          })),
+          totalCents: doc.totalCents,
+          payments: (item.payments as Array<Record<string, unknown>>).map((p) => ({
+            method: String(p.method ?? "PIX"),
+            amountCents: Number(p.amountCents ?? doc.totalCents),
+          })),
+          footerNote: `NFC-e nº ${doc.numero ?? 1} Série ${doc.serie ?? "1"}\nChave: ${chaveAcesso}\nProt: ${resultado.protocolo ?? "153260000000000"}`,
+        },
+      });
+    } catch (errPrint) {
+      deps.onLog?.(`[fiscal] Erro ao enfileirar impressão do DANFE para ${doc.id}: ${errPrint}`);
+    }
   } else {
     deps.onLog?.(`[fiscal] NFC-e ${doc.id} rejeitada na SVRS (cStat ${resultado.cstat}): ${resultado.xmotivo}`);
     await supabase
@@ -237,6 +263,32 @@ async function processarDocumentoSimulado(supabase: SupabaseClient, item: Claime
       updated_at_ms: nowMs,
     })
     .eq("id", doc.id);
+
+  try {
+    await supabase.from("fa_kiosk_print_jobs").insert({
+      unit_id: item.unit.id,
+      kind: "RECEIPT",
+      payload_json: {
+        title: "DANFE NFC-e (SIMULADO)",
+        unitName: item.unit.cnpj ? `CNPJ: ${item.unit.cnpj}` : "FAÇA AMIGOS",
+        code: item.order.orderCode,
+        dateTime: new Date(nowMs).toLocaleString("pt-BR"),
+        items: (item.items as Array<Record<string, unknown>>).map((it) => ({
+          description: String(it.description ?? it.name ?? "Item"),
+          quantity: Number(it.quantity ?? 1),
+          amountCents: Number(it.totalCents ?? 0),
+        })),
+        totalCents: doc.totalCents,
+        payments: (item.payments as Array<Record<string, unknown>>).map((p) => ({
+          method: String(p.method ?? "PIX"),
+          amountCents: Number(p.amountCents ?? doc.totalCents),
+        })),
+        footerNote: `NFC-e nº ${doc.numero ?? 1} Série ${doc.serie ?? "1"}\nChave: ${accessKey}\nProt: ${protocolNumber}`,
+      },
+    });
+  } catch (errPrint) {
+    // Silencioso em ambiente simulado se print jobs falhar
+  }
 }
 
 /** Uma passada de claim + processamento. Retorna quantos documentos tratou. */

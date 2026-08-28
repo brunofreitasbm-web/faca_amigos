@@ -58,6 +58,32 @@ export async function processarNfseSimulado(supabase: SupabaseClient, item: Clai
       updated_at_ms: nowMs,
     })
     .eq("id", doc.id);
+
+  try {
+    await supabase.from("fa_kiosk_print_jobs").insert({
+      unit_id: unit.id,
+      kind: "RECEIPT",
+      payload_json: {
+        title: "COMPROVANTE NFS-e (SIMULADO)",
+        unitName: unit.cnpj ? `CNPJ: ${unit.cnpj}` : "FAÇA AMIGOS",
+        code: item.order.orderCode,
+        dateTime: new Date(nowMs).toLocaleString("pt-BR"),
+        items: (item.items as Array<Record<string, unknown>>).map((it) => ({
+          description: String(it.description ?? it.name ?? "Serviço de Recreação"),
+          quantity: Number(it.quantity ?? 1),
+          amountCents: Number(it.totalCents ?? 0),
+        })),
+        totalCents: doc.totalCents,
+        payments: (item.payments as Array<Record<string, unknown>>).map((p) => ({
+          method: String(p.method ?? "PIX"),
+          amountCents: Number(p.amountCents ?? doc.totalCents),
+        })),
+        footerNote: `NFS-e (RPS nº ${numero})\nProt: SIMULADO-${doc.id.slice(0, 8)}`,
+      },
+    });
+  } catch (errPrint) {
+    // Silencioso em caso de falha de enfileiramento de impressão
+  }
 }
 
 export async function bloquearNfsePorFaltaDeTransporteReal(supabase: SupabaseClient, doc: ClaimedFiscalDoc["doc"]): Promise<void> {
@@ -231,18 +257,45 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
   }
 
   const nNFSeMatch = resultado.nfseXml?.match(/<nNFSe>(\d+)<\/nNFSe>/);
+  const nfseNum = nNFSeMatch?.[1] ?? resultado.chaveAcesso ?? String(numero);
   await supabase
     .from("fa_kiosk_fiscal_docs")
     .update({
       status: "AUTORIZADO",
       rps_numero: numero,
       numero,
-      nfse_numero: nNFSeMatch?.[1] ?? resultado.chaveAcesso ?? String(numero),
+      nfse_numero: nfseNum,
       access_key: resultado.chaveAcesso,
       protocol_number: resultado.chaveAcesso,
       authorized_at_ms: nowMs,
       updated_at_ms: nowMs,
     })
     .eq("id", doc.id);
+
+  try {
+    await supabase.from("fa_kiosk_print_jobs").insert({
+      unit_id: unit.id,
+      kind: "RECEIPT",
+      payload_json: {
+        title: "COMPROVANTE NFS-e NACIONAL",
+        unitName: unitFiscal.cnpj ? `CNPJ: ${unitFiscal.cnpj}` : "FAÇA AMIGOS",
+        code: order.orderCode,
+        dateTime: new Date(nowMs).toLocaleString("pt-BR"),
+        items: (item.items as Array<Record<string, unknown>>).map((it) => ({
+          description: String(it.description ?? it.name ?? "Serviço de Recreação"),
+          quantity: Number(it.quantity ?? 1),
+          amountCents: Number(it.totalCents ?? 0),
+        })),
+        totalCents: doc.totalCents,
+        payments: (item.payments as Array<Record<string, unknown>>).map((p) => ({
+          method: String(p.method ?? "PIX"),
+          amountCents: Number(p.amountCents ?? doc.totalCents),
+        })),
+        footerNote: `NFS-e nº ${nfseNum}\nChave: ${resultado.chaveAcesso ?? ""}`,
+      },
+    });
+  } catch (errPrint) {
+    onLog?.(`[fiscal] Erro ao enfileirar impressão da NFS-e para ${doc.id}: ${errPrint}`);
+  }
   onLog?.(`[fiscal] NFS-e ${doc.id} (venda ${order.orderCode}) autorizada pelo ADN — chave ${resultado.chaveAcesso}.`);
 }
