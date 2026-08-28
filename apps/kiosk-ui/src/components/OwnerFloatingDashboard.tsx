@@ -119,7 +119,9 @@ export function OwnerFloatingDashboard() {
         const h = row.hour;
         if (hoursMap.has(h)) {
           const current = hoursMap.get(h)!;
-          current[row.unit_name] = (current[row.unit_name] ?? 0) + row.count;
+          const matchedUnit = units.find((u) => u.id === row.unit_id || u.name === row.unit_name);
+          const uName = matchedUnit ? matchedUnit.name : row.unit_name;
+          current[uName] = (current[uName] ?? 0) + row.count;
         }
       }
 
@@ -605,13 +607,13 @@ export function OwnerFloatingDashboard() {
             </div>
           </div>
 
-          {/* GRÁFICO DE PROGRESSO DIÁRIO POR HORA */}
+          {/* GRÁFICO DE PROGRESSO DIÁRIO POR HORA (MINIMALISTA) */}
           <div
             style={{
-              padding: "20px",
-              borderRadius: "16px",
-              background: "rgba(30, 41, 59, 0.5)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              padding: "16px",
+              borderRadius: "14px",
+              background: "rgba(15, 23, 42, 0.4)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
             }}
           >
             <div
@@ -619,51 +621,50 @@ export function OwnerFloatingDashboard() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: "16px",
+                marginBottom: "12px",
               }}
             >
-              <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#F8FAFC" }}>
-                📊 Progresso Diário de Atendimentos por Hora (Check-ins)
-              </h3>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Das 10h às 22h</span>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Fluxo por Hora
+              </span>
             </div>
 
-            <div style={{ width: "100%", height: 240 }}>
+            <div style={{ width: "100%", height: 210 }}>
               <ResponsiveContainer width="100%" height="100%">
                 {selectedUnitId === "ALL" && units.length > 1 ? (
-                  <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" vertical={false} />
-                    <XAxis dataKey="hourLabel" stroke="#64748B" fontSize={12} tickLine={false} />
-                    <YAxis stroke="#64748B" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <BarChart data={hourlyData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
+                    <XAxis dataKey="hourLabel" stroke="#475569" fontSize={11} tickLine={false} />
+                    <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12, color: "#CBD5E1" }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: "#94A3B8" }} />
                     {units.map((u, i) => (
                       <Bar
                         key={u.id}
                         dataKey={u.name}
                         fill={CHART_COLORS[i % CHART_COLORS.length]}
                         radius={[4, 4, 0, 0]}
-                        maxBarSize={18}
+                        maxBarSize={16}
                       />
                     ))}
                   </BarChart>
                 ) : (
-                  <AreaChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <AreaChart data={hourlyData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
                     <defs>
                       <linearGradient id="ownerHourlyGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2ECFB5" stopOpacity={0.5} />
+                        <stop offset="5%" stopColor="#2ECFB5" stopOpacity={0.4} />
                         <stop offset="95%" stopColor="#2ECFB5" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" vertical={false} />
-                    <XAxis dataKey="hourLabel" stroke="#64748B" fontSize={12} tickLine={false} />
-                    <YAxis stroke="#64748B" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(val: number) => [`${val} check-ins`, "Fluxo"]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
+                    <XAxis dataKey="hourLabel" stroke="#475569" fontSize={11} tickLine={false} />
+                    <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(val: number) => [`${val}`, "Atendimentos"]} />
                     <Area
                       type="monotone"
                       dataKey={selectedUnitId === "ALL" ? "total" : units.find((u) => u.id === selectedUnitId)?.name ?? "total"}
                       stroke="#2ECFB5"
-                      strokeWidth={3}
+                      strokeWidth={2.5}
                       fillOpacity={1}
                       fill="url(#ownerHourlyGrad)"
                     />

@@ -2888,7 +2888,7 @@ export const Api = {
   reportCheckinsByHour: async (unitId: string | null, from: string, to: string): Promise<CheckinsByHour[]> => {
     let query = supabase()
       .from("fa_kiosk_sessions")
-      .select("unit_id, checkin_at_ms, fa_kiosk_units(name)")
+      .select("unit_id, checkin_at_ms, checkin_at, fa_kiosk_units(id, name)")
       .gte("business_date", from)
       .lte("business_date", to);
     if (unitId) query = query.eq("unit_id", unitId);
@@ -2896,8 +2896,17 @@ export const Api = {
     const map = new Map<string, { unit_id: string; unit_name: string; hour: number; count: number }>();
     for (const s of sessions) {
       const uid = s.unit_id as string;
-      const uname = ((s.fa_kiosk_units as { name?: string } | null)?.name) ?? "—";
-      const hour = new Date(s.checkin_at_ms as number).getHours();
+      let uname = "—";
+      if (s.fa_kiosk_units) {
+        if (Array.isArray(s.fa_kiosk_units) && s.fa_kiosk_units[0]) {
+          uname = (s.fa_kiosk_units[0] as { name?: string }).name ?? "—";
+        } else if (typeof s.fa_kiosk_units === "object") {
+          uname = (s.fa_kiosk_units as { name?: string }).name ?? "—";
+        }
+      }
+      const rawTs = s.checkin_at_ms ? Number(s.checkin_at_ms) : (s.checkin_at ? new Date(s.checkin_at as string).getTime() : 0);
+      if (!rawTs) continue;
+      const hour = new Date(rawTs).getHours();
       const key = `${uid}:${hour}`;
       const cur = map.get(key) ?? { unit_id: uid, unit_name: uname, hour, count: 0 };
       cur.count += 1;
