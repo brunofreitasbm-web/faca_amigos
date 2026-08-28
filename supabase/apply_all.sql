@@ -684,7 +684,7 @@ begin
   ) values (
     v_session_id, p_unit_id, p_activity, p_asset_id, p_plan_id, v_child_id, p_child->>'fullName', v_guardian_id,
     v_wristband, v_ticket, v_now_ms, p_employee_id,
-    v_coupon.id, v_coupon_discount_cents, false, fa_kiosk_business_date(v_now_ms, v_unit.business_day_cutoff_hour)
+    v_coupon_id, v_coupon_discount_cents, false, fa_kiosk_business_date(v_now_ms, v_unit.business_day_cutoff_hour)
   );
 
   insert into fa_kiosk_visit_log (child_id, activity, at_ms) values (v_child_id, p_activity, v_now_ms);
