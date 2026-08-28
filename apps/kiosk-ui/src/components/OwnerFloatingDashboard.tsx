@@ -2,14 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  Legend,
 } from "recharts";
 import { Button, Card, Modal, WalletIcon, GridIcon, ChartBarIcon, ArrowClockwiseIcon } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
@@ -34,18 +31,6 @@ interface HourlyProgressData {
   [unitName: string]: number | string;
 }
 
-// Cores do gráfico: os 4 primeiros nomes vêm de --chart-1..4 (mesma
-// paleta de BI usada no Relatório); os 2 extras cobrem uma 5ª/6ª unidade
-// sem repetir cor, usando marca (pink/amber) em vez de inventar tons novos.
-const CHART_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--color-pink)",
-  "var(--color-amber)",
-];
-
 const tooltipStyle = {
   background: "var(--surface-card)",
   border: "1px solid var(--border-subtle)",
@@ -66,7 +51,7 @@ export function OwnerFloatingDashboard() {
 
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
-  const [selectedUnitId, setSelectedUnitId] = useState<string>("ALL"); // 'ALL' = Consolidado
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
 
   const [loading, setLoading] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
@@ -74,11 +59,10 @@ export function OwnerFloatingDashboard() {
   const [unitSummaries, setUnitSummaries] = useState<UnitSummary[]>([]);
   const [hourlyData, setHourlyData] = useState<HourlyProgressData[]>([]);
 
-  // Totais consolidados
+  // Totais do negócio inteiro — usados só no resumo do widget minimizado/FAB,
+  // já que não existe mais uma aba de visão consolidada no painel aberto.
   const totalRevenueCents = unitSummaries.reduce((acc, u) => acc + u.revenueCents, 0);
   const totalSessionsCount = unitSummaries.reduce((acc, u) => acc + u.sessionsCount, 0);
-  const overallTicketMedioCents =
-    totalSessionsCount > 0 ? Math.round(totalRevenueCents / totalSessionsCount) : 0;
 
   // Recarregar dados
   const loadDashboardData = useCallback(async () => {
@@ -171,31 +155,24 @@ export function OwnerFloatingDashboard() {
     }
   }, [isOwner, loadDashboardData]);
 
+  // Seleciona a primeira unidade assim que a lista carrega — não existe
+  // mais visão consolidada, então sempre há uma unidade específica ativa.
+  useEffect(() => {
+    if (!selectedUnitId && units.length > 0) {
+      setSelectedUnitId(units[0]!.id);
+    }
+  }, [units, selectedUnitId]);
+
   if (!isOwner) return null;
 
   // Filtragem dos dados exibidos no card principal
-  const activeSummary =
-    selectedUnitId === "ALL"
-      ? {
-          revenueCents: totalRevenueCents,
-          sessionsCount: totalSessionsCount,
-          ticketMedioCents: overallTicketMedioCents,
-          minTicketCents: Math.round(
-            unitSummaries.reduce((a, b) => a + b.minTicketCents, 0) /
-              (unitSummaries.length || 1)
-          ),
-          targetTicketCents: Math.round(
-            unitSummaries.reduce((a, b) => a + b.targetTicketCents, 0) /
-              (unitSummaries.length || 1)
-          ),
-        }
-      : unitSummaries.find((u) => u.unitId === selectedUnitId) ?? {
-          revenueCents: 0,
-          sessionsCount: 0,
-          ticketMedioCents: 0,
-          minTicketCents: 0,
-          targetTicketCents: 0,
-        };
+  const activeSummary = unitSummaries.find((u) => u.unitId === selectedUnitId) ?? {
+    revenueCents: 0,
+    sessionsCount: 0,
+    ticketMedioCents: 0,
+    minTicketCents: 0,
+    targetTicketCents: 0,
+  };
 
   // Status visual do Ticket Médio — reaproveita a paleta de semáforo
   // operacional (packages/ui/src/tokens/status.css), a mesma usada no
@@ -387,14 +364,6 @@ export function OwnerFloatingDashboard() {
 
         {/* SELETOR DE UNIDADE */}
         <div role="group" aria-label="Filtrar unidade" style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", overflowX: "auto", paddingBottom: "2px" }}>
-          <button
-            type="button"
-            onClick={() => setSelectedUnitId("ALL")}
-            aria-pressed={selectedUnitId === "ALL"}
-            style={unitTabStyle(selectedUnitId === "ALL")}
-          >
-            Visão consolidada ({units.length} {units.length === 1 ? "unidade" : "unidades"})
-          </button>
           {units.map((u) => (
             <button
               key={u.id}
@@ -476,83 +445,31 @@ export function OwnerFloatingDashboard() {
 
           <div style={{ width: "100%", height: 240 }}>
             <ResponsiveContainer width="100%" height="100%">
-              {selectedUnitId === "ALL" && units.length > 1 ? (
-                <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
-                  <XAxis dataKey="hourLabel" stroke="var(--text-muted)" fontSize={12} tickLine={false} />
-                  <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
-                  {units.map((u, i) => (
-                    <Bar
-                      key={u.id}
-                      dataKey={u.name}
-                      fill={CHART_COLORS[i % CHART_COLORS.length]}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={18}
-                    />
-                  ))}
-                </BarChart>
-              ) : (
-                <AreaChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    {/* Cor fixa igual a --color-teal: defs de gradiente SVG
-                        não resolvem var() em stop-color. */}
-                    <linearGradient id="ownerHourlyGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2ECFB5" stopOpacity={0.5} />
-                      <stop offset="95%" stopColor="#2ECFB5" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
-                  <XAxis dataKey="hourLabel" stroke="var(--text-muted)" fontSize={12} tickLine={false} />
-                  <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(val: number) => [`${val} check-ins`, "Fluxo"]} />
-                  <Area
-                    type="monotone"
-                    dataKey={selectedUnitId === "ALL" ? "total" : units.find((u) => u.id === selectedUnitId)?.name ?? "total"}
-                    stroke="var(--color-teal)"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#ownerHourlyGrad)"
-                  />
-                </AreaChart>
-              )}
+              <AreaChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  {/* Cor fixa igual a --color-teal: defs de gradiente SVG
+                      não resolvem var() em stop-color. */}
+                  <linearGradient id="ownerHourlyGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2ECFB5" stopOpacity={0.5} />
+                    <stop offset="95%" stopColor="#2ECFB5" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                <XAxis dataKey="hourLabel" stroke="var(--text-muted)" fontSize={12} tickLine={false} />
+                <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(val: number) => [`${val} check-ins`, "Fluxo"]} />
+                <Area
+                  type="monotone"
+                  dataKey={units.find((u) => u.id === selectedUnitId)?.name ?? "total"}
+                  stroke="var(--color-teal)"
+                  strokeWidth={3}
+                  fillOpacity={1}
+                  fill="url(#ownerHourlyGrad)"
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* DETALHAMENTO DE DESEMPENHO POR UNIDADE (VISÃO CONSOLIDADA) */}
-        {selectedUnitId === "ALL" && units.length > 1 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--space-3)" }}>
-            {unitSummaries.map((u) => (
-              <Card key={u.unitId} bodyStyle={{ padding: "var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--text-primary)" }}>
-                    {u.unitName}
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedUnitId(u.unitId)}>
-                    Filtrar
-                  </Button>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
-                  <div>
-                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Faturamento</span>
-                    <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-teal-text)" }}>
-                      {money(u.revenueCents)}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Ticket médio</span>
-                    <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-primary-hover)" }}>
-                      {money(u.ticketMedioCents)}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
 
         {/* PAINEL DE ESTRATÉGIA E ALAVANCAGEM COMERCIAL */}
         <div
