@@ -20,9 +20,6 @@ import { initAutoUpdater, checkForUpdatesAndWait, getUpdateStatus, applyUpdate }
  * preenchido. Variáveis já definidas no ambiente real (produção) não são
  * sobrescritas.
  */
-const DEFAULT_SUPABASE_URL = "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
-const DEFAULT_SUPABASE_SERVICE_ROLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2anZwZHpzZmpkcHlhYmJ6enVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDUwNjA2OSwiZXhwIjoyMTAwMDgyMDY5fQ.wuwMmQAX8ICxFrOltge1QSCf-O31J9FZ021--behJFM";
 
 function loadDotEnvFromCandidates(): void {
   let userDataEnv = "";

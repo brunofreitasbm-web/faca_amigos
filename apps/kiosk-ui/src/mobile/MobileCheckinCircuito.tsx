@@ -105,6 +105,20 @@ export function MobileCheckinCircuito({
     setStep("veiculo");
   }
 
+  function parseFriendlyError(err: unknown): string {
+    if (!(err instanceof Error)) return "Não foi possível liberar a pista.";
+    const msg = err.message || "";
+    if (msg.includes("ASSET_INDISPONIVEL")) return "Este veículo acabou de ser ocupado ou está indisponível. Escolha outro.";
+    if (msg.includes("ASSET_OBRIGATORIO")) return "Por favor, escolha um veículo disponível para liberar a pista.";
+    if (msg.includes("PLANO_INVALIDO")) return "O plano selecionado não é válido para a modalidade Circuito.";
+    if (msg.includes("PACOTE_INVALIDO")) return "O pacote selecionado não é válido para a modalidade Circuito.";
+    if (msg.includes("FORA_DO_HORARIO")) {
+      const split = msg.split(":");
+      return split.length > 1 ? split.slice(1).join(":").trim() : "O quiosque está fora do horário de atendimento.";
+    }
+    return msg || "Não foi possível liberar a pista.";
+  }
+
   async function confirm() {
     if (!picked || !assetId || !offerReady || !checklistDone || submitting) return;
     setSubmitting(true);
@@ -114,11 +128,11 @@ export function MobileCheckinCircuito({
         activity: "CARRINHO",
         assetId,
         planId: catalogo === "planos" ? planId : null,
-        packageId: catalogo === "pacotes" ? packageId : undefined,
+        packageId: catalogo === "pacotes" ? packageId : null,
         employeeId,
         child: { id: picked.id, fullName: picked.full_name, birthDate: picked.birth_date, inclusiveEligible: false },
         guardian: {
-          fullName: picked.guardian_name ?? "",
+          fullName: picked.guardian_name || "Responsável",
           cpf: normalizeCpf(picked.cpf ?? ""),
           phoneE164: normalizePhoneE164(picked.phone_e164 ?? ""),
         },
@@ -132,7 +146,7 @@ export function MobileCheckinCircuito({
       setStep("pronto");
       onDone();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível liberar a pista.");
+      toast.error(parseFriendlyError(err));
     } finally {
       setSubmitting(false);
     }
