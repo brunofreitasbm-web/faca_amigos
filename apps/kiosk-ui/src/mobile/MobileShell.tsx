@@ -3,6 +3,7 @@ import type { Unit } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { usePendingRenewals } from "../api/renewalRequests.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { InstallPwaBanner } from "../components/InstallPwaBanner.js";
 import { UpdatePwaBanner } from "../components/UpdatePwaBanner.js";
@@ -184,6 +185,7 @@ function MobileMais({
   onSair: () => void;
 }) {
   const { can } = useAuth();
+  const { employee } = useAppState();
 
   const telas: Array<{ screen: EscapeScreen; titulo: string; ajuda: string; show: boolean }> = [
     { screen: "ENTRADA", titulo: "Entrada completa", ajuda: "criança nova, cupom, pacote, carrinho, contrato", show: can("sessao.checkin") },
@@ -239,9 +241,11 @@ function MobileMais({
           <button type="button" className="m-pill" onClick={onUsarVersaoCompleta}>
             Sempre abrir a versão completa
           </button>
-          <button type="button" className="m-pill" onClick={onTrocarModulo}>
-            Trocar de unidade
-          </button>
+          {employee?.role !== "OPERADOR" && (
+            <button type="button" className="m-pill" onClick={onTrocarModulo}>
+              Trocar de unidade
+            </button>
+          )}
           <button type="button" className="m-pill" onClick={onSair} style={{ color: "var(--color-primary-hover)" }}>
             Sair
           </button>

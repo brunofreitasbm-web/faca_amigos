@@ -4,10 +4,15 @@ import { useAppState } from "../state/AppState.js";
 import { useAuth } from "../auth/AuthContext.js";
 
 export function SelectModuleScreen() {
-  const { units, setUnitId, setGerencial } = useAppState();
+  const { units, setUnitId, setGerencial, employee } = useAppState();
   const { can } = useAuth();
 
-  const displayModules = UNIT_BRANDS.map((mod) => {
+  const isOperador = employee?.role === "OPERADOR";
+
+  const displayModules = UNIT_BRANDS.filter((mod) => {
+    if (!isOperador) return true;
+    return units.some((u) => unitMatchesBrand(mod.key, u.name));
+  }).map((mod) => {
     const matchedUnit = units.find((u) => unitMatchesBrand(mod.key, u.name));
     return {
       ...mod,
@@ -104,7 +109,7 @@ export function SelectModuleScreen() {
           );
         })}
 
-        {can("config.write") && (
+        {!isOperador && can("config.write") && (
           <Card
             key="gerencial"
             onClick={() => setGerencial(true)}

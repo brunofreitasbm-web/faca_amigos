@@ -41,23 +41,59 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // As unidades só podem ser lidas com sessão (as policies de leitura são
   // `to authenticated` desde a migration 20260807000003), então a busca
   // depende do colaborador estar logado.
+  // Para colaboradores com papel OPERADOR, a lista de unidades é restrita
+  // exclusivamente à(s) unidade(s) alocada(s) em fa_kiosk_employee_units.
   useEffect(() => {
     if (!employee) {
       setUnits([]);
       return;
     }
-    Api.units().then(setUnits).catch(() => setUnits([]));
+
+    let isCancelled = false;
+
+    async function loadUnits() {
+      try {
+        const allUnits = await Api.units();
+        if (isCancelled) return;
+
+        if (employee?.role === "OPERADOR") {
+          const myIds: string[] = await Api.myUnitIds(employee.id).catch(() => []);
+          if (isCancelled) return;
+          const assigned = allUnits.filter((u) => myIds.includes(u.id));
+          if (assigned.length > 0) {
+            setUnits(assigned);
+          } else {
+            // Se for operador sem vinculo especifico gravado, limita a 1 unidade
+            setUnits(allUnits.slice(0, 1));
+          }
+        } else {
+          setUnits(allUnits);
+        }
+      } catch {
+        if (!isCancelled) setUnits([]);
+      }
+    }
+
+    void loadUnits();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [employee]);
 
-  // Se o colaborador está vinculado a uma única unidade, pular a tela de
-  // seleção de módulo é só atrito a menos: não existe escolha de verdade
-  // ali. Dispara uma vez por login (ref abaixo) para não brigar com
-  // "Trocar Módulo", que zera unitId de propósito para deixar escolher —
-  // inclusive entrar no Gerencial, que só aparece nessa tela.
+  // Se o colaborador está vinculado a uma única unidade (ou é Operador),
+  // pular a tela de seleção de módulo automaticamente.
   const autoSelectedForEmployeeId = useRef<string | null>(null);
   useEffect(() => {
     if (!employee || unitId) return;
     if (autoSelectedForEmployeeId.current === employee.id) return;
+
+    if (employee.role === "OPERADOR" && units.length > 0) {
+      autoSelectedForEmployeeId.current = employee.id;
+      setUnitId(units[0]!.id);
+      return;
+    }
+
     Api.myUnitIds(employee.id)
       .then((ids) => {
         autoSelectedForEmployeeId.current = employee.id;
@@ -66,7 +102,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         autoSelectedForEmployeeId.current = employee.id;
       });
-  }, [employee, unitId]);
+  }, [employee, unitId, units]);
 
   // Restaura a sessão do Supabase Auth que o navegador já tinha (o terminal
   // do balcão não deve pedir PIN a cada refresh da página) e reflete
@@ -112,11 +148,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const refreshUnits = async () => {
     if (!employee) return;
     try {
-      const fresh = await Api.units();
-      setUnits(fresh);
+      const allUnits = await Api.units();
+      if (employee.role === "OPERADOR") {
+        const myIds: string[] = await Api.myUnitIds(employee.id).catch(() => []);
+        const assigned = allUnits.filter((u) => myIds.includes(u.id));
+        setUnits(assigned.length > 0 ? assigned : allUnits.slice(0, 1));
+      } else {
+        setUnits(allUnits);
+      }
     } catch (err) {
       console.error("Erro ao recarregar unidades:", err);
     }
+  };
+
+  const handleSetGerencial = (val: boolean) => {
+    // Operador NUNCA acessa o módulo gerencial
+    if (val && employee?.role === "OPERADOR") {
+      setGerencial(false);
+      return;
+    }
+    setGerencial(val);
   };
 
   const value = useMemo<AppStateValue>(
@@ -125,8 +176,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       unit: units.find((u) => u.id === unitId) ?? null,
       setUnitId,
       refreshUnits,
-      gerencial,
-      setGerencial,
+      gerencial: employee?.role === "OPERADOR" ? false : gerencial,
+      setGerencial: handleSetGerencial,
       employee,
       terminalEmployees,
       restoring,

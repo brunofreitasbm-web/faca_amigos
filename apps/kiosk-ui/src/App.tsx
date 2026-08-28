@@ -286,11 +286,18 @@ export function App() {
   // No celular a porta de entrada é a home "as 3 operações numa tela"
   // (MobileGerencial), não o console de 21 abas direto — ver o comentário
   // em mobile/MobileGerencial.tsx.
+  // Modo Gerencial: fora do contexto das 3 unidades, é onde o Owner configura
+  // o que vale para várias unidades de uma vez e vê relatórios cross-unit.
+  // Operador NUNCA acessa o módulo Gerencial.
   if (gerencial) {
-    if (mobile.active) {
-      return <MobileGerencial units={units} onExit={() => setGerencial(false)} onLogout={handleLogout} />;
+    if (employee?.role === "OPERADOR" || !can("config.write")) {
+      setGerencial(false);
+    } else {
+      if (mobile.active) {
+        return <MobileGerencial units={units} onExit={() => setGerencial(false)} onLogout={handleLogout} />;
+      }
+      return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
     }
-    return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
   }
 
   // Se nenhuma operação/módulo foi selecionado ainda, exibe a Tela Inicial de Seleção de Módulo
@@ -479,15 +486,17 @@ export function App() {
             {employee.full_name} · {ROLE_LABEL[employee.role]}
           </span>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleChangeModule}
-            title="Alternar para a tela inicial de seleção de módulos"
-            style={{ fontSize: "12px", border: "1px solid var(--border-subtle)" }}
-          >
-            <ArrowClockwiseIcon /> Trocar Módulo
-          </Button>
+          {employee.role !== "OPERADOR" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleChangeModule}
+              title="Alternar para a tela inicial de seleção de módulos"
+              style={{ fontSize: "12px", border: "1px solid var(--border-subtle)" }}
+            >
+              <ArrowClockwiseIcon /> Trocar Módulo
+            </Button>
+          )}
 
           <Button
             variant="ghost"
