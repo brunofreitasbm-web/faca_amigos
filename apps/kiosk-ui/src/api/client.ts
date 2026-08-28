@@ -16,6 +16,24 @@ export interface ApiError {
  */
 export const systemStatus = new EventTarget();
 
+/**
+ * Identifica este computador para o print bridge local (Electron) só
+ * imprimir os jobs que ele mesmo emitiu — sem isto, 2 terminais na mesma
+ * unidade imprimem cada pulseira/cupom em dobro. Vem do servidor local
+ * (persistido por instalação); fora do Electron (ex.: PWA sem print
+ * bridge) o fetch falha e os jobs seguem sem origin_device_id, como antes.
+ */
+let deviceIdPromise: Promise<string | null> | null = null;
+function localDeviceId(): Promise<string | null> {
+  if (!deviceIdPromise) {
+    deviceIdPromise = fetch("/api/system/device-id")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => (data && typeof data.deviceId === "string" ? data.deviceId : null))
+      .catch(() => null);
+  }
+  return deviceIdPromise;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -1405,17 +1423,20 @@ export const Api = {
     employeeId: string;
     payments: { method: string; amountCents: number }[];
   }) =>
-    callResilient<{
-      orderId: string;
-      orderCode: string;
-      chargedCents: number;
-      guardianPackageId: string;
-      expiresAtMs: number;
-    }>("fa_upsell_vender_pacote", {
-      p_offer_id: body.offerId,
-      p_payments: body.payments,
-      p_employee_id: body.employeeId,
-    }),
+    localDeviceId().then((deviceId) =>
+      callResilient<{
+        orderId: string;
+        orderCode: string;
+        chargedCents: number;
+        guardianPackageId: string;
+        expiresAtMs: number;
+      }>("fa_upsell_vender_pacote", {
+        p_offer_id: body.offerId,
+        p_payments: body.payments,
+        p_employee_id: body.employeeId,
+        p_device_id: deviceId,
+      }),
+    ),
   /**
    * Cross-sell rápido: adiciona um produto único (ex.: "Água") à comanda
    * da sessão, cobrado junto no fechamento (fa_checkout). Diferente do
@@ -1566,43 +1587,46 @@ export const Api = {
     // fa_checkin também enfileira, na mesma transação, a pulseira e o recibo
     // de guarda. Nenhuma tela precisa disparar impressão no check-in: se a
     // RPC voltou, as duas vias já estão na fila do print bridge.
-    callResilient<{
-      sessionId: string;
-      childId: string;
-      guardianId: string;
-      accessCode: string;
-      /** PIN numérico de 4 dígitos para digitação rápida na Saída (único do dia). */
-      exitPin: string;
-      wristbandCode: string;
-      ticketCode: string;
-      /** Minutos do banco de horas alocados nesta entrada (só quando useHourBank). */
-      hourBankAllocatedMinutes: number | null;
-      /** Minutos do pacote alocados nesta entrada (só quando packageId). */
-      packageAllocatedMinutes: number | null;
-    }>(
-      "fa_checkin",
-      {
-        p_unit_id: body.unitId,
-        p_activity: body.activity,
-        p_plan_id: body.planId,
-        p_use_hour_bank: body.useHourBank ?? false,
-        p_package_id: body.packageId ?? null,
-        p_asset_id: body.assetId ?? null,
-        p_guardian: { id: body.guardian.id, fullName: body.guardian.fullName, cpf: body.guardian.cpf, phoneE164: body.guardian.phoneE164 },
-        p_child: {
-          id: body.child.id,
-          fullName: body.child.fullName,
-          birthDate: body.child.birthDate,
-          inclusiveEligible: body.child.inclusiveEligible,
-          inclusiveProofType: body.child.inclusiveProofType,
+    localDeviceId().then((deviceId) =>
+      callResilient<{
+        sessionId: string;
+        childId: string;
+        guardianId: string;
+        accessCode: string;
+        /** PIN numérico de 4 dígitos para digitação rápida na Saída (único do dia). */
+        exitPin: string;
+        wristbandCode: string;
+        ticketCode: string;
+        /** Minutos do banco de horas alocados nesta entrada (só quando useHourBank). */
+        hourBankAllocatedMinutes: number | null;
+        /** Minutos do pacote alocados nesta entrada (só quando packageId). */
+        packageAllocatedMinutes: number | null;
+      }>(
+        "fa_checkin",
+        {
+          p_unit_id: body.unitId,
+          p_activity: body.activity,
+          p_plan_id: body.planId,
+          p_use_hour_bank: body.useHourBank ?? false,
+          p_package_id: body.packageId ?? null,
+          p_asset_id: body.assetId ?? null,
+          p_guardian: { id: body.guardian.id, fullName: body.guardian.fullName, cpf: body.guardian.cpf, phoneE164: body.guardian.phoneE164 },
+          p_child: {
+            id: body.child.id,
+            fullName: body.child.fullName,
+            birthDate: body.child.birthDate,
+            inclusiveEligible: body.child.inclusiveEligible,
+            inclusiveProofType: body.child.inclusiveProofType,
+          },
+          p_coupon_code: body.couponCode ?? null,
+          p_employee_id: body.employeeId,
+          p_notes: body.notes ?? null,
+          p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
+          p_pre_checkin_id: body.preCheckinId ?? null,
+          p_pre_checkin_child_index: body.preCheckinChildIndex ?? null,
+          p_device_id: deviceId,
         },
-        p_coupon_code: body.couponCode ?? null,
-        p_employee_id: body.employeeId,
-        p_notes: body.notes ?? null,
-        p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
-        p_pre_checkin_id: body.preCheckinId ?? null,
-        p_pre_checkin_child_index: body.preCheckinChildIndex ?? null,
-      },
+      ),
     ),
 
   // --- QR Code de Acesso Rápido (pré-cadastro pelo responsável, sem login) --

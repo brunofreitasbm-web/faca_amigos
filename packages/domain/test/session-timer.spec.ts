@@ -61,20 +61,28 @@ describe("computeSessionTiming", () => {
     expect(t.overMinutes).toBe(0);
   });
 
-  it("um minuto após o teto já cobra e vira EXCEDENTE", () => {
-    const t = computeSessionTiming(plan, { checkinAtMs, ...notPaused }, 15 * 60_000 + 1);
+  it("durante o 1º minuto após o teto (tolerância/graça) não cobra excedente e permanece em VERMELHO", () => {
+    const t30s = computeSessionTiming(plan, { checkinAtMs, ...notPaused }, 15 * 60_000 + 30_000); // +30s
+    expect(t30s.overMinutes).toBe(0);
+    expect(t30s.overCents).toBe(0);
+    expect(t30s.liveTotalCents).toBe(3000);
+    expect(t30s.phase).toBe("VERMELHO");
+
+    const t60s = computeSessionTiming(plan, { checkinAtMs, ...notPaused }, 15 * 60_000 + 60_000); // no limite de 1 min de graça
+    expect(t60s.overMinutes).toBe(0);
+    expect(t60s.overCents).toBe(0);
+    expect(t60s.phase).toBe("VERMELHO");
+  });
+
+  it("após passar 1 minuto do teto (tolerância), vira EXCEDENTE e inicia a cobrança", () => {
+    const t = computeSessionTiming(plan, { checkinAtMs, ...notPaused }, 15 * 60_000 + 60_001); // 1 min + 1 ms após o teto
     expect(t.overMinutes).toBe(1);
     expect(t.overCents).toBe(100);
     expect(t.liveTotalCents).toBe(3100);
     expect(t.phase).toBe("EXCEDENTE");
   });
 
-  it("arredonda o excedente para cima por minuto (fração de 1 min)", () => {
-    const t = computeSessionTiming(plan, { checkinAtMs, ...notPaused }, 15 * 60_000 + 30_000); // +30s
-    expect(t.overMinutes).toBe(1);
-  });
-
-  it("Day Use de 5h calcula excedente em horas convertidas para minutos", () => {
+  it("Day Use de 5h calcula excedente considerando a tolerância de 1 min", () => {
     const dayUse: Plan = {
       id: "plan-day-use",
       activity: "PLAYGROUND",
@@ -86,8 +94,8 @@ describe("computeSessionTiming", () => {
       color: "#A020EE",
     };
     const t = computeSessionTiming(dayUse, { checkinAtMs, ...notPaused }, 5 * 60 * 60_000 + 10 * 60_000); // +10 min
-    expect(t.overMinutes).toBe(10);
-    expect(t.overCents).toBe(1800);
+    expect(t.overMinutes).toBe(9); // 10 min decorridos além do plano - 1 min de tolerância = 9 min
+    expect(t.overCents).toBe(1620); // 9 * 180 = 1620
     expect(t.phase).toBe("EXCEDENTE");
   });
 

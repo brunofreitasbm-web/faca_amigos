@@ -75,7 +75,7 @@ describe("fluxo completo: check-in até fechamento de turno", () => {
     insertVisit(db, uuidv7(NOW), childId, "CARRINHO", NOW);
     expect(getVisitLog(db, childId)).toEqual([{ atMs: NOW }]);
 
-    // Check-out 18 minutos depois: 3 min de excedente a R$1,00 = R$3,00.
+    // Check-out 18 minutos depois (num plano de 15 min): 3 min além do plano - 1 min de tolerância = 2 min de excedente a R$1,00 = R$2,00.
     const checkoutAtMs = NOW + 18 * 60_000;
     const plan = getPlan(db, planId)!;
     const session = getSession(db, sessionId)!;
@@ -90,7 +90,7 @@ describe("fluxo completo: check-in até fechamento de turno", () => {
       pausedMsTotal: 0,
     }, checkoutAtMs);
 
-    expect(quote.totalCents).toBe(3300);
+    expect(quote.totalCents).toBe(3200);
 
     expect(tryMarkAwaitingPayment(db, sessionId)).toBe(true);
     expect(tryMarkAwaitingPayment(db, sessionId)).toBe(false); // segundo terminal não consegue fechar de novo
@@ -122,11 +122,11 @@ describe("fluxo completo: check-in até fechamento de turno", () => {
     expect(getSession(db, sessionId)!.status).toBe("FINALIZADA");
 
     const byMethod = sumPaymentsByMethodForShift(db, shiftId);
-    expect(byMethod).toEqual([{ method: "PIX", total_cents: 3300 }]);
+    expect(byMethod).toEqual([{ method: "PIX", total_cents: 3200 }]);
 
     // Fechamento não-cego: declarado bate com esperado (troco + vendas em dinheiro, que aqui é zero).
     const declared = { DINHEIRO: 10000 };
-    const expected = { DINHEIRO: 10000, PIX: 3300 };
+    const expected = { DINHEIRO: 10000, PIX: 3200 };
     closeShift(db, shiftId, employeeId, declared, expected, checkoutAtMs + 1000);
     expect(getOpenShift(db, unitId)).toBeUndefined();
 

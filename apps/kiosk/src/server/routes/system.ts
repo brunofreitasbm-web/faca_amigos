@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { AppContext } from "../context.js";
 import { getUpdateStatus, checkForUpdates, applyUpdate } from "../../main/autoUpdater.js";
@@ -8,6 +9,32 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): voi
       update: getUpdateStatus(),
       now: Date.now(),
     };
+  });
+
+  /**
+   * Identifica este computador (não a unidade) para o print bridge só
+   * imprimir os jobs que ele mesmo enfileirou — sem isto, 2 terminais na
+   * mesma unidade imprimem cada pulseira/cupom em dobro. Gerado uma vez e
+   * persistido localmente; cada instalação do Electron tem o seu.
+   */
+  app.get("/api/system/device-id", async () => {
+    const row = ctx.db.prepare("SELECT value FROM app_settings WHERE unit_id = 'global' AND key = 'device_id'").get() as
+      | { value: string }
+      | undefined;
+    if (row?.value) return { deviceId: row.value };
+
+    const deviceId = randomUUID();
+    ctx.db
+      .prepare(
+        `INSERT INTO app_settings (unit_id, key, value, updated_at_ms)
+         VALUES ('global', 'device_id', ?, ?)
+         ON CONFLICT (unit_id, key) DO NOTHING`
+      )
+      .run(deviceId, Date.now());
+    const persisted = ctx.db.prepare("SELECT value FROM app_settings WHERE unit_id = 'global' AND key = 'device_id'").get() as {
+      value: string;
+    };
+    return { deviceId: persisted.value };
   });
 
   app.get("/api/system/terminal-unit", async () => {

@@ -14,6 +14,7 @@ interface PrintJobRow {
   kind: "WRISTBAND" | "RECEIPT";
   payload_json: Record<string, unknown>;
   status: string;
+  origin_device_id?: string | null;
 }
 
 import QRCode from "qrcode";
@@ -253,6 +254,25 @@ export function getTerminalUnitIds(db?: any): Set<string> {
 }
 
 /**
+ * ID único deste computador, persistido em app_settings pela rota
+ * /api/system/device-id (mesma tabela, mesma chave 'device_id'). Jobs
+ * marcados com origin_device_id só são impressos pelo terminal que os
+ * emitiu — jobs sem origem (legado, ou emitidos fora deste app) continuam
+ * sendo aceitos por qualquer terminal da unidade, como antes.
+ */
+export function getLocalDeviceId(db?: any): string | null {
+  if (!db) return null;
+  try {
+    const row = db.prepare("SELECT value FROM app_settings WHERE unit_id = 'global' AND key = 'device_id'").get() as
+      | { value: string }
+      | undefined;
+    return row?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Se isto retornar `started: false`, NENHUM job de fa_kiosk_print_jobs vai
  * ser processado neste terminal — os jobs ficam acumulando como PENDING
  * para sempre, sem nenhum aviso além deste retorno. Quem chama isto deve avisar o operador visivelmente.
@@ -362,6 +382,12 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
       return;
     }
 
+    const localDeviceId = getLocalDeviceId(db);
+    if (job.origin_device_id && localDeviceId && job.origin_device_id !== localDeviceId) {
+      console.log(`[print-bridge] Ignorando job ${job.id}: emitido pelo terminal ${job.origin_device_id}, este é ${localDeviceId}.`);
+      return;
+    }
+
     try {
       let deviceName: string | null = null;
       try {
@@ -399,10 +425,10 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
         const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
         const isCircuito =
           Boolean(payload.accessCode) &&
+          payload.activity !== "PLAYGROUND" &&
           (payload.activity === "CARRINHO" ||
-            /circuito/i.test(payload.unitName) ||
             Boolean(payload.assetName) ||
-            payload.activity !== "PLAYGROUND");
+            /circuito/i.test(payload.unitName));
 
         if (isVirtualOrPdf) {
           const html = await receiptHtml(payload);
@@ -459,7 +485,7 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
   // futuros, não histórico.
   supabase
     .from("fa_kiosk_print_jobs")
-    .select("id, unit_id, kind, payload_json, status")
+    .select("id, unit_id, kind, payload_json, status, origin_device_id")
     .eq("status", "PENDING")
     .then(({ data }) => {
       const allowedUnits = getTerminalUnitIds(db);
