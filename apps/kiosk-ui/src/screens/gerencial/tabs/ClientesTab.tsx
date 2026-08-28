@@ -126,20 +126,20 @@ export function ClientesTab() {
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Resumo de Indicadores da Base */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
-        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--color-surface)" }}>
-          <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>Total de Responsáveis</span>
+        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--surface-card)" }}>
+          <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Total de Responsáveis</span>
           <strong style={{ display: "block", fontSize: "28px", marginTop: "4px", color: "var(--color-primary)" }}>
             {totalGuardians}
           </strong>
         </Card>
-        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--color-surface)" }}>
-          <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>Crianças Vinculadas</span>
-          <strong style={{ display: "block", fontSize: "28px", marginTop: "4px", color: "var(--color-text)" }}>
+        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--surface-card)" }}>
+          <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Crianças Vinculadas</span>
+          <strong style={{ display: "block", fontSize: "28px", marginTop: "4px", color: "var(--text-primary)" }}>
             {totalChildren}
           </strong>
         </Card>
-        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--color-surface)" }}>
-          <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>Visitas Registradas</span>
+        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--surface-card)" }}>
+          <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Visitas Registradas</span>
           <strong style={{ display: "block", fontSize: "28px", marginTop: "4px", color: "#10b981" }}>
             {totalVisits}
           </strong>
@@ -164,9 +164,9 @@ export function ClientesTab() {
               style={{
                 padding: "10px 14px",
                 borderRadius: "10px",
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
+                border: "1px solid var(--border-subtle)",
+                background: "var(--surface-card)",
+                color: "var(--text-primary)",
                 fontSize: "14px",
               }}
             >
@@ -185,7 +185,7 @@ export function ClientesTab() {
               onClick={handleResetVisitCounter}
               disabled={resetting}
               title="Zera a contagem de visitas exibida aqui, sem apagar o histórico real de check-ins"
-              style={{ border: "1px solid var(--color-border)" }}
+              style={{ border: "1px solid var(--border-subtle)" }}
             >
               ↺ Reiniciar contador de visitas
             </Button>
@@ -207,7 +207,7 @@ export function ClientesTab() {
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", textAlign: "left" }}>
               <thead>
-                <tr style={{ borderBottom: "2px solid var(--color-border)", color: "var(--color-text-muted)" }}>
+                <tr style={{ borderBottom: "2px solid var(--border-subtle)", color: "var(--text-muted)" }}>
                   <th style={{ padding: "12px 8px" }}>Responsável</th>
                   <th style={{ padding: "12px 8px" }}>Telefone / CPF</th>
                   <th style={{ padding: "12px 8px" }}>Crianças Vinculadas</th>
@@ -219,18 +219,18 @@ export function ClientesTab() {
                 {clientes.map((c) => (
                   <tr
                     key={c.guardian_id}
-                    style={{ borderBottom: "1px solid var(--color-border)", cursor: "pointer" }}
+                    style={{ borderBottom: "1px solid var(--border-subtle)", cursor: "pointer" }}
                     onClick={() => setSelectedCliente(c)}
                   >
-                    <td style={{ padding: "14px 8px", fontWeight: "600", color: "var(--color-text)" }}>
+                    <td style={{ padding: "14px 8px", fontWeight: "600", color: "var(--text-primary)" }}>
                       <div>{c.guardian_name}</div>
                       {c.email && (
-                        <span style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: "normal" }}>
+                        <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "normal" }}>
                           {c.email}
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: "14px 8px", color: "var(--color-text-muted)" }}>
+                    <td style={{ padding: "14px 8px", color: "var(--text-muted)" }}>
                       <div>{c.phone_e164 ? formatPhoneBr(c.phone_e164) : "—"}</div>
                       {c.cpf && <span style={{ fontSize: "12px" }}>CPF: {c.cpf}</span>}
                     </td>
@@ -243,7 +243,7 @@ export function ClientesTab() {
                             </Tag>
                           ))
                         ) : (
-                          <span style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>Nenhuma criança</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>Nenhuma criança</span>
                         )}
                       </div>
                     </td>
@@ -285,14 +285,20 @@ export function ClientesTab() {
             zIndex: 300,
             padding: "20px",
           }}
-          onClick={() => setSelectedCliente(null)}
+          onClick={() => {
+            if (saving) return;
+            setSelectedCliente(null);
+            setEditing(false);
+          }}
         >
           <div
             style={{
-              background: "var(--color-surface)",
+              background: "var(--surface-card)",
               borderRadius: "20px",
               maxWidth: "540px",
               width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
               padding: "24px",
               display: "flex",
               flexDirection: "column",
@@ -305,59 +311,158 @@ export function ClientesTab() {
               <h3 style={{ margin: 0, fontSize: "20px", fontFamily: "var(--font-display)" }}>
                 👤 {selectedCliente.guardian_name}
               </h3>
-              <Button variant="secondary" size="sm" onClick={() => setSelectedCliente(null)}>
-                ✖ Fechar
-              </Button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {!editing && can("clientes.write") && (
+                  <Button variant="secondary" size="sm" onClick={() => startEditing(selectedCliente)}>
+                    ✏️ Editar
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => {
+                    setSelectedCliente(null);
+                    setEditing(false);
+                  }}
+                >
+                  ✖ Fechar
+                </Button>
+              </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "14px" }}>
-              <div>
-                <strong>Telefone:</strong> {selectedCliente.phone_e164 ? formatPhoneBr(selectedCliente.phone_e164) : "Não informado"}
-              </div>
-              <div>
-                <strong>CPF:</strong> {selectedCliente.cpf || "Não informado"}
-              </div>
-              <div>
-                <strong>E-mail:</strong> {selectedCliente.email || "Não informado"}
-              </div>
-              <div>
-                <strong>Total de Visitas:</strong> {selectedCliente.total_visits}
-              </div>
-            </div>
-
-            <hr style={{ border: 0, borderTop: "1px solid var(--color-border)", margin: 0 }} />
-
-            <div>
-              <h4 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>Crianças Cadastradas</h4>
-              {selectedCliente.children && selectedCliente.children.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {selectedCliente.children.map((ch) => (
-                    <div
-                      key={ch.id}
-                      style={{
-                        padding: "12px",
-                        borderRadius: "12px",
-                        background: "var(--color-background)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <strong>🧒 {ch.fullName}</strong>
-                        {ch.birthDate && (
-                          <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-                            Nascido em: {dateBrFromIso(ch.birthDate)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+            {!editing ? (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "14px" }}>
+                  <div>
+                    <strong>Telefone:</strong> {selectedCliente.phone_e164 ? formatPhoneBr(selectedCliente.phone_e164) : "Não informado"}
+                  </div>
+                  <div>
+                    <strong>CPF:</strong> {selectedCliente.cpf || "Não informado"}
+                  </div>
+                  <div>
+                    <strong>E-mail:</strong> {selectedCliente.email || "Não informado"}
+                  </div>
+                  <div>
+                    <strong>Total de Visitas:</strong> {selectedCliente.total_visits}
+                  </div>
                 </div>
-              ) : (
-                <span style={{ color: "var(--color-text-muted)" }}>Nenhuma criança cadastrada para este responsável.</span>
-              )}
-            </div>
+
+                <hr style={{ border: 0, borderTop: "1px solid var(--border-subtle)", margin: 0 }} />
+
+                <div>
+                  <h4 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>Crianças Cadastradas</h4>
+                  {selectedCliente.children && selectedCliente.children.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      {selectedCliente.children.map((ch) => (
+                        <div
+                          key={ch.id}
+                          style={{
+                            padding: "12px",
+                            borderRadius: "12px",
+                            background: "var(--surface-sunken)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div>
+                            <strong>🧒 {ch.fullName}</strong>
+                            {ch.birthDate && (
+                              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                                Nascido em: {dateBrFromIso(ch.birthDate)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>Nenhuma criança cadastrada para este responsável.</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <Input
+                    label="Nome do responsável"
+                    value={guardianDraft.fullName}
+                    onChange={(e) => setGuardianDraft((d) => ({ ...d, fullName: e.target.value }))}
+                  />
+                  <Input
+                    label="Telefone"
+                    value={guardianDraft.phoneE164}
+                    onChange={(e) => setGuardianDraft((d) => ({ ...d, phoneE164: e.target.value }))}
+                  />
+                  <Input
+                    label="CPF"
+                    value={guardianDraft.cpf}
+                    onChange={(e) => setGuardianDraft((d) => ({ ...d, cpf: e.target.value }))}
+                  />
+                  <Input
+                    label="E-mail"
+                    type="email"
+                    value={guardianDraft.email}
+                    onChange={(e) => setGuardianDraft((d) => ({ ...d, email: e.target.value }))}
+                  />
+                </div>
+
+                <hr style={{ border: 0, borderTop: "1px solid var(--border-subtle)", margin: 0 }} />
+
+                <div>
+                  <h4 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>Crianças Vinculadas</h4>
+                  {childrenDraft.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {childrenDraft.map((ch, idx) => (
+                        <div
+                          key={ch.id}
+                          style={{
+                            padding: "12px",
+                            borderRadius: "12px",
+                            background: "var(--surface-sunken)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px",
+                          }}
+                        >
+                          <Input
+                            label="Nome da criança"
+                            value={ch.fullName}
+                            onChange={(e) =>
+                              setChildrenDraft((list) =>
+                                list.map((c, i) => (i === idx ? { ...c, fullName: e.target.value } : c)),
+                              )
+                            }
+                          />
+                          <Input
+                            label="Data de nascimento"
+                            type="date"
+                            value={ch.birthDate}
+                            onChange={(e) =>
+                              setChildrenDraft((list) =>
+                                list.map((c, i) => (i === idx ? { ...c, birthDate: e.target.value } : c)),
+                              )
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>Nenhuma criança cadastrada para este responsável.</span>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                  <Button variant="secondary" onClick={cancelEditing} disabled={saving}>
+                    Cancelar
+                  </Button>
+                  <Button variant="primary" onClick={saveEditing} loading={saving} disabled={saving}>
+                    💾 Salvar alterações
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
