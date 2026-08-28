@@ -57,14 +57,6 @@ function loadDotEnvFromCandidates(): void {
       console.warn(`[main] Erro ao ler ${envPath}:`, err);
     }
   }
-
-  // Fallback garantido para o Supabase no quiosque se não definido em nenhum .env
-  if (!process.env.FACAAMIGOS_SUPABASE_URL) {
-    process.env.FACAAMIGOS_SUPABASE_URL = DEFAULT_SUPABASE_URL;
-  }
-  if (!process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY) {
-    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY = DEFAULT_SUPABASE_SERVICE_ROLE_KEY;
-  }
 }
 
 loadDotEnvFromCandidates();
