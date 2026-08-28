@@ -77,6 +77,17 @@ export function OwnerFloatingDashboard() {
     try {
       const todayStr = businessDateFor(Date.now(), 3); // cutoff 3h
 
+      // Buscar gráfico de fluxo/sessões por hora de todas as unidades
+      const rawHourly = await Api.reportCheckinsByHour(null, todayStr, todayStr).catch(
+        () => []
+      );
+
+      const checkinCountByUnit = new Map<string, number>();
+      for (const row of rawHourly) {
+        const key = row.unit_id || row.unit_name;
+        checkinCountByUnit.set(key, (checkinCountByUnit.get(key) ?? 0) + row.count);
+      }
+
       const summaries: UnitSummary[] = await Promise.all(
         units.map(async (u: Unit) => {
           const cutoff = u.business_day_cutoff_hour ?? 3;
@@ -90,11 +101,13 @@ export function OwnerFloatingDashboard() {
             Api.ticketGoal(u.id).catch(() => null),
           ]);
 
+          const checkinsCount = checkinCountByUnit.get(u.id) ?? checkinCountByUnit.get(u.name) ?? 0;
+
           return {
             unitId: u.id,
             unitName: u.name,
             revenueCents: rev.totalCents,
-            sessionsCount: tm.ordersCount,
+            sessionsCount: checkinsCount > 0 ? checkinsCount : tm.ordersCount,
             ticketMedioCents: tm.avgCents,
             minTicketCents: goal?.minTicketCents ?? 0,
             targetTicketCents: goal?.targetTicketCents ?? 0,
@@ -103,11 +116,6 @@ export function OwnerFloatingDashboard() {
       );
 
       setUnitSummaries(summaries);
-
-      // Buscar gráfico por hora
-      const rawHourly = await Api.reportCheckinsByHour(null, todayStr, todayStr).catch(
-        () => []
-      );
 
       // Pivotar por hora (padrão 08h às 22h, expandindo dinamicamente se houver sessões fora dessa faixa)
       let startHour = 8;
@@ -738,11 +746,17 @@ export function OwnerFloatingDashboard() {
                     </Button>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
                     <div>
                       <span style={{ fontSize: "11px", color: "#94A3B8" }}>Faturamento</span>
                       <div style={{ fontSize: "14px", fontWeight: 700, color: "#2ECFB5" }}>
                         {money(u.revenueCents)}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "11px", color: "#94A3B8" }}>Sessões</span>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#F8FAFC" }}>
+                        {u.sessionsCount}
                       </div>
                     </div>
                     <div>
