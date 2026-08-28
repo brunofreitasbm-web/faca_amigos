@@ -35,6 +35,7 @@ export const CAPABILITIES = [
   "ocorrencias.write",
   "notificacoes.owner_push",
   "metas.ticket.write",
+  "clientes.write",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -68,6 +69,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "ocorrencias.write": "Lançar ocorrências (atestado/falta) de colaboradores",
   "notificacoes.owner_push": "Ativar notificações de relatório do Owner neste dispositivo",
   "metas.ticket.write": "Configurar meta de Ticket Médio (mínimo e alvo) de cada unidade",
+  "clientes.write": "Editar dados de clientes (responsável e crianças vinculadas)",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
