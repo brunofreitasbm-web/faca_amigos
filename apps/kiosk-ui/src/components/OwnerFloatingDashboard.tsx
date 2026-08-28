@@ -55,7 +55,7 @@ export function OwnerFloatingDashboard() {
 
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
-  const [selectedUnitId, setSelectedUnitId] = useState<string>("ALL"); // 'ALL' = Consolidado
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("ALL"); // 'ALL' = Consolidado (fallback até 1ª unidade carregar)
 
   const [loading, setLoading] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
@@ -159,6 +159,12 @@ export function OwnerFloatingDashboard() {
       return () => clearInterval(interval);
     }
   }, [isOwner, loadDashboardData]);
+
+  useEffect(() => {
+    if (selectedUnitId === "ALL" && units[0]) {
+      setSelectedUnitId(units[0].id);
+    }
+  }, [units, selectedUnitId]);
 
   if (!isOwner) return null;
 
@@ -323,7 +329,7 @@ export function OwnerFloatingDashboard() {
       <div
         style={{
           width: "100%",
-          maxWidth: "920px",
+          maxWidth: "1200px",
           maxHeight: "90vh",
           overflowY: "auto",
           background: "#0F172A",
@@ -450,24 +456,6 @@ export function OwnerFloatingDashboard() {
           <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 700, marginRight: "4px" }}>
             Filtrar Unidade:
           </span>
-          <button
-            type="button"
-            onClick={() => setSelectedUnitId("ALL")}
-            style={{
-              padding: "6px 14px",
-              borderRadius: "8px",
-              border: "1px solid",
-              borderColor: selectedUnitId === "ALL" ? "#2ECFB5" : "rgba(255, 255, 255, 0.1)",
-              background: selectedUnitId === "ALL" ? "rgba(46, 207, 181, 0.15)" : "transparent",
-              color: selectedUnitId === "ALL" ? "#2ECFB5" : "#CBD5E1",
-              fontWeight: selectedUnitId === "ALL" ? 700 : 500,
-              fontSize: "13px",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            🌐 Visão Consolidada ({units.length} Unidades)
-          </button>
           {units.map((u) => (
             <button
               key={u.id}

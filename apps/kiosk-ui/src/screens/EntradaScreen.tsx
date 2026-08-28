@@ -615,7 +615,7 @@ export function EntradaScreen({
         sessionId: res.sessionId,
         accessCode: res.accessCode,
         exitPin: res.exitPin,
-        childName: childName.trim(),
+        childName: isNeurodivergent && !childName.includes("🧩") ? `${childName.trim()} 🧩` : childName.trim(),
         guardianId: res.guardianId,
         // Plano acima de 2h vendido agora: habilita o botão do contrato de
         // prestação de serviços (banco de horas garantido em contrato).
@@ -800,7 +800,12 @@ export function EntradaScreen({
             >
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <strong style={{ fontSize: "17px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  {childName}
+                  {childName}{isNeurodivergent && !childName.includes("🧩") ? " 🧩" : ""}
+                  {isNeurodivergent && (
+                    <Badge variant="teal" title="Criança Neurodivergente">
+                      🧩 Neurodivergente
+                    </Badge>
+                  )}
                   {matchedChild?.is_vip && (
                     <Badge variant="vip" title={`${matchedChild.visits_in_window} visitas nos últimos 30 dias`}>
                       ★ VIP

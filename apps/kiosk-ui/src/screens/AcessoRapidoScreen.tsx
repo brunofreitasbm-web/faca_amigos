@@ -329,7 +329,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
                         fontSize: "13px",
                       }}
                     >
-                      <span>{c.childName || `Criança ${i + 1}`}</span>
+                      <span>{(c.childName || `Criança ${i + 1}`) + (c.isNeurodivergent && !c.childName.includes("🧩") ? " 🧩" : "")}</span>
                       <span style={{ fontWeight: 700, color: session ? "var(--color-teal-text)" : "var(--text-muted)" }}>
                         {session ? "✓ Confirmada" : "Aguardando balcão"}
                       </span>
@@ -377,7 +377,9 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
                 >
                   {children.length > 1 && (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-muted)" }}>Criança {index + 1}</span>
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-muted)" }}>
+                        {child.childName ? `${child.childName}${child.isNeurodivergent && !child.childName.includes("🧩") ? " 🧩" : ""}` : `Criança ${index + 1}`}
+                      </span>
                       <Button variant="ghost" size="sm" type="button" onClick={() => removeChild(index)}>
                         ✕ Remover
                       </Button>

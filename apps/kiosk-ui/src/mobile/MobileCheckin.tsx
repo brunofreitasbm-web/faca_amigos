@@ -229,7 +229,9 @@ export function MobileCheckin({
                   }}
                 >
                   <div className="m-grow">
-                    <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>{item.childName}</p>
+                    <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>
+                      {item.childName}{(item.inclusiveEligible || (item.sensoryTags?.length ?? 0) > 0) && !item.childName.includes("🧩") ? " 🧩" : ""}
+                    </p>
                     <p style={{ margin: "3px 0 0", fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>
                       resp. {item.guardianName}
                       {item.totalChildren > 1 ? ` · ${item.childIndex + 1} de ${item.totalChildren} irmãos` : ""}

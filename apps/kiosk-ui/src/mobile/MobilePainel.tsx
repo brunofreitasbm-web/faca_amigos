@@ -153,7 +153,9 @@ export function MobilePainel({
                 }}
               >
                 <div className="m-grow">
-                  <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>{entry.session.child_name_snapshot}</p>
+                  <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>
+                    {entry.session.child_name_snapshot}{((entry.session.sensory_tags?.length ?? 0) > 0 || entry.session.notes?.toLowerCase().includes("neuro")) && !entry.session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
+                  </p>
                   <p style={{ margin: "3px 0 0", fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>
                     {entry.plan.name} · pulseira {entry.session.access_code ?? entry.session.wristband_code ?? "—"}
                   </p>
@@ -209,7 +211,9 @@ export function MobilePainel({
       {selected && (
         <div className="m-sheet" role="dialog" aria-label={`Ações de ${selected.session.child_name_snapshot}`}>
           <div className="m-row" style={{ justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-            <p className="m-title-sm m-trunc m-grow">{selected.session.child_name_snapshot}</p>
+            <p className="m-title-sm m-trunc m-grow">
+              {selected.session.child_name_snapshot}{((selected.session.sensory_tags?.length ?? 0) > 0 || selected.session.notes?.toLowerCase().includes("neuro")) && !selected.session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
+            </p>
             <button
               type="button"
               onClick={() => setSelectedId(null)}
