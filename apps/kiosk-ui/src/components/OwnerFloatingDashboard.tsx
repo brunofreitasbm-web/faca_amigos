@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   AreaChart,
   Area,
@@ -11,7 +11,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { Button } from "@facaamigos/ui";
+import { Button, Card, Modal, WalletIcon, GridIcon, ChartBarIcon, ArrowClockwiseIcon } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { Api, businessDateFor } from "../api/client.js";
@@ -34,14 +34,25 @@ interface HourlyProgressData {
   [unitName: string]: number | string;
 }
 
-const CHART_COLORS = ["#2ECFB5", "#6366F1", "#F59E0B", "#EC4899", "#10B981", "#8B5CF6"];
+// Cores do gráfico: os 4 primeiros nomes vêm de --chart-1..4 (mesma
+// paleta de BI usada no Relatório); os 2 extras cobrem uma 5ª/6ª unidade
+// sem repetir cor, usando marca (pink/amber) em vez de inventar tons novos.
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--color-pink)",
+  "var(--color-amber)",
+];
 
 const tooltipStyle = {
-  background: "#1E293B",
-  border: "1px solid rgba(255, 255, 255, 0.15)",
-  borderRadius: "8px",
-  boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-  color: "#F8FAFC",
+  background: "var(--surface-card)",
+  border: "1px solid var(--border-subtle)",
+  borderRadius: "var(--radius-sm)",
+  boxShadow: "var(--shadow-md)",
+  color: "var(--text-primary)",
+  fontFamily: "var(--font-body)",
   fontSize: "13px",
   padding: "8px 12px",
 };
@@ -186,31 +197,32 @@ export function OwnerFloatingDashboard() {
           targetTicketCents: 0,
         };
 
-  // Status visual do Ticket Médio (Acima da meta / Atenção / Abaixo da meta)
+  // Status visual do Ticket Médio — reaproveita a paleta de semáforo
+  // operacional (packages/ui/src/tokens/status.css), a mesma usada no
+  // resto do quiosque para "bom / atenção / ruim", em vez de inventar
+  // uma escala de cor nova só para este painel.
   const ticketStatus =
     activeSummary.targetTicketCents > 0
       ? activeSummary.ticketMedioCents >= activeSummary.targetTicketCents
-        ? { label: "Meta Atingida 🎉", color: "#10B981", bg: "rgba(16, 185, 129, 0.15)" }
+        ? { label: "Meta atingida", bg: "var(--status-verde-soft)", fg: "var(--status-verde-text)" }
         : activeSummary.ticketMedioCents >= activeSummary.minTicketCents
-        ? { label: "Aparado na Média 🟡", color: "#F59E0B", bg: "rgba(245, 158, 11, 0.15)" }
-        : { label: "Abaixo do Alvo 🔴", color: "#EF4444", bg: "rgba(239, 68, 68, 0.15)" }
-      : { label: "Meta Não Definida", color: "#94A3B8", bg: "rgba(148, 163, 184, 0.1)" };
+        ? { label: "Na média", bg: "var(--status-amarelo-soft)", fg: "var(--status-amarelo-text)" }
+        : { label: "Abaixo do alvo", bg: "var(--status-vermelho-soft)", fg: "var(--status-vermelho-text)" }
+      : { label: "Meta não definida", bg: "var(--surface-raised)", fg: "var(--text-muted)" };
 
   // Dica Comercial Automatizada para Alavancar Vendas
   const getSmartCommercialInsight = () => {
     if (activeSummary.ticketMedioCents < activeSummary.targetTicketCents) {
       const diff = activeSummary.targetTicketCents - activeSummary.ticketMedioCents;
       return {
-        title: "⚡ Oportunidade de Alavancagem do Ticket Médio",
+        title: "Oportunidade de alavancagem do ticket médio",
         message: `Seu ticket médio atual está ${money(diff)} abaixo da meta. Oriente os operadores a venderem meias antiderrapantes e fazerem o upgrade de tempo (+15min/30min) no check-in para bater a meta do dia!`,
-        action: "Incentivar Combo Tempo Extra + Meias",
       };
     }
     return {
-      title: "🚀 Excelente Desempenho de Vendas!",
+      title: "Excelente desempenho de vendas",
       message:
         "O ticket médio hoje está atingindo o valor ideal. Continue estimulando a equipe do caixa para vendas complementares de snacks e brindes no check-out.",
-      action: "Manter Ritmo Comercial",
     };
   };
 
@@ -219,551 +231,397 @@ export function OwnerFloatingDashboard() {
   // 1. Caso esteja totalmente fechado
   if (!isOpen) {
     return (
-      <button
-        type="button"
+      <Button
+        variant="dark"
         onClick={() => {
           setIsOpen(true);
           setIsMinimized(false);
         }}
-        title="Abrir Dashboard OWNER"
         style={{
           position: "fixed",
-          bottom: "24px",
-          right: "24px",
+          bottom: "var(--space-6)",
+          right: "var(--space-6)",
           zIndex: 999,
-          padding: "10px 16px",
-          borderRadius: "9999px",
-          background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
-          color: "#2ECFB5",
-          border: "1px solid rgba(46, 207, 181, 0.4)",
-          boxShadow: "0 8px 30px rgba(0, 0, 0, 0.4)",
-          fontWeight: 700,
-          fontSize: "13px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
+          boxShadow: "var(--shadow-lg)",
         }}
       >
-        <span>👑 Dashboard OWNER</span>
+        <ChartBarIcon aria-hidden="true" />
+        Dashboard OWNER
+      </Button>
+    );
+  }
+
+  // 2. Caso esteja minimizado (widget flutuante)
+  if (isMinimized) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsMinimized(false)}
+        aria-label={`Expandir Dashboard OWNER. Faturamento de hoje: ${money(totalRevenueCents)}, ${totalSessionsCount} visitas.`}
+        style={{
+          position: "fixed",
+          bottom: "var(--space-6)",
+          right: "var(--space-6)",
+          zIndex: 999,
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          background: "var(--surface-card)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "var(--radius-full)",
+          padding: "var(--space-2) var(--space-3) var(--space-2) var(--space-4)",
+          minHeight: "44px",
+          boxShadow: "var(--shadow-lg)",
+          color: "var(--text-primary)",
+          cursor: "pointer",
+          fontFamily: "var(--font-body)",
+        }}
+      >
+        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "2px" }}>
+          <span
+            style={{
+              fontSize: "var(--text-xs)",
+              fontWeight: "var(--weight-bold)" as unknown as number,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "var(--tracking-wide)",
+            }}
+          >
+            OWNER · hoje
+          </span>
+          <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-teal-text)" }}>
+            {money(totalRevenueCents)}{" "}
+            <span style={{ color: "var(--text-secondary)", fontWeight: "var(--weight-medium)" as unknown as number }}>
+              ({totalSessionsCount} vis.)
+            </span>
+          </span>
+        </span>
+
+        <span
+          aria-hidden="true"
+          style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "var(--radius-circle)",
+            background: "var(--color-teal)",
+            color: "var(--text-on-primary)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <ChartBarIcon />
+        </span>
       </button>
     );
   }
 
-  // 2. Caso esteja minimizado (Widget FAB Flutuante)
-  if (isMinimized) {
-    return (
-      <div
+  // 3. Caso esteja aberto — reaproveita o Modal compartilhado (foco preso,
+  // Escape para fechar, devolução de foco, role="dialog") em vez do overlay
+  // artesanal anterior, igual aos outros diálogos do produto.
+  const modalTitle = (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-3)" }}>
+      <span
+        aria-hidden="true"
         style={{
-          position: "fixed",
-          bottom: "24px",
-          right: "24px",
-          zIndex: 999,
+          width: "40px",
+          height: "40px",
+          borderRadius: "var(--radius-md)",
+          background: "var(--color-teal)",
+          color: "var(--text-on-primary)",
           display: "flex",
           alignItems: "center",
-          gap: "10px",
-          background: "rgba(15, 23, 42, 0.92)",
-          backdropFilter: "blur(12px)",
-          border: "1px solid rgba(46, 207, 181, 0.4)",
-          padding: "8px 16px",
-          borderRadius: "9999px",
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
-          color: "#F8FAFC",
+          justifyContent: "center",
+          flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          <span style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 600 }}>
-            👑 OWNER · Hoje
-          </span>
-          <span style={{ fontSize: "13px", color: "#2ECFB5", fontWeight: 800 }}>
-            {money(totalRevenueCents)} <span style={{ color: "#CBD5E1", fontWeight: 500 }}>({totalSessionsCount} vis.)</span>
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setIsMinimized(false)}
-          title="Expandir Dashboard"
+        <ChartBarIcon style={{ fontSize: "20px" }} />
+      </span>
+      <span>
+        Painel de Gestão OWNER
+        <span
           style={{
-            background: "rgba(46, 207, 181, 0.15)",
-            border: "1px solid rgba(46, 207, 181, 0.3)",
-            color: "#2ECFB5",
-            borderRadius: "50%",
-            width: "32px",
-            height: "32px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 800,
-            fontSize: "14px",
+            marginLeft: "8px",
+            display: "inline-block",
+            fontSize: "var(--text-xs)",
+            fontWeight: "var(--weight-bold)" as unknown as number,
+            padding: "2px 8px",
+            borderRadius: "var(--radius-full)",
+            background: "var(--status-verde-soft)",
+            color: "var(--status-verde-text)",
           }}
         >
-          ⤢
-        </button>
-      </div>
-    );
-  }
+          AO VIVO{lastUpdated ? ` · ${lastUpdated}` : ""}
+        </span>
+      </span>
+    </span>
+  );
 
-  // 3. Caso esteja aberto (Modal Flutuante Central)
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        background: "rgba(2, 6, 23, 0.75)",
-        backdropFilter: "blur(8px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "16px",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "920px",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          background: "#0F172A",
-          border: "1px solid rgba(255, 255, 255, 0.12)",
-          borderRadius: "20px",
-          boxShadow: "0 25px 60px rgba(0, 0, 0, 0.7)",
-          color: "#F8FAFC",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {/* CABEÇALHO */}
+    <Modal title={modalTitle} onClose={() => setIsOpen(false)} maxWidth="960px" zIndex={1000}>
+      <div style={{ fontFamily: "var(--font-body)", display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+        {/* BARRA DE AÇÕES */}
         <div
           style={{
-            padding: "20px 24px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: "12px",
-            background: "linear-gradient(180deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.6) 100%)",
+            gap: "var(--space-3)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div
-              style={{
-                width: "42px",
-                height: "42px",
-                borderRadius: "12px",
-                background: "linear-gradient(135deg, #2ECFB5 0%, #0D9488 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "22px",
-                boxShadow: "0 4px 14px rgba(46, 207, 181, 0.3)",
-              }}
-            >
-              👑
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#FFFFFF" }}>
-                  Painel de Gestão OWNER
-                </h2>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    padding: "2px 8px",
-                    borderRadius: "9999px",
-                    background: "rgba(46, 207, 181, 0.15)",
-                    color: "#2ECFB5",
-                    border: "1px solid rgba(46, 207, 181, 0.3)",
-                    fontWeight: 700,
-                  }}
-                >
-                  LIVE {lastUpdated ? `· ${lastUpdated}` : ""}
-                </span>
-              </div>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>
-                Acompanhamento em tempo real de vendas, fluxo e ticket médio
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={loadDashboardData}
-              disabled={loading}
-              style={{
-                color: "#94A3B8",
-                borderColor: "rgba(255, 255, 255, 0.1)",
-                fontSize: "12px",
-              }}
-            >
-              {loading ? "Carregando…" : "🔄 Atualizar"}
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+            Acompanhamento em tempo real de vendas, fluxo e ticket médio
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <Button variant="ghost" size="sm" onClick={loadDashboardData} disabled={loading}>
+              <ArrowClockwiseIcon aria-hidden="true" />
+              {loading ? "Atualizando…" : "Atualizar"}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsMinimized(true)}
-              title="Minimizar para botão flutuante"
-              style={{
-                color: "#CBD5E1",
-                borderColor: "rgba(255, 255, 255, 0.1)",
-                fontSize: "12px",
-              }}
-            >
-              ➖ Minimizar
+            <Button variant="ghost" size="sm" onClick={() => setIsMinimized(true)}>
+              Minimizar
             </Button>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              title="Fechar Dashboard"
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#64748B",
-                fontSize: "20px",
-                cursor: "pointer",
-                padding: "4px 8px",
-                borderRadius: "6px",
-              }}
-            >
-              ✕
-            </button>
           </div>
         </div>
 
-        {/* CONTROLES / SELETOR DE UNIDADE */}
-        <div
-          style={{
-            padding: "12px 24px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
-            background: "#1E293B",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            overflowX: "auto",
-          }}
-        >
-          <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 700, marginRight: "4px" }}>
-            Filtrar Unidade:
-          </span>
+        {/* SELETOR DE UNIDADE */}
+        <div role="group" aria-label="Filtrar unidade" style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", overflowX: "auto", paddingBottom: "2px" }}>
           <button
             type="button"
             onClick={() => setSelectedUnitId("ALL")}
-            style={{
-              padding: "6px 14px",
-              borderRadius: "8px",
-              border: "1px solid",
-              borderColor: selectedUnitId === "ALL" ? "#2ECFB5" : "rgba(255, 255, 255, 0.1)",
-              background: selectedUnitId === "ALL" ? "rgba(46, 207, 181, 0.15)" : "transparent",
-              color: selectedUnitId === "ALL" ? "#2ECFB5" : "#CBD5E1",
-              fontWeight: selectedUnitId === "ALL" ? 700 : 500,
-              fontSize: "13px",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
+            aria-pressed={selectedUnitId === "ALL"}
+            style={unitTabStyle(selectedUnitId === "ALL")}
           >
-            🌐 Visão Consolidada ({units.length} Unidades)
+            Visão consolidada ({units.length} {units.length === 1 ? "unidade" : "unidades"})
           </button>
           {units.map((u) => (
             <button
               key={u.id}
               type="button"
               onClick={() => setSelectedUnitId(u.id)}
-              style={{
-                padding: "6px 14px",
-                borderRadius: "8px",
-                border: "1px solid",
-                borderColor: selectedUnitId === u.id ? "#2ECFB5" : "rgba(255, 255, 255, 0.1)",
-                background: selectedUnitId === u.id ? "rgba(46, 207, 181, 0.15)" : "transparent",
-                color: selectedUnitId === u.id ? "#2ECFB5" : "#CBD5E1",
-                fontWeight: selectedUnitId === u.id ? 700 : 500,
-                fontSize: "13px",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
+              aria-pressed={selectedUnitId === u.id}
+              style={unitTabStyle(selectedUnitId === u.id)}
             >
-              📍 {u.name}
+              {u.name}
             </button>
           ))}
         </div>
 
-        {/* CONTEÚDO PRINCIPAL */}
-        <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
-          {/* PAINEL DE METRICAS (4 CARDS) */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "16px",
-            }}
-          >
-            {/* Card 1: Faturamento */}
-            <div
-              style={{
-                padding: "16px",
-                borderRadius: "14px",
-                background: "rgba(30, 41, 59, 0.7)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 600 }}>
-                  Faturamento Acumulado
-                </span>
-                <span style={{ fontSize: "16px" }}>💰</span>
-              </div>
-              <span style={{ fontSize: "22px", fontWeight: 800, color: "#2ECFB5" }}>
-                {money(activeSummary.revenueCents)}
-              </span>
-              <span style={{ fontSize: "11px", color: "#64748B" }}>Hoje no dia operacional</span>
-            </div>
+        {/* PAINEL DE MÉTRICAS (4 CARDS) */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+          <Card bodyStyle={{ display: "flex", flexDirection: "column" }}>
+            <MetricHeader label="Faturamento acumulado" icon={<WalletIcon aria-hidden="true" />} accent="var(--color-teal)" />
+            <MetricValue color="var(--color-teal-text)">{money(activeSummary.revenueCents)}</MetricValue>
+            <MetricNote>Hoje no dia operacional</MetricNote>
+          </Card>
 
-            {/* Card 2: Sessões / Crianças */}
-            <div
-              style={{
-                padding: "16px",
-                borderRadius: "14px",
-                background: "rgba(30, 41, 59, 0.7)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 600 }}>
-                  Sessões / Crianças
-                </span>
-                <span style={{ fontSize: "16px" }}>👧</span>
-              </div>
-              <span style={{ fontSize: "22px", fontWeight: 800, color: "#818CF8" }}>
-                {activeSummary.sessionsCount}{" "}
-                <span style={{ fontSize: "13px", fontWeight: 500, color: "#94A3B8" }}>
-                  atendimentos
-                </span>
+          <Card bodyStyle={{ display: "flex", flexDirection: "column" }}>
+            <MetricHeader label="Sessões / crianças" icon={<GridIcon aria-hidden="true" />} accent="var(--color-primary-hover)" />
+            <MetricValue color="var(--color-primary-hover)">
+              {activeSummary.sessionsCount}{" "}
+              <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)" as unknown as number, color: "var(--text-muted)" }}>
+                atendimentos
               </span>
-              <span style={{ fontSize: "11px", color: "#64748B" }}>Total de visitas registradas</span>
-            </div>
+            </MetricValue>
+            <MetricNote>Total de visitas registradas</MetricNote>
+          </Card>
 
-            {/* Card 3: Ticket Médio */}
-            <div
+          <Card bodyStyle={{ display: "flex", flexDirection: "column" }}>
+            <MetricHeader label="Ticket médio" icon={<ChartBarIcon aria-hidden="true" />} accent={ticketStatus.fg} />
+            <MetricValue color={ticketStatus.fg}>{money(activeSummary.ticketMedioCents)}</MetricValue>
+            <span
               style={{
-                padding: "16px",
-                borderRadius: "14px",
-                background: "rgba(30, 41, 59, 0.7)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
+                display: "inline-flex",
+                alignSelf: "flex-start",
+                padding: "2px 10px",
+                borderRadius: "var(--radius-full)",
+                background: ticketStatus.bg,
+                color: ticketStatus.fg,
+                fontSize: "var(--text-xs)",
+                fontWeight: "var(--weight-bold)" as unknown as number,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 600 }}>
-                  Ticket Médio
-                </span>
-                <span style={{ fontSize: "16px" }}>🎟️</span>
-              </div>
-              <span style={{ fontSize: "22px", fontWeight: 800, color: ticketStatus.color }}>
-                {money(activeSummary.ticketMedioCents)}
-              </span>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  alignSelf: "flex-start",
-                  padding: "2px 8px",
-                  borderRadius: "9999px",
-                  background: ticketStatus.bg,
-                  color: ticketStatus.color,
-                  fontSize: "11px",
-                  fontWeight: 700,
-                }}
-              >
-                {ticketStatus.label}
-              </div>
-            </div>
+              {ticketStatus.label}
+            </span>
+          </Card>
 
-            {/* Card 4: Meta de Ticket Alvo */}
-            <div
-              style={{
-                padding: "16px",
-                borderRadius: "14px",
-                background: "rgba(30, 41, 59, 0.7)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 600 }}>
-                  Meta da Unidade
-                </span>
-                <span style={{ fontSize: "16px" }}>🎯</span>
-              </div>
-              <span style={{ fontSize: "14px", fontWeight: 700, color: "#F8FAFC" }}>
-                Mínimo: {money(activeSummary.minTicketCents)}
-              </span>
-              <span style={{ fontSize: "14px", fontWeight: 700, color: "#2ECFB5" }}>
-                Alvo: {money(activeSummary.targetTicketCents)}
-              </span>
-            </div>
+          <Card bodyStyle={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <MetricHeader label="Meta da unidade" icon={<WalletIcon aria-hidden="true" />} accent="var(--color-amber)" />
+            <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)" as unknown as number, color: "var(--text-primary)" }}>
+              Mínimo: {money(activeSummary.minTicketCents)}
+            </span>
+            <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)" as unknown as number, color: "var(--color-teal-text)" }}>
+              Alvo: {money(activeSummary.targetTicketCents)}
+            </span>
+          </Card>
+        </div>
+
+        {/* GRÁFICO DE PROGRESSO DIÁRIO POR HORA */}
+        <div
+          style={{
+            padding: "var(--space-5)",
+            borderRadius: "var(--radius-card)",
+            background: "var(--surface-card)",
+            border: "1px solid var(--border-subtle)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-4)", flexWrap: "wrap", gap: "var(--space-2)" }}>
+            <h3 style={{ margin: 0, fontSize: "var(--text-md)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--text-primary)" }}>
+              Progresso diário de atendimentos por hora (check-ins)
+            </h3>
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Das 10h às 22h</span>
           </div>
 
-          {/* GRÁFICO DE PROGRESSO DIÁRIO POR HORA */}
-          <div
-            style={{
-              padding: "20px",
-              borderRadius: "16px",
-              background: "rgba(30, 41, 59, 0.5)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "16px",
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#F8FAFC" }}>
-                📊 Progresso Diário de Atendimentos por Hora (Check-ins)
-              </h3>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Das 10h às 22h</span>
-            </div>
-
-            <div style={{ width: "100%", height: 240 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                {selectedUnitId === "ALL" && units.length > 1 ? (
-                  <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" vertical={false} />
-                    <XAxis dataKey="hourLabel" stroke="#64748B" fontSize={12} tickLine={false} />
-                    <YAxis stroke="#64748B" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12, color: "#CBD5E1" }} />
-                    {units.map((u, i) => (
-                      <Bar
-                        key={u.id}
-                        dataKey={u.name}
-                        fill={CHART_COLORS[i % CHART_COLORS.length]}
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={18}
-                      />
-                    ))}
-                  </BarChart>
-                ) : (
-                  <AreaChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="ownerHourlyGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2ECFB5" stopOpacity={0.5} />
-                        <stop offset="95%" stopColor="#2ECFB5" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" vertical={false} />
-                    <XAxis dataKey="hourLabel" stroke="#64748B" fontSize={12} tickLine={false} />
-                    <YAxis stroke="#64748B" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(val: number) => [`${val} check-ins`, "Fluxo"]} />
-                    <Area
-                      type="monotone"
-                      dataKey={selectedUnitId === "ALL" ? "total" : units.find((u) => u.id === selectedUnitId)?.name ?? "total"}
-                      stroke="#2ECFB5"
-                      strokeWidth={3}
-                      fillOpacity={1}
-                      fill="url(#ownerHourlyGrad)"
+          <div style={{ width: "100%", height: 240 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              {selectedUnitId === "ALL" && units.length > 1 ? (
+                <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis dataKey="hourLabel" stroke="var(--text-muted)" fontSize={12} tickLine={false} />
+                  <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
+                  {units.map((u, i) => (
+                    <Bar
+                      key={u.id}
+                      dataKey={u.name}
+                      fill={CHART_COLORS[i % CHART_COLORS.length]}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={18}
                     />
-                  </AreaChart>
-                )}
-              </ResponsiveContainer>
-            </div>
+                  ))}
+                </BarChart>
+              ) : (
+                <AreaChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    {/* Cor fixa igual a --color-teal: defs de gradiente SVG
+                        não resolvem var() em stop-color. */}
+                    <linearGradient id="ownerHourlyGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2ECFB5" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="#2ECFB5" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis dataKey="hourLabel" stroke="var(--text-muted)" fontSize={12} tickLine={false} />
+                  <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(val: number) => [`${val} check-ins`, "Fluxo"]} />
+                  <Area
+                    type="monotone"
+                    dataKey={selectedUnitId === "ALL" ? "total" : units.find((u) => u.id === selectedUnitId)?.name ?? "total"}
+                    stroke="var(--color-teal)"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#ownerHourlyGrad)"
+                  />
+                </AreaChart>
+              )}
+            </ResponsiveContainer>
           </div>
+        </div>
 
-          {/* DETALHAMENTO DE DESEMPENHO POR UNIDADE (VISÃO CONSOLIDADA) */}
-          {selectedUnitId === "ALL" && units.length > 1 && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                gap: "12px",
-              }}
-            >
-              {unitSummaries.map((u) => (
-                <div
-                  key={u.unitId}
-                  style={{
-                    padding: "14px 16px",
-                    borderRadius: "12px",
-                    background: "rgba(30, 41, 59, 0.4)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: "#F8FAFC" }}>
-                      📍 {u.unitName}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedUnitId(u.unitId)}
-                      style={{ fontSize: "11px", padding: "2px 8px" }}
-                    >
-                      Filtrar
-                    </Button>
-                  </div>
+        {/* DETALHAMENTO DE DESEMPENHO POR UNIDADE (VISÃO CONSOLIDADA) */}
+        {selectedUnitId === "ALL" && units.length > 1 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--space-3)" }}>
+            {unitSummaries.map((u) => (
+              <Card key={u.unitId} bodyStyle={{ padding: "var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--text-primary)" }}>
+                    {u.unitName}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedUnitId(u.unitId)}>
+                    Filtrar
+                  </Button>
+                </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                    <div>
-                      <span style={{ fontSize: "11px", color: "#94A3B8" }}>Faturamento</span>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#2ECFB5" }}>
-                        {money(u.revenueCents)}
-                      </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
+                  <div>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Faturamento</span>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-teal-text)" }}>
+                      {money(u.revenueCents)}
                     </div>
-                    <div>
-                      <span style={{ fontSize: "11px", color: "#94A3B8" }}>Ticket Médio</span>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#818CF8" }}>
-                        {money(u.ticketMedioCents)}
-                      </div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Ticket médio</span>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-primary-hover)" }}>
+                      {money(u.ticketMedioCents)}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* PAINEL DE ESTRATÉGIA E ALAVANCAGEM COMERCIAL */}
-          <div
-            style={{
-              padding: "16px 20px",
-              borderRadius: "14px",
-              background: "linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)",
-              border: "1px solid rgba(46, 207, 181, 0.25)",
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "14px",
-            }}
-          >
-            <div style={{ fontSize: "24px" }}>💡</div>
-            <div style={{ flex: 1 }}>
-              <h4 style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: 700, color: "#2ECFB5" }}>
-                {insight.title}
-              </h4>
-              <p style={{ margin: 0, fontSize: "13px", color: "#CBD5E1", lineHeight: 1.5 }}>
-                {insight.message}
-              </p>
-            </div>
+              </Card>
+            ))}
           </div>
+        )}
+
+        {/* PAINEL DE ESTRATÉGIA E ALAVANCAGEM COMERCIAL */}
+        <div
+          style={{
+            padding: "var(--space-4) var(--space-5)",
+            borderRadius: "var(--radius-card)",
+            background: "var(--surface-raised)",
+            borderLeft: "4px solid var(--color-teal)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+          }}
+        >
+          <h4 style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-teal-text)" }}>
+            {insight.title}
+          </h4>
+          <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
+            {insight.message}
+          </p>
         </div>
       </div>
+    </Modal>
+  );
+}
+
+function unitTabStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: "10px 16px",
+    minHeight: "40px",
+    borderRadius: "var(--radius-full)",
+    border: `1px solid ${active ? "var(--color-teal)" : "var(--border-subtle)"}`,
+    background: active ? "rgba(46, 207, 181, 0.12)" : "transparent",
+    color: active ? "var(--color-teal-text)" : "var(--text-secondary)",
+    fontFamily: "var(--font-body)",
+    fontWeight: (active ? "var(--weight-bold)" : "var(--weight-medium)") as unknown as number,
+    fontSize: "var(--text-sm)",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  };
+}
+
+function MetricHeader({ label, icon, accent }: { label: string; icon: React.ReactNode; accent: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+      <span
+        style={{
+          fontSize: "var(--text-xs)",
+          fontWeight: "var(--weight-bold)" as unknown as number,
+          color: "var(--text-muted)",
+          textTransform: "uppercase",
+          letterSpacing: "var(--tracking-wide)",
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ color: accent, display: "flex", fontSize: "16px" }}>{icon}</span>
     </div>
   );
+}
+
+function MetricValue({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <span style={{ display: "block", fontSize: "var(--text-xl)", fontWeight: "var(--weight-black)" as unknown as number, color, marginBottom: "4px" }}>
+      {children}
+    </span>
+  );
+}
+
+function MetricNote({ children }: { children: React.ReactNode }) {
+  return <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{children}</span>;
 }
