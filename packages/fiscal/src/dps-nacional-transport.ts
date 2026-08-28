@@ -2,19 +2,23 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { request } from "node:https";
 
 /**
- * Transporte da DPS ao Ambiente de Dados Nacional (ADN) do Sistema
- * Nacional NFS-e — `POST /notafiscal-adn-ws/api/adn/dps`, mTLS com o
- * certificado A1 do prestador (o CNPJ do certificado precisa ter a mesma
- * raiz do CNPJ do contribuinte, conforme o Manual de Contribuintes da
- * Prefeitura de Belém). Hosts confirmados em gov.br/nfse
- * (biblioteca/documentacao-tecnica/apis-prod-restrita-e-producao,
- * 2026-08-19) — o mesmo endpoint central atende qualquer município
+ * Transporte da DPS ao SEFIN Nacional do Sistema Nacional NFS-e —
+ * `POST /SefinNacional/nfse`, mTLS com o certificado A1 do prestador (o
+ * CNPJ do certificado precisa ter a mesma raiz do CNPJ do contribuinte,
+ * conforme o Manual de Contribuintes da Prefeitura de Belém). O host
+ * `adn.*.nfse.gov.br` (Ambiente de Dados Nacional) é só para
+ * distribuição/consulta de documentos já autorizados (DFe, eventos) — a
+ * emissão em si vai para o host `sefin.*.nfse.gov.br`, confirmado em
+ * gov.br/nfse e no swagger público em
+ * sefin.producaorestrita.nfse.gov.br/API/SefinNacional/docs/ (2026-08-28,
+ * corrigindo o host/path errados usados até então, que causavam HTTP 404
+ * sem corpo). O mesmo endpoint central atende qualquer município
  * conveniado ao Sistema Nacional, não há host por município.
  */
 
-const HOST_HOMOLOGACAO = "adn.producaorestrita.nfse.gov.br";
-const HOST_PRODUCAO = "adn.nfse.gov.br";
-const PATH_DPS = "/notafiscal-adn-ws/api/adn/dps";
+const HOST_HOMOLOGACAO = "sefin.producaorestrita.nfse.gov.br";
+const HOST_PRODUCAO = "sefin.nfse.gov.br";
+const PATH_DPS = "/SefinNacional/nfse";
 
 export interface TransmitirDpsInput {
   /** DPS já assinada (XMLDSig), pronta para envio. */
