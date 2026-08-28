@@ -76,6 +76,7 @@ export function BancoTalentosTab() {
     try {
       await Api.updateJobApplicationStatus(item.id, status);
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status } : i)));
+      toast.success(`Status atualizado para '${STATUS_LABEL[status]}'.`);
     } catch {
       toast.error("Não foi possível atualizar o status.");
     } finally {
@@ -142,25 +143,28 @@ export function BancoTalentosTab() {
 
             {/* Checkboxes de Status Rápido */}
             <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", padding: "10px 12px", background: "var(--surface-sunken)", borderRadius: "10px", margin: "10px 0" }}>
-              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: busyId === item.id ? "wait" : "pointer", opacity: busyId === item.id ? 0.6 : 1 }}>
                 <input
                   type="checkbox"
+                  disabled={busyId === item.id}
                   checked={item.status === "LIDO"}
                   onChange={() => handleStatusChange(item, item.status === "LIDO" ? "NOVO" : "LIDO")}
                 />
                 Lido
               </label>
-              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: busyId === item.id ? "wait" : "pointer", opacity: busyId === item.id ? 0.6 : 1 }}>
                 <input
                   type="checkbox"
+                  disabled={busyId === item.id}
                   checked={item.status === "ESPERA"}
                   onChange={() => handleStatusChange(item, item.status === "ESPERA" ? "NOVO" : "ESPERA")}
                 />
                 Espera
               </label>
-              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+              <label style={{ fontSize: "12px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", cursor: busyId === item.id ? "wait" : "pointer", opacity: busyId === item.id ? 0.6 : 1 }}>
                 <input
                   type="checkbox"
+                  disabled={busyId === item.id}
                   checked={item.status === "ENTREVISTA"}
                   onChange={() => handleStatusChange(item, item.status === "ENTREVISTA" ? "NOVO" : "ENTREVISTA")}
                 />

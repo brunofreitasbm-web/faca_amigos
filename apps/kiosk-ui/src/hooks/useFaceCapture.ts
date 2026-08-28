@@ -21,36 +21,78 @@ export function useFaceCapture() {
   const streamRef = useRef<MediaStream | null>(null);
   const [state, setState] = useState<UseFaceCaptureState>({ ready: false, starting: false, error: null });
 
-  const start = useCallback(async () => {
-    setState({ ready: false, starting: true, error: null });
-    try {
-      await loadFaceModels();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setState({ ready: true, starting: false, error: null });
-    } catch (err) {
-      setState({
-        ready: false,
-        starting: false,
-        error: err instanceof Error ? err.message : "Não foi possível acessar a câmera.",
+  const attachStreamToVideo = useCallback((video: HTMLVideoElement | null, stream: MediaStream | null) => {
+    if (!video || !stream) return;
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+      video.setAttribute("playsinline", "true");
+      video.play().catch((err) => {
+        console.warn("Falha no video.play():", err);
       });
     }
   }, []);
 
+  const start = useCallback(async () => {
+    setState({ ready: false, starting: true, error: null });
+    try {
+      await loadFaceModels();
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      } catch {
+        // Fallback genérico caso facingMode restritivo falhe
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        attachStreamToVideo(videoRef.current, stream);
+      }
+
+      setState({ ready: true, starting: false, error: null });
+    } catch (err) {
+      let message = "Não foi possível acessar a câmera.";
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError" || err.name === "SecurityError") {
+          message = "Acesso à câmera bloqueado. Libere a permissão no navegador ou sistema.";
+        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+          message = "Nenhuma câmera foi encontrada neste dispositivo.";
+        } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+          message = "A câmera já está sendo usada por outro aplicativo ou processo.";
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setState({
+        ready: false,
+        starting: false,
+        error: message,
+      });
+    }
+  }, [attachStreamToVideo]);
+
+  // Garante a vinculação do stream ao elemento <video> assim que ele for renderizado/montado no DOM
+  useEffect(() => {
+    if (state.ready && videoRef.current && streamRef.current) {
+      attachStreamToVideo(videoRef.current, streamRef.current);
+    }
+  }, [state.ready, attachStreamToVideo]);
+
   const stop = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setState({ ready: false, starting: false, error: null });
   }, []);
 
   useEffect(() => () => stop(), [stop]);
 
   const capture = useCallback(async (): Promise<{ descriptor: number[]; photo: Blob } | null> => {
-    if (!videoRef.current) return null;
+    if (!videoRef.current || videoRef.current.readyState < 2) return null;
     const [descriptor, photo] = await Promise.all([
       extractFaceDescriptor(videoRef.current),
       captureFrameAsJpeg(videoRef.current),
@@ -61,3 +103,4 @@ export function useFaceCapture() {
 
   return { videoRef, ...state, start, stop, capture };
 }
+
