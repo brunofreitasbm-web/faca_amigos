@@ -7,10 +7,9 @@ import * as faceapi from "@vladmandic/face-api";
 // passo de baixar os pesos (~6MB) antes do primeiro build.
 const MODEL_URL = "/models";
 
-// Mesmo limiar usado no sistema irmão (Porto Terapia): abaixo de 0.45,
-// distância euclidiana entre os dois descriptors de 128 floats é
-// considerada "mesma pessoa" pelo face-api.js/@vladmandic face-api.
-const MATCH_THRESHOLD = 0.45;
+// Limiar flexível para maior tolerância e rapidez na captação: abaixo de 0.55
+// a distância euclidiana entre os descriptors é considerada "mesma pessoa".
+const MATCH_THRESHOLD = 0.55;
 
 let modelsLoadedPromise: Promise<void> | null = null;
 
@@ -26,11 +25,17 @@ export function loadFaceModels(): Promise<void> {
   return modelsLoadedPromise;
 }
 
-/** Extrai o descriptor facial (128 floats) do frame atual de um <video> com a webcam ligada. Null se nenhum rosto foi detectado. */
+/** Extrai o descriptor facial (128 floats) do frame atual com configurações de ultra-velocidade (inputSize 160, scoreThreshold 0.3). */
 export async function extractFaceDescriptor(video: HTMLVideoElement): Promise<number[] | null> {
   await loadFaceModels();
+  // Configurações otimizadas para captação ultra-rápida e menor exigência biométrica
+  const options = new faceapi.TinyFaceDetectorOptions({
+    inputSize: 160, // 160px processa ~4x-6x mais rápido que o padrão (416px)
+    scoreThreshold: 0.3, // Menor exigência de pontuação para detecção imediata
+  });
+
   const detection = await faceapi
-    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+    .detectSingleFace(video, options)
     .withFaceLandmarks()
     .withFaceDescriptor();
   if (!detection) return null;
