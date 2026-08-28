@@ -127,7 +127,7 @@ async function startLocalServer() {
   const tls = process.env.FACAAMIGOS_TLS === "true" ? loadOrCreateTls(`${app.getPath("userData")}/certs`) : undefined;
   const server = await buildApp({ db, hmacKey, nowMs: () => Date.now() }, { tls, uiDist: resolveUiDist() });
   await server.listen({ port: PORT, host: "0.0.0.0" });
-  return tls;
+  return { tls, db };
 }
 
 function createWindow(protocol: "http" | "https", splash?: BrowserWindow) {
@@ -182,9 +182,9 @@ if (isPrimaryInstance) {
     // ocupada, migração quebrada, TLS sem permissão de escrita) virava uma
     // unhandledRejection silenciosa e a splash "Iniciando o sistema..."
     // ficava travada para sempre, sem nenhum aviso pro usuário.
-    let tls: Awaited<ReturnType<typeof startLocalServer>>;
+    let serverRes: Awaited<ReturnType<typeof startLocalServer>>;
     try {
-      tls = await startLocalServer();
+      serverRes = await startLocalServer();
     } catch (err) {
       console.error("[main] falha ao iniciar o servidor local:", err);
       dialog.showErrorBox(
@@ -195,11 +195,11 @@ if (isPrimaryInstance) {
       app.quit();
       return;
     }
-    const protocol = tls ? "https" : "http";
+    const protocol = serverRes.tls ? "https" : "http";
 
     // O certificado é o mesmo que acabamos de gerar/carregar em disco —
     // confiar nele aqui é aceitável porque a origem é local, não terceira.
-    if (tls) {
+    if (serverRes.tls) {
       app.on("certificate-error", (event, _webContents, url, _error, _certificate, callback) => {
         if (url.startsWith(`https://127.0.0.1:${PORT}`)) {
           event.preventDefault();
@@ -236,7 +236,7 @@ if (isPrimaryInstance) {
     // Sem isto, a ponte de impressão falhava só com um console.warn: o
     // terminal parecia funcionar normalmente, mas nenhuma pulseira/recibo
     // saía e ninguém no balcão descobria até a família já ter ido embora.
-    const printBridgeResult = startPrintBridge();
+    const printBridgeResult = startPrintBridge(serverRes.db);
     if (!printBridgeResult.started) {
       dialog.showMessageBox({
         type: "warning",

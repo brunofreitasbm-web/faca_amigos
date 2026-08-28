@@ -18,9 +18,14 @@ export interface SessionForQuote {
   checkinAtMs: number;
   childName: string;
   planId: string;
-  /** Desconto de cupom já validado, em centavos (0 = nenhum). */
+  activity?: "PLAYGROUND" | "CARRINHO";
+  /** Desconto de cupom já validado, em centavos (0 = nenhum). Usado direto para cupom DESCONTO_VALOR. */
   couponDiscountCents: number;
   couponCode: string | null;
+  /** Tipo do cupom aplicado no check-in (null/undefined = nenhum, ou cupom antigo sem essa info). */
+  couponKind?: "DESCONTO_PCT" | "DESCONTO_VALOR" | null;
+  /** Percentual do cupom quando couponKind = DESCONTO_PCT (ex: 50 = 50%). */
+  couponPct?: number | null;
   /** Resgate de cortesia de fidelidade — zera o total. */
   freeFromLoyalty: boolean;
   /** Timestamp de quando a sessão foi pausada; null = não está pausada agora. */

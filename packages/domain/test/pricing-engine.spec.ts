@@ -55,4 +55,25 @@ describe("quoteForSession", () => {
     expect(q.totalCents).toBe(0);
     expect(q.lines.at(-1)?.label).toBe("Cortesia — resgate de fidelidade");
   });
+
+  it("cupom percentual no Playground desconta plano + excedente, não só o plano", () => {
+    const q = quoteForSession(
+      plan,
+      session({ activity: "PLAYGROUND", couponKind: "DESCONTO_PCT", couponPct: 50, couponCode: "50% MEIA - Inclusivo" }),
+      15 * 60_000 + 4 * 60_000, // +4 min de excedente (400 centavos)
+    );
+    // total sem cupom seria 3000 + 400 = 3400; com 50% sobre tudo, sobra 1700.
+    expect(q.totalCents).toBe(1700);
+    expect(q.lines.at(-1)).toEqual({ label: "Cupom 50% MEIA - Inclusivo", cents: -1700 });
+  });
+
+  it("cupom percentual fora do Playground não recebe o desconto proporcional ao excedente", () => {
+    const q = quoteForSession(
+      plan,
+      session({ activity: "CARRINHO", couponKind: "DESCONTO_PCT", couponPct: 50, couponDiscountCents: 0 }),
+      15 * 60_000 + 4 * 60_000,
+    );
+    expect(q.totalCents).toBe(3400);
+    expect(q.lines).toHaveLength(2);
+  });
 });

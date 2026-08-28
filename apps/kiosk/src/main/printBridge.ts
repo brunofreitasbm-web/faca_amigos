@@ -226,14 +226,38 @@ export interface PrintBridgeStartResult {
   reason?: string;
 }
 
+export function getTerminalUnitIds(db?: any): Set<string> {
+  const allowed = new Set<string>();
+
+  const envUnit = process.env.FACAAMIGOS_UNIT_ID || process.env.UNIT_ID;
+  if (envUnit && envUnit.trim()) {
+    for (const id of envUnit.split(",")) {
+      if (id.trim()) allowed.add(id.trim());
+    }
+  }
+
+  if (db) {
+    try {
+      const row = db.prepare("SELECT value FROM app_settings WHERE key = 'terminal_unit_id'").get() as { value: string } | undefined;
+      if (row?.value && row.value.trim()) {
+        for (const id of row.value.split(",")) {
+          if (id.trim()) allowed.add(id.trim());
+        }
+      }
+    } catch {
+      // Tabela app_settings pode não estar pronta em testes sem DB
+    }
+  }
+
+  return allowed;
+}
+
 /**
  * Se isto retornar `started: false`, NENHUM job de fa_kiosk_print_jobs vai
  * ser processado neste terminal — os jobs ficam acumulando como PENDING
- * para sempre, sem nenhum aviso além deste retorno (foi assim que uma
- * falta de .env em produção virou "a impressora não funciona" sem erro
- * nenhum na tela). Quem chama isto deve avisar o operador visivelmente.
+ * para sempre, sem nenhum aviso além deste retorno. Quem chama isto deve avisar o operador visivelmente.
  */
-export function startPrintBridge(): PrintBridgeStartResult {
+export function startPrintBridge(db?: any): PrintBridgeStartResult {
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
   const serviceRoleKey =
     process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
@@ -263,6 +287,12 @@ export function startPrintBridge(): PrintBridgeStartResult {
   }
 
   async function resolvePrinterDeviceName(unitId: string, kind: PrintJobRow["kind"]): Promise<string | null> {
+    const allowedUnits = getTerminalUnitIds(db);
+    if (allowedUnits.size > 0 && !allowedUnits.has(unitId)) {
+      console.log(`[print-bridge] Recusando resolução de impressora: job da unidade ${unitId} não pertence a este terminal.`);
+      return null;
+    }
+
     const configured = await printerNameFor(unitId, kind);
     const win = BrowserWindow.getAllWindows()[0];
     const installed = await listWindowsPrinters(() => (win ? win.webContents.getPrintersAsync() : Promise.resolve([])));
@@ -278,12 +308,18 @@ export function startPrintBridge(): PrintBridgeStartResult {
         (n) => n.toLowerCase().includes(trimmed.toLowerCase()) || trimmed.toLowerCase().includes(n.toLowerCase()),
       );
       if (partial) return partial;
+
+      // Se havia uma impressora especificamente configurada para esta unidade,
+      // mas ela não existe nesta máquina, NÃO usar fallback arbitrário para
+      // impressoras de outra unidade neste terminal.
+      console.warn(`[print-bridge] Impressora "${configured}" configurada para unidade ${unitId} não foi encontrada neste terminal.`);
+      return null;
     }
 
     const physical = installedNames.find((n) => !isVirtualOrPdfPrinter(n));
     if (physical) return physical;
 
-    return configured || installedNames[0] || null;
+    return installedNames[0] || null;
   }
 
   async function handleReceiptPdfFallback(job: PrintJobRow, originalError: string): Promise<void> {
@@ -320,6 +356,12 @@ export function startPrintBridge(): PrintBridgeStartResult {
   }
 
   async function handleJob(job: PrintJobRow): Promise<void> {
+    const allowedUnits = getTerminalUnitIds(db);
+    if (allowedUnits.size > 0 && !allowedUnits.has(job.unit_id)) {
+      console.log(`[print-bridge] Ignorando job ${job.id} para unidade ${job.unit_id} (este terminal está configurado para: ${Array.from(allowedUnits).join(", ")})`);
+      return;
+    }
+
     try {
       let deviceName: string | null = null;
       try {
@@ -420,13 +462,23 @@ export function startPrintBridge(): PrintBridgeStartResult {
     .select("id, unit_id, kind, payload_json, status")
     .eq("status", "PENDING")
     .then(({ data }) => {
-      for (const job of (data ?? []) as PrintJobRow[]) void handleJob(job);
+      const allowedUnits = getTerminalUnitIds(db);
+      for (const job of (data ?? []) as PrintJobRow[]) {
+        if (allowedUnits.size > 0 && !allowedUnits.has(job.unit_id)) continue;
+        void handleJob(job);
+      }
     });
 
   supabase
     .channel("fa_kiosk_print_jobs_bridge")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "fa_kiosk_print_jobs" }, (payload) => {
-      void handleJob(payload.new as PrintJobRow);
+      const job = payload.new as PrintJobRow;
+      const allowedUnits = getTerminalUnitIds(db);
+      if (allowedUnits.size > 0 && !allowedUnits.has(job.unit_id)) {
+        console.log(`[print-bridge] Ignorando evento Realtime do job ${job.id} para unidade ${job.unit_id} (este terminal está configurado para: ${Array.from(allowedUnits).join(", ")})`);
+        return;
+      }
+      void handleJob(job);
     })
     .subscribe((status) => {
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {

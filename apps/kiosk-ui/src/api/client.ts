@@ -1158,8 +1158,11 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         checkinAtMs: row.checkin_at_ms as number,
         childName: row.child_name_snapshot as string,
         planId: row.plan_id as string,
+        activity: row.activity as "PLAYGROUND" | "CARRINHO",
         couponDiscountCents: row.coupon_discount_cents as number,
         couponCode: null,
+        couponKind: (row.coupon_kind as "DESCONTO_PCT" | "DESCONTO_VALOR" | null) ?? null,
+        couponPct: (row.coupon_pct as number | null) ?? null,
         freeFromLoyalty: Boolean(row.free_from_loyalty),
         pausedAtMs: (row.paused_at_ms as number | null) ?? null,
         pausedMsTotal: (row.paused_ms_total as number) ?? 0,
@@ -2235,6 +2238,17 @@ export const Api = {
       );
     } catch (err) {
       console.warn("Supabase RLS impediu gravação remota em fa_kiosk_app_settings (salvo localmente no quiosque):", err);
+    }
+    if (key === "printer_receipt" || key === "printer_wristband") {
+      try {
+        await fetch("/api/system/terminal-unit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ unitId }),
+        });
+      } catch {
+        // ignora se não estiver rodando sob o servidor local do Fastify
+      }
     }
   },
   /**

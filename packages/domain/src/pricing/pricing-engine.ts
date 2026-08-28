@@ -25,8 +25,17 @@ export function quoteForSession(plan: Plan, session: SessionForQuote, nowMs: num
 
   let totalCents = timing.liveTotalCents;
 
-  if (session.couponDiscountCents > 0) {
-    const applied = Math.min(session.couponDiscountCents, totalCents);
+  // Cupom percentual (o par 50% inclusivo / 40% padrão) recalcula sobre o
+  // valor total ao vivo — que já inclui o excedente — em vez de reusar o
+  // valor fixo travado no check-in, e só vale para Playground. Cupom de
+  // valor fixo (DESCONTO_VALOR) continua sendo subtraído direto.
+  const discountCents =
+    session.couponKind === "DESCONTO_PCT" && session.activity === "PLAYGROUND" && session.couponPct
+      ? Math.round((totalCents * session.couponPct) / 100)
+      : session.couponDiscountCents;
+
+  if (discountCents > 0) {
+    const applied = Math.min(discountCents, totalCents);
     lines.push({ label: `Cupom ${session.couponCode ?? ""}`.trim(), cents: -applied });
     totalCents -= applied;
   }
