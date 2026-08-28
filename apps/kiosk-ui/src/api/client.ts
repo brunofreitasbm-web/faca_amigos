@@ -1245,6 +1245,25 @@ export const Api = {
     );
     return row.face_descriptor ?? null;
   },
+  /** Retorna todos os colaboradores ativos da unidade com descriptor facial cadastrado para reconhecimento rápido. */
+  allEnrolledFaceDescriptors: async (unitId?: string): Promise<{ id: string; full_name: string; role: string; face_descriptor: number[] }[]> => {
+    const rows = await unwrap<{ id: string; full_name: string; role: string; face_descriptor: number[] | null }[]>(
+      supabase()
+        .from("fa_kiosk_employees")
+        .select("id, full_name, role, face_descriptor")
+        .eq("active", true)
+        .not("face_descriptor", "is", null),
+    );
+    const valid = rows.filter((r): r is { id: string; full_name: string; role: string; face_descriptor: number[] } => Array.isArray(r.face_descriptor) && r.face_descriptor.length > 0);
+    if (!unitId) return valid;
+    const links = await unwrap<{ employee_id: string }[]>(
+      supabase().from("fa_kiosk_employee_units").select("employee_id").eq("unit_id", unitId),
+    );
+    if (links.length === 0) return valid;
+    const linkedIds = new Set(links.map((l) => l.employee_id));
+    return valid.filter((v) => linkedIds.has(v.id));
+  },
+
   /** Cadastra/atualiza o rosto de um colaborador — RPC fa_kiosk_enroll_face (self ou config.employees.write). */
   enrollFace: (employeeId: string, descriptor: number[], photoPath: string) =>
     unwrap(

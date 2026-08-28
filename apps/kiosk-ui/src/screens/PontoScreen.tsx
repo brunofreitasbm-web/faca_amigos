@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Button, Card, Modal, HelpText } from "@facaamigos/ui";
+import { useEffect, useState, useRef } from "react";
+import { Button, Card, Modal, HelpText, Tabs } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Employee, PontoRecord } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -9,7 +9,7 @@ import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { PunchPhotoCapture } from "../components/PunchPhotoCapture.js";
 import { useFaceCapture } from "../hooks/useFaceCapture.js";
 import { useGeolocation } from "../hooks/useGeolocation.js";
-import { isSameFace } from "../lib/faceRecognition.js";
+import { isSameFace, findBestFaceMatch, playSuccessChime } from "../lib/faceRecognition.js";
 
 const KINDS = [
   { value: "ENTRADA", label: "Entrada", help: "Registrar que você chegou para trabalhar agora" },
@@ -22,27 +22,31 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function getNextLogicalKind(todayPunches: PontoRecord[]): (typeof KINDS)[number]["value"] {
+  if (!todayPunches || todayPunches.length === 0) return "ENTRADA";
+  const last = todayPunches[todayPunches.length - 1];
+  if (!last) return "ENTRADA";
+  if (last.kind === "ENTRADA") return "INTERVALO_INICIO";
+  if (last.kind === "INTERVALO_INICIO") return "INTERVALO_FIM";
+  if (last.kind === "INTERVALO_FIM") return "SAIDA";
+  return "ENTRADA";
+}
+
 /**
- * Bater ponto (Portaria MTP 671/2021 — ver packages/db-local/repositories/ponto.ts).
- * Sem edição/exclusão por desenho: cada marcação é um registro novo,
- * com NSR sequencial próprio.
- *
- * A marcação só vale legalmente se for a própria pessoa batendo — por
- * isso, escolher um colaborador na lista não libera os botões direto: é
- * preciso provar, com login real ou PIN de terminal já cadastrado, que
- * quem está na frente da tela é aquele colaborador (EmployeeAuthGate).
- * O servidor (fa_register_ponto) também recusa qualquer employee_id que
- * não bata com a sessão autenticada — a tela é só a primeira barreira.
+ * Bater ponto / Controle de Frequência para Estagiários e Colaboradores.
+ * Suporta Modo Reconhecimento Facial Rápido (Touchless) e Fallback por PIN.
+ * Registra instantaneamente com envio direto para a Folha de Ponto.
  */
 export function PontoScreen() {
   const { unit, employee } = useAppState();
-  // Estagiário não "bate ponto" no vocabulário do RH — é "Controle de
-  // Frequência". Mesmo fluxo e mesma RPC (fa_register_ponto), só o rótulo
-  // muda pra quem só tem a capacidade ponto.self.
   const isEstagiario = employee?.role === "ESTAGIARIO";
   const screenTitle = isEstagiario ? "Controle de Frequência" : "Bater ponto";
   const toast = useToast();
+
+  const [mode, setMode] = useState<"FACIAL_RAPIDO" | "PIN_MANUAL">("FACIAL_RAPIDO");
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [enrolledFaceList, setEnrolledFaceList] = useState<{ id: string; full_name: string; role: string; face_descriptor: number[] }[]>([]);
+
   const [selected, setSelected] = useState<Employee | null>(null);
   const [authedAs, setAuthedAs] = useState<TerminalEmployee | null>(null);
   const [today, setToday] = useState<PontoRecord[]>([]);
@@ -50,13 +54,44 @@ export function PontoScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [myDescriptor, setMyDescriptor] = useState<number[] | null>(null);
 
+  // Status de escaneamento facial rápido
+  const [scanState, setScanState] = useState<"idle" | "scanning" | "detected" | "success" | "fail">("idle");
+  const [detectedName, setDetectedName] = useState<string | null>(null);
+  const [autoPunchResult, setAutoPunchResult] = useState<{
+    fullName: string;
+    role: string;
+    kind: string;
+    atMs: number;
+    nsr: number;
+  } | null>(null);
+
   const faceCapture = useFaceCapture();
   const geolocation = useGeolocation();
   const geofenceRadiusM = unit?.geofence_radius_m ?? null;
 
+  const isScanningRef = useRef(false);
+
   useEffect(() => {
     Api.employees(unit?.id).then(setEmployees);
+    Api.allEnrolledFaceDescriptors(unit?.id).then(setEnrolledFaceList).catch(() => setEnrolledFaceList([]));
   }, [unit?.id]);
+
+  // Liga a câmera automaticamente quando no modo FACIAL_RAPIDO
+  useEffect(() => {
+    if (mode === "FACIAL_RAPIDO") {
+      faceCapture.start();
+      setScanState("scanning");
+    } else if (!authedAs) {
+      faceCapture.stop();
+      setScanState("idle");
+    }
+    return () => {
+      if (mode === "FACIAL_RAPIDO" && !authedAs) {
+        faceCapture.stop();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   useEffect(() => {
     if (!authedAs) return;
@@ -65,9 +100,6 @@ export function PontoScreen() {
     Api.pontoHistory(authedAs.id, startOfDay.getTime(), Date.now()).then(setToday);
   }, [authedAs, message]);
 
-  // Liga a câmera e busca o descriptor cadastrado assim que a identidade é
-  // confirmada por PIN/login — cada marcação depois disso reaproveita a
-  // mesma câmera já ligada, só tira um frame novo por clique.
   useEffect(() => {
     if (!authedAs) return;
     faceCapture.start();
@@ -79,22 +111,107 @@ export function PontoScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authedAs?.id]);
 
+  // Escaneamento facial instantâneo/rápido
+  async function handleAutoScan() {
+    if (isScanningRef.current || busy || scanState === "success" || !faceCapture.ready) return;
+    isScanningRef.current = true;
+    try {
+      const captured = await faceCapture.capture();
+      if (!captured || !captured.descriptor) {
+        toast.error("Rosto não enquadrado. Por favor centralize a face na moldura.");
+        return;
+      }
+
+      const candidates = enrolledFaceList.map((e) => ({
+        id: e.id,
+        descriptor: e.face_descriptor,
+        full_name: e.full_name,
+        role: e.role,
+      }));
+
+      const matchResult = findBestFaceMatch(captured.descriptor, candidates);
+      if (matchResult) {
+        const empMatch = matchResult.match;
+        setScanState("detected");
+        setDetectedName(empMatch.full_name);
+        playSuccessChime();
+
+        await executeAutoPunch(empMatch, captured.photo);
+      } else {
+        setScanState("fail");
+        toast.error("Rosto não cadastrado ou não reconhecido. Cadastre a biometria ou use o PIN.");
+        setTimeout(() => setScanState("scanning"), 3000);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível processar o reconhecimento facial.");
+    } finally {
+      isScanningRef.current = false;
+    }
+  }
+
+  async function executeAutoPunch(
+    empMatch: { id: string; full_name: string; role: string },
+    photo: Blob,
+  ) {
+    if (busy || !unit) return;
+    setBusy(true);
+    try {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const userTodayPunches = await Api.pontoHistory(empMatch.id, startOfDay.getTime(), Date.now());
+      const nextKind = getNextLogicalKind(userTodayPunches);
+
+      const punchPhotoPath = await Api.uploadPontoFoto(empMatch.id, photo, "punch");
+
+      let lat: number | null = null;
+      let lng: number | null = null;
+      if (geofenceRadiusM !== null) {
+        const pos = geolocation.position ?? (await geolocation.request());
+        if (pos) {
+          lat = pos.lat;
+          lng = pos.lng;
+        }
+      }
+
+      const res = await Api.ponto({
+        unitId: unit.id,
+        employeeId: empMatch.id,
+        kind: nextKind,
+        registeredByEmployeeId: empMatch.id,
+        lat,
+        lng,
+        punchPhotoPath,
+      });
+
+      setScanState("success");
+      setAutoPunchResult({
+        fullName: empMatch.full_name,
+        role: empMatch.role,
+        kind: KINDS.find((k) => k.value === nextKind)?.label ?? nextKind,
+        atMs: res.atMs,
+        nsr: res.nsr,
+      });
+
+      setTimeout(() => {
+        setAutoPunchResult(null);
+        setScanState("scanning");
+        setDetectedName(null);
+      }, 4500);
+    } catch (err) {
+      setScanState("fail");
+      toast.error(err instanceof Error ? err.message : "Erro ao registrar o ponto facial.");
+      setTimeout(() => setScanState("scanning"), 3000);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function bater(kind: (typeof KINDS)[number]["value"]) {
-    // Guarda extra contra duplo clique/double-tap: `disabled={busy}` no
-    // botão já cobre o caso normal, mas dois eventos de clique disparados
-    // antes do primeiro re-render (comum em touch) chamariam bater() duas
-    // vezes. A garantia real está no servidor (fa_register_ponto recusa
-    // marcação repetida em <5s); isto aqui só evita a segunda chamada de
-    // rede desnecessária.
     if (busy || !authedAs || !unit) return;
     setBusy(true);
     try {
       let punchPhotoPath: string | null = null;
 
-      // Reconhecimento facial: só bloqueia quem já tem rosto cadastrado —
-      // colaborador sem cadastro ainda (ver ColaboradoresTab > Cadastrar
-      // rosto) continua batendo ponto normalmente por PIN/login, sem essa
-      // segunda checagem, pra não travar quem nunca foi cadastrado.
       if (faceCapture.ready) {
         const captured = await faceCapture.capture();
         if (!captured) {
@@ -130,10 +247,8 @@ export function PontoScreen() {
         punchPhotoPath,
       });
       setMessage(`Registrado às ${formatTime(res.atMs)} — NSR ${res.nsr}`);
+      playSuccessChime();
     } catch (err) {
-      // Sem catch aqui, uma falha ficava muda: a marcação (registro
-      // legal, Portaria MTP 671/2021) podia não ter sido gravada e o
-      // colaborador saía achando que bateu ponto.
       toast.error(err instanceof Error ? err.message : "Não foi possível registrar a marcação de ponto. Tente novamente.");
     } finally {
       setBusy(false);
@@ -148,58 +263,132 @@ export function PontoScreen() {
   }
 
   return (
-    <div style={{ maxWidth: "560px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>{screenTitle}</h1>
+    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>{screenTitle}</h1>
+        <Tabs
+          value={mode}
+          onChange={(v) => {
+            trocarColaborador();
+            setMode(v as typeof mode);
+          }}
+          tabs={[
+            { value: "FACIAL_RAPIDO", label: "⚡ Facial Rápido" },
+            { value: "PIN_MANUAL", label: "🔑 Seleção / PIN" },
+          ]}
+        />
+      </div>
+
       <HelpText>
-        Registro obrigatório de horário de trabalho. Toque no seu nome na lista abaixo, confirme que é você com
-        login/PIN e depois escolha o que está registrando (chegada, saída ou intervalo).
+        {mode === "FACIAL_RAPIDO"
+          ? "Posicione seu rosto em frente ao terminal. O reconhecimento identifica o estagiário/colaborador e registra a frequência instantaneamente na Folha de Ponto."
+          : "Registro via seleção de nome com PIN de validação."}
       </HelpText>
 
-      {!selected ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <HelpText icon="👆">Toque no seu nome para começar:</HelpText>
-          {employees.map((emp) => (
-            <Card key={emp.id} onClick={() => setSelected(emp)} style={{ cursor: "pointer", padding: "12px" }}>
-              {emp.full_name}
-            </Card>
-          ))}
-        </div>
-      ) : !authedAs ? (
-        <Modal onClose={trocarColaborador} ariaLabel="Confirmar identidade" maxWidth="420px">
-          <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
-            {isEstagiario ? "Para registrar a frequência de" : "Para bater o ponto de"} <strong>{selected.full_name}</strong>, confirme com login ou PIN.
-          </p>
-          <EmployeeAuthGate restrictToEmployeeId={selected.id} onAuthenticated={setAuthedAs} onCancel={trocarColaborador} />
-        </Modal>
-      ) : (
+      {mode === "FACIAL_RAPIDO" && !authedAs && (
+        <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px", borderRadius: "18px" }}>
+          <PunchPhotoCapture
+            faceCapture={faceCapture}
+            geolocation={geolocation}
+            geofenceRadiusM={geofenceRadiusM}
+            scanState={scanState}
+            detectedName={detectedName}
+          />
+
+          {faceCapture.ready && scanState === "scanning" && (
+            <Button
+              variant="primary"
+              size="lg"
+              loading={busy}
+              disabled={busy}
+              onClick={handleAutoScan}
+              style={{ borderRadius: "9999px", background: "linear-gradient(135deg, #10b981, #059669)", fontWeight: "bold" }}
+            >
+              📸 Reconhecer Rosto e Bater Ponto
+            </Button>
+          )}
+
+          {autoPunchResult && (
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: "14px",
+                background: "rgba(16, 185, 129, 0.12)",
+                border: "2px solid #10b981",
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+                alignItems: "center",
+                textAlign: "center",
+              }}
+            >
+              <span style={{ fontSize: "28px" }}>🎉</span>
+              <strong style={{ fontSize: "18px", color: "var(--color-teal-text, #047857)" }}>
+                Ponto Registrado com Sucesso!
+              </strong>
+              <div style={{ fontSize: "15px", fontWeight: "600" }}>
+                {autoPunchResult.fullName} {autoPunchResult.role === "ESTAGIARIO" ? "(🎓 Estagiário)" : ""}
+              </div>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)" }}>
+                {autoPunchResult.kind} às {formatTime(autoPunchResult.atMs)} — NSR #{autoPunchResult.nsr}
+              </div>
+              <div style={{ fontSize: "12px", background: "#10b981", color: "#fff", padding: "3px 10px", borderRadius: "9999px", marginTop: "4px" }}>
+                ✓ Enviado automaticamente para a Folha de Ponto
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {mode === "PIN_MANUAL" && (
         <>
-          <h2>{authedAs.full_name}</h2>
+          {!selected ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <HelpText icon="👆">Toque no seu nome para começar:</HelpText>
+              {employees.map((emp) => (
+                <Card key={emp.id} onClick={() => setSelected(emp)} style={{ cursor: "pointer", padding: "12px" }}>
+                  {emp.full_name} {emp.role === "ESTAGIARIO" ? "(🎓 Estagiário)" : ""}
+                </Card>
+              ))}
+            </div>
+          ) : !authedAs ? (
+            <Modal onClose={trocarColaborador} ariaLabel="Confirmar identidade" maxWidth="420px">
+              <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
+                {isEstagiario ? "Para registrar a frequência de" : "Para bater o ponto de"} <strong>{selected.full_name}</strong>, confirme com login ou PIN.
+              </p>
+              <EmployeeAuthGate restrictToEmployeeId={selected.id} onAuthenticated={setAuthedAs} onCancel={trocarColaborador} />
+            </Modal>
+          ) : (
+            <>
+              <h2>{authedAs.full_name}</h2>
 
-          <PunchPhotoCapture faceCapture={faceCapture} geolocation={geolocation} geofenceRadiusM={geofenceRadiusM} />
+              <PunchPhotoCapture faceCapture={faceCapture} geolocation={geolocation} geofenceRadiusM={geofenceRadiusM} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            {KINDS.map((k) => (
-              <Button key={k.value} variant="secondary" size="lg" disabled={busy} title={k.help} onClick={() => bater(k.value)}>
-                {k.label}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                {KINDS.map((k) => (
+                  <Button key={k.value} variant="secondary" size="lg" disabled={busy} title={k.help} onClick={() => bater(k.value)}>
+                    {k.label}
+                  </Button>
+                ))}
+              </div>
+
+              {message && <p style={{ color: "var(--color-teal-text)" }}>{message}</p>}
+
+              <h3>Marcações de hoje</h3>
+              <ul>
+                {today.map((r) => (
+                  <li key={r.id}>
+                    {formatTime(r.at_ms)} — {r.kind} (NSR {r.nsr})
+                  </li>
+                ))}
+                {today.length === 0 && <li>Nenhuma marcação ainda.</li>}
+              </ul>
+
+              <Button variant="ghost" onClick={trocarColaborador}>
+                trocar colaborador
               </Button>
-            ))}
-          </div>
-
-          {message && <p style={{ color: "var(--color-teal-text)" }}>{message}</p>}
-
-          <h3>Marcações de hoje</h3>
-          <ul>
-            {today.map((r) => (
-              <li key={r.id}>
-                {formatTime(r.at_ms)} — {r.kind} (NSR {r.nsr})
-              </li>
-            ))}
-            {today.length === 0 && <li>Nenhuma marcação ainda.</li>}
-          </ul>
-
-          <Button variant="ghost" onClick={trocarColaborador}>
-            trocar colaborador
-          </Button>
+            </>
+          )}
         </>
       )}
     </div>

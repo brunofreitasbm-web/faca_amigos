@@ -170,7 +170,16 @@ export function FrequenciaTab() {
             <tbody>
               {records.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.full_name}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>{r.full_name}</span>
+                      {r.role === "ESTAGIARIO" && (
+                        <span style={{ fontSize: "11px", fontWeight: "bold", background: "rgba(180, 83, 9, 0.15)", color: "#b45309", padding: "1px 6px", borderRadius: "9999px" }}>
+                          🎓 Estagiário
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td>{r.role ? ROLE_LABEL[r.role] : "—"}</td>
                   <td>{units.find((u) => u.id === r.unit_id)?.name ?? "—"}</td>
                   <td>{KIND_LABEL[r.kind]}</td>
