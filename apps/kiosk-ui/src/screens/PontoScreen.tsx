@@ -38,7 +38,7 @@ function getNextLogicalKind(todayPunches: PontoRecord[]): (typeof KINDS)[number]
  * Registra instantaneamente com envio direto para a Folha de Ponto.
  */
 export function PontoScreen() {
-  const { unit, employee } = useAppState();
+  const { unit, employee, hasFaceEnrolled } = useAppState();
   const isEstagiario = employee?.role === "ESTAGIARIO";
   const screenTitle = isEstagiario ? "Controle de Frequência" : "Bater ponto";
   const toast = useToast();
@@ -70,6 +70,15 @@ export function PontoScreen() {
   const geofenceRadiusM = unit?.geofence_radius_m ?? null;
 
   const isScanningRef = useRef(false);
+
+  const isCurrentEmployeeBiometricEnrolled =
+    hasFaceEnrolled === true || (!!employee && enrolledFaceList.some((e) => e.id === employee.id));
+
+  useEffect(() => {
+    if (isCurrentEmployeeBiometricEnrolled && mode === "PIN_MANUAL") {
+      setMode("FACIAL_RAPIDO");
+    }
+  }, [isCurrentEmployeeBiometricEnrolled, mode]);
 
   useEffect(() => {
     Api.employees(unit?.id).then(setEmployees);
@@ -269,12 +278,20 @@ export function PontoScreen() {
         <Tabs
           value={mode}
           onChange={(v) => {
+            if (v === "PIN_MANUAL" && isCurrentEmployeeBiometricEnrolled) {
+              toast.error("Seleção por PIN desabilitada. Sua biometria facial está cadastrada, utilize o Facial Rápido.");
+              return;
+            }
             trocarColaborador();
             setMode(v as typeof mode);
           }}
           tabs={[
             { value: "FACIAL_RAPIDO", label: "⚡ Facial Rápido" },
-            { value: "PIN_MANUAL", label: "🔑 Seleção / PIN" },
+            {
+              value: "PIN_MANUAL",
+              label: "🔑 Seleção / PIN",
+              disabled: isCurrentEmployeeBiometricEnrolled,
+            },
           ]}
         />
       </div>
@@ -345,11 +362,40 @@ export function PontoScreen() {
           {!selected ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <HelpText icon="👆">Toque no seu nome para começar:</HelpText>
-              {employees.map((emp) => (
-                <Card key={emp.id} onClick={() => setSelected(emp)} style={{ cursor: "pointer", padding: "12px" }}>
-                  {emp.full_name} {emp.role === "ESTAGIARIO" ? "(🎓 Estagiário)" : ""}
-                </Card>
-              ))}
+              {employees.map((emp) => {
+                const empHasFace = enrolledFaceList.some((e) => e.id === emp.id);
+                return (
+                  <Card
+                    key={emp.id}
+                    onClick={() => {
+                      if (empHasFace) {
+                        toast.error(
+                          `O colaborador ${emp.full_name} possui Biometria Facial cadastrada. Por favor, utilize o Facial Rápido.`,
+                        );
+                        return;
+                      }
+                      setSelected(emp);
+                    }}
+                    style={{
+                      cursor: empHasFace ? "not-allowed" : "pointer",
+                      padding: "12px",
+                      opacity: empHasFace ? 0.6 : 1,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span>
+                      {emp.full_name} {emp.role === "ESTAGIARIO" ? "(🎓 Estagiário)" : ""}
+                    </span>
+                    {empHasFace && (
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)", fontStyle: "italic" }}>
+                        ⚡ Biometria Facial ativa (PIN desabilitado)
+                      </span>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           ) : !authedAs ? (
             <Modal onClose={trocarColaborador} ariaLabel="Confirmar identidade" maxWidth="420px">

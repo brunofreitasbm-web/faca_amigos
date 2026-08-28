@@ -9,6 +9,7 @@ export interface FaceEnrollmentModalProps {
   employeeName: string;
   onClose: () => void;
   onEnrolled?: () => void;
+  required?: boolean;
 }
 
 /**
@@ -19,7 +20,13 @@ export interface FaceEnrollmentModalProps {
  * cadastrou o quê, mas o consentimento do próprio titular é capturado nesta
  * tela, antes de qualquer chamada à câmera.
  */
-export function FaceEnrollmentModal({ employeeId, employeeName, onClose, onEnrolled }: FaceEnrollmentModalProps) {
+export function FaceEnrollmentModal({
+  employeeId,
+  employeeName,
+  onClose,
+  onEnrolled,
+  required = false,
+}: FaceEnrollmentModalProps) {
   const toast = useToast();
   const [consent, setConsent] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,7 +46,7 @@ export function FaceEnrollmentModal({ employeeId, employeeName, onClose, onEnrol
       }
       const photoPath = await Api.uploadPontoFoto(employeeId, result.photo, "enroll");
       await Api.enrollFace(employeeId, result.descriptor, photoPath);
-      toast.success(`Rosto de ${employeeName} cadastrado.`);
+      toast.success(`Rosto de ${employeeName} cadastrado com sucesso.`);
       stop();
       onEnrolled?.();
       onClose();
@@ -51,11 +58,24 @@ export function FaceEnrollmentModal({ employeeId, employeeName, onClose, onEnrol
   }
 
   return (
-    <Modal title={`Cadastrar rosto — ${employeeName}`} onClose={() => { stop(); onClose(); }} maxWidth="480px">
+    <Modal
+      title={required ? `⚡ Cadastro de Biometria Facial (Obrigatório) — ${employeeName}` : `Cadastrar rosto — ${employeeName}`}
+      onClose={() => {
+        if (required && !consent) {
+          toast.error("O cadastro da biometria facial é obrigatório no primeiro login.");
+          return;
+        }
+        stop();
+        onClose();
+      }}
+      closeOnBackdrop={!required}
+      maxWidth="480px"
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         <HelpText>
-          A foto e o padrão facial extraído dela passam a ser usados como uma segunda prova de identidade ao bater
-          o ponto neste quiosque, além do login/PIN.
+          {required
+            ? "Como Operador/Líder, seu cadastro de biometria facial é obrigatório neste primeiro login para habilitar o registro de ponto rápido."
+            : "A foto e o padrão facial extraído dela passam a ser usados como uma segunda prova de identidade ao bater o ponto neste quiosque, além do login/PIN."}
         </HelpText>
 
         {!ready && !starting && (

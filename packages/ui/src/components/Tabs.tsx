@@ -5,7 +5,7 @@ import { Button } from "./Button.js";
 export interface TabsProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
-  tabs: Array<{ value: T; label: string }>;
+  tabs: Array<{ value: T; label: string; disabled?: boolean }>;
   style?: CSSProperties;
 }
 
@@ -26,6 +26,7 @@ export function Tabs<T extends string>({ value, onChange, tabs, style }: TabsPro
     e.preventDefault();
     const next = e.key === "ArrowRight" ? (index + 1) % tabs.length : (index - 1 + tabs.length) % tabs.length;
     const nextTab = tabs[next]!;
+    if (nextTab.disabled) return;
     onChange(nextTab.value);
     refs.current[nextTab.value]?.focus();
   }
@@ -41,7 +42,8 @@ export function Tabs<T extends string>({ value, onChange, tabs, style }: TabsPro
           tabIndex={value === t.value ? 0 : -1}
           variant={value === t.value ? "primary" : "ghost"}
           size="sm"
-          onClick={() => onChange(t.value)}
+          disabled={t.disabled}
+          onClick={() => !t.disabled && onChange(t.value)}
           onKeyDown={(e) => onKeyDown(e, i)}
           title={`Abrir aba ${t.label}`}
         >

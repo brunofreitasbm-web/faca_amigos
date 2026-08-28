@@ -43,6 +43,7 @@ import { GerencialApp } from "./screens/gerencial/GerencialApp.js";
 import { TapReturnScreen } from "./screens/TapReturnScreen.js";
 import { parseTapReturn } from "./lib/infinitepayTap.js";
 import { ConnectDeviceModal } from "./components/ConnectDeviceModal.js";
+import { FaceEnrollmentModal } from "./components/FaceEnrollmentModal.js";
 import { ConnectionStatusChip } from "./components/ConnectionStatusChip.js";
 import { InstallPwaBanner } from "./components/InstallPwaBanner.js";
 import { UpdatePwaBanner } from "./components/UpdatePwaBanner.js";
@@ -83,7 +84,7 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
 };
 
 export function App() {
-  const { units, unit, setUnitId, gerencial, setGerencial, employee, logout, restoring } = useAppState();
+  const { units, unit, setUnitId, gerencial, setGerencial, employee, logout, restoring, hasFaceEnrolled, setHasFaceEnrolled } = useAppState();
   const { can, loading: loadingCapabilities } = useAuth();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
@@ -511,6 +512,15 @@ export function App() {
       </header>
 
       {showConnectModal && <ConnectDeviceModal onClose={() => setShowConnectModal(false)} />}
+      {employee && (employee.role === "OPERADOR" || employee.role === "GERENTE") && hasFaceEnrolled === false && (
+        <FaceEnrollmentModal
+          employeeId={employee.id}
+          employeeName={employee.full_name}
+          required={true}
+          onClose={() => {}}
+          onEnrolled={() => setHasFaceEnrolled(true)}
+        />
+      )}
 
       <InstallPwaBanner />
       <UpdatePwaBanner />

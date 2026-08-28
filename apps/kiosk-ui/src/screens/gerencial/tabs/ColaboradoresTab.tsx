@@ -119,7 +119,22 @@ export function ColaboradoresTab() {
     setGeneralInviteError(null);
     try {
       const { unitId, token } = await Api.generalInviteLink(generalInviteUnitId);
-      setGeneralInviteLink(`${window.location.origin}${window.location.pathname}?cadastro-estagiario=${unitId}.${token}`);
+      // Mesmo endereço público (Vercel) usado no pareamento de celular/tablet
+      // (ver ConnectDeviceModal/EntradaScreen) — no Electron local,
+      // window.location.origin é 127.0.0.1, que o estagiário no celular dele
+      // não alcança.
+      const envAppUrl = import.meta.env.VITE_PUBLIC_APP_URL as string | undefined;
+      const isLocalOrigin = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+      const publicAppOrigin = envAppUrl ?? (isLocalOrigin ? undefined : window.location.origin);
+      if (!publicAppOrigin) {
+        setGeneralInviteError(
+          "URL pública não configurada (VITE_PUBLIC_APP_URL). Peça para configurar o build para gerar um link acessível fora desta rede.",
+        );
+        return;
+      }
+      setGeneralInviteLink(
+        `${publicAppOrigin.replace(/\/$/, "")}${window.location.pathname}?cadastro-estagiario=${unitId}.${token}`,
+      );
     } catch (err) {
       setGeneralInviteError(err instanceof Error ? err.message : "Não foi possível gerar o link");
     } finally {
