@@ -68,9 +68,13 @@ async function processarNfceReal(supabase: SupabaseClient, deps: ClaimDeps, item
 
   // 2. Se não encontrou no disco local, busca via Edge Function do Supabase (upload feito via Painel Gerencial)
   if (!pfxBuffer) {
+    const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
     const { data: certData, error: certError } = await supabase.functions.invoke<{ pfxBase64: string; password: string }>(
       "nfse-certificate-fetch",
-      { body: { unitId: item.unit.id } }
+      {
+        body: { unitId: item.unit.id },
+        headers: serviceRoleKey ? { Authorization: `Bearer ${serviceRoleKey}` } : undefined,
+      }
     );
     if (certData?.pfxBase64 && certData?.password) {
       pfxBuffer = Buffer.from(certData.pfxBase64, "base64");

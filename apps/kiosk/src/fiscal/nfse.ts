@@ -171,8 +171,10 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
     return;
   }
 
+  const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const { data: certData, error: certError } = await supabase.functions.invoke<{ pfxBase64: string; password: string }>("nfse-certificate-fetch", {
     body: { unitId: unit.id },
+    headers: serviceRoleKey ? { Authorization: `Bearer ${serviceRoleKey}` } : undefined,
   });
   if (certError || !certData) {
     let detail = certError?.message ?? "não configurado em Configurações → Fiscal";

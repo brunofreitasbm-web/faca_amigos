@@ -12,6 +12,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { jsonResponse, preflight } from "../_shared/http.ts";
+import { requireCapability } from "../_shared/requireCapability.ts";
 
 interface FetchBody {
   unitId: string;
@@ -53,7 +54,23 @@ Deno.serve(async (req) => {
 
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const authHeader = req.headers.get("Authorization");
-  if (!serviceRoleKey || authHeader !== `Bearer ${serviceRoleKey}`) {
+
+  let authorized = false;
+  if (serviceRoleKey && authHeader && (authHeader === `Bearer ${serviceRoleKey}` || authHeader.includes(serviceRoleKey))) {
+    authorized = true;
+  } else if (authHeader) {
+    const capCheck = await requireCapability(req, "config.fiscal.write");
+    if (capCheck.ok) {
+      authorized = true;
+    } else {
+      const capCheckRead = await requireCapability(req, "config.fiscal.read");
+      if (capCheckRead.ok) {
+        authorized = true;
+      }
+    }
+  }
+
+  if (!authorized) {
     return jsonResponse(req, { error: "não autorizado" }, 401);
   }
 
