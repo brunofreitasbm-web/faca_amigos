@@ -29,7 +29,7 @@ let currentUpdateState: UpdateState = {
 
 let initialized = false;
 
-const PERIODIC_CHECK_INTERVAL_MS = 2 * 60 * 60 * 1000;
+const PERIODIC_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
 // O quiosque fica ligado 24/7 — o autoInstallOnAppQuit sozinho nunca dispara
 // porque o app não é fechado no dia a dia. Sem uma janela de instalação

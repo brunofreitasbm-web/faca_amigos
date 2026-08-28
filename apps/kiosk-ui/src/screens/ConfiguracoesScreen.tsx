@@ -114,7 +114,7 @@ export function ConfiguracoesScreen() {
     UNIDADE: "Dados da unidade: nome, fuso, virada do dia operacional e o que aparece no cabeçalho do cupom.",
     FISCAL: "Dados do emitente para NFC-e (produtos) e o cadastro de NFS-e (serviço). Confira com seu contador antes de ligar a emissão.",
     TERMOS: "Texto que o responsável aceita no check-in. Alterações ficam registradas na trilha de auditoria.",
-    IMPRESSORAS: "Informe o nome das impressoras de pulseira e de cupom instaladas neste terminal.",
+    IMPRESSORAS: "Informe o nome da impressora de cupom instalada neste terminal.",
     NOTIFICACOES: "Ative para receber no seu celular/computador os relatórios automáticos de abertura, acompanhamento (17h e 20h) e fechamento de caixa desta unidade.",
   };
 
@@ -1720,44 +1720,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
         </HelpText>
       )}
 
-      {/* IMPRESSORA DE PULSEIRAS */}
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Impressora de Pulseiras</h2>
-        <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}>
-            <Select value={wristbandPrinter} onChange={(e) => setWristbandPrinter(e.target.value)} disabled={!installedPrinters || installedPrinters.length === 0}>
-              <option value="">{loadingPrinters ? "Buscando impressoras…" : "Selecione uma impressora instalada"}</option>
-              {installedPrinters?.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Button variant="ghost" size="sm" loading={loadingPrinters} onClick={refreshPrinters}>
-            🔄 Buscar novamente
-          </Button>
-        </div>
 
-        <div style={{ display: "flex", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
-          <Button variant="primary" size="sm" loading={saving === "WRISTBAND"} onClick={() => save("WRISTBAND")}>
-            Salvar Impressora
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => setShowWristbandTestModal(true)}>
-            🖨️ Abrir Diálogo / Imprimir Pulseira de Teste
-          </Button>
-          <Button variant="ghost" size="sm" loading={testingWristband} onClick={testWristbandPrint} title="Enviar job diretamente para a fila de impressão do Electron (print bridge)">
-            ⚡ Enviar para Fila de Impressão
-          </Button>
-        </div>
-
-        {showWristbandTestModal && (
-          <WristbandPrintModal
-            data={SAMPLE_WRISTBAND}
-            onClose={() => setShowWristbandTestModal(false)}
-          />
-        )}
-      </Card>
 
       {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -1804,22 +1767,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
           Layout em tempo real — mostra o enquadramento exato de 42 colunas como sairá na impressora térmica de 80mm.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Pulseira (Gainscha / Zebra — 20mm × 270mm)</h3>
-            <div
-              style={{
-                background: "#ffffff",
-                color: "#141414",
-                padding: "8px 16px",
-                borderRadius: "12px",
-                border: "2px dashed var(--border-subtle)",
-                fontFamily: "var(--font-body)",
-                overflowX: "auto",
-              }}
-            >
-              <WristbandLabelPreview data={SAMPLE_WRISTBAND} entryTime="14:32" />
-            </div>
-          </Card>
+
           <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
             <h3 style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Cupom não fiscal (80mm - 42 Colunas)</h3>
             <pre
