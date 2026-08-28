@@ -109,9 +109,18 @@ export function OwnerFloatingDashboard() {
         () => []
       );
 
-      // Pivotar por hora (das 10h às 22h)
+      // Pivotar por hora (padrão 08h às 22h, expandindo dinamicamente se houver sessões fora dessa faixa)
+      let startHour = 8;
+      let endHour = 22;
+      for (const row of rawHourly) {
+        if (typeof row.hour === "number") {
+          if (row.hour < startHour) startHour = Math.max(0, row.hour);
+          if (row.hour > endHour) endHour = Math.min(23, row.hour);
+        }
+      }
+
       const hoursMap = new Map<number, Record<string, number>>();
-      for (let h = 10; h <= 22; h++) {
+      for (let h = startHour; h <= endHour; h++) {
         hoursMap.set(h, {});
       }
 
@@ -129,7 +138,7 @@ export function OwnerFloatingDashboard() {
         ([hour, unitCounts]) => {
           let sum = 0;
           const entry: HourlyProgressData = {
-            hourLabel: `${hour}h`,
+            hourLabel: `${String(hour).padStart(2, "0")}h`,
             total: 0,
           };
 
@@ -161,12 +170,6 @@ export function OwnerFloatingDashboard() {
       return () => clearInterval(interval);
     }
   }, [isOwner, loadDashboardData]);
-
-  useEffect(() => {
-    if (selectedUnitId === "ALL" && units[0]) {
-      setSelectedUnitId(units[0].id);
-    }
-  }, [units, selectedUnitId]);
 
   if (!isOwner) return null;
 
@@ -458,6 +461,26 @@ export function OwnerFloatingDashboard() {
           <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 700, marginRight: "4px" }}>
             Filtrar Unidade:
           </span>
+          {units.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setSelectedUnitId("ALL")}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "8px",
+                border: "1px solid",
+                borderColor: selectedUnitId === "ALL" ? "#2ECFB5" : "rgba(255, 255, 255, 0.1)",
+                background: selectedUnitId === "ALL" ? "rgba(46, 207, 181, 0.15)" : "transparent",
+                color: selectedUnitId === "ALL" ? "#2ECFB5" : "#CBD5E1",
+                fontWeight: selectedUnitId === "ALL" ? 700 : 500,
+                fontSize: "13px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🌐 Consolidado (Todas)
+            </button>
+          )}
           {units.map((u) => (
             <button
               key={u.id}
@@ -624,9 +647,14 @@ export function OwnerFloatingDashboard() {
                 marginBottom: "12px",
               }}
             >
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Fluxo por Hora
-              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Fluxo por Hora
+                </span>
+                <span style={{ fontSize: "11px", color: "#64748B" }}>
+                  Sessões e check-ins de entrada registrados por hora local
+                </span>
+              </div>
             </div>
 
             <div style={{ width: "100%", height: 210 }}>
