@@ -2277,6 +2277,26 @@ export const Api = {
    * contar só sessões a partir de agora (ver fa_kiosk_visit_counter_reset).
    */
   resetVisitCounter: () => unwrap(supabase().rpc("fa_config_reset_visit_counter")),
+  /** Edita os dados do responsável no modal de detalhes do Gerencial > Clientes (exige `clientes.write`). */
+  updateGerencialGuardian: (body: { guardianId: string; fullName: string; phoneE164: string; cpf?: string | null; email?: string | null }) =>
+    unwrap(
+      supabase().rpc("fa_gerencial_update_guardian", {
+        p_guardian_id: body.guardianId,
+        p_full_name: body.fullName,
+        p_phone_e164: body.phoneE164,
+        p_cpf: body.cpf ?? null,
+        p_email: body.email ?? null,
+      }),
+    ),
+  /** Edita os dados de uma criança vinculada no mesmo modal (exige `clientes.write`). */
+  updateGerencialChild: (body: { childId: string; fullName: string; birthDate: string }) =>
+    unwrap(
+      supabase().rpc("fa_gerencial_update_child", {
+        p_child_id: body.childId,
+        p_full_name: body.fullName,
+        p_birth_date: body.birthDate,
+      }),
+    ),
   /** Lista o audit log (`fa_kiosk_audit_log`) para o Gerencial > Auditoria — quem fez o quê, quando. */
   auditLog: async (filters: {
     search?: string;
