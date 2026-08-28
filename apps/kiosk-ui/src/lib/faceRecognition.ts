@@ -7,9 +7,8 @@ import * as faceapi from "@vladmandic/face-api";
 // passo de baixar os pesos (~6MB) antes do primeiro build.
 const MODEL_URL = "/models";
 
-// Limiar flexível para maior tolerância e rapidez na captação: abaixo de 0.55
-// a distância euclidiana entre os descriptors é considerada "mesma pessoa".
-const MATCH_THRESHOLD = 0.55;
+// Limiar flexível para maior tolerância e rapidez na captação: até 0.60 de distância euclidiana.
+const MATCH_THRESHOLD = 0.60;
 
 let modelsLoadedPromise: Promise<void> | null = null;
 
@@ -25,13 +24,13 @@ export function loadFaceModels(): Promise<void> {
   return modelsLoadedPromise;
 }
 
-/** Extrai o descriptor facial (128 floats) do frame atual com configurações de ultra-velocidade (inputSize 160, scoreThreshold 0.3). */
+/** Extrai o descriptor facial (128 floats) do frame atual com configurações de ultra-velocidade e baixa rigidez biométrica. */
 export async function extractFaceDescriptor(video: HTMLVideoElement): Promise<number[] | null> {
   await loadFaceModels();
-  // Configurações otimizadas para captação ultra-rápida e menor exigência biométrica
+  // Configurações otimizadas para captação ultra-rápida e tolerância a sombras, ângulos e distâncias
   const options = new faceapi.TinyFaceDetectorOptions({
-    inputSize: 160, // 160px processa ~4x-6x mais rápido que o padrão (416px)
-    scoreThreshold: 0.3, // Menor exigência de pontuação para detecção imediata
+    inputSize: 128, // 128px é a menor resolução suportada pelo TinyFaceDetector, processamento instantâneo (~10-20ms)
+    scoreThreshold: 0.15, // Menor exigência de confiança para detectar a face imediatamente sem exigir alinhamento perfeito
   });
 
   const detection = await faceapi
