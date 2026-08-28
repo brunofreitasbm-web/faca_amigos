@@ -15,6 +15,7 @@ interface AppStateValue {
   units: Unit[];
   unit: Unit | null;
   setUnitId: (id: string) => void;
+  refreshUnits: () => Promise<void>;
   /** Modo Gerencial: fora das 3 unidades, configura o que vale para várias de uma vez. */
   gerencial: boolean;
   setGerencial: (value: boolean) => void;
@@ -108,11 +109,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const refreshUnits = async () => {
+    if (!employee) return;
+    try {
+      const fresh = await Api.units();
+      setUnits(fresh);
+    } catch (err) {
+      console.error("Erro ao recarregar unidades:", err);
+    }
+  };
+
   const value = useMemo<AppStateValue>(
     () => ({
       units,
       unit: units.find((u) => u.id === unitId) ?? null,
       setUnitId,
+      refreshUnits,
       gerencial,
       setGerencial,
       employee,

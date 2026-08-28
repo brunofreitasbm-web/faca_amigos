@@ -1903,7 +1903,7 @@ function SystemVersionCard() {
 // config.unit.write no servidor e audita a alteração.
 function UnidadeTab({ unitId }: { unitId: string }) {
   const toast = useToast();
-  const { units } = useAppState();
+  const { units, refreshUnits } = useAppState();
   const unit = units.find((u) => u.id === unitId);
 
   const [name, setName] = useState("");
@@ -1919,13 +1919,14 @@ function UnidadeTab({ unitId }: { unitId: string }) {
   useEffect(() => {
     if (!unit) return;
     setName(unit.name);
+    setTimezone(unit.timezone ?? "America/Belem");
     setCutoffHour(String(unit.business_day_cutoff_hour ?? 4));
     setAddress(unit.address ?? "");
     setPhone(unit.phone ?? "");
     setLatitude(unit.latitude != null ? String(unit.latitude) : "");
     setLongitude(unit.longitude != null ? String(unit.longitude) : "");
     setGeofenceRadiusM(unit.geofence_radius_m != null ? String(unit.geofence_radius_m) : "");
-  }, [unit?.id]);
+  }, [unit]);
 
   async function save() {
     setSaving(true);
@@ -1940,7 +1941,8 @@ function UnidadeTab({ unitId }: { unitId: string }) {
         longitude: longitude.trim() ? Number(longitude) : null,
         geofenceRadiusM: geofenceRadiusM.trim() ? Number(geofenceRadiusM) : null,
       });
-      toast.success("Dados da unidade salvos. Recarregue a página para ver o nome no cabeçalho.");
+      await refreshUnits();
+      toast.success("Dados da unidade salvos com sucesso.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível salvar a unidade.");
     } finally {
@@ -2100,6 +2102,7 @@ const HEARTBEAT_STALE_MS = 30 * 60 * 1000;
 
 function FiscalTab({ unitId }: { unitId: string }) {
   const toast = useToast();
+  const { refreshUnits } = useAppState();
   const [fiscal, setFiscal] = useState<UnitFiscal | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<ProductFiscal[]>([]);
@@ -2190,6 +2193,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
     setSaving(true);
     try {
       await Api.updateUnitFiscal(unitId, form);
+      await refreshUnits();
       toast.success("Dados fiscais salvos.");
       load();
     } catch (err) {
