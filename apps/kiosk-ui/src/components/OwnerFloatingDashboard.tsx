@@ -1,17 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
-import { Button, Card, Modal, WalletIcon, GridIcon, ChartBarIcon, ArrowClockwiseIcon } from "@facaamigos/ui";
+import { Modal } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import { useAuth } from "../auth/AuthContext.js";
-import { Api, businessDateFor } from "../api/client.js";
+import { Api } from "../api/client.js";
 import type { Unit } from "../api/client.js";
 import { money } from "../format.js";
 
@@ -25,21 +16,30 @@ interface UnitSummary {
   targetTicketCents: number;
 }
 
-interface HourlyProgressData {
-  hourLabel: string;
-  total: number;
-  [unitName: string]: number | string;
-}
-
-const tooltipStyle = {
+// Cartão flat sem sombra (borda 1px + raio 24px), igual ao `.m-card` da
+// casca mobile (apps/kiosk-ui/src/mobile/mobile.css) — este painel segue
+// a mesma linguagem visual minimalista em vez do Card sombreado de
+// packages/ui, que é pensado para as telas de balcão do desktop.
+const flatCardStyle: React.CSSProperties = {
   background: "var(--surface-card)",
-  border: "1px solid var(--border-subtle)",
-  borderRadius: "var(--radius-sm)",
-  boxShadow: "var(--shadow-md)",
-  color: "var(--text-primary)",
+  border: "1px solid var(--color-gray-200)",
+  borderRadius: "24px",
+  padding: "14px 16px",
+};
+
+const flatPillStyle: React.CSSProperties = {
+  borderRadius: "var(--radius-full)",
+  padding: "10px 16px",
+  minHeight: "40px",
   fontFamily: "var(--font-body)",
-  fontSize: "13px",
-  padding: "8px 12px",
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-bold)" as unknown as number,
+  border: "1px solid var(--color-gray-200)",
+  background: "var(--surface-page)",
+  color: "var(--text-primary)",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
 };
 
 export function OwnerFloatingDashboard() {
@@ -57,7 +57,6 @@ export function OwnerFloatingDashboard() {
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   const [unitSummaries, setUnitSummaries] = useState<UnitSummary[]>([]);
-  const [hourlyData, setHourlyData] = useState<HourlyProgressData[]>([]);
 
   // Totais do negócio inteiro — usados só no resumo do widget minimizado/FAB,
   // já que não existe mais uma aba de visão consolidada no painel aberto.
@@ -70,11 +69,11 @@ export function OwnerFloatingDashboard() {
     setLoading(true);
 
     try {
-      const todayStr = businessDateFor(Date.now(), 3); // cutoff 3h
+      const cutoffFallback = 3;
 
       const summaries: UnitSummary[] = await Promise.all(
         units.map(async (u: Unit) => {
-          const cutoff = u.business_day_cutoff_hour ?? 3;
+          const cutoff = u.business_day_cutoff_hour ?? cutoffFallback;
           const [rev, tm, goal] = await Promise.all([
             Api.todayRevenue(u.id, cutoff).catch(() => ({ totalCents: 0 })),
             Api.todayTicketMedio(u.id, cutoff).catch(() => ({
@@ -98,45 +97,6 @@ export function OwnerFloatingDashboard() {
       );
 
       setUnitSummaries(summaries);
-
-      // Buscar gráfico por hora
-      const rawHourly = await Api.reportCheckinsByHour(null, todayStr, todayStr).catch(
-        () => []
-      );
-
-      // Pivotar por hora (das 10h às 22h)
-      const hoursMap = new Map<number, Record<string, number>>();
-      for (let h = 10; h <= 22; h++) {
-        hoursMap.set(h, {});
-      }
-
-      for (const row of rawHourly) {
-        const h = row.hour;
-        if (hoursMap.has(h)) {
-          const current = hoursMap.get(h)!;
-          current[row.unit_name] = (current[row.unit_name] ?? 0) + row.count;
-        }
-      }
-
-      const formattedHourly: HourlyProgressData[] = Array.from(hoursMap.entries()).map(
-        ([hour, unitCounts]) => {
-          let sum = 0;
-          const entry: HourlyProgressData = {
-            hourLabel: `${hour}h`,
-            total: 0,
-          };
-
-          for (const u of units) {
-            const count = unitCounts[u.name] ?? 0;
-            entry[u.name] = count;
-            sum += count;
-          }
-          entry.total = sum;
-          return entry;
-        }
-      );
-
-      setHourlyData(formattedHourly);
       setLastUpdated(
         new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
       );
@@ -181,35 +141,17 @@ export function OwnerFloatingDashboard() {
   const ticketStatus =
     activeSummary.targetTicketCents > 0
       ? activeSummary.ticketMedioCents >= activeSummary.targetTicketCents
-        ? { label: "Meta atingida", bg: "var(--status-verde-soft)", fg: "var(--status-verde-text)" }
+        ? { label: "Meta atingida", fg: "var(--status-verde-text)" }
         : activeSummary.ticketMedioCents >= activeSummary.minTicketCents
-        ? { label: "Na média", bg: "var(--status-amarelo-soft)", fg: "var(--status-amarelo-text)" }
-        : { label: "Abaixo do alvo", bg: "var(--status-vermelho-soft)", fg: "var(--status-vermelho-text)" }
-      : { label: "Meta não definida", bg: "var(--surface-raised)", fg: "var(--text-muted)" };
-
-  // Dica Comercial Automatizada para Alavancar Vendas
-  const getSmartCommercialInsight = () => {
-    if (activeSummary.ticketMedioCents < activeSummary.targetTicketCents) {
-      const diff = activeSummary.targetTicketCents - activeSummary.ticketMedioCents;
-      return {
-        title: "Oportunidade de alavancagem do ticket médio",
-        message: `Seu ticket médio atual está ${money(diff)} abaixo da meta. Oriente os operadores a venderem meias antiderrapantes e fazerem o upgrade de tempo (+15min/30min) no check-in para bater a meta do dia!`,
-      };
-    }
-    return {
-      title: "Excelente desempenho de vendas",
-      message:
-        "O ticket médio hoje está atingindo o valor ideal. Continue estimulando a equipe do caixa para vendas complementares de snacks e brindes no check-out.",
-    };
-  };
-
-  const insight = getSmartCommercialInsight();
+        ? { label: "Na média", fg: "var(--status-amarelo-text)" }
+        : { label: "Abaixo do alvo", fg: "var(--status-vermelho-text)" }
+      : { label: "Meta não definida", fg: "var(--text-muted)" };
 
   // 1. Caso esteja totalmente fechado
   if (!isOpen) {
     return (
-      <Button
-        variant="dark"
+      <button
+        type="button"
         onClick={() => {
           setIsOpen(true);
           setIsMinimized(false);
@@ -219,12 +161,25 @@ export function OwnerFloatingDashboard() {
           bottom: "var(--space-6)",
           right: "var(--space-6)",
           zIndex: 999,
-          boxShadow: "var(--shadow-lg)",
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-2)",
+          minHeight: "44px",
+          padding: "10px 18px",
+          borderRadius: "var(--radius-full)",
+          background: "var(--surface-card)",
+          border: "1px solid var(--color-gray-200)",
+          boxShadow: "var(--shadow-sm)",
+          color: "var(--text-primary)",
+          fontFamily: "var(--font-body)",
+          fontWeight: "var(--weight-bold)" as unknown as number,
+          fontSize: "var(--text-sm)",
+          cursor: "pointer",
         }}
       >
-        <ChartBarIcon aria-hidden="true" />
-        Dashboard OWNER
-      </Button>
+        <span aria-hidden="true" style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--color-teal)", flexShrink: 0 }} />
+        Painel OWNER
+      </button>
     );
   }
 
@@ -234,7 +189,7 @@ export function OwnerFloatingDashboard() {
       <button
         type="button"
         onClick={() => setIsMinimized(false)}
-        aria-label={`Expandir Dashboard OWNER. Faturamento de hoje: ${money(totalRevenueCents)}, ${totalSessionsCount} visitas.`}
+        aria-label={`Expandir Painel OWNER. Faturamento de hoje: ${money(totalRevenueCents)}, ${totalSessionsCount} visitas.`}
         style={{
           position: "fixed",
           bottom: "var(--space-6)",
@@ -243,52 +198,22 @@ export function OwnerFloatingDashboard() {
           display: "flex",
           alignItems: "center",
           gap: "var(--space-3)",
-          background: "var(--surface-card)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "var(--radius-full)",
-          padding: "var(--space-2) var(--space-3) var(--space-2) var(--space-4)",
           minHeight: "44px",
-          boxShadow: "var(--shadow-lg)",
+          padding: "10px 16px",
+          borderRadius: "var(--radius-full)",
+          background: "var(--surface-card)",
+          border: "1px solid var(--color-gray-200)",
+          boxShadow: "var(--shadow-sm)",
           color: "var(--text-primary)",
           cursor: "pointer",
           fontFamily: "var(--font-body)",
         }}
       >
-        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "2px" }}>
-          <span
-            style={{
-              fontSize: "var(--text-xs)",
-              fontWeight: "var(--weight-bold)" as unknown as number,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "var(--tracking-wide)",
-            }}
-          >
-            OWNER · hoje
+        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>OWNER · hoje</span>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: "18px", color: "var(--color-primary-hover)" }}>
+            {money(totalRevenueCents)}
           </span>
-          <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-teal-text)" }}>
-            {money(totalRevenueCents)}{" "}
-            <span style={{ color: "var(--text-secondary)", fontWeight: "var(--weight-medium)" as unknown as number }}>
-              ({totalSessionsCount} vis.)
-            </span>
-          </span>
-        </span>
-
-        <span
-          aria-hidden="true"
-          style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "var(--radius-circle)",
-            background: "var(--color-teal)",
-            color: "var(--text-on-primary)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <ChartBarIcon />
         </span>
       </button>
     );
@@ -296,249 +221,92 @@ export function OwnerFloatingDashboard() {
 
   // 3. Caso esteja aberto — reaproveita o Modal compartilhado (foco preso,
   // Escape para fechar, devolução de foco, role="dialog") em vez do overlay
-  // artesanal anterior, igual aos outros diálogos do produto.
-  const modalTitle = (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-3)" }}>
-      <span
-        aria-hidden="true"
-        style={{
-          width: "40px",
-          height: "40px",
-          borderRadius: "var(--radius-md)",
-          background: "var(--color-teal)",
-          color: "var(--text-on-primary)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <ChartBarIcon style={{ fontSize: "20px" }} />
-      </span>
-      <span>
-        Painel de Gestão OWNER
-        <span
-          style={{
-            marginLeft: "8px",
-            display: "inline-block",
-            fontSize: "var(--text-xs)",
-            fontWeight: "var(--weight-bold)" as unknown as number,
-            padding: "2px 8px",
-            borderRadius: "var(--radius-full)",
-            background: "var(--status-verde-soft)",
-            color: "var(--status-verde-text)",
-          }}
-        >
-          AO VIVO{lastUpdated ? ` · ${lastUpdated}` : ""}
-        </span>
-      </span>
-    </span>
-  );
-
+  // artesanal anterior, igual aos outros diálogos do produto. O conteúdo
+  // segue o visual flat da casca mobile (MobileGerencialHome): cartões com
+  // borda fina em vez de sombra, números grandes em --font-display, sem
+  // gráfico nem painel de dicas — só o essencial pra bater o olho.
   return (
-    <Modal title={modalTitle} onClose={() => setIsOpen(false)} maxWidth="960px" zIndex={1000}>
-      <div style={{ fontFamily: "var(--font-body)", display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-        {/* BARRA DE AÇÕES */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "var(--space-3)",
-          }}
-        >
-          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-            Acompanhamento em tempo real de vendas, fluxo e ticket médio
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-            <Button variant="ghost" size="sm" onClick={loadDashboardData} disabled={loading}>
-              <ArrowClockwiseIcon aria-hidden="true" />
-              {loading ? "Atualizando…" : "Atualizar"}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setIsMinimized(true)}>
-              Minimizar
-            </Button>
-          </div>
-        </div>
+    <Modal title="Painel OWNER" onClose={() => setIsOpen(false)} maxWidth="420px" zIndex={1000}>
+      <div style={{ fontFamily: "var(--font-body)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+          {loading ? "Atualizando…" : lastUpdated ? `Atualizado às ${lastUpdated}` : ""}
+        </span>
 
         {/* SELETOR DE UNIDADE */}
-        <div role="group" aria-label="Filtrar unidade" style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", overflowX: "auto", paddingBottom: "2px" }}>
-          {units.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              onClick={() => setSelectedUnitId(u.id)}
-              aria-pressed={selectedUnitId === u.id}
-              style={unitTabStyle(selectedUnitId === u.id)}
-            >
-              {u.name}
-            </button>
-          ))}
+        {units.length > 1 && (
+          <div role="group" aria-label="Filtrar unidade" style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", overflowX: "auto", paddingBottom: "2px" }}>
+            {units.map((u) => {
+              const active = selectedUnitId === u.id;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => setSelectedUnitId(u.id)}
+                  aria-pressed={active}
+                  style={{
+                    ...flatPillStyle,
+                    background: active ? "var(--color-teal)" : "var(--surface-page)",
+                    borderColor: active ? "var(--color-teal)" : "var(--color-gray-200)",
+                    color: active ? "var(--text-on-primary)" : "var(--text-primary)",
+                  }}
+                >
+                  {u.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* FATURAMENTO + SESSÕES */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+          <div style={flatCardStyle}>
+            <p style={{ margin: 0, fontSize: "12px", fontWeight: "var(--weight-semibold)" as unknown as number, color: "var(--text-muted)" }}>
+              Faturamento hoje
+            </p>
+            <p style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: "24px", color: "var(--color-primary-hover)" }}>
+              {money(activeSummary.revenueCents)}
+            </p>
+          </div>
+          <div style={flatCardStyle}>
+            <p style={{ margin: 0, fontSize: "12px", fontWeight: "var(--weight-semibold)" as unknown as number, color: "var(--text-muted)" }}>
+              Atendimentos
+            </p>
+            <p style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: "24px", color: "#1D8273" }}>
+              {activeSummary.sessionsCount}
+            </p>
+          </div>
         </div>
 
-        {/* PAINEL DE MÉTRICAS (4 CARDS) */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
-          <Card bodyStyle={{ display: "flex", flexDirection: "column" }}>
-            <MetricHeader label="Faturamento acumulado" icon={<WalletIcon aria-hidden="true" />} accent="var(--color-teal)" />
-            <MetricValue color="var(--color-teal-text)">{money(activeSummary.revenueCents)}</MetricValue>
-            <MetricNote>Hoje no dia operacional</MetricNote>
-          </Card>
-
-          <Card bodyStyle={{ display: "flex", flexDirection: "column" }}>
-            <MetricHeader label="Sessões / crianças" icon={<GridIcon aria-hidden="true" />} accent="var(--color-primary-hover)" />
-            <MetricValue color="var(--color-primary-hover)">
-              {activeSummary.sessionsCount}{" "}
-              <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)" as unknown as number, color: "var(--text-muted)" }}>
-                atendimentos
-              </span>
-            </MetricValue>
-            <MetricNote>Total de visitas registradas</MetricNote>
-          </Card>
-
-          <Card bodyStyle={{ display: "flex", flexDirection: "column" }}>
-            <MetricHeader label="Ticket médio" icon={<ChartBarIcon aria-hidden="true" />} accent={ticketStatus.fg} />
-            <MetricValue color={ticketStatus.fg}>{money(activeSummary.ticketMedioCents)}</MetricValue>
-            <span
-              style={{
-                display: "inline-flex",
-                alignSelf: "flex-start",
-                padding: "2px 10px",
-                borderRadius: "var(--radius-full)",
-                background: ticketStatus.bg,
-                color: ticketStatus.fg,
-                fontSize: "var(--text-xs)",
-                fontWeight: "var(--weight-bold)" as unknown as number,
-              }}
-            >
+        {/* TICKET MÉDIO */}
+        <div style={flatCardStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <p style={{ margin: 0, fontSize: "12px", fontWeight: "var(--weight-semibold)" as unknown as number, color: "var(--text-muted)" }}>
+              Ticket médio
+            </p>
+            <span style={{ fontSize: "12px", fontWeight: "var(--weight-bold)" as unknown as number, color: ticketStatus.fg }}>
               {ticketStatus.label}
             </span>
-          </Card>
-
-          <Card bodyStyle={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <MetricHeader label="Meta da unidade" icon={<WalletIcon aria-hidden="true" />} accent="var(--color-amber)" />
-            <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)" as unknown as number, color: "var(--text-primary)" }}>
-              Mínimo: {money(activeSummary.minTicketCents)}
-            </span>
-            <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)" as unknown as number, color: "var(--color-teal-text)" }}>
-              Alvo: {money(activeSummary.targetTicketCents)}
-            </span>
-          </Card>
-        </div>
-
-        {/* GRÁFICO DE PROGRESSO DIÁRIO POR HORA */}
-        <div
-          style={{
-            padding: "var(--space-5)",
-            borderRadius: "var(--radius-card)",
-            background: "var(--surface-card)",
-            border: "1px solid var(--border-subtle)",
-            boxShadow: "var(--shadow-sm)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-4)", flexWrap: "wrap", gap: "var(--space-2)" }}>
-            <h3 style={{ margin: 0, fontSize: "var(--text-md)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--text-primary)" }}>
-              Progresso diário de atendimentos por hora (check-ins)
-            </h3>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Das 10h às 22h</span>
           </div>
-
-          <div style={{ width: "100%", height: 240 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  {/* Cor fixa igual a --color-teal: defs de gradiente SVG
-                      não resolvem var() em stop-color. */}
-                  <linearGradient id="ownerHourlyGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2ECFB5" stopOpacity={0.5} />
-                    <stop offset="95%" stopColor="#2ECFB5" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
-                <XAxis dataKey="hourLabel" stroke="var(--text-muted)" fontSize={12} tickLine={false} />
-                <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(val: number) => [`${val} check-ins`, "Fluxo"]} />
-                <Area
-                  type="monotone"
-                  dataKey={units.find((u) => u.id === selectedUnitId)?.name ?? "total"}
-                  stroke="var(--color-teal)"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#ownerHourlyGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* PAINEL DE ESTRATÉGIA E ALAVANCAGEM COMERCIAL */}
-        <div
-          style={{
-            padding: "var(--space-4) var(--space-5)",
-            borderRadius: "var(--radius-card)",
-            background: "var(--surface-raised)",
-            borderLeft: "4px solid var(--color-teal)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "4px",
-          }}
-        >
-          <h4 style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-teal-text)" }}>
-            {insight.title}
-          </h4>
-          <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
-            {insight.message}
+          <p style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: "24px", color: "var(--text-primary)" }}>
+            {money(activeSummary.ticketMedioCents)}
           </p>
+          {activeSummary.targetTicketCents > 0 && (
+            <p style={{ margin: "6px 0 0", fontSize: "12px", color: "var(--text-muted)" }}>
+              Mínimo {money(activeSummary.minTicketCents)} · Alvo {money(activeSummary.targetTicketCents)}
+            </p>
+          )}
+        </div>
+
+        {/* AÇÕES */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
+          <button type="button" style={flatPillStyle} onClick={loadDashboardData} disabled={loading}>
+            {loading ? "Atualizando…" : "Atualizar"}
+          </button>
+          <button type="button" style={flatPillStyle} onClick={() => setIsMinimized(true)}>
+            Minimizar
+          </button>
         </div>
       </div>
     </Modal>
   );
-}
-
-function unitTabStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "10px 16px",
-    minHeight: "40px",
-    borderRadius: "var(--radius-full)",
-    border: `1px solid ${active ? "var(--color-teal)" : "var(--border-subtle)"}`,
-    background: active ? "rgba(46, 207, 181, 0.12)" : "transparent",
-    color: active ? "var(--color-teal-text)" : "var(--text-secondary)",
-    fontFamily: "var(--font-body)",
-    fontWeight: (active ? "var(--weight-bold)" : "var(--weight-medium)") as unknown as number,
-    fontSize: "var(--text-sm)",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-  };
-}
-
-function MetricHeader({ label, icon, accent }: { label: string; icon: React.ReactNode; accent: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
-      <span
-        style={{
-          fontSize: "var(--text-xs)",
-          fontWeight: "var(--weight-bold)" as unknown as number,
-          color: "var(--text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "var(--tracking-wide)",
-        }}
-      >
-        {label}
-      </span>
-      <span style={{ color: accent, display: "flex", fontSize: "16px" }}>{icon}</span>
-    </div>
-  );
-}
-
-function MetricValue({ children, color }: { children: React.ReactNode; color: string }) {
-  return (
-    <span style={{ display: "block", fontSize: "var(--text-xl)", fontWeight: "var(--weight-black)" as unknown as number, color, marginBottom: "4px" }}>
-      {children}
-    </span>
-  );
-}
-
-function MetricNote({ children }: { children: React.ReactNode }) {
-  return <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{children}</span>;
 }
