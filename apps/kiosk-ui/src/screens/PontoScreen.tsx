@@ -290,6 +290,8 @@ export function PontoScreen() {
     }
   }
 
+  const nextKind = getNextLogicalKind(today);
+
   function trocarColaborador() {
     faceCapture.stop();
     setSelected(null);
@@ -436,12 +438,29 @@ export function PontoScreen() {
 
               <PunchPhotoCapture faceCapture={faceCapture} geolocation={geolocation} geofenceRadiusM={geofenceRadiusM} />
 
+              <HelpText icon="👉">
+                Próxima marcação: <strong>{KINDS.find((k) => k.value === nextKind)?.label ?? nextKind}</strong>
+              </HelpText>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                {KINDS.map((k) => (
-                  <Button key={k.value} variant="secondary" size="lg" disabled={busy} title={k.help} onClick={() => bater(k.value)}>
-                    {k.label}
-                  </Button>
-                ))}
+                {KINDS.map((k) => {
+                  const isNext = k.value === nextKind;
+                  const isDone = KINDS.findIndex((x) => x.value === k.value) < KINDS.findIndex((x) => x.value === nextKind);
+                  return (
+                    <Button
+                      key={k.value}
+                      variant={isNext ? "primary" : "secondary"}
+                      size="lg"
+                      disabled={busy || !isNext}
+                      title={isNext ? k.help : isDone ? "Já registrado hoje" : "Aguarde a marcação anterior"}
+                      onClick={() => bater(k.value)}
+                      style={isDone ? { opacity: 0.5 } : undefined}
+                    >
+                      {isDone ? "✓ " : ""}
+                      {k.label}
+                    </Button>
+                  );
+                })}
               </div>
 
               {message && <p style={{ color: "var(--color-teal-text)" }}>{message}</p>}
