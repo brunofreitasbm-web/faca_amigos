@@ -2444,18 +2444,32 @@ export const Api = {
     // pediu; passada a carência, qualquer terminal daquela unidade
     // assume — importante porque venda feita em tablet/PWA chega sem
     // origem e, com regra estrita, nunca imprimiria em lugar nenhum.
-    localDeviceId().then((deviceId) =>
-      unwrap(
+    //
+    // unit_id do job usa a unidade AMARRADA A ESTE TERMINAL, não a
+    // `unitId` recebida (a unidade "operando" na sessão, que muda
+    // conforme o colaborador — troca de módulo, papel com acesso a mais
+    // de uma unidade, seleção errada). O print bridge só aceita e
+    // resolve impressora pelo unit_id do job (ver getTerminalUnitIds em
+    // printJobPolicy.ts); gravar a unidade da sessão em vez da da máquina
+    // era exatamente como "imprimir no Circuito" saía impresso no
+    // Playground e vice-versa — o job nascia com o unit_id errado e o
+    // bridge, corretamente, recusava aqui e entregava no terminal
+    // amarrado àquela outra unidade. Fora do Electron (tablet/PWA sem
+    // print bridge local) getTerminalUnit() devolve `available: false` e
+    // mantém a `unitId` recebida, como antes.
+    Promise.all([localDeviceId(), getTerminalUnit()]).then(([deviceId, terminal]) => {
+      const effectiveUnitId = terminal.available && terminal.unitId ? terminal.unitId : unitId;
+      return unwrap(
         supabase().from("fa_kiosk_print_jobs").insert({
-          unit_id: unitId,
+          unit_id: effectiveUnitId,
           kind,
           payload_json: payload,
           status: "PENDING",
           created_at_ms: Date.now(),
           origin_device_id: deviceId,
         }),
-      ),
-    ),
+      );
+    }),
   todayRevenue: async (unitId: string, cutoffHour: number) => {
     const totalCents = await unwrap<number>(
       supabase().rpc("fa_kiosk_today_revenue", { p_unit_id: unitId, p_business_date: businessDateFor(Date.now(), cutoffHour) }),
