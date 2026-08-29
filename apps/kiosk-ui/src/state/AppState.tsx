@@ -103,27 +103,61 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     };
   }, [employee]);
 
-  // Se o colaborador está vinculado a uma única unidade (ou é Operador),
-  // pular a tela de seleção de módulo automaticamente.
+  // Seleciona a unidade do terminal (definida localmente no Electron/Fastify)
+  // ou vinculada ao colaborador automaticamente ao fazer login.
   const autoSelectedForEmployeeId = useRef<string | null>(null);
   useEffect(() => {
     if (!employee || unitId) return;
     if (autoSelectedForEmployeeId.current === employee.id) return;
 
-    if (employee.role === "OPERADOR" && units.length > 0) {
-      autoSelectedForEmployeeId.current = employee.id;
-      setUnitId(units[0]!.id);
-      return;
-    }
+    let isCancelled = false;
+    fetch("/api/system/terminal-unit")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isCancelled) return;
+        if (data?.unitId && units.some((u) => u.id === data.unitId)) {
+          autoSelectedForEmployeeId.current = employee.id;
+          setUnitId(data.unitId);
+          return;
+        }
 
-    Api.myUnitIds(employee.id)
-      .then((ids) => {
-        autoSelectedForEmployeeId.current = employee.id;
-        if (ids.length === 1) setUnitId(ids[0]!);
+        if (employee.role === "OPERADOR" && units.length > 0) {
+          autoSelectedForEmployeeId.current = employee.id;
+          setUnitId(units[0]!.id);
+          return;
+        }
+
+        Api.myUnitIds(employee.id)
+          .then((ids) => {
+            if (isCancelled) return;
+            autoSelectedForEmployeeId.current = employee.id;
+            if (ids.length === 1) setUnitId(ids[0]!);
+          })
+          .catch(() => {
+            if (!isCancelled) autoSelectedForEmployeeId.current = employee.id;
+          });
       })
       .catch(() => {
-        autoSelectedForEmployeeId.current = employee.id;
+        if (isCancelled) return;
+        if (employee.role === "OPERADOR" && units.length > 0) {
+          autoSelectedForEmployeeId.current = employee.id;
+          setUnitId(units[0]!.id);
+          return;
+        }
+        Api.myUnitIds(employee.id)
+          .then((ids) => {
+            if (isCancelled) return;
+            autoSelectedForEmployeeId.current = employee.id;
+            if (ids.length === 1) setUnitId(ids[0]!);
+          })
+          .catch(() => {
+            if (!isCancelled) autoSelectedForEmployeeId.current = employee.id;
+          });
       });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [employee, unitId, units]);
 
   // Restaura a sessão do Supabase Auth que o navegador já tinha (o terminal

@@ -1555,6 +1555,7 @@ const SAMPLE_RECEIPT = generateEscPosReceipt({
 
 function ImpressorasTab({ unitId }: { unitId: string }) {
   const toast = useToast();
+  const { units } = useAppState();
   const [wristbandPrinter, setWristbandPrinter] = useState("");
   const [receiptPrinter, setReceiptPrinter] = useState("");
   const [saving, setSaving] = useState<"WRISTBAND" | "RECEIPT" | null>(null);
@@ -1571,11 +1572,41 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   // texto livre.
   const [installedPrinters, setInstalledPrinters] = useState<string[] | undefined>(undefined);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
+  const [terminalUnitId, setTerminalUnitId] = useState<string>("");
+  const [savingTerminalUnit, setSavingTerminalUnit] = useState(false);
 
   useEffect(() => {
     Api.unitSetting(unitId, "printer_wristband").then((r) => setWristbandPrinter(r.value ?? ""));
     Api.unitSetting(unitId, "printer_receipt").then((r) => setReceiptPrinter(r.value ?? ""));
+    fetch("/api/system/terminal-unit")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.unitId) setTerminalUnitId(data.unitId);
+      })
+      .catch(() => {});
   }, [unitId]);
+
+  async function saveTerminalUnit() {
+    if (!terminalUnitId) return;
+    setSavingTerminalUnit(true);
+    try {
+      const res = await fetch("/api/system/terminal-unit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unitId: terminalUnitId }),
+      });
+      if (res.ok) {
+        const boundUnitName = units.find((u) => u.id === terminalUnitId)?.name || terminalUnitId;
+        toast.success(`Este computador foi vinculado à unidade "${boundUnitName}" com sucesso.`);
+      } else {
+        toast.error("Falha ao salvar a unidade deste computador.");
+      }
+    } catch {
+      toast.error("Servidor local não respondeu ao vincular a unidade do computador.");
+    } finally {
+      setSavingTerminalUnit(false);
+    }
+  }
 
   function refreshPrinters() {
     const list = window.facaamigos?.listPrinters;
@@ -1661,24 +1692,31 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   async function testCheckinReceiptPrint() {
     setTestingCheckinReceipt(true);
     try {
-      const now = new Date();
       await Api.queuePrintJob(unitId, "RECEIPT", {
-        title: "Check-in",
+        title: "Check-in (Teste)",
         unitName: "Unidade FaçaAmigos",
         employeeName: "Operador Kiosk",
-        accessCode: "TESTE0001AB",
-        exitPin: "0000",
-        entryTime: now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        expectedExitTime: new Date(now.getTime() + 60 * 60_000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        planName: "Plano Teste 1h",
-        careNotes: "Teste de acompanhamento — ignorar",
-        items: [{ description: "Plano Teste 1h", quantity: 1, amountCents: 0 }],
-        totalCents: 0,
-        customerInfo: { childName: "Criança Teste", guardianName: "Responsável Teste" },
+        dateTime: new Date().toLocaleString("pt-BR"),
+        accessCode: "TESTE1234567",
+        exitPin: "1234",
+        qrValue: "TESTE1234567",
+        entryTime: "14:00",
+        expectedExitTime: "15:00",
+        planName: "Plano 60 min (Teste)",
+        activity: "PLAYGROUND",
+        items: [{ description: "Plano 60 min", quantity: 1, amountCents: 6000 }],
+        totalCents: 6000,
+        customerInfo: {
+          childName: "Criança Teste",
+          childBirthDate: "01/01/2018",
+          guardianName: "Responsável Teste",
+          guardianCpf: "000.000.000-00",
+          phone: "(91) 99999-9999",
+        },
       });
-      toast.success("Cupom de teste de Check-in enviado — inclui o QR de acompanhamento.");
+      toast.success("Cupom de check-in de teste enviado para a fila!");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível enviar cupom de teste de Check-in.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar cupom de teste.");
     } finally {
       setTestingCheckinReceipt(false);
     }
@@ -1688,15 +1726,14 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     setTestingWristband(true);
     try {
       await Api.queuePrintJob(unitId, "WRISTBAND", {
-        wristbandCode: "TESTE-01",
+        wristbandCode: "TESTE1234567",
         childName: "Criança Teste",
         guardianName: "Responsável Teste",
-        phone: "(11) 99999-9999",
-        planName: "Plano Teste 1h",
-        notes: "Teste de enquadramento OK",
-        entryTime: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        phone: "(91) 99999-9999",
+        planName: "Plano 60 min (Teste)",
+        entryTime: "14:00",
       });
-      toast.success("Pulseira de teste enviada para a fila de impressão!");
+      toast.success("Pulseira de teste enviada para a fila!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível enviar pulseira de teste.");
     } finally {
@@ -1720,7 +1757,30 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
         </HelpText>
       )}
 
-
+      {/* UNIDADE DESTE TERMINAL / COMPUTADOR */}
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>🖥️ Vinculação deste Computador / Terminal</h2>
+          <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
+            Indica a qual unidade este computador físico pertence (Circuito ou Playground). O Print Bridge escutará e imprimirá <strong>exclusivamente</strong> os cupons e pulseiras da unidade vinculada a este computador.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <Select value={terminalUnitId} onChange={(e) => setTerminalUnitId(e.target.value)}>
+              <option value="">Selecione a unidade deste computador</option>
+              {units.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.kind})
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button variant="primary" size="sm" loading={savingTerminalUnit} onClick={saveTerminalUnit} disabled={!terminalUnitId}>
+            💾 Vincular Computador
+          </Button>
+        </div>
+      </Card>
 
       {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>

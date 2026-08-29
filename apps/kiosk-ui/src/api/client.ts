@@ -2267,17 +2267,6 @@ export const Api = {
     } catch (err) {
       console.warn("Supabase RLS impediu gravação remota em fa_kiosk_app_settings (salvo localmente no quiosque):", err);
     }
-    if (key === "printer_receipt" || key === "printer_wristband") {
-      try {
-        await fetch("/api/system/terminal-unit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ unitId }),
-        });
-      } catch {
-        // ignora se não estiver rodando sob o servidor local do Fastify
-      }
-    }
   },
   /**
    * Enfileira um pedido de impressão para o print bridge (processo local
@@ -2380,14 +2369,29 @@ export const Api = {
     ),
   /** Reimprime pulseira + recibo de guarda da mesma sessão, sem gerar código novo. */
   reimprimirEntrada: (sessionId: string, employeeId?: string) =>
-    unwrap<{ accessCode: string }>(
-      supabase().rpc("fa_reimprimir_entrada", { p_session_id: sessionId, p_employee_id: employeeId ?? null }),
+    localDeviceId().then((deviceId) =>
+      unwrap<{ accessCode: string }>(
+        supabase().rpc("fa_reimprimir_entrada", {
+          p_session_id: sessionId,
+          p_employee_id: employeeId ?? null,
+          p_device_id: deviceId,
+        }),
+      ),
     ),
   queuePrintJob: (unitId: string, kind: "WRISTBAND" | "RECEIPT", payload: unknown) =>
-    unwrap(
-      supabase()
-        .from("fa_kiosk_print_jobs")
-        .insert({ unit_id: unitId, kind, payload_json: payload, status: "PENDING", created_at_ms: Date.now() }),
+    localDeviceId().then((deviceId) =>
+      unwrap(
+        supabase()
+          .from("fa_kiosk_print_jobs")
+          .insert({
+            unit_id: unitId,
+            kind,
+            payload_json: payload,
+            status: "PENDING",
+            created_at_ms: Date.now(),
+            origin_device_id: deviceId,
+          }),
+      ),
     ),
   todayRevenue: async (unitId: string, cutoffHour: number) => {
     const totalCents = await unwrap<number>(

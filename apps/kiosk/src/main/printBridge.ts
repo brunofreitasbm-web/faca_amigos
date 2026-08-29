@@ -336,6 +336,10 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
       return null;
     }
 
+    if (allowedUnits.size > 0 && !allowedUnits.has(unitId)) {
+      return null;
+    }
+
     const physical = installedNames.find((n) => !isVirtualOrPdfPrinter(n));
     if (physical) return physical;
 
@@ -489,8 +493,10 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
     .eq("status", "PENDING")
     .then(({ data }) => {
       const allowedUnits = getTerminalUnitIds(db);
+      const localDeviceId = getLocalDeviceId(db);
       for (const job of (data ?? []) as PrintJobRow[]) {
         if (allowedUnits.size > 0 && !allowedUnits.has(job.unit_id)) continue;
+        if (job.origin_device_id && localDeviceId && job.origin_device_id !== localDeviceId) continue;
         void handleJob(job);
       }
     });
@@ -500,8 +506,13 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "fa_kiosk_print_jobs" }, (payload) => {
       const job = payload.new as PrintJobRow;
       const allowedUnits = getTerminalUnitIds(db);
+      const localDeviceId = getLocalDeviceId(db);
       if (allowedUnits.size > 0 && !allowedUnits.has(job.unit_id)) {
         console.log(`[print-bridge] Ignorando evento Realtime do job ${job.id} para unidade ${job.unit_id} (este terminal está configurado para: ${Array.from(allowedUnits).join(", ")})`);
+        return;
+      }
+      if (job.origin_device_id && localDeviceId && job.origin_device_id !== localDeviceId) {
+        console.log(`[print-bridge] Ignorando evento Realtime do job ${job.id}: emitido por ${job.origin_device_id}, este é ${localDeviceId}.`);
         return;
       }
       void handleJob(job);
