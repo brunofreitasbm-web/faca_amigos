@@ -29,9 +29,13 @@ function loadDotEnvFromCandidates(): void {
     // app.getPath pode falhar se chamado antes da inicialização completa dos caminhos
   }
 
+  // userData ANTES do .env que veio dentro do instalador: o primeiro que
+  // define uma variável vence, e o instalador é idêntico nas duas
+  // máquinas. Sem esta ordem não há como trocar a chave de um terminal
+  // (ou rotacioná-la) sem gerar um instalador novo.
   const candidates: string[] = [
-    process.resourcesPath ? join(process.resourcesPath, ".env") : "",
     userDataEnv,
+    process.resourcesPath ? join(process.resourcesPath, ".env") : "",
     join(process.cwd(), ".env"),
     join(import.meta.dirname, "../.env"),
     process.execPath ? join(process.execPath, "../.env") : "",
@@ -233,11 +237,15 @@ if (isPrimaryInstance) {
     // saía e ninguém no balcão descobria até a família já ter ido embora.
     const printBridgeResult = startPrintBridge(serverRes.db);
     if (!printBridgeResult.started) {
-      // Terminal sem unidade amarrada é o caso comum e tem conserto na
-      // própria tela, sem reiniciar — por isso o texto muda conforme o
-      // motivo em vez de mandar reiniciar sempre.
+      // Duas causas diferentes, dois consertos diferentes — e quem lê
+      // isto está no balcão, então cada uma mostra só o que serve para
+      // ela. Sem unidade amarrada: resolve na própria tela, sem
+      // reiniciar. Amarrado e mesmo assim parado: o que falta é a chave,
+      // e o caminho do .env é a única coisa acionável.
+      const envPath = join(app.getPath("userData"), ".env");
       const comoResolver = printBridgeResult.bound
-        ? "Os check-ins continuam funcionando normalmente, mas nada será impresso até isso ser corrigido e o app reiniciado."
+        ? `Arquivo de configuração deste computador:\n${envPath}\n\n` +
+          "Os check-ins continuam funcionando normalmente, mas nada será impresso até isso ser corrigido e o app reiniciado."
         : "Os check-ins continuam funcionando normalmente. Assim que você escolher a unidade em Configurações > Impressoras, a impressão volta sozinha — não precisa reiniciar.";
       dialog.showMessageBox({
         type: "warning",

@@ -40,10 +40,14 @@ function loadOrCreateTerminalId(userDataPath: string): string {
 
 export function startFiscalWorker(userDataPath: string, deviceId?: string | null): void {
   const url = process.env.FACAAMIGOS_SUPABASE_URL;
-  const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) {
+  // Mesma ordem do print bridge: chave nova primeiro, nome antigo como
+  // ponte para os .env já instalados. Nunca há padrão embutido aqui —
+  // sem chave, a emissão fica desligada e avisa, em vez de rodar com uma
+  // credencial que veio dentro do instalador.
+  const secretKey = process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !secretKey) {
     console.warn(
-      "[fiscal] FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados — " +
+      "[fiscal] FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SECRET_KEY não configurados — " +
         "emissão de NFC-e desligada neste terminal.",
     );
     return;
@@ -54,7 +58,7 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
   const log = (message: string) => console.log(message);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = createClient(url, serviceRoleKey, { realtime: { transport: WebSocket as any } });
+  const supabase = createClient(url, secretKey, { realtime: { transport: WebSocket as any } });
 
   let processing = false;
   async function drainQueue(): Promise<void> {
