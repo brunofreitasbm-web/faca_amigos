@@ -38,16 +38,25 @@ function formatCtps(numero: string | null, serie: string | null, uf: string | nu
 }
 
 /** Dia (1-31) e "HH:mm" de um timestamp, no fuso da unidade — não em UTC cru. */
-function dayAndTimeInTz(atMs: number, timeZone: string): { day: number; time: string } {
-  const parts = new Intl.DateTimeFormat("pt-BR", {
-    timeZone,
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date(atMs));
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return { day: Number(get("day")), time: `${get("hour")}:${get("minute")}` };
+function dayAndTimeInTz(atMs: number, timeZone?: string | null): { day: number; time: string } {
+  const tz = timeZone && timeZone.trim() ? timeZone : "America/Belem";
+  try {
+    const parts = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: tz,
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(atMs));
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+    return { day: Number(get("day")), time: `${get("hour")}:${get("minute")}` };
+  } catch {
+    const d = new Date(atMs);
+    return {
+      day: d.getDate(),
+      time: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+    };
+  }
 }
 
 /**
@@ -86,10 +95,12 @@ function buildDayRows(data: EspelhoPonto): DayRow[] {
     day: i + 1,
     byKind: { ENTRADA: [], SAIDA: [], INTERVALO_INICIO: [], INTERVALO_FIM: [] },
   }));
-  for (const rec of data.records) {
+  for (const rec of data.records || []) {
     const { day, time } = dayAndTimeInTz(rec.atMs, data.timezone);
     const row = rows[day - 1];
-    if (row) row.byKind[rec.kind].push(time);
+    if (row && row.byKind && row.byKind[rec.kind]) {
+      row.byKind[rec.kind].push(time);
+    }
   }
   return rows;
 }
@@ -117,33 +128,24 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
   // devolveria uma tabela vazia, parecendo um bug em vez de "mês futuro").
   const isFutureMonth = year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1);
 
-  useEffect(() => {
+  const fetchEspelho = () => {
     if (isFutureMonth) {
       setData(null);
       setError(null);
       setLoading(false);
       return;
     }
-    // Troca rápida de mês/ano (vários cliques seguidos) não pode deixar a
-    // resposta de uma seleção antiga sobrescrever a da seleção atual —
-    // ignora qualquer resultado que chegue depois de `year`/`month` já
-    // terem mudado de novo.
-    let cancelled = false;
     setLoading(true);
     setError(null);
     Api.espelhoPonto(employee.id, year, month)
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Não foi possível gerar o espelho de ponto");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : "Não foi possível gerar o espelho de ponto"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchEspelho();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee.id, year, month, isFutureMonth]);
 
   const rows = useMemo(() => (data ? buildDayRows(data) : []), [data]);
@@ -235,9 +237,14 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
             </option>
           ))}
         </Select>
-        <Button variant="primary" disabled={!data || loading} onClick={handlePrint} style={{ marginLeft: "auto" }}>
-          🖨️ Imprimir
-        </Button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+          <Button variant="secondary" disabled={loading} onClick={fetchEspelho}>
+            🔄 Atualizar
+          </Button>
+          <Button variant="primary" disabled={!data || loading} onClick={handlePrint}>
+            🖨️ Imprimir
+          </Button>
+        </div>
       </div>
 
       {isFutureMonth && <p style={{ color: "var(--text-muted)" }}>Este mês ainda não decorreu — escolha um mês já passado ou o atual.</p>}

@@ -62,6 +62,8 @@ declare
   v_coupon record;
   v_coupon_id uuid := null;
   v_coupon_discount_cents integer := 0;
+  v_coupon_kind text := null;
+  v_coupon_pct integer := null;
   v_discount_base_cents integer;
   v_session_id uuid := gen_random_uuid();
   v_access_code text;
@@ -197,6 +199,8 @@ begin
     if v_coupon.kind = 'DESCONTO_VALOR' then v_coupon_discount_cents := v_coupon.value; end if;
     if v_coupon.kind = 'DESCONTO_PCT' then v_coupon_discount_cents := round(v_discount_base_cents * v_coupon.value / 100.0); end if;
     v_coupon_id := v_coupon.id;
+    v_coupon_kind := v_coupon.kind;
+    v_coupon_pct := case when v_coupon.kind = 'DESCONTO_PCT' then v_coupon.value else null end;
   end if;
 
   -- Compra do pacote acontece aqui, depois de guardian/child e do cupom
@@ -233,7 +237,7 @@ begin
     v_child_id, p_child->>'fullName', v_guardian_id,
     v_access_code, v_exit_pin, v_access_code, v_access_code, nullif(trim(coalesce(p_notes, '')), ''), p_sensory_tags,
     to_timestamp(v_now_ms / 1000.0), v_now_ms, p_employee_id,
-    v_coupon_id, v_coupon_discount_cents, v_coupon.kind, v_coupon.value, false, v_business_date,
+    v_coupon_id, v_coupon_discount_cents, v_coupon_kind, v_coupon_pct, false, v_business_date,
     p_use_hour_bank, v_bank_allocated, v_bank_overage,
     p_package_id is not null, p_package_id, v_pkg_name, v_pkg_price_cents,
     v_pkg_allocated, v_pkg_overage

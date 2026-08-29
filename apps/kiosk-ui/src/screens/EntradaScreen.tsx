@@ -291,9 +291,16 @@ export function EntradaScreen({
   // Aplicação automática de cupons no Playground:
   // - Criança neurodivergente marcada -> "50% MEIA - Inclusivo"
   // - Não marcada -> "40% PROMOCIONAL" em todos os planos
+  // Só sobrescreve se o cupom atual ainda for o último aplicado
+  // automaticamente por este efeito — assim um cupom escolhido à mão pelo
+  // operador (ex.: parceria aplicada para toda a entrada da família) não é
+  // apagado quando o próximo irmão reseta o "criança neurodivergente".
+  const lastAutoCouponRef = useRef<string | null>(null);
   useEffect(() => {
     if (activity !== "PLAYGROUND") return;
+    if (couponCode && couponCode !== lastAutoCouponRef.current) return;
 
+    let next: string;
     if (isNeurodivergent) {
       const match50 = coupons.find(
         (c) =>
@@ -303,7 +310,7 @@ export function EntradaScreen({
             c.code.toLowerCase().includes("meia") ||
             c.description?.toLowerCase().includes("inclusivo")),
       );
-      setCouponCode(match50 ? match50.code : "50% MEIA - Inclusivo");
+      next = match50 ? match50.code : "50% MEIA - Inclusivo";
     } else {
       const match40 = coupons.find(
         (c) =>
@@ -312,8 +319,10 @@ export function EntradaScreen({
             c.code.toLowerCase().includes("promocional") ||
             c.description?.toLowerCase().includes("promocional")),
       );
-      setCouponCode(match40 ? match40.code : "40% PROMOCIONAL");
+      next = match40 ? match40.code : "40% PROMOCIONAL";
     }
+    lastAutoCouponRef.current = next;
+    setCouponCode(next);
   }, [activity, isNeurodivergent, coupons]);
 
   // Busca única com debounce. Só dígitos quando o operador digitou um número:
@@ -444,7 +453,6 @@ export function EntradaScreen({
     setCustomNotes("");
     setChildPhoto(null);
     setPlanId(null);
-    setCouponCode("");
     setShowExtras(false);
     setFavoriteAssetId(null);
     setQuickUpsellAccepted(false);
@@ -454,6 +462,11 @@ export function EntradaScreen({
       setGuardianName("");
       setPhone("");
       setLastGuardianId(null);
+      // Cupom de desconto vale para a entrada inteira do responsável — só
+      // limpa ao trocar de família, senão o irmão seguinte perde o desconto
+      // que o operador já tinha aplicado.
+      setCouponCode("");
+      lastAutoCouponRef.current = null;
     }
     searchRef.current?.focus();
   }
@@ -615,7 +628,7 @@ export function EntradaScreen({
         sessionId: res.sessionId,
         accessCode: res.accessCode,
         exitPin: res.exitPin,
-        childName: childName.trim(),
+        childName: isNeurodivergent && !childName.includes("🧩") ? `${childName.trim()} 🧩` : childName.trim(),
         guardianId: res.guardianId,
         // Plano acima de 2h vendido agora: habilita o botão do contrato de
         // prestação de serviços (banco de horas garantido em contrato).
@@ -800,7 +813,12 @@ export function EntradaScreen({
             >
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <strong style={{ fontSize: "17px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  {childName}
+                  {childName}{isNeurodivergent && !childName.includes("🧩") ? " 🧩" : ""}
+                  {isNeurodivergent && (
+                    <Badge variant="teal" title="Criança Neurodivergente">
+                      🧩 Neurodivergente
+                    </Badge>
+                  )}
                   {matchedChild?.is_vip && (
                     <Badge variant="vip" title={`${matchedChild.visits_in_window} visitas nos últimos 30 dias`}>
                       ★ VIP

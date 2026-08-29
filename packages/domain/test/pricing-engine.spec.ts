@@ -34,10 +34,10 @@ describe("quoteForSession", () => {
     expect(q.lines).toHaveLength(1);
   });
 
-  it("soma o excedente como linha separada", () => {
-    const q = quoteForSession(plan, session(), 15 * 60_000 + 3 * 60_000); // +3 min
-    expect(q.totalCents).toBe(3000 + 300);
-    expect(q.lines.map((l) => l.label)).toEqual(["Helena — 15 minutos", `Excedente (3 min × ${money(100)})`]);
+  it("soma o excedente como linha separada após a tolerância de 1 minuto", () => {
+    const q = quoteForSession(plan, session(), 15 * 60_000 + 3 * 60_000); // 3 min após plano - 1 min tolerância = 2 min cobrados
+    expect(q.totalCents).toBe(3000 + 200);
+    expect(q.lines.map((l) => l.label)).toEqual(["Helena — 15 minutos", `Excedente (2 min × ${money(100)})`]);
   });
 
   it("aplica cupom antes da cortesia de fidelidade, e cupom nunca deixa o total negativo", () => {
@@ -60,20 +60,20 @@ describe("quoteForSession", () => {
     const q = quoteForSession(
       plan,
       session({ activity: "PLAYGROUND", couponKind: "DESCONTO_PCT", couponPct: 50, couponCode: "50% MEIA - Inclusivo" }),
-      15 * 60_000 + 4 * 60_000, // +4 min de excedente (400 centavos)
+      15 * 60_000 + 4 * 60_000, // 4 min decorridos além do plano - 1 min tolerância = 3 min cobrados (300 centavos)
     );
-    // total sem cupom seria 3000 + 400 = 3400; com 50% sobre tudo, sobra 1700.
-    expect(q.totalCents).toBe(1700);
-    expect(q.lines.at(-1)).toEqual({ label: "Cupom 50% MEIA - Inclusivo", cents: -1700 });
+    // total sem cupom é 3000 + 300 = 3300; com 50% sobre tudo, sobra 1650.
+    expect(q.totalCents).toBe(1650);
+    expect(q.lines.at(-1)).toEqual({ label: "Cupom 50% MEIA - Inclusivo", cents: -1650 });
   });
 
   it("cupom percentual fora do Playground não recebe o desconto proporcional ao excedente", () => {
     const q = quoteForSession(
       plan,
       session({ activity: "CARRINHO", couponKind: "DESCONTO_PCT", couponPct: 50, couponDiscountCents: 0 }),
-      15 * 60_000 + 4 * 60_000,
+      15 * 60_000 + 4 * 60_000, // 4 min decorridos além do plano - 1 min tolerância = 3 min cobrados (300 centavos)
     );
-    expect(q.totalCents).toBe(3400);
+    expect(q.totalCents).toBe(3300);
     expect(q.lines).toHaveLength(2);
   });
 });

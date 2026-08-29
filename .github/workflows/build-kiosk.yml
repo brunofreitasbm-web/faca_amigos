@@ -1,0 +1,108 @@
+# Gera o instalador Windows do quiosque.
+#
+# Existe porque o instalador NSIS só empacota em Windows (no Linux o
+# electron-builder precisa de Wine com suporte 32-bit) — sem isto o build
+# depende de alguém rodar na própria máquina, e a versão distribuída passa
+# a variar conforme quem buildou.
+#
+# Disparo manual apenas: o instalador tem ~105MB e leva vários minutos, não
+# faz sentido rodar a cada push.
+name: Build do instalador (kiosk)
+
+on:
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Publicar no feed de auto-update? ATENÇÃO: os terminais em operação se atualizam sozinhos."
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Roda antes do empacotamento: se o guarda de credenciais falhar, o
+      # build para aqui em vez de gerar um instalador com chave dentro.
+      - name: Testes do kiosk
+        run: pnpm --filter @facaamigos/kiosk test
+
+      # NÃO cria apps/kiosk/.env. Esse arquivo é embutido no instalador
+      # (extraResources), então um .env aqui faria a chave voltar a viajar
+      # dentro de cada instalador. Cada terminal recebe a sua em
+      # %APPDATA%\FacaAmigos\.env — ver apps/kiosk/.env.example.
+      - name: Empacotar instalador
+        run: pnpm dist:kiosk
+
+      # Confere o ARTEFATO, não o código-fonte: é o bundle que vai para as
+      # máquinas, e é nele que uma chave embutida faria estrago.
+      - name: Conferir que o artefato não leva credencial
+        shell: pwsh
+        run: |
+          $padroes = @('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_-]{20,}', 'sb_secret_[A-Za-z0-9_-]{20,}')
+          $alvos = @('apps/kiosk/bundle/main.mjs')
+          if (Test-Path 'apps/kiosk/release/win-unpacked/resources/.env') {
+            throw 'O instalador levaria um .env embutido. Remova apps/kiosk/.env antes de empacotar.'
+          }
+          foreach ($alvo in $alvos) {
+            $conteudo = Get-Content $alvo -Raw
+            foreach ($padrao in $padroes) {
+              if ($conteudo -match $padrao) { throw "Credencial embutida encontrada em $alvo" }
+            }
+          }
+          Write-Host 'OK: nenhuma credencial no artefato.'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FacaAmigos-Setup
+          path: |
+            apps/kiosk/release/*.exe
+            apps/kiosk/release/*.exe.blockmap
+            apps/kiosk/release/latest.yml
+          if-no-files-found: error
+          retention-days: 30
+
+  # Job separado e apontado para um Environment: assim dá para exigir
+  # aprovação manual antes de qualquer coisa chegar aos terminais. Configure
+  # a proteção em Settings > Environments > producao > Required reviewers.
+  publicar:
+    needs: build
+    if: inputs.publicar
+    runs-on: windows-latest
+    timeout-minutes: 40
+    environment: producao
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # As credenciais entram como variáveis de ambiente, nunca como
+      # arquivo: release-kiosk.mjs lê process.env primeiro justamente para
+      # o publish ter a chave sem que ela entre no instalador.
+      - name: Buildar e publicar no feed
+        env:
+          FACAAMIGOS_SUPABASE_URL: ${{ secrets.FACAAMIGOS_SUPABASE_URL }}
+          FACAAMIGOS_SUPABASE_SECRET_KEY: ${{ secrets.FACAAMIGOS_SUPABASE_SECRET_KEY }}
+        run: pnpm release:kiosk

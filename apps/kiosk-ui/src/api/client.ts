@@ -16,6 +16,68 @@ export interface ApiError {
  */
 export const systemStatus = new EventTarget();
 
+/**
+ * Identifica este computador para o print bridge local (Electron) só
+ * imprimir os jobs que ele mesmo emitiu — sem isto, 2 terminais na mesma
+ * unidade imprimem cada pulseira/cupom em dobro. Vem do servidor local
+ * (persistido por instalação); fora do Electron (ex.: PWA sem print
+ * bridge) o fetch falha e os jobs seguem sem origin_device_id, como antes.
+ */
+let deviceIdPromise: Promise<string | null> | null = null;
+function localDeviceId(): Promise<string | null> {
+  if (!deviceIdPromise) {
+    deviceIdPromise = fetch("/api/system/device-id")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => (data && typeof data.deviceId === "string" ? data.deviceId : null))
+      .catch(() => null);
+  }
+  return deviceIdPromise;
+}
+
+/**
+ * Unidade a que ESTE computador pertence — diferente da unidade
+ * selecionada na sessão, que muda conforme quem está operando. É o que
+ * o print bridge usa para só imprimir os jobs da própria unidade.
+ *
+ * Devolve `{ unitId: null, available: false }` fora do Electron
+ * (tablet/PWA sem o servidor local): esses aparelhos não imprimem nada
+ * sozinhos, então não faz sentido pedir a amarração ao operador ali.
+ */
+export interface TerminalUnitInfo {
+  unitId: string | null;
+  available: boolean;
+}
+
+async function getTerminalUnit(): Promise<TerminalUnitInfo> {
+  try {
+    const res = await fetch("/api/system/terminal-unit");
+    if (!res.ok) return { unitId: null, available: false };
+    const data = (await res.json()) as { unitId?: string | null };
+    return { unitId: typeof data.unitId === "string" && data.unitId ? data.unitId : null, available: true };
+  } catch {
+    return { unitId: null, available: false };
+  }
+}
+
+/**
+ * Lança quando não dá para gravar. A versão anterior engolia o erro num
+ * `try/catch` em volta do `fetch` — e `fetch` não lança em 500, então a
+ * gravação falhava (FK do SQLite local) enquanto a tela dizia "salvo com
+ * sucesso" e o terminal seguia sem unidade, imprimindo job de todas.
+ */
+async function setTerminalUnit(unitId: string): Promise<string> {
+  const res = await fetch("/api/system/terminal-unit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ unitId }),
+  });
+  const data = (await res.json().catch(() => null)) as { ok?: boolean; unitId?: string; message?: string } | null;
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.message ?? `Não foi possível vincular este computador à unidade (HTTP ${res.status}).`);
+  }
+  return data.unitId ?? unitId;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -929,8 +991,12 @@ export interface SessionAudit {
  * `fa_kiosk_business_date`, que é quem grava `business_date` nas tabelas.
  */
 export function businessDateFor(nowMs: number, cutoffHour: number): string {
+  // UTC, não hora local: espelha `to_timestamp(...)::date` no Postgres, que
+  // resolve na timezone da sessão (UTC no Supabase). Usar getters locais aqui
+  // desalinha o "dia operacional" do cliente do que foi gravado no servidor
+  // sempre que a máquina do kiosk não estiver rodando em UTC.
   const shifted = new Date(nowMs - cutoffHour * 3600_000);
-  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}-${String(shifted.getDate()).padStart(2, "0")}`;
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
 }
 
 function planFromRow(row: Record<string, unknown>): Plan {
@@ -1219,6 +1285,11 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
 }
 
 export const Api = {
+  /** Unidade amarrada a ESTE computador (Configurações > Impressoras > Este terminal). */
+  terminalUnit: () => getTerminalUnit(),
+  setTerminalUnit: (unitId: string) => setTerminalUnit(unitId),
+  /** ID desta instalação; null fora do Electron. */
+  deviceId: () => localDeviceId(),
   units: () =>
     unwrap<Unit[]>(
       supabase()
@@ -1405,17 +1476,20 @@ export const Api = {
     employeeId: string;
     payments: { method: string; amountCents: number }[];
   }) =>
-    callResilient<{
-      orderId: string;
-      orderCode: string;
-      chargedCents: number;
-      guardianPackageId: string;
-      expiresAtMs: number;
-    }>("fa_upsell_vender_pacote", {
-      p_offer_id: body.offerId,
-      p_payments: body.payments,
-      p_employee_id: body.employeeId,
-    }),
+    localDeviceId().then((deviceId) =>
+      callResilient<{
+        orderId: string;
+        orderCode: string;
+        chargedCents: number;
+        guardianPackageId: string;
+        expiresAtMs: number;
+      }>("fa_upsell_vender_pacote", {
+        p_offer_id: body.offerId,
+        p_payments: body.payments,
+        p_employee_id: body.employeeId,
+        p_device_id: deviceId,
+      }),
+    ),
   /**
    * Cross-sell rápido: adiciona um produto único (ex.: "Água") à comanda
    * da sessão, cobrado junto no fechamento (fa_checkout). Diferente do
@@ -1566,43 +1640,46 @@ export const Api = {
     // fa_checkin também enfileira, na mesma transação, a pulseira e o recibo
     // de guarda. Nenhuma tela precisa disparar impressão no check-in: se a
     // RPC voltou, as duas vias já estão na fila do print bridge.
-    callResilient<{
-      sessionId: string;
-      childId: string;
-      guardianId: string;
-      accessCode: string;
-      /** PIN numérico de 4 dígitos para digitação rápida na Saída (único do dia). */
-      exitPin: string;
-      wristbandCode: string;
-      ticketCode: string;
-      /** Minutos do banco de horas alocados nesta entrada (só quando useHourBank). */
-      hourBankAllocatedMinutes: number | null;
-      /** Minutos do pacote alocados nesta entrada (só quando packageId). */
-      packageAllocatedMinutes: number | null;
-    }>(
-      "fa_checkin",
-      {
-        p_unit_id: body.unitId,
-        p_activity: body.activity,
-        p_plan_id: body.planId,
-        p_use_hour_bank: body.useHourBank ?? false,
-        p_package_id: body.packageId ?? null,
-        p_asset_id: body.assetId ?? null,
-        p_guardian: { id: body.guardian.id, fullName: body.guardian.fullName, cpf: body.guardian.cpf, phoneE164: body.guardian.phoneE164 },
-        p_child: {
-          id: body.child.id,
-          fullName: body.child.fullName,
-          birthDate: body.child.birthDate,
-          inclusiveEligible: body.child.inclusiveEligible,
-          inclusiveProofType: body.child.inclusiveProofType,
+    localDeviceId().then((deviceId) =>
+      callResilient<{
+        sessionId: string;
+        childId: string;
+        guardianId: string;
+        accessCode: string;
+        /** PIN numérico de 4 dígitos para digitação rápida na Saída (único do dia). */
+        exitPin: string;
+        wristbandCode: string;
+        ticketCode: string;
+        /** Minutos do banco de horas alocados nesta entrada (só quando useHourBank). */
+        hourBankAllocatedMinutes: number | null;
+        /** Minutos do pacote alocados nesta entrada (só quando packageId). */
+        packageAllocatedMinutes: number | null;
+      }>(
+        "fa_checkin",
+        {
+          p_unit_id: body.unitId,
+          p_activity: body.activity,
+          p_plan_id: body.planId,
+          p_use_hour_bank: body.useHourBank ?? false,
+          p_package_id: body.packageId ?? null,
+          p_asset_id: body.assetId ?? null,
+          p_guardian: { id: body.guardian.id, fullName: body.guardian.fullName, cpf: body.guardian.cpf, phoneE164: body.guardian.phoneE164 },
+          p_child: {
+            id: body.child.id,
+            fullName: body.child.fullName,
+            birthDate: body.child.birthDate,
+            inclusiveEligible: body.child.inclusiveEligible,
+            inclusiveProofType: body.child.inclusiveProofType,
+          },
+          p_coupon_code: body.couponCode ?? null,
+          p_employee_id: body.employeeId,
+          p_notes: body.notes ?? null,
+          p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
+          p_pre_checkin_id: body.preCheckinId ?? null,
+          p_pre_checkin_child_index: body.preCheckinChildIndex ?? null,
+          p_device_id: deviceId,
         },
-        p_coupon_code: body.couponCode ?? null,
-        p_employee_id: body.employeeId,
-        p_notes: body.notes ?? null,
-        p_sensory_tags: body.sensoryTags && body.sensoryTags.length > 0 ? body.sensoryTags : null,
-        p_pre_checkin_id: body.preCheckinId ?? null,
-        p_pre_checkin_child_index: body.preCheckinChildIndex ?? null,
-      },
+      ),
     ),
 
   // --- QR Code de Acesso Rápido (pré-cadastro pelo responsável, sem login) --
@@ -2239,15 +2316,16 @@ export const Api = {
     } catch (err) {
       console.warn("Supabase RLS impediu gravação remota em fa_kiosk_app_settings (salvo localmente no quiosque):", err);
     }
+    // Amarração implícita do terminal só como BOOTSTRAP de instalação
+    // nova. Antes ela gravava sempre, com a unidade SELECIONADA na tela —
+    // configurar a impressora da outra unidade a partir deste computador
+    // reamarrava a máquina para lá, em silêncio.
     if (key === "printer_receipt" || key === "printer_wristband") {
       try {
-        await fetch("/api/system/terminal-unit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ unitId }),
-        });
-      } catch {
-        // ignora se não estiver rodando sob o servidor local do Fastify
+        const current = await getTerminalUnit();
+        if (current.available && !current.unitId) await setTerminalUnit(unitId);
+      } catch (err) {
+        console.warn("Não foi possível vincular automaticamente este computador à unidade:", err);
       }
     }
   },
@@ -2352,14 +2430,31 @@ export const Api = {
     ),
   /** Reimprime pulseira + recibo de guarda da mesma sessão, sem gerar código novo. */
   reimprimirEntrada: (sessionId: string, employeeId?: string) =>
-    unwrap<{ accessCode: string }>(
-      supabase().rpc("fa_reimprimir_entrada", { p_session_id: sessionId, p_employee_id: employeeId ?? null }),
+    localDeviceId().then((deviceId) =>
+      unwrap<{ accessCode: string }>(
+        supabase().rpc("fa_reimprimir_entrada", {
+          p_session_id: sessionId,
+          p_employee_id: employeeId ?? null,
+          p_device_id: deviceId,
+        }),
+      ),
     ),
   queuePrintJob: (unitId: string, kind: "WRISTBAND" | "RECEIPT", payload: unknown) =>
-    unwrap(
-      supabase()
-        .from("fa_kiosk_print_jobs")
-        .insert({ unit_id: unitId, kind, payload_json: payload, status: "PENDING", created_at_ms: Date.now() }),
+    // origin_device_id dá preferência de impressão ao computador que
+    // pediu; passada a carência, qualquer terminal daquela unidade
+    // assume — importante porque venda feita em tablet/PWA chega sem
+    // origem e, com regra estrita, nunca imprimiria em lugar nenhum.
+    localDeviceId().then((deviceId) =>
+      unwrap(
+        supabase().from("fa_kiosk_print_jobs").insert({
+          unit_id: unitId,
+          kind,
+          payload_json: payload,
+          status: "PENDING",
+          created_at_ms: Date.now(),
+          origin_device_id: deviceId,
+        }),
+      ),
     ),
   todayRevenue: async (unitId: string, cutoffHour: number) => {
     const totalCents = await unwrap<number>(
@@ -2864,7 +2959,7 @@ export const Api = {
   reportCheckinsByHour: async (unitId: string | null, from: string, to: string): Promise<CheckinsByHour[]> => {
     let query = supabase()
       .from("fa_kiosk_sessions")
-      .select("unit_id, checkin_at_ms, fa_kiosk_units(name)")
+      .select("unit_id, checkin_at_ms, checkin_at, fa_kiosk_units(id, name)")
       .gte("business_date", from)
       .lte("business_date", to);
     if (unitId) query = query.eq("unit_id", unitId);
@@ -2872,8 +2967,17 @@ export const Api = {
     const map = new Map<string, { unit_id: string; unit_name: string; hour: number; count: number }>();
     for (const s of sessions) {
       const uid = s.unit_id as string;
-      const uname = ((s.fa_kiosk_units as { name?: string } | null)?.name) ?? "—";
-      const hour = new Date(s.checkin_at_ms as number).getHours();
+      let uname = "—";
+      if (s.fa_kiosk_units) {
+        if (Array.isArray(s.fa_kiosk_units) && s.fa_kiosk_units[0]) {
+          uname = (s.fa_kiosk_units[0] as { name?: string }).name ?? "—";
+        } else if (typeof s.fa_kiosk_units === "object") {
+          uname = (s.fa_kiosk_units as { name?: string }).name ?? "—";
+        }
+      }
+      const rawTs = s.checkin_at_ms ? Number(s.checkin_at_ms) : (s.checkin_at ? new Date(s.checkin_at as string).getTime() : 0);
+      if (!rawTs) continue;
+      const hour = new Date(rawTs).getHours();
       const key = `${uid}:${hour}`;
       const cur = map.get(key) ?? { unit_id: uid, unit_name: uname, hour, count: 0 };
       cur.count += 1;

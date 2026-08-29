@@ -65,7 +65,7 @@ export async function callResilient<T>(rpcName: string, args: Record<string, unk
     const { data, error } = await supabase().rpc(rpcName, fullArgs);
     if (error) {
       console.warn(`[RPC ${rpcName} Error]`, error);
-      const msg = error.message || error.details || "Erro no servidor (RPC)";
+      const msg = error.message || error.details || error.hint || "Erro no servidor (RPC)";
       throw new Error(msg);
     }
     return data as T;

@@ -109,14 +109,14 @@ function findPlan(activity, planId) {
 function computeSessionTiming(plan, session, nowMs) {
   const elapsedMs = Math.max(0, nowMs - session.checkinAtMs);
   const durationMs = planDurationMinutes(plan) * 60000;
-  const overMs = Math.max(0, elapsedMs - durationMs);
+  const overMs = Math.max(0, elapsedMs - durationMs - 60000);
   const overMinutes = Math.ceil(overMs / 60000);
   const overCents = overMinutes * plan.overageCentsPerMinute;
   const liveTotalCents = plan.valueCents + overCents;
   let phase;
-  if (elapsedMs < durationMs * 0.8) phase = "VERDE";
-  else if (elapsedMs < durationMs) phase = "AMARELO";
-  else phase = "EXCEDENTE";
+  if (overMinutes > 0) phase = "EXCEDENTE";
+  else if (elapsedMs < durationMs * 0.8) phase = "VERDE";
+  else phase = "AMARELO";
   return { elapsedMs, durationMs, overMinutes, overCents, liveTotalCents, phase };
 }
 function quoteForSession(session, nowMs) {

@@ -451,7 +451,7 @@ export function PainelScreen() {
                 </span>
                 <div>
                   <strong style={{ fontSize: "13px", display: "block" }}>
-                    {item.childName}
+                    {item.childName}{(item.inclusiveEligible || (item.sensoryTags?.length ?? 0) > 0 || item.notes?.toLowerCase().includes("neuro")) && !item.childName.includes("🧩") ? " 🧩" : ""}
                     {item.totalChildren > 1 && (
                       <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> ({item.childIndex + 1}/{item.totalChildren})</span>
                     )}
@@ -573,12 +573,17 @@ export function PainelScreen() {
                           diferenciado, e precisa ser lido de relance num
                           painel cheio. Sem animação de propósito — ver a
                           variante `vip` do Badge. */}
+                      {((session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && (
+                        <Badge variant="teal" title="Criança Neurodivergente — Atendimento Inclusivo">
+                          🧩 Neurodivergente
+                        </Badge>
+                      )}
                       {vipChildIds.has(session.child_id) && (
                         <Badge variant="vip" title="Cliente VIP — 4 ou mais visitas nos últimos 30 dias">
                           ★ VIP
                         </Badge>
                       )}
-                      {session.child_name_snapshot}
+                      {session.child_name_snapshot}{((session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
                       {session.child_birth_date && (
                         <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}>· {formatAge(session.child_birth_date)}</span>
                       )}
@@ -770,7 +775,9 @@ export function PainelScreen() {
                     e.stopPropagation();
                     setPrintData({
                       wristbandCode,
-                      childName: session.child_name_snapshot,
+                      childName: ((session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩")
+                        ? `${session.child_name_snapshot} 🧩`
+                        : session.child_name_snapshot,
                       guardianName: session.guardian_name_snapshot || "Responsável",
                       phone: session.guardian_phone_snapshot || "",
                       entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),

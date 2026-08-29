@@ -145,7 +145,7 @@ export function checkForUpdatesAndWait(timeoutMs = 5 * 60 * 1000): Promise<void>
 
 export function initAutoUpdater(): void {
   if (typeof ipcMain?.handle === "function") {
-    ipcMain.handle("get-app-version", () => (app?.getVersion ? app.getVersion() : "0.1.6-dev"));
+    ipcMain.handle("get-app-version", () => (app?.getVersion ? app.getVersion() : "0.1.13-dev"));
     ipcMain.handle("get-update-status", () => getUpdateStatus());
     ipcMain.handle("check-for-updates", () => {
       checkForUpdates();
