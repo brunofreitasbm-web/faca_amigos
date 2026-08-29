@@ -544,14 +544,16 @@ export function OwnerFloatingDashboard() {
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 600 }}>
-                  Faturamento Acumulado
+                  Faturamento Acumulado Diário
                 </span>
                 <span style={{ fontSize: "16px" }}>💰</span>
               </div>
               <span style={{ fontSize: "22px", fontWeight: 800, color: "#2ECFB5" }}>
                 {money(activeSummary.revenueCents)}
               </span>
-              <span style={{ fontSize: "11px", color: "#64748B" }}>Hoje no dia operacional</span>
+              <span style={{ fontSize: "11px", color: "#64748B" }}>
+                {selectedUnitId === "ALL" ? "Total diário acumulado de todas as unidades" : "Acumulado hoje no dia operacional"}
+              </span>
             </div>
 
             {/* Card 2: Sessões / Crianças */}
@@ -756,7 +758,7 @@ export function OwnerFloatingDashboard() {
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
                     <div>
-                      <span style={{ fontSize: "11px", color: "#94A3B8" }}>Faturamento</span>
+                      <span style={{ fontSize: "11px", color: "#94A3B8" }}>Fat. Acumulado</span>
                       <div style={{ fontSize: "14px", fontWeight: 700, color: "#2ECFB5" }}>
                         {money(u.revenueCents)}
                       </div>
