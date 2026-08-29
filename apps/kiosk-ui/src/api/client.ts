@@ -947,8 +947,12 @@ export interface SessionAudit {
  * `fa_kiosk_business_date`, que é quem grava `business_date` nas tabelas.
  */
 export function businessDateFor(nowMs: number, cutoffHour: number): string {
+  // UTC, não hora local: espelha `to_timestamp(...)::date` no Postgres, que
+  // resolve na timezone da sessão (UTC no Supabase). Usar getters locais aqui
+  // desalinha o "dia operacional" do cliente do que foi gravado no servidor
+  // sempre que a máquina do kiosk não estiver rodando em UTC.
   const shifted = new Date(nowMs - cutoffHour * 3600_000);
-  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}-${String(shifted.getDate()).padStart(2, "0")}`;
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
 }
 
 function planFromRow(row: Record<string, unknown>): Plan {

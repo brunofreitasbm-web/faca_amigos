@@ -140,6 +140,12 @@ export function CaixaScreen() {
   const [declared, setDeclared] = useState<Record<string, string>>({ DINHEIRO: "0", PIX: "0", CREDITO: "0", DEBITO: "0" });
   const [closeJustifications, setCloseJustifications] = useState<Record<string, string>>({});
   const [closeResult, setCloseResult] = useState<CloseResult | null>(null);
+  const [shiftOpenSuccessModal, setShiftOpenSuccessModal] = useState<{
+    openingCashCents: number;
+    openedAtMs: number;
+    employeeName: string;
+    unitName: string;
+  } | null>(null);
   const [refreshError, setRefreshError] = useState(false);
   // Enquanto isso está preenchido, o fechamento foi enviado mas ficou na fila
   // offline (sem rede no momento) — ainda NÃO aconteceu de fato. O
@@ -250,8 +256,15 @@ export function CaixaScreen() {
     setBusy(true);
     setError(null);
     try {
-      await Api.openShift({ unitId: unit.id, employeeId: employee.id, openingCashCents: Math.round(Number(openingCash) * 100) });
+      const openingCashCents = Math.round(Number(openingCash) * 100);
+      await Api.openShift({ unitId: unit.id, employeeId: employee.id, openingCashCents });
       await refresh();
+      setShiftOpenSuccessModal({
+        openingCashCents,
+        openedAtMs: Date.now(),
+        employeeName: employee.full_name,
+        unitName: unit.name,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao abrir turno";
       setError(msg);
@@ -425,62 +438,85 @@ export function CaixaScreen() {
   // turno" antes do operador conseguir ler — inclusive com divergência.
   if (closeResult) {
     return (
-      <div style={{ maxWidth: "480px", margin: "40px auto" }}>
-        <h1 style={{ fontFamily: "var(--font-display)" }}>Turno fechado</h1>
-        <HelpText>
-          "Esperado" é o que o sistema calculou pelas vendas; "Declarado" é o que você contou. "✓ bateu" quer dizer
-          que os dois valores são iguais — qualquer diferença aparece com o valor da falta ou sobra.
-        </HelpText>
-        {/* Cabeçalho e células precisam do MESMO alinhamento — antes o
-            cabeçalho ficava centralizado (padrão do navegador) sobre
-            valores em dinheiro sem textAlign nenhum (também padrão,
-            mas "left"), então título e número nunca ficavam um sobre o
-            outro nesta tabela de conferência de caixa. */}
-        <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>Método</th>
-              <th style={{ textAlign: "right" }}>Esperado</th>
-              <th style={{ textAlign: "right" }}>Declarado</th>
-              <th style={{ textAlign: "right" }}>Diferença</th>
-              <th style={{ textAlign: "left" }}>Justificativa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.keys(closeResult.divergence).map((method) => {
-              const balanced = closeResult.divergence[method] === 0;
-              return (
-                <tr key={method}>
-                  <td>{method}</td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{money(closeResult.expected[method] ?? 0)}</td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{money(closeResult.declared[method] ?? 0)}</td>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      fontVariantNumeric: "tabular-nums",
-                      color: balanced ? "var(--color-teal-text)" : "var(--color-error-text)",
-                    }}
-                  >
-                    {/* Texto além da cor: "bateu"/"faltou" é o que decide
-                        se o caixa fecha limpo — não pode depender só de
-                        enxergar a cor. */}
-                    {balanced ? "✓ bateu" : `⚠ ${money(closeResult.divergence[method] ?? 0)}`}
-                  </td>
-                  <td style={{ fontSize: "13px" }}>{balanced ? "—" : closeResult.justifications[method] ?? "—"}</td>
+      <div style={{ maxWidth: "540px", margin: "40px auto", padding: "0 16px" }}>
+        <Card style={{ padding: "24px", borderRadius: "18px", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
+          <div style={{ textAlign: "center", marginBottom: "20px" }}>
+            <div
+              style={{
+                width: "60px",
+                height: "60px",
+                margin: "0 auto 12px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "28px",
+                color: "#fff",
+                boxShadow: "0 8px 18px rgba(59, 130, 246, 0.3)",
+              }}
+            >
+              🏁
+            </div>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
+              Turno Fechado com Sucesso!
+            </h1>
+            <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>
+              Resumo de conferência de caixa · {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+
+          <HelpText style={{ marginBottom: "16px" }}>
+            "Esperado" é o valor calculado pelo sistema; "Declarado" é a contagem informada. "✓ bateu" confirma a convergência dos valores.
+          </HelpText>
+
+          <div style={{ overflowX: "auto", marginBottom: "20px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid var(--border-subtle)" }}>
+                  <th style={{ textAlign: "left", padding: "8px" }}>Método</th>
+                  <th style={{ textAlign: "right", padding: "8px" }}>Esperado</th>
+                  <th style={{ textAlign: "right", padding: "8px" }}>Declarado</th>
+                  <th style={{ textAlign: "right", padding: "8px" }}>Diferença</th>
+                  <th style={{ textAlign: "left", padding: "8px" }}>Justificativa</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        </div>
-        <Button
-          variant="primary"
-          onClick={() => { setCloseResult(null); setClosing(false); setCloseJustifications({}); refresh(); }}
-          style={{ marginTop: "16px" }}
-        >
-          Ir para novo turno
-        </Button>
+              </thead>
+              <tbody>
+                {Object.keys(closeResult.divergence).map((method) => {
+                  const balanced = closeResult.divergence[method] === 0;
+                  return (
+                    <tr key={method} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                      <td style={{ padding: "8px", fontWeight: "600" }}>{method}</td>
+                      <td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{money(closeResult.expected[method] ?? 0)}</td>
+                      <td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{money(closeResult.declared[method] ?? 0)}</td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: "8px",
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: "bold",
+                          color: balanced ? "var(--color-teal-text)" : "var(--color-error-text)",
+                        }}
+                      >
+                        {balanced ? "✓ bateu" : `⚠ ${money(closeResult.divergence[method] ?? 0)}`}
+                      </td>
+                      <td style={{ fontSize: "13px", padding: "8px" }}>{balanced ? "—" : closeResult.justifications[method] ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => { setCloseResult(null); setClosing(false); setCloseJustifications({}); refresh(); }}
+            style={{ width: "100%", borderRadius: "10px" }}
+          >
+            ✓ Entendido, Concluir Fechamento
+          </Button>
+        </Card>
       </div>
     );
   }
@@ -1009,6 +1045,61 @@ export function CaixaScreen() {
       >
         Fechar turno
       </Button>
+
+      {shiftOpenSuccessModal && (
+        <Modal onClose={() => setShiftOpenSuccessModal(null)} ariaLabel="Confirmação de Abertura de Turno" maxWidth="460px">
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", padding: "10px 4px" }}>
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #10b981, #059669)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "32px",
+                color: "#fff",
+                boxShadow: "0 8px 20px rgba(16, 185, 129, 0.35)",
+              }}
+            >
+              🟢
+            </div>
+
+            <h2 style={{ margin: 0, fontSize: "22px", fontFamily: "var(--font-display)", color: "#10b981" }}>
+              Turno Aberto com Sucesso!
+            </h2>
+
+            <div style={{ background: "var(--surface-sunken)", width: "100%", padding: "16px", borderRadius: "14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)" }}>
+                Unidade: <strong>{shiftOpenSuccessModal.unitName}</strong>
+              </div>
+              <div style={{ fontSize: "15px", fontWeight: "bold" }}>
+                Operador: {shiftOpenSuccessModal.employeeName}
+              </div>
+              <div style={{ fontSize: "18px", color: "var(--color-teal-text)", fontWeight: "bold", background: "rgba(16, 185, 129, 0.12)", padding: "8px", borderRadius: "8px" }}>
+                Fundo de Caixa Inicial: {money(shiftOpenSuccessModal.openingCashCents)}
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                Horário de Abertura: {new Date(shiftOpenSuccessModal.openedAtMs).toLocaleString("pt-BR")}
+              </div>
+            </div>
+
+            <div style={{ fontSize: "14px", color: "var(--text-secondary)", fontWeight: "500", fontStyle: "italic" }}>
+              🚀 Desejamos um ótimo dia e excelentes vendas para toda a equipe!
+            </div>
+
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => setShiftOpenSuccessModal(null)}
+              style={{ width: "100%", marginTop: "6px", borderRadius: "10px", background: "linear-gradient(135deg, #10b981, #059669)" }}
+            >
+              Iniciar Operações
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -64,6 +64,13 @@ export function PontoScreen() {
     atMs: number;
     nsr: number;
   } | null>(null);
+  const [punchSuccessModal, setPunchSuccessModal] = useState<{
+    fullName: string;
+    role: string;
+    kind: string;
+    atMs: number;
+    nsr: number;
+  } | null>(null);
 
   const faceCapture = useFaceCapture();
   const geolocation = useGeolocation();
@@ -192,20 +199,24 @@ export function PontoScreen() {
         punchPhotoPath,
       });
 
+      const kindObj = KINDS.find((k) => k.value === nextKind);
       setScanState("success");
-      setAutoPunchResult({
+      const punchData = {
         fullName: empMatch.full_name,
         role: empMatch.role,
-        kind: KINDS.find((k) => k.value === nextKind)?.label ?? nextKind,
+        kind: kindObj?.label ?? nextKind,
         atMs: res.atMs,
         nsr: res.nsr,
-      });
+      };
+      setAutoPunchResult(punchData);
+      setPunchSuccessModal(punchData);
+      playSuccessChime();
 
       setTimeout(() => {
         setAutoPunchResult(null);
         setScanState("scanning");
         setDetectedName(null);
-      }, 4500);
+      }, 5000);
     } catch (err) {
       setScanState("fail");
       toast.error(err instanceof Error ? err.message : "Erro ao registrar o ponto facial.");
@@ -255,8 +266,23 @@ export function PontoScreen() {
         lng,
         punchPhotoPath,
       });
-      setMessage(`Registrado às ${formatTime(res.atMs)} — NSR ${res.nsr}`);
+      const kindObj = KINDS.find((k) => k.value === kind);
+      const msgText = `Registrado às ${formatTime(res.atMs)} — NSR ${res.nsr}`;
+      setMessage(msgText);
+      const punchData = {
+        fullName: authedAs.full_name,
+        role: authedAs.role,
+        kind: kindObj?.label ?? kind,
+        atMs: res.atMs,
+        nsr: res.nsr,
+      };
+      setPunchSuccessModal(punchData);
       playSuccessChime();
+
+      // Recarrega marcações do dia
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      Api.pontoHistory(authedAs.id, startOfDay.getTime(), Date.now()).then(setToday);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível registrar a marcação de ponto. Tente novamente.");
     } finally {
@@ -436,6 +462,58 @@ export function PontoScreen() {
             </>
           )}
         </>
+      )}
+
+      {punchSuccessModal && (
+        <Modal onClose={() => setPunchSuccessModal(null)} ariaLabel="Confirmação de Registro de Ponto" maxWidth="460px">
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "10px 4px" }}>
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #10b981, #059669)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "32px",
+                color: "#fff",
+                boxShadow: "0 8px 20px rgba(16, 185, 129, 0.35)",
+              }}
+            >
+              ✓
+            </div>
+
+            <h2 style={{ margin: 0, fontSize: "22px", fontFamily: "var(--font-display)", color: "#10b981" }}>
+              Ponto Registrado com Sucesso!
+            </h2>
+
+            <div style={{ background: "var(--surface-sunken)", width: "100%", padding: "14px", borderRadius: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ fontSize: "16px", fontWeight: "bold" }}>
+                {punchSuccessModal.fullName} {punchSuccessModal.role === "ESTAGIARIO" ? "🎓 (Estagiário)" : ""}
+              </div>
+              <div style={{ fontSize: "15px", color: "var(--color-teal-text)", fontWeight: "600" }}>
+                📍 {punchSuccessModal.kind} às {formatTime(punchSuccessModal.atMs)}
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                NSR #{punchSuccessModal.nsr} · {new Date(punchSuccessModal.atMs).toLocaleDateString("pt-BR")}
+              </div>
+            </div>
+
+            <div style={{ fontSize: "13px", color: "#059669", background: "rgba(16, 185, 129, 0.1)", padding: "6px 14px", borderRadius: "20px", fontWeight: "500" }}>
+              ✓ Salvo na Folha de Ponto e sincronizado com o sistema
+            </div>
+
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => setPunchSuccessModal(null)}
+              style={{ width: "100%", marginTop: "8px", borderRadius: "10px", background: "linear-gradient(135deg, #10b981, #059669)" }}
+            >
+              OK, Entendido
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );
