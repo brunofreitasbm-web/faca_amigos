@@ -493,6 +493,10 @@ export function EntradaScreen({
   const selectedPackageId = usingPackage ? planId!.slice(PACKAGE_PREFIX.length) : null;
   const selectedPlan = plans.find((p) => p.id === planId) ?? packagePlans.find((p) => p.id === planId);
   const threshold = 120;
+  // Fechamento continua às 22:00, mas paramos de abrir plano novo 15min
+  // antes disso (21:45) em todas as unidades — mesmo corte aplicado no
+  // servidor (fa_checkin), esta cópia é só para feedback imediato na tela.
+  const salesCutoffMinutes = 15;
 
   // Cupons restritos a um plano (ex.: "N ESTRELAS", só no plano de 30min)
   // só aparecem quando esse plano está selecionado — evita o operador
@@ -1040,8 +1044,8 @@ export function EntradaScreen({
             // Pacotes seguem a mesma regra (o saldo comprado não se perde).
             const fits =
               remainingMinutes === null ||
-              minutes <= remainingMinutes ||
-              ((minutes > threshold || isPackage) && remainingMinutes > 0);
+              (remainingMinutes >= salesCutoffMinutes &&
+                (minutes <= remainingMinutes || minutes > threshold || isPackage));
             const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
             return (
               <Card
@@ -1053,7 +1057,13 @@ export function EntradaScreen({
                     setCrossSellModalOpen(true);
                   }
                 }}
-                title={fits ? undefined : `Não cabe até o fechamento — faltam ${Math.max(0, remainingMinutes ?? 0)} min`}
+                title={
+                  fits
+                    ? undefined
+                    : remainingMinutes !== null && remainingMinutes < salesCutoffMinutes
+                      ? "Não é possível abrir novos planos nos últimos 15 minutos antes do fechamento"
+                      : `Não cabe até o fechamento — faltam ${Math.max(0, remainingMinutes ?? 0)} min`
+                }
                 style={{
                   cursor: fits ? "pointer" : "not-allowed",
                   opacity: fits ? 1 : 0.4,
