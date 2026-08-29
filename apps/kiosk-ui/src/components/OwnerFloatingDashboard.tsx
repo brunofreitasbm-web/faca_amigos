@@ -102,13 +102,21 @@ export function OwnerFloatingDashboard() {
           ]);
 
           const checkinsCount = checkinCountByUnit.get(u.id) ?? checkinCountByUnit.get(u.name) ?? 0;
+          const sessionsCount = checkinsCount > 0 ? checkinsCount : tm.ordersCount;
+          const revenueCents = Math.max(rev.totalCents, tm.totalCents);
+          const ticketMedioCents =
+            tm.avgCents > 0
+              ? tm.avgCents
+              : sessionsCount > 0 && revenueCents > 0
+              ? Math.round(revenueCents / sessionsCount)
+              : 0;
 
           return {
             unitId: u.id,
             unitName: u.name,
-            revenueCents: rev.totalCents,
-            sessionsCount: checkinsCount > 0 ? checkinsCount : tm.ordersCount,
-            ticketMedioCents: tm.avgCents,
+            revenueCents,
+            sessionsCount,
+            ticketMedioCents,
             minTicketCents: goal?.minTicketCents ?? 0,
             targetTicketCents: goal?.targetTicketCents ?? 0,
           };
