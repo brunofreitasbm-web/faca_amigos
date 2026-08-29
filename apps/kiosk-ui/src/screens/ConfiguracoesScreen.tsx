@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Input, Select, Tabs, HelpText, Modal, Tag } from "@facaamigos/ui";
 import { generateEscPosReceipt } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
@@ -1580,6 +1580,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   const [terminalUnitAvailable, setTerminalUnitAvailable] = useState(false);
   const [terminalUnitDraft, setTerminalUnitDraft] = useState("");
   const [savingTerminalUnit, setSavingTerminalUnit] = useState(false);
+  const [loadingTerminalInfo, setLoadingTerminalInfo] = useState(false);
   const [allUnits, setAllUnits] = useState<{ id: string; name: string }[]>([]);
   const [deviceId, setDeviceId] = useState<string | null>(null);
 
@@ -1594,23 +1595,42 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       .catch(() => {});
   }, [unitId]);
 
+  const refreshTerminalInfo = useCallback(() => {
+    setLoadingTerminalInfo(true);
+    Promise.all([
+      Api.terminalUnit().catch(() => ({ available: false, unitId: null })),
+      Api.deviceId().catch(() => null),
+    ])
+      .then(([info, devId]) => {
+        setTerminalUnitAvailable(info.available);
+        if (info.available) {
+          setTerminalUnitId(info.unitId);
+          setTerminalUnitDraft((prev) => prev || info.unitId || "");
+        }
+        if (devId) setDeviceId(devId);
+      })
+      .finally(() => {
+        setLoadingTerminalInfo(false);
+      });
+  }, []);
+
   useEffect(() => {
-    Api.terminalUnit().then((info) => {
-      setTerminalUnitAvailable(info.available);
-      setTerminalUnitId(info.unitId);
-      setTerminalUnitDraft(info.unitId ?? "");
-    });
-    Api.deviceId().then(setDeviceId);
+    refreshTerminalInfo();
     Api.units()
       .then((list) => setAllUnits(list.map((u) => ({ id: u.id, name: u.name }))))
       .catch(() => setAllUnits([]));
-  }, []);
 
-  async function saveTerminalUnit() {
-    if (!terminalUnitDraft) return;
+    const retryDelaysMs = [1000, 3000, 7000];
+    const timers = retryDelaysMs.map((delay) => setTimeout(refreshTerminalInfo, delay));
+    return () => timers.forEach(clearTimeout);
+  }, [refreshTerminalInfo]);
+
+  async function saveTerminalUnit(targetUnitId?: string) {
+    const unitToSave = targetUnitId || terminalUnitDraft;
+    if (!unitToSave) return;
     setSavingTerminalUnit(true);
     try {
-      const saved = await Api.setTerminalUnit(terminalUnitDraft);
+      const saved = await Api.setTerminalUnit(unitToSave);
       setTerminalUnitId(saved);
       setTerminalUnitDraft(saved);
       toast.success("Computador vinculado à unidade. A impressão já passa a sair só aqui.");
@@ -1771,52 +1791,124 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       )}
 
       {/* ESTE TERMINAL — a que unidade este computador pertence */}
-      {terminalUnitAvailable && (
-        <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Este terminal</h2>
-          <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
-            De qual unidade é <strong>este computador</strong>. Ele só imprime pulseira e cupom da unidade escolhida aqui — é isto que impede a
-            impressão de uma unidade de sair também na outra.
-          </p>
-
-          {!terminalUnitId && (
-            <HelpText icon="⚠️" style={{ color: "var(--danger, #d9534f)" }}>
-              Este computador não está vinculado a nenhuma unidade — nada será impresso aqui até você escolher.
-            </HelpText>
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>
+            🖥️ Este terminal — Travar Impressão Local
+          </h2>
+          {terminalUnitId ? (
+            <span
+              style={{
+                background: "rgba(40, 167, 69, 0.15)",
+                color: "#28a745",
+                padding: "4px 10px",
+                borderRadius: "12px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              🔒 Impressão Travada Neste Terminal
+            </span>
+          ) : (
+            <span
+              style={{
+                background: "rgba(220, 53, 69, 0.15)",
+                color: "#dc3545",
+                padding: "4px 10px",
+                borderRadius: "12px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              ⚠️ Terminal Não Vinculado
+            </span>
           )}
+        </div>
 
-          {terminalUnitId && terminalUnitId !== unitId && (
-            <HelpText icon="⚠️" style={{ color: "var(--warning, #b8860b)" }}>
-              Você está operando <strong>{allUnits.find((u) => u.id === unitId)?.name ?? "outra unidade"}</strong>, mas este computador está
-              vinculado a <strong>{allUnits.find((u) => u.id === terminalUnitId)?.name ?? terminalUnitId}</strong>. As impressões desta sessão vão
-              sair no computador da outra unidade.
-            </HelpText>
-          )}
+        <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
+          Defina a qual unidade <strong>este computador físico</strong> pertence. Ele aceitará e imprimirá pulseiras e cupons{" "}
+          <strong>apenas desta unidade</strong>, travando a fila de impressão nesta máquina e impedindo que impressões saiam na outra unidade.
+        </p>
 
-          <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
-              <Select value={terminalUnitDraft} onChange={(e) => setTerminalUnitDraft(e.target.value)}>
-                <option value="">Selecione a unidade deste computador</option>
-                {allUnits.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </Select>
+        {!terminalUnitAvailable && !printerApiAvailable && (
+          <HelpText icon="ℹ️" style={{ color: "var(--text-muted)" }}>
+            Este terminal está em execução via navegador web/dispositivo móvel. A trava de impressora local é gerenciada diretamente no aplicativo desktop FaçaAmigos instalado no computador de caixa.
+          </HelpText>
+        )}
+
+        {terminalUnitAvailable && (
+          <>
+            {!terminalUnitId && (
+              <HelpText icon="⚠️" style={{ color: "var(--danger, #d9534f)" }}>
+                Este computador ainda não está travado em nenhuma unidade — selecione a unidade abaixo e clique em vincular.
+              </HelpText>
+            )}
+
+            {terminalUnitId && terminalUnitId !== unitId && (
+              <HelpText icon="⚠️" style={{ color: "var(--warning, #b8860b)" }}>
+                Atenção: Você está operando a sessão em <strong>{allUnits.find((u) => u.id === unitId)?.name ?? "outra unidade"}</strong>, mas este computador físico está travado na unidade <strong>{allUnits.find((u) => u.id === terminalUnitId)?.name ?? terminalUnitId}</strong>. As impressões desta sessão sairão no computador daquela unidade.
+              </HelpText>
+            )}
+
+            <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: "240px" }}>
+                <Select value={terminalUnitDraft} onChange={(e) => setTerminalUnitDraft(e.target.value)}>
+                  <option value="">Selecione a unidade para travar este computador</option>
+                  {allUnits.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={savingTerminalUnit}
+                disabled={!terminalUnitDraft || terminalUnitDraft === terminalUnitId}
+                onClick={() => saveTerminalUnit()}
+              >
+                🔒 Vincular e Travar Impressão
+              </Button>
+
+              {unitId && unitId !== terminalUnitId && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={savingTerminalUnit}
+                  onClick={() => {
+                    setTerminalUnitDraft(unitId);
+                    saveTerminalUnit(unitId);
+                  }}
+                >
+                  📍 Travar na Unidade Atual ({allUnits.find((u) => u.id === unitId)?.name ?? "Sessão"})
+                </Button>
+              )}
             </div>
-            <Button variant="primary" size="sm" loading={savingTerminalUnit} disabled={!terminalUnitDraft} onClick={saveTerminalUnit}>
-              Vincular
+
+            {deviceId && (
+              <HelpText>
+                Identificação desta máquina: <code style={{ fontFamily: "monospace", fontWeight: "bold" }}>{deviceId.slice(0, 8)}</code> — verifique se cada computador de caixa exibe um código diferente.
+              </HelpText>
+            )}
+          </>
+        )}
+
+        {!terminalUnitAvailable && printerApiAvailable && (
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
+            <HelpText icon="⏳">Conectando ao serviço de terminal local...</HelpText>
+            <Button variant="ghost" size="sm" loading={loadingTerminalInfo} onClick={refreshTerminalInfo}>
+              🔄 Tentar Novamente
             </Button>
           </div>
-
-          {deviceId && (
-            <HelpText>
-              Identificação desta máquina: <code style={{ fontFamily: "monospace" }}>{deviceId.slice(0, 8)}</code> — os dois computadores devem
-              mostrar códigos diferentes.
-            </HelpText>
-          )}
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
