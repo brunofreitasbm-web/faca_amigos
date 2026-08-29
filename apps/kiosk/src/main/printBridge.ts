@@ -278,14 +278,31 @@ export function getLocalDeviceId(db?: any): string | null {
  * para sempre, sem nenhum aviso além deste retorno. Quem chama isto deve avisar o operador visivelmente.
  */
 export function startPrintBridge(db?: any): PrintBridgeStartResult {
+  // A URL do projeto não é segredo (ela vai em toda requisição do
+  // navegador), então continua com padrão embutido — assim só a CHAVE
+  // precisa ser provisionada e um .env incompleto não desliga a
+  // impressão sozinho.
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
-  const serviceRoleKey =
-    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2anZwZHpzZmpkcHlhYmJ6enVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDUwNjA2OSwiZXhwIjoyMTAwMDgyMDY5fQ.wuwMmQAX8ICxFrOltge1QSCf-O31J9FZ021--behJFM";
 
-  if (!url || !serviceRoleKey) {
+  // A chave NUNCA fica no código. Até esta versão havia uma service_role
+  // embutida aqui como fallback: ela ignora todo o RLS do banco e viajava
+  // dentro de cada instalador distribuído, além de estar no histórico do
+  // git. Quem tivesse o instalador lia e escrevia qualquer tabela,
+  // inclusive os dados bancários da folha (fa_kiosk_employee_payroll_info).
+  //
+  // Ordem de preferência:
+  //  1. FACAAMIGOS_SUPABASE_SECRET_KEY — formato novo (sb_secret_...),
+  //     que pode ser rotacionado sozinho, sem invalidar a chave
+  //     publicável usada pela SPA nem a anon usada nas landing pages;
+  //  2. FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY — nome antigo, mantido para
+  //     os .env já instalados continuarem funcionando na transição.
+  const secretKey =
+    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !secretKey) {
     const reason =
-      "FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados — impressão automática de pulseira/cupom está desligada neste terminal.";
+      "A chave de acesso ao banco não está configurada neste terminal (FACAAMIGOS_SUPABASE_SECRET_KEY). " +
+      "Ela precisa estar no arquivo .env da instalação — impressão automática de pulseira/cupom está desligada até lá.";
     console.warn(`[print-bridge] ${reason}`);
     return { started: false, reason };
   }
@@ -293,7 +310,7 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
   // supabase-js/realtime-js precisa de um WebSocket explícito fora do
   // navegador (o processo main do Electron é Node puro).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = createClient(url, serviceRoleKey, { realtime: { transport: WebSocket as any } });
+  const supabase = createClient(url, secretKey, { realtime: { transport: WebSocket as any } });
 
   async function printerNameFor(unitId: string, kind: PrintJobRow["kind"]): Promise<string | null> {
     const key = kind === "WRISTBAND" ? "printer_wristband" : "printer_receipt";
