@@ -33,13 +33,31 @@ function loadEnv(envPath) {
   return env;
 }
 
+// As variáveis de ambiente vêm ANTES do arquivo, de propósito: o
+// electron-builder embute apps/kiosk/.env dentro do instalador
+// (extraResources). Se o CI criasse esse arquivo só para publicar, a chave
+// voltaria a viajar dentro de cada instalador distribuído — exatamente o
+// que a remoção da chave embutida corrigiu. Com env vars, o publish tem a
+// credencial e o instalador não.
 const envPath = join(kioskDir, ".env");
-if (!existsSync(envPath)) throw new Error(`Não encontrei ${envPath}`);
-const env = loadEnv(envPath);
-const supabaseUrl = env.FACAAMIGOS_SUPABASE_URL;
-const serviceRoleKey = env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+const fileEnv = existsSync(envPath) ? loadEnv(envPath) : {};
+const pick = (...names) => {
+  for (const name of names) {
+    const value = process.env[name] ?? fileEnv[name];
+    if (value && value.trim()) return value.trim();
+  }
+  return undefined;
+};
+
+const supabaseUrl = pick("FACAAMIGOS_SUPABASE_URL");
+// Aceita o nome novo (sb_secret_..., rotacionável sozinho) e mantém o
+// antigo funcionando para não quebrar um .env já preenchido.
+const serviceRoleKey = pick("FACAAMIGOS_SUPABASE_SECRET_KEY", "FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY");
 if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error("FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ausentes em apps/kiosk/.env");
+  throw new Error(
+    "FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SECRET_KEY ausentes — " +
+      `defina como variáveis de ambiente (preferido, não entra no instalador) ou em ${envPath}.`,
+  );
 }
 
 async function storageFetch(path, options) {

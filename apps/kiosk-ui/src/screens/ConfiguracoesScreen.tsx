@@ -114,7 +114,7 @@ export function ConfiguracoesScreen() {
     UNIDADE: "Dados da unidade: nome, fuso, virada do dia operacional e o que aparece no cabeçalho do cupom.",
     FISCAL: "Dados do emitente para NFC-e (produtos) e o cadastro de NFS-e (serviço). Confira com seu contador antes de ligar a emissão.",
     TERMOS: "Texto que o responsável aceita no check-in. Alterações ficam registradas na trilha de auditoria.",
-    IMPRESSORAS: "Informe o nome da impressora de cupom instalada neste terminal.",
+    IMPRESSORAS: "Escolha a unidade deste computador e as impressoras instaladas nele.",
     NOTIFICACOES: "Ative para receber no seu celular/computador os relatórios automáticos de abertura, acompanhamento (17h e 20h) e fechamento de caixa desta unidade.",
   };
 
@@ -1575,6 +1575,17 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   const [terminalUnitId, setTerminalUnitId] = useState<string>("");
   const [savingTerminalUnit, setSavingTerminalUnit] = useState(false);
 
+  // Unidade amarrada a ESTE computador — diferente da unidade selecionada
+  // na sessão. É o que decide quais jobs de impressão este terminal pega:
+  // sem amarração ele não imprime nada (antes imprimia os de TODAS as
+  // unidades, e a impressão de uma unidade saía também na outra).
+  const [terminalUnitId, setTerminalUnitId] = useState<string | null>(null);
+  const [terminalUnitAvailable, setTerminalUnitAvailable] = useState(false);
+  const [terminalUnitDraft, setTerminalUnitDraft] = useState("");
+  const [savingTerminalUnit, setSavingTerminalUnit] = useState(false);
+  const [allUnits, setAllUnits] = useState<{ id: string; name: string }[]>([]);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+
   useEffect(() => {
     Api.unitSetting(unitId, "printer_wristband").then((r) => setWristbandPrinter(r.value ?? ""));
     Api.unitSetting(unitId, "printer_receipt").then((r) => setReceiptPrinter(r.value ?? ""));
@@ -1586,23 +1597,28 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       .catch(() => {});
   }, [unitId]);
 
+  useEffect(() => {
+    Api.terminalUnit().then((info) => {
+      setTerminalUnitAvailable(info.available);
+      setTerminalUnitId(info.unitId);
+      setTerminalUnitDraft(info.unitId ?? "");
+    });
+    Api.deviceId().then(setDeviceId);
+    Api.units()
+      .then((list) => setAllUnits(list.map((u) => ({ id: u.id, name: u.name }))))
+      .catch(() => setAllUnits([]));
+  }, []);
+
   async function saveTerminalUnit() {
-    if (!terminalUnitId) return;
+    if (!terminalUnitDraft) return;
     setSavingTerminalUnit(true);
     try {
-      const res = await fetch("/api/system/terminal-unit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unitId: terminalUnitId }),
-      });
-      if (res.ok) {
-        const boundUnitName = units.find((u) => u.id === terminalUnitId)?.name || terminalUnitId;
-        toast.success(`Este computador foi vinculado à unidade "${boundUnitName}" com sucesso.`);
-      } else {
-        toast.error("Falha ao salvar a unidade deste computador.");
-      }
-    } catch {
-      toast.error("Servidor local não respondeu ao vincular a unidade do computador.");
+      const saved = await Api.setTerminalUnit(terminalUnitDraft);
+      setTerminalUnitId(saved);
+      setTerminalUnitDraft(saved);
+      toast.success("Computador vinculado à unidade. A impressão já passa a sair só aqui.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível vincular este computador à unidade.");
     } finally {
       setSavingTerminalUnit(false);
     }
@@ -1757,30 +1773,53 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
         </HelpText>
       )}
 
-      {/* UNIDADE DESTE TERMINAL / COMPUTADOR */}
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-        <div>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>🖥️ Vinculação deste Computador / Terminal</h2>
+      {/* ESTE TERMINAL — a que unidade este computador pertence */}
+      {terminalUnitAvailable && (
+        <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 4px" }}>Este terminal</h2>
           <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
-            Indica a qual unidade este computador físico pertence (Circuito ou Playground). O Print Bridge escutará e imprimirá <strong>exclusivamente</strong> os cupons e pulseiras da unidade vinculada a este computador.
+            De qual unidade é <strong>este computador</strong>. Ele só imprime pulseira e cupom da unidade escolhida aqui — é isto que impede a
+            impressão de uma unidade de sair também na outra.
           </p>
-        </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}>
-            <Select value={terminalUnitId} onChange={(e) => setTerminalUnitId(e.target.value)}>
-              <option value="">Selecione a unidade deste computador</option>
-              {units.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.kind})
-                </option>
-              ))}
-            </Select>
+
+          {!terminalUnitId && (
+            <HelpText icon="⚠️" style={{ color: "var(--danger, #d9534f)" }}>
+              Este computador não está vinculado a nenhuma unidade — nada será impresso aqui até você escolher.
+            </HelpText>
+          )}
+
+          {terminalUnitId && terminalUnitId !== unitId && (
+            <HelpText icon="⚠️" style={{ color: "var(--warning, #b8860b)" }}>
+              Você está operando <strong>{allUnits.find((u) => u.id === unitId)?.name ?? "outra unidade"}</strong>, mas este computador está
+              vinculado a <strong>{allUnits.find((u) => u.id === terminalUnitId)?.name ?? terminalUnitId}</strong>. As impressões desta sessão vão
+              sair no computador da outra unidade.
+            </HelpText>
+          )}
+
+          <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <Select value={terminalUnitDraft} onChange={(e) => setTerminalUnitDraft(e.target.value)}>
+                <option value="">Selecione a unidade deste computador</option>
+                {allUnits.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button variant="primary" size="sm" loading={savingTerminalUnit} disabled={!terminalUnitDraft} onClick={saveTerminalUnit}>
+              Vincular
+            </Button>
           </div>
-          <Button variant="primary" size="sm" loading={savingTerminalUnit} onClick={saveTerminalUnit} disabled={!terminalUnitId}>
-            💾 Vincular Computador
-          </Button>
-        </div>
-      </Card>
+
+          {deviceId && (
+            <HelpText>
+              Identificação desta máquina: <code style={{ fontFamily: "monospace" }}>{deviceId.slice(0, 8)}</code> — os dois computadores devem
+              mostrar códigos diferentes.
+            </HelpText>
+          )}
+        </Card>
+      )}
 
       {/* IMPRESSORA DE CUPONS NÃO FISCAIS */}
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>

@@ -1,21 +1,29 @@
 import { BrowserWindow } from "electron";
 import { existsSync, mkdirSync, writeFileSync, readdirSync, unlinkSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
+import type { Db } from "@facaamigos/db-local";
 import { generateEscPosReceipt, generateEscPosCircuitoTermo, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import type { ReceiptPrintPayload, WristbandPrintPayload } from "@facaamigos/domain";
 import { printRawWindows } from "./rawPrint.js";
 import { listWindowsPrinters } from "./listPrinters.js";
+import { onPrintBridgeRebind } from "./printBridgeControl.js";
+import {
+  getTerminalUnitIds,
+  getLocalDeviceId,
+  shouldConsiderJob,
+  claimPrintJobs,
+  claimPrintJob,
+  isVirtualOrPdfPrinter,
+  resolvePrinterName,
+  type PrintJobRow,
+} from "./printJobPolicy.js";
 
-interface PrintJobRow {
-  id: string;
-  unit_id: string;
-  kind: "WRISTBAND" | "RECEIPT";
-  payload_json: Record<string, unknown>;
-  status: string;
-  origin_device_id?: string | null;
-}
+export { getTerminalUnitIds, getLocalDeviceId };
+
+/** Intervalo do sweep: também é o teto de atraso quando o Realtime cai. */
+const SWEEP_INTERVAL_MS = 10_000;
 
 import QRCode from "qrcode";
 import { getFriendlyWristbandCode } from "@facaamigos/domain";
@@ -224,52 +232,9 @@ export async function cleanupExpiredPdfReceipts(
 
 export interface PrintBridgeStartResult {
   started: boolean;
+  /** false = terminal sem unidade amarrada; tem conserto na tela, sem reiniciar. */
+  bound: boolean;
   reason?: string;
-}
-
-export function getTerminalUnitIds(db?: any): Set<string> {
-  const allowed = new Set<string>();
-
-  const envUnit = process.env.FACAAMIGOS_UNIT_ID || process.env.UNIT_ID;
-  if (envUnit && envUnit.trim()) {
-    for (const id of envUnit.split(",")) {
-      if (id.trim()) allowed.add(id.trim());
-    }
-  }
-
-  if (db) {
-    try {
-      const row = db.prepare("SELECT value FROM app_settings WHERE key = 'terminal_unit_id'").get() as { value: string } | undefined;
-      if (row?.value && row.value.trim()) {
-        for (const id of row.value.split(",")) {
-          if (id.trim()) allowed.add(id.trim());
-        }
-      }
-    } catch {
-      // Tabela app_settings pode não estar pronta em testes sem DB
-    }
-  }
-
-  return allowed;
-}
-
-/**
- * ID único deste computador, persistido em app_settings pela rota
- * /api/system/device-id (mesma tabela, mesma chave 'device_id'). Jobs
- * marcados com origin_device_id só são impressos pelo terminal que os
- * emitiu — jobs sem origem (legado, ou emitidos fora deste app) continuam
- * sendo aceitos por qualquer terminal da unidade, como antes.
- */
-export function getLocalDeviceId(db?: any): string | null {
-  if (!db) return null;
-  try {
-    const row = db.prepare("SELECT value FROM app_settings WHERE unit_id = 'global' AND key = 'device_id'").get() as
-      | { value: string }
-      | undefined;
-    return row?.value ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -277,23 +242,40 @@ export function getLocalDeviceId(db?: any): string | null {
  * ser processado neste terminal — os jobs ficam acumulando como PENDING
  * para sempre, sem nenhum aviso além deste retorno. Quem chama isto deve avisar o operador visivelmente.
  */
-export function startPrintBridge(db?: any): PrintBridgeStartResult {
+export function startPrintBridge(db?: Db): PrintBridgeStartResult {
+  // A URL do projeto não é segredo (ela vai em toda requisição do
+  // navegador), então continua com padrão embutido — assim só a CHAVE
+  // precisa ser provisionada e um .env incompleto não desliga a
+  // impressão sozinho.
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
-  const serviceRoleKey =
-    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2anZwZHpzZmpkcHlhYmJ6enVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDUwNjA2OSwiZXhwIjoyMTAwMDgyMDY5fQ.wuwMmQAX8ICxFrOltge1QSCf-O31J9FZ021--behJFM";
 
-  if (!url || !serviceRoleKey) {
+  // A chave NUNCA fica no código. Até esta versão havia uma service_role
+  // embutida aqui como fallback: ela ignora todo o RLS do banco e viajava
+  // dentro de cada instalador distribuído, além de estar no histórico do
+  // git. Quem tivesse o instalador lia e escrevia qualquer tabela,
+  // inclusive os dados bancários da folha (fa_kiosk_employee_payroll_info).
+  //
+  // Ordem de preferência:
+  //  1. FACAAMIGOS_SUPABASE_SECRET_KEY — formato novo (sb_secret_...),
+  //     que pode ser rotacionado sozinho, sem invalidar a chave
+  //     publicável usada pela SPA nem a anon usada nas landing pages;
+  //  2. FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY — nome antigo, mantido para
+  //     os .env já instalados continuarem funcionando na transição.
+  const secretKey =
+    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !secretKey) {
     const reason =
-      "FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY não configurados — impressão automática de pulseira/cupom está desligada neste terminal.";
+      "A chave de acesso ao banco não está configurada neste terminal (FACAAMIGOS_SUPABASE_SECRET_KEY). " +
+      "Ela precisa estar no arquivo .env da instalação — impressão automática de pulseira/cupom está desligada até lá.";
     console.warn(`[print-bridge] ${reason}`);
-    return { started: false, reason };
+    return { started: false, bound: getTerminalUnitIds(db).size > 0, reason };
   }
 
   // supabase-js/realtime-js precisa de um WebSocket explícito fora do
   // navegador (o processo main do Electron é Node puro).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = createClient(url, serviceRoleKey, { realtime: { transport: WebSocket as any } });
+  const supabase = createClient(url, secretKey, { realtime: { transport: WebSocket as any } });
 
   async function printerNameFor(unitId: string, kind: PrintJobRow["kind"]): Promise<string | null> {
     const key = kind === "WRISTBAND" ? "printer_wristband" : "printer_receipt";
@@ -301,14 +283,12 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
     return (data?.value as string | undefined) ?? null;
   }
 
-  function isVirtualOrPdfPrinter(deviceName: string): boolean {
-    const lower = deviceName.toLowerCase();
-    return lower.includes("pdf") || lower.includes("xps") || lower.includes("virtual") || lower.includes("fax") || lower.includes("onenote");
-  }
-
   async function resolvePrinterDeviceName(unitId: string, kind: PrintJobRow["kind"]): Promise<string | null> {
+    // Fail-closed: terminal sem unidade amarrada não resolve impressora
+    // nenhuma. Antes a guarda era `size > 0 && !has(...)`, isto é, um
+    // terminal não amarrado aceitava a impressora de qualquer unidade.
     const allowedUnits = getTerminalUnitIds(db);
-    if (allowedUnits.size > 0 && !allowedUnits.has(unitId)) {
+    if (allowedUnits.size === 0 || !allowedUnits.has(unitId.toLowerCase())) {
       console.log(`[print-bridge] Recusando resolução de impressora: job da unidade ${unitId} não pertence a este terminal.`);
       return null;
     }
@@ -316,37 +296,13 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
     const configured = await printerNameFor(unitId, kind);
     const win = BrowserWindow.getAllWindows()[0];
     const installed = await listWindowsPrinters(() => (win ? win.webContents.getPrintersAsync() : Promise.resolve([])));
-    const installedNames = installed.map((p) => p.name);
 
-    if (configured && configured.trim()) {
-      const trimmed = configured.trim();
-      const exact = installedNames.find((n) => n === trimmed);
-      if (exact) return exact;
-      const caseIns = installedNames.find((n) => n.toLowerCase() === trimmed.toLowerCase());
-      if (caseIns) return caseIns;
-      const partial = installedNames.find(
-        (n) => n.toLowerCase().includes(trimmed.toLowerCase()) || trimmed.toLowerCase().includes(n.toLowerCase()),
-      );
-      if (partial) return partial;
-
-      // Se havia uma impressora especificamente configurada para esta unidade,
-      // mas ela não existe nesta máquina, NÃO usar fallback arbitrário para
-      // impressoras de outra unidade neste terminal.
-      console.warn(`[print-bridge] Impressora "${configured}" configurada para unidade ${unitId} não foi encontrada neste terminal.`);
-      return null;
-    }
-
-    if (allowedUnits.size > 0 && !allowedUnits.has(unitId)) {
-      return null;
-    }
-
-    const physical = installedNames.find((n) => !isVirtualOrPdfPrinter(n));
-    if (physical) return physical;
-
-    return installedNames[0] || null;
+    const match = resolvePrinterName(configured, installed.map((p) => p.name));
+    if (match.warning) console.warn(`[print-bridge] ${match.warning}`);
+    return match.name;
   }
 
-  async function handleReceiptPdfFallback(job: PrintJobRow, originalError: string): Promise<void> {
+  async function handleReceiptPdfFallback(job: PrintJobRow, originalError: string, deviceId: string | null): Promise<void> {
     const rawPayload = job.payload_json as unknown as ReceiptPrintPayload;
     const trackingUrl = trackingUrlFor(rawPayload.accessCode);
     const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
@@ -374,23 +330,19 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
         pdf_url: pdfDataUrl,
         printed_at_ms: Date.now(),
       })
-      .eq("id", job.id);
+      .eq("id", job.id)
+      .eq("claimed_by_device_id", deviceId);
 
     console.log(`[print-bridge] job ${job.id} (RECEIPT) salvo em PDF devido a impressora ausente/com erro: ${filePath}`);
   }
 
+  /**
+   * Imprime um job JÁ RESERVADO por este terminal. Quem reserva é o
+   * Postgres (fa_kiosk_claim_print_job/_jobs): é a reserva, e não o
+   * filtro em TypeScript, que garante que só um terminal imprime.
+   */
   async function handleJob(job: PrintJobRow): Promise<void> {
-    const allowedUnits = getTerminalUnitIds(db);
-    if (allowedUnits.size > 0 && !allowedUnits.has(job.unit_id)) {
-      console.log(`[print-bridge] Ignorando job ${job.id} para unidade ${job.unit_id} (este terminal está configurado para: ${Array.from(allowedUnits).join(", ")})`);
-      return;
-    }
-
-    const localDeviceId = getLocalDeviceId(db);
-    if (job.origin_device_id && localDeviceId && job.origin_device_id !== localDeviceId) {
-      console.log(`[print-bridge] Ignorando job ${job.id}: emitido pelo terminal ${job.origin_device_id}, este é ${localDeviceId}.`);
-      return;
-    }
+    const deviceId = getLocalDeviceId(db);
 
     try {
       let deviceName: string | null = null;
@@ -401,7 +353,7 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
       }
 
       if (!deviceName && job.kind === "RECEIPT") {
-        await handleReceiptPdfFallback(job, "Nenhuma impressora de cupom configurada");
+        await handleReceiptPdfFallback(job, "Nenhuma impressora de cupom configurada", deviceId);
         return;
       }
 
@@ -461,19 +413,27 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
         }
       }
 
-      await supabase.from("fa_kiosk_print_jobs").update({ status: "PRINTED", printed_at_ms: Date.now() }).eq("id", job.id);
+      await supabase
+        .from("fa_kiosk_print_jobs")
+        .update({ status: "PRINTED", printed_at_ms: Date.now() })
+        .eq("id", job.id)
+        .eq("claimed_by_device_id", deviceId);
       console.log(`[print-bridge] job ${job.id} (${job.kind}) impresso em "${deviceName}".`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (job.kind === "RECEIPT") {
         try {
-          await handleReceiptPdfFallback(job, message);
+          await handleReceiptPdfFallback(job, message, deviceId);
           return;
         } catch (pdfErr) {
           console.error(`[print-bridge] Falha no fallback para PDF do job ${job.id}:`, pdfErr);
         }
       }
-      await supabase.from("fa_kiosk_print_jobs").update({ status: "FAILED", error: message }).eq("id", job.id);
+      await supabase
+        .from("fa_kiosk_print_jobs")
+        .update({ status: "FAILED", error: message })
+        .eq("id", job.id)
+        .eq("claimed_by_device_id", deviceId);
       console.error(`[print-bridge] job ${job.id} (${job.kind}) falhou: ${message}`);
     }
   }
@@ -484,48 +444,117 @@ export function startPrintBridge(db?: any): PrintBridgeStartResult {
     void cleanupExpiredPdfReceipts(supabase, 10);
   }, 12 * 60 * 60 * 1000);
 
-  // Pega pedidos que chegaram antes deste terminal ligar (ex.: reiniciou
-  // no meio do expediente) — a assinatura Realtime abaixo só pega INSERTs
-  // futuros, não histórico.
-  supabase
-    .from("fa_kiosk_print_jobs")
-    .select("id, unit_id, kind, payload_json, status, origin_device_id")
-    .eq("status", "PENDING")
-    .then(({ data }) => {
-      const allowedUnits = getTerminalUnitIds(db);
-      const localDeviceId = getLocalDeviceId(db);
-      for (const job of (data ?? []) as PrintJobRow[]) {
-        if (allowedUnits.size > 0 && !allowedUnits.has(job.unit_id)) continue;
-        if (job.origin_device_id && localDeviceId && job.origin_device_id !== localDeviceId) continue;
-        void handleJob(job);
-      }
-    });
+  // -------------------------------------------------------------------
+  // Entrega dos jobs
+  // -------------------------------------------------------------------
+  // O sweep periódico é o caminho PRINCIPAL, não o Realtime: uma queda do
+  // canal passa a custar até SWEEP_INTERVAL_MS de atraso em vez de deixar
+  // o job PENDING até alguém reiniciar o terminal (era o que o log
+  // "canal Realtime caiu" avisava e ninguém conseguia evitar).
+  //
+  // Em ambos os caminhos quem decide é a reserva no Postgres: se a RPC não
+  // devolver o job, outro terminal já é o dono e este não imprime.
 
-  supabase
-    .channel("fa_kiosk_print_jobs_bridge")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "fa_kiosk_print_jobs" }, (payload) => {
-      const job = payload.new as PrintJobRow;
-      const allowedUnits = getTerminalUnitIds(db);
-      const localDeviceId = getLocalDeviceId(db);
-      if (allowedUnits.size > 0 && !allowedUnits.has(job.unit_id)) {
-        console.log(`[print-bridge] Ignorando evento Realtime do job ${job.id} para unidade ${job.unit_id} (este terminal está configurado para: ${Array.from(allowedUnits).join(", ")})`);
-        return;
-      }
-      if (job.origin_device_id && localDeviceId && job.origin_device_id !== localDeviceId) {
-        console.log(`[print-bridge] Ignorando evento Realtime do job ${job.id}: emitido por ${job.origin_device_id}, este é ${localDeviceId}.`);
-        return;
-      }
-      void handleJob(job);
-    })
-    .subscribe((status) => {
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        console.error(
-          `[print-bridge] canal Realtime caiu (${status}) — jobs novos de impressão vão ficar PENDING até o terminal reiniciar.`,
-        );
-      } else {
-        console.log(`[print-bridge] canal Realtime: ${status}`);
-      }
-    });
+  let channels: RealtimeChannel[] = [];
+  // null (e não "") como estado inicial: um terminal ainda não amarrado
+  // tem lista vazia, e "" == "" faria a primeira sincronização sair sem
+  // nem avisar que nada será impresso aqui.
+  let subscribedUnits: string | null = null;
+  let sweeping = false;
 
-  return { started: true };
+  function currentUnitIds(): string[] {
+    return Array.from(getTerminalUnitIds(db)).sort();
+  }
+
+  async function claimAndPrintBatch(): Promise<void> {
+    if (sweeping) return;
+    sweeping = true;
+    try {
+      const jobs = await claimPrintJobs(supabase, currentUnitIds(), getLocalDeviceId(db));
+      for (const job of jobs) await handleJob(job);
+    } finally {
+      sweeping = false;
+    }
+  }
+
+  async function claimAndPrintOne(jobId: string): Promise<void> {
+    const job = await claimPrintJob(supabase, jobId, currentUnitIds(), getLocalDeviceId(db));
+    if (!job) return; // outro terminal já reservou — nada a fazer
+    await handleJob(job);
+  }
+
+  /**
+   * (Re)assina o Realtime conforme a unidade amarrada a este terminal.
+   * Um canal POR unidade, cada um com filtro no servidor: assim o
+   * terminal nem recebe o evento das outras unidades, em vez de receber
+   * tudo e torcer para o filtro do cliente segurar — que é como a
+   * impressão de uma unidade saía também na outra.
+   */
+  function syncSubscription(): void {
+    const unitIds = currentUnitIds();
+    const key = unitIds.join(",");
+    if (key === subscribedUnits) return;
+
+    for (const channel of channels) void supabase.removeChannel(channel);
+    channels = [];
+    subscribedUnits = key;
+
+    if (unitIds.length === 0) {
+      console.warn(
+        "[print-bridge] Terminal sem unidade amarrada — nenhum job será impresso aqui. Configurações > Impressoras > Este terminal.",
+      );
+      return;
+    }
+
+    for (const unitId of unitIds) {
+      const channel = supabase
+        .channel(`fa_kiosk_print_jobs_bridge_${unitId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "fa_kiosk_print_jobs", filter: `unit_id=eq.${unitId}` },
+          (payload) => {
+            const job = payload.new as PrintJobRow;
+            const decision = shouldConsiderJob({ job, allowedUnits: getTerminalUnitIds(db), deviceId: getLocalDeviceId(db) });
+            if (!decision.accept) {
+              console.log(`[print-bridge] ${decision.reason}`);
+              return;
+            }
+            void claimAndPrintOne(job.id);
+          },
+        )
+        .subscribe((status) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            console.error(
+              `[print-bridge] canal Realtime da unidade ${unitId} caiu (${status}) — o sweep de ${SWEEP_INTERVAL_MS / 1000}s continua entregando os jobs.`,
+            );
+          } else {
+            console.log(`[print-bridge] canal Realtime da unidade ${unitId}: ${status}`);
+          }
+        });
+      channels.push(channel);
+    }
+
+    void claimAndPrintBatch();
+  }
+
+  // Amarrar o terminal na tela passa a valer na hora, sem reiniciar o app.
+  onPrintBridgeRebind(() => syncSubscription());
+
+  syncSubscription();
+  setInterval(() => {
+    syncSubscription();
+    void claimAndPrintBatch();
+  }, SWEEP_INTERVAL_MS);
+
+  const bound = currentUnitIds().length > 0;
+  if (!bound) {
+    return {
+      started: false,
+      bound: false,
+      reason:
+        "Este computador ainda não foi vinculado a uma unidade. Abra Configurações > Impressoras > Este terminal e escolha a unidade — enquanto isso, nada será impresso aqui.",
+    };
+  }
+
+  return { started: true, bound: true };
 }

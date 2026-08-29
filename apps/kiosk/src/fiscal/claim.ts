@@ -44,6 +44,13 @@ export interface ClaimedFiscalDoc {
 export interface ClaimDeps {
   supabase: SupabaseClient;
   terminalId: string;
+  /**
+   * device_id DESTE computador (terminal_settings), diferente do
+   * terminalId do worker fiscal. Vai como origin_device_id no cupom
+   * enfileirado para o print bridge dar preferência de impressão à
+   * máquina que emitiu a nota, em vez de esperar a carência.
+   */
+  deviceId?: string | null;
   simulado: boolean;
   userDataPath?: string;
   crypto?: CofreCrypto;
@@ -205,6 +212,7 @@ async function processarNfceReal(supabase: SupabaseClient, deps: ClaimDeps, item
       await supabase.from("fa_kiosk_print_jobs").insert({
         unit_id: item.unit.id,
         kind: "RECEIPT",
+        origin_device_id: deps.deviceId ?? null,
         payload_json: {
           title: "DANFE NFC-e SIMPLIFICADO",
           unitName: item.unit.cnpj ? `CNPJ: ${item.unit.cnpj}` : "FAÇA AMIGOS",
@@ -239,7 +247,7 @@ async function processarNfceReal(supabase: SupabaseClient, deps: ClaimDeps, item
   }
 }
 
-async function processarDocumentoSimulado(supabase: SupabaseClient, item: ClaimedFiscalDoc): Promise<void> {
+async function processarDocumentoSimulado(supabase: SupabaseClient, item: ClaimedFiscalDoc, originDeviceId: string | null = null): Promise<void> {
   const nowMs = Date.now();
   const doc = item.doc;
   const accessKey = doc.accessKey && doc.accessKey.length === 44 && !doc.accessKey.startsWith("000000")
@@ -272,6 +280,7 @@ async function processarDocumentoSimulado(supabase: SupabaseClient, item: Claime
     await supabase.from("fa_kiosk_print_jobs").insert({
       unit_id: item.unit.id,
       kind: "RECEIPT",
+      origin_device_id: originDeviceId,
       payload_json: {
         title: "DANFE NFC-e (SIMULADO)",
         unitName: item.unit.cnpj ? `CNPJ: ${item.unit.cnpj}` : "FAÇA AMIGOS",
@@ -311,13 +320,13 @@ export async function runFiscalClaimOnce(deps: ClaimDeps, limit = 5): Promise<nu
     try {
       if (item.doc.docType === "NFSE") {
         if (deps.simulado) {
-          await processarNfseSimulado(deps.supabase, item);
+          await processarNfseSimulado(deps.supabase, item, deps.deviceId ?? null);
           deps.onLog?.(`[fiscal] NFS-e ${item.doc.id} (venda ${item.order.orderCode}) autorizada (SIMULADO).`);
         } else {
-          await processarNfseReal(deps.supabase, item, deps.onLog);
+          await processarNfseReal(deps.supabase, item, deps.onLog, deps.deviceId ?? null);
         }
       } else if (deps.simulado) {
-        await processarDocumentoSimulado(deps.supabase, item);
+        await processarDocumentoSimulado(deps.supabase, item, deps.deviceId ?? null);
         deps.onLog?.(`[fiscal] documento ${item.doc.id} (venda ${item.order.orderCode}) autorizado (SIMULADO).`);
       } else {
         await processarNfceReal(deps.supabase, deps, item);

@@ -1681,9 +1681,704 @@ begin
 end;
 $$ language plpgsql stable;
 
+-- =====================================================================
+-- Notificação por e-mail (Abertura/Fechamento de caixa)
+-- =====================================================================
+-- Estende a fila fa_kiosk_owner_notifications (20260818000001) com um
+-- segundo canal de entrega, independente do push: e-mail via Gmail SMTP,
+-- remetente fixo hub.operacao.lojas@gmail.com (credenciais já cadastradas
+-- como secrets GMAIL_USER/GMAIL_APP_PASSWORD nas Edge Functions do
+-- projeto). Só ABERTURA e FECHAMENTO disparam e-mail — os demais tipos de
+-- relatório continuam só push.
+--
+-- emailed_at_ms é uma coluna própria (não reaproveita sent_at_ms, que já
+-- é a marca de "reivindicado pelo push") para os dois canais reivindicarem
+-- a mesma notificação de forma independente.
+-- =====================================================================
+
+alter table fa_kiosk_owner_notifications add column if not exists emailed_at_ms bigint;
+
+-- Notificações que já existiam antes deste canal existir não devem
+-- disparar e-mail retroativo — marca tudo que já está na fila como "já
+-- tratado" no canal de e-mail; só notificações novas (INSERT após esta
+-- migration) ficam com emailed_at_ms null e entram na fila de envio.
+update fa_kiosk_owner_notifications
+  set emailed_at_ms = (extract(epoch from now()) * 1000)::bigint
+  where emailed_at_ms is null;
+
+-- ---------------------------------------------------------------------
+-- Reivindicação atômica das notificações de Abertura/Fechamento pendentes
+-- de e-mail + fan-out para todo ADMIN (Owner) com e-mail cadastrado.
+-- ---------------------------------------------------------------------
+create or replace function fa_owner_email_claim_due(p_now_ms bigint) returns table (
+  notification_id uuid, title text, body text, recipient_email text
+) as $$
+  with due as (
+    update fa_kiosk_owner_notifications
+    set emailed_at_ms = p_now_ms
+    where emailed_at_ms is null
+      and due_at_ms <= p_now_ms
+      and report_type in ('ABERTURA', 'FECHAMENTO')
+    returning id, title, body
+  )
+  select d.id, d.title, d.body, e.email
+  from due d
+  cross join fa_kiosk_employees e
+  where e.role = 'ADMIN' and e.email is not null and length(trim(e.email)) > 0;
+$$ language sql volatile security definer;
+
+revoke execute on function fa_owner_email_claim_due(bigint) from public;
+grant execute on function fa_owner_email_claim_due(bigint) to service_role;
+
+-- ---------------------------------------------------------------------
+-- Cron: dispara a edge function de envio de e-mail a cada minuto (mesmo
+-- padrão de fa-owner-report-dispatch, canal separado).
+-- ---------------------------------------------------------------------
+do $$
+begin
+  perform cron.unschedule('fa-owner-email-dispatch');
+exception when others then null;
+end $$;
+
+select cron.schedule(
+  'fa-owner-email-dispatch',
+  '* * * * *',
+  $$ select net.http_post(
+       url := 'https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/owner-email-dispatch',
+       headers := '{"Content-Type":"application/json"}'::jsonb,
+       body := '{}'::jsonb
+     ); $$
+);
+
+-- fa-owner-email-dispatch (acima) usava o timeout padrão do net.http_post
+-- (5s do pg_net) — insuficiente para o handshake TLS com smtp.gmail.com via
+-- nodemailer, especialmente em cold start da function (resolução do módulo
+-- npm:nodemailer + handshake). Confirmado em teste real:
+-- net._http_response.timed_out = true, "Timeout of 5000 ms reached" — a
+-- function nem chegava a responder. Reagenda com timeout maior.
+do $$
+begin
+  perform cron.unschedule('fa-owner-email-dispatch');
+exception when others then null;
+end $$;
+
+select cron.schedule(
+  'fa-owner-email-dispatch',
+  '* * * * *',
+  $$ select net.http_post(
+       url := 'https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/owner-email-dispatch',
+       headers := '{"Content-Type":"application/json"}'::jsonb,
+       body := '{}'::jsonb,
+       timeout_milliseconds := 20000
+     ); $$
+);
 
 
 
 
 
 
+
+
+
+-- =====================================================================
+-- Impressão duplicada entre unidades: reserva atômica dos jobs
+-- (migration 20260830000001_fa_kiosk_print_jobs_claim.sql)
+-- =====================================================================
+-- Impressão duplicada entre unidades: o app instalado em dois
+-- computadores, um por unidade, imprimia o job da outra unidade também.
+--
+-- A raiz estava no terminal (a amarração terminal->unidade nunca era
+-- gravada, então o filtro do bridge era fail-open), mas o roteamento em
+-- si nunca teve trava: handleJob imprimia e SÓ DEPOIS marcava PRINTED.
+-- Dois bridges ligados imprimem duas vezes — exatamente o que
+-- 20260806000032_fa_kiosk_fiscal_docs.sql já anotava como pendência.
+--
+-- Aqui entra a reserva atômica, no mesmo formato de fa_fiscal_claim_next
+-- (20260806000033): `for update skip locked` faz dois terminais
+-- concorrentes nunca enxergarem a mesma linha. É a única garantia de
+-- impressão única, independente de quantos terminais escutem a tabela.
+
+-- A migration 20260819000006 (fallback de cupom em PDF) NUNCA foi aplicada
+-- em produção: fa_kiosk_print_jobs não tem pdf_path/pdf_url e o CHECK de
+-- status não aceita SAVED_PDF, então handleReceiptPdfFallback falha em toda
+-- invocação. Como o fluxo novo depende desses UPDATEs darem certo, as
+-- colunas entram aqui também — idempotente, no-op onde já existirem.
+alter table fa_kiosk_print_jobs add column if not exists pdf_path text;
+alter table fa_kiosk_print_jobs add column if not exists pdf_url text;
+
+alter table fa_kiosk_print_jobs add column if not exists claimed_by_device_id text;
+alter table fa_kiosk_print_jobs add column if not exists claimed_at_ms bigint;
+alter table fa_kiosk_print_jobs add column if not exists claim_attempts integer not null default 0;
+
+alter table fa_kiosk_print_jobs drop constraint if exists fa_kiosk_print_jobs_status_check;
+alter table fa_kiosk_print_jobs add constraint fa_kiosk_print_jobs_status_check
+  check (status in ('PENDING', 'CLAIMED', 'PRINTED', 'FAILED', 'SAVED_PDF'));
+
+create index if not exists idx_fa_kiosk_print_jobs_claim
+  on fa_kiosk_print_jobs (status, unit_id, created_at_ms);
+
+-- Descarta a fila acumulada ANTES deste ajuste. Sem isto, o primeiro
+-- sweep do terminal corrigido despeja de uma vez todo o PENDING antigo —
+-- um rolo inteiro de pulseiras saindo no balcão. Constante fixa (e não
+-- now()) para a linha ser idempotente e segura de reexecutar via
+-- apply_all.sql.
+update fa_kiosk_print_jobs
+   set status = 'FAILED',
+       error = 'Fila anterior ao ajuste de roteamento por unidade'
+ where status = 'PENDING'
+   and created_at_ms < 1788048000000;
+
+-- ---------------------------------------------------------------------
+-- Reserva em lote (o sweep periódico do bridge)
+-- ---------------------------------------------------------------------
+-- p_grace_ms: janela em que só o terminal que ORIGINOU o pedido pode
+-- reservar. Passada a janela, qualquer terminal amarrado àquela unidade
+-- assume. É preferência, não exclusividade, de propósito: venda feita em
+-- tablet/PWA chega com origin_device_id nulo, e regra estrita deixaria
+-- esse cupom sem imprimir em lugar nenhum, em silêncio.
+--
+-- p_stale_ms: devolve para a fila o job reservado por um terminal que
+-- caiu no meio da impressão. p_max_attempts limita a uma segunda via, no
+-- máximo — nunca um loop de reimpressão.
+--
+-- Não conflita com fa_kiosk_cleanup_expired_pdf_receipts (20260819000006):
+-- aquela função só apaga SAVED_PDF e nunca toca PENDING/CLAIMED. Se um
+-- dia alguém for "melhorar" o predicado dela, este comentário é o aviso.
+create or replace function fa_kiosk_claim_print_jobs(
+  p_device_id text,
+  p_unit_ids text[],
+  p_limit integer default 10,
+  p_grace_ms bigint default 20000,
+  p_stale_ms bigint default 180000,
+  p_max_attempts integer default 2
+) returns jsonb as $$
+declare
+  v_now_ms bigint := (extract(epoch from now()) * 1000)::bigint;
+  v_result jsonb;
+begin
+  -- Fail-closed também no banco: terminal sem identidade ou sem unidade
+  -- amarrada não reserva nada.
+  if p_device_id is null or btrim(p_device_id) = '' then return '[]'::jsonb; end if;
+  if coalesce(array_length(p_unit_ids, 1), 0) = 0 then return '[]'::jsonb; end if;
+
+  update fa_kiosk_print_jobs
+     set status = 'PENDING', claimed_by_device_id = null, claimed_at_ms = null
+   where status = 'CLAIMED'
+     and lower(unit_id::text) = any(p_unit_ids)
+     and claimed_at_ms < v_now_ms - p_stale_ms
+     and claim_attempts < p_max_attempts;
+
+  update fa_kiosk_print_jobs
+     set status = 'FAILED',
+         error = 'Impressão não confirmada por nenhum terminal'
+   where status = 'CLAIMED'
+     and lower(unit_id::text) = any(p_unit_ids)
+     and claimed_at_ms < v_now_ms - p_stale_ms
+     and claim_attempts >= p_max_attempts;
+
+  with picked as (
+    select id from fa_kiosk_print_jobs
+     where status = 'PENDING'
+       and lower(unit_id::text) = any(p_unit_ids)
+       and (origin_device_id is null
+            or origin_device_id = p_device_id
+            or created_at_ms <= v_now_ms - p_grace_ms)
+     order by created_at_ms
+     limit greatest(p_limit, 1)
+     for update skip locked
+  ), claimed as (
+    update fa_kiosk_print_jobs j
+       set status = 'CLAIMED',
+           claimed_by_device_id = p_device_id,
+           claimed_at_ms = v_now_ms,
+           claim_attempts = j.claim_attempts + 1
+      from picked
+     where j.id = picked.id
+    returning j.*
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', c.id,
+    'unit_id', c.unit_id,
+    'kind', c.kind,
+    'payload_json', c.payload_json,
+    'origin_device_id', c.origin_device_id)), '[]'::jsonb)
+    into v_result
+    from claimed c;
+
+  return v_result;
+end;
+$$ language plpgsql volatile security definer set search_path = public, pg_temp;
+
+-- ---------------------------------------------------------------------
+-- Reserva de um job só (o caminho do evento Realtime)
+-- ---------------------------------------------------------------------
+create or replace function fa_kiosk_claim_print_job(
+  p_job_id uuid,
+  p_device_id text,
+  p_unit_ids text[],
+  p_grace_ms bigint default 20000
+) returns jsonb as $$
+declare
+  v_now_ms bigint := (extract(epoch from now()) * 1000)::bigint;
+  v_result jsonb;
+begin
+  if p_device_id is null or btrim(p_device_id) = '' then return null; end if;
+  if coalesce(array_length(p_unit_ids, 1), 0) = 0 then return null; end if;
+
+  with picked as (
+    select id from fa_kiosk_print_jobs
+     where id = p_job_id
+       and status = 'PENDING'
+       and lower(unit_id::text) = any(p_unit_ids)
+       and (origin_device_id is null
+            or origin_device_id = p_device_id
+            or created_at_ms <= v_now_ms - p_grace_ms)
+     for update skip locked
+  ), claimed as (
+    update fa_kiosk_print_jobs j
+       set status = 'CLAIMED',
+           claimed_by_device_id = p_device_id,
+           claimed_at_ms = v_now_ms,
+           claim_attempts = j.claim_attempts + 1
+      from picked
+     where j.id = picked.id
+    returning j.*
+  )
+  select jsonb_build_object(
+    'id', c.id,
+    'unit_id', c.unit_id,
+    'kind', c.kind,
+    'payload_json', c.payload_json,
+    'origin_device_id', c.origin_device_id)
+    into v_result
+    from claimed c;
+
+  return v_result;
+end;
+$$ language plpgsql volatile security definer set search_path = public, pg_temp;
+
+-- O EXECUTE padrão do Postgres é PUBLIC; estas funções mexem na fila de
+-- impressão de todas as unidades e só o print bridge (service_role) deve
+-- chamá-las.
+revoke all on function fa_kiosk_claim_print_jobs(text, text[], integer, bigint, bigint, integer) from public;
+revoke all on function fa_kiosk_claim_print_jobs(text, text[], integer, bigint, bigint, integer) from anon;
+revoke all on function fa_kiosk_claim_print_jobs(text, text[], integer, bigint, bigint, integer) from authenticated;
+grant execute on function fa_kiosk_claim_print_jobs(text, text[], integer, bigint, bigint, integer) to service_role;
+
+revoke all on function fa_kiosk_claim_print_job(uuid, text, text[], bigint) from public;
+revoke all on function fa_kiosk_claim_print_job(uuid, text, text[], bigint) from anon;
+revoke all on function fa_kiosk_claim_print_job(uuid, text, text[], bigint) from authenticated;
+grant execute on function fa_kiosk_claim_print_job(uuid, text, text[], bigint) to service_role;
+
+-- ---------------------------------------------------------------------
+-- Reimpressão de entrada carregando o terminal de origem
+-- ---------------------------------------------------------------------
+-- fa_reimprimir_entrada chamava fa_kiosk_enqueue_entry_prints sem device,
+-- então a reimpressão entrava na fila sem origem. Com o claim isso não
+-- duplica mais, mas sem a origem a preferência pelo terminal que pediu a
+-- reimpressão não funciona. Recriada também para ganhar o
+-- `set search_path` que faltava na definição de 20260807000007.
+-- A assinatura de 2 argumentos precisa sair: ela chama a versão de 1
+-- argumento de fa_kiosk_enqueue_entry_prints, que não carimba a origem, e
+-- um chamador com 2 argumentos casaria nela por arity exata em vez de cair
+-- na versão nova com default.
+drop function if exists fa_reimprimir_entrada(uuid, uuid);
+
+create or replace function fa_reimprimir_entrada(
+  p_session_id uuid,
+  p_employee_id uuid default null,
+  p_device_id text default null
+) returns jsonb as $$
+declare v_s record;
+begin
+  select * into v_s from fa_kiosk_sessions where id = p_session_id;
+  if not found then raise exception 'SESSAO_NAO_ENCONTRADA'; end if;
+  if v_s.access_code is null then
+    update fa_kiosk_sessions set access_code = fa_kiosk_new_access_code() where id = p_session_id;
+    select * into v_s from fa_kiosk_sessions where id = p_session_id;
+  end if;
+  perform fa_kiosk_enqueue_entry_prints(p_session_id, p_device_id);
+  perform fa_kiosk_log_session_event(p_session_id, 'REIMPRESSAO_ENTRADA', p_employee_id, null);
+  return jsonb_build_object('accessCode', v_s.access_code);
+end;
+$$ language plpgsql volatile security definer set search_path = public, extensions, pg_temp;
+
+-- =====================================================================
+-- Fechamento completo (Valor Faturado, Meta, Sessões) + Divergência no
+-- canal de e-mail
+-- =====================================================================
+-- 20260820000001_fa_kiosk_owner_notifications_19h_meta.sql já existia no
+-- repositório mas nunca tinha sido de fato aplicada neste projeto Supabase
+-- (fa_owner_report_build_fechamento em produção ainda era a versão antiga,
+-- sem Valor Faturado total, Meta do dia e Total de sessões/locações —
+-- confirmado lendo a função ao vivo). Reaplica o mesmo conteúdo aqui.
+--
+-- Além disso, o canal de e-mail (20260829000003_fa_owner_email_notifications)
+-- só cobria ABERTURA/FECHAMENTO — Divergência no fechamento
+-- (fa_owner_report_build_divergencia, que já roda em produção) ia só por
+-- push. Passa a ir por e-mail também.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. Constraint de report_type — inclui ACOMPANHAMENTO_19H.
+-- ---------------------------------------------------------------------
+alter table fa_kiosk_owner_notifications drop constraint if exists fa_kiosk_owner_notifications_report_type_check;
+alter table fa_kiosk_owner_notifications add constraint fa_kiosk_owner_notifications_report_type_check
+  check (report_type in (
+    'ABERTURA', 'ACOMPANHAMENTO_17H', 'ACOMPANHAMENTO_19H', 'ACOMPANHAMENTO_20H', 'FECHAMENTO',
+    'DIVERGENCIA_FECHAMENTO', 'RESUMO_SEMANAL', 'CANDIDATURA_TALENTOS',
+    'OCORRENCIA_COLABORADOR', 'AVALIACAO_NEGATIVA'
+  ));
+
+-- ---------------------------------------------------------------------
+-- 2. Acompanhamento (17h/19h/20h) — meta diária e % de atingimento.
+-- ---------------------------------------------------------------------
+create or replace function fa_owner_report_build_acompanhamento(p_unit_id uuid, p_slot text) returns void as $$
+declare
+  v_unit record;
+  v_business_date date;
+  v_faturado_cents bigint;
+  v_pedidos integer;
+  v_visitas integer;
+  v_ticket_cents bigint;
+  v_daily_goal_cents bigint := 0;
+  v_meta_pct numeric;
+  v_meta_str text := '';
+  v_report_type text := case p_slot
+    when '17H' then 'ACOMPANHAMENTO_17H'
+    when '19H' then 'ACOMPANHAMENTO_19H'
+    when '20H' then 'ACOMPANHAMENTO_20H'
+    else 'ACOMPANHAMENTO_19H'
+  end;
+begin
+  select * into v_unit from fa_kiosk_units where id = p_unit_id;
+  v_business_date := (now() at time zone v_unit.timezone)::date;
+
+  -- Faturamento acumulado do dia
+  select coalesce(sum(total_cents), 0), count(*) into v_faturado_cents, v_pedidos
+    from fa_kiosk_orders where unit_id = p_unit_id and business_date = v_business_date and status = 'PAGA';
+
+  -- Quantidade de sessões/locações do dia
+  select count(*) into v_visitas
+    from fa_kiosk_sessions
+    where unit_id = p_unit_id
+      and (to_timestamp(checkin_at_ms / 1000.0) at time zone v_unit.timezone)::date = v_business_date;
+
+  -- Meta de faturamento diária configurada em fa_kiosk_app_settings
+  select coalesce(value::bigint, 0) into v_daily_goal_cents
+    from fa_kiosk_app_settings
+    where unit_id = p_unit_id and key = 'daily_goal_cents';
+
+  if v_daily_goal_cents > 0 then
+    v_meta_pct := round(((v_faturado_cents::numeric / v_daily_goal_cents::numeric) * 100), 1);
+    v_meta_str := E'\nMeta do dia: ' || fa_owner_report_money(v_daily_goal_cents) ||
+                  ' (' || v_meta_pct || '% atingida)';
+  else
+    v_meta_str := E'\nMeta do dia: Não definida';
+  end if;
+
+  v_ticket_cents := case when v_pedidos > 0 then round(v_faturado_cents::numeric / v_pedidos) else 0 end;
+
+  perform fa_owner_report_enqueue(
+    p_unit_id, v_report_type, v_business_date,
+    v_unit.emoji || ' Visão Geral ' || p_slot || ' — ' || v_unit.name,
+    'Faturado até agora: ' || fa_owner_report_money(v_faturado_cents) ||
+      v_meta_str ||
+      E'\nSessões/locações: ' || v_visitas ||
+      E'\nTicket médio: ' || fa_owner_report_money(v_ticket_cents)
+  );
+end;
+$$ language plpgsql volatile security definer;
+
+-- ---------------------------------------------------------------------
+-- 3. Varredura periódica — inclui a janela das 19h (19:00-19:04:59).
+-- ---------------------------------------------------------------------
+create or replace function fa_owner_reports_run_acompanhamento() returns void as $$
+declare
+  v_unit record;
+  v_local_time time;
+begin
+  for v_unit in select * from fa_kiosk_units loop
+    v_local_time := (now() at time zone v_unit.timezone)::time;
+    if v_local_time between '17:00' and '17:04:59' then
+      perform fa_owner_report_build_acompanhamento(v_unit.id, '17H');
+    elsif v_local_time between '19:00' and '19:04:59' then
+      perform fa_owner_report_build_acompanhamento(v_unit.id, '19H');
+    elsif v_local_time between '20:00' and '20:04:59' then
+      perform fa_owner_report_build_acompanhamento(v_unit.id, '20H');
+    end if;
+  end loop;
+end;
+$$ language plpgsql volatile security definer;
+
+-- ---------------------------------------------------------------------
+-- 4. Fechamento — Valor Faturado total, Meta do dia e Total de
+--    sessões/locações, além do que já existia (Fundo de Caixa, Envelope,
+--    detalhamento por forma de pagamento).
+-- ---------------------------------------------------------------------
+create or replace function fa_owner_report_build_fechamento(p_shift_id uuid) returns void as $$
+declare
+  v_shift record;
+  v_unit record;
+  v_operador text;
+  v_envelope_cents bigint;
+  v_fundo_cents bigint;
+  v_dinheiro_cents bigint;
+  v_credito_cents bigint;
+  v_debito_cents bigint;
+  v_pix_cents bigint;
+  v_outros_cents bigint;
+  v_faturado_total_cents bigint;
+  v_visitas integer;
+  v_daily_goal_cents bigint := 0;
+  v_meta_pct numeric;
+  v_meta_str text := '';
+begin
+  select s.*, e.full_name as operador_name into v_shift
+    from fa_kiosk_shifts s left join fa_kiosk_employees e on e.id = coalesce(s.closed_by_employee_id, s.opened_by_employee_id)
+    where s.id = p_shift_id;
+  select * into v_unit from fa_kiosk_units where id = v_shift.unit_id;
+  v_operador := coalesce(v_shift.operador_name, 'Operador');
+
+  select coalesce(sum(amount_cents), 0) into v_envelope_cents
+    from fa_kiosk_cash_movements where shift_id = p_shift_id and kind = 'SANGRIA' and envelope_number is not null;
+
+  select fundo_caixa_cents into v_fundo_cents
+    from fa_kiosk_cash_movements where shift_id = p_shift_id and fundo_caixa_cents is not null
+    order by at_ms desc limit 1;
+
+  select
+      coalesce(sum(p.amount_cents) filter (where p.method = 'DINHEIRO'), 0),
+      coalesce(sum(p.amount_cents) filter (where p.method = 'CREDITO'), 0),
+      coalesce(sum(p.amount_cents) filter (where p.method = 'DEBITO'), 0),
+      coalesce(sum(p.amount_cents) filter (where p.method = 'PIX'), 0),
+      coalesce(sum(p.amount_cents) filter (where p.method not in ('DINHEIRO', 'CREDITO', 'DEBITO', 'PIX')), 0)
+    into v_dinheiro_cents, v_credito_cents, v_debito_cents, v_pix_cents, v_outros_cents
+    from fa_kiosk_payments p join fa_kiosk_orders o on o.id = p.order_id
+    where o.shift_id = p_shift_id and o.status = 'PAGA';
+
+  v_faturado_total_cents := v_dinheiro_cents + v_credito_cents + v_debito_cents + v_pix_cents + v_outros_cents;
+
+  -- Sessões/locações do dia
+  select count(*) into v_visitas
+    from fa_kiosk_sessions
+    where unit_id = v_shift.unit_id
+      and (to_timestamp(checkin_at_ms / 1000.0) at time zone v_unit.timezone)::date = v_shift.business_date;
+
+  -- Meta de faturamento diária em fa_kiosk_app_settings
+  select coalesce(value::bigint, 0) into v_daily_goal_cents
+    from fa_kiosk_app_settings
+    where unit_id = v_shift.unit_id and key = 'daily_goal_cents';
+
+  if v_daily_goal_cents > 0 then
+    v_meta_pct := round(((v_faturado_total_cents::numeric / v_daily_goal_cents::numeric) * 100), 1);
+    v_meta_str := E'\nMeta do dia: ' || fa_owner_report_money(v_daily_goal_cents) ||
+                  ' (' || v_meta_pct || '% atingida)';
+  else
+    v_meta_str := E'\nMeta do dia: Não definida';
+  end if;
+
+  perform fa_owner_report_enqueue(
+    v_shift.unit_id, 'FECHAMENTO', v_shift.business_date,
+    v_unit.emoji || ' Fechamento ' || v_unit.name,
+    v_operador || ' - Data: ' ||
+      to_char(to_timestamp(v_shift.closed_at_ms / 1000.0) at time zone v_unit.timezone, 'DD/MM/YYYY, HH24:MI') ||
+      E'\nValor Faturado: ' || fa_owner_report_money(v_faturado_total_cents) ||
+      v_meta_str ||
+      E'\nTotal de sessões/locações: ' || v_visitas ||
+      E'\nFundo de Caixa: ' || fa_owner_report_money(coalesce(v_fundo_cents, v_shift.opening_cash_cents)) ||
+      E'\nValor em Envelope: ' || fa_owner_report_money(v_envelope_cents) ||
+      E'\nDetalhamento faturado — Dinheiro: ' || fa_owner_report_money(v_dinheiro_cents) ||
+      ', Crédito: ' || fa_owner_report_money(v_credito_cents) ||
+      ', Débito: ' || fa_owner_report_money(v_debito_cents) ||
+      ', Pix: ' || fa_owner_report_money(v_pix_cents) ||
+      case when v_outros_cents > 0 then ', Outros: ' || fa_owner_report_money(v_outros_cents) else '' end
+  );
+end;
+$$ language plpgsql volatile security definer;
+
+-- ---------------------------------------------------------------------
+-- 5. Canal de e-mail passa a cobrir também Divergência no fechamento
+--    (fa_owner_report_build_divergencia já roda em produção, hoje só
+--    para push) — mesmo destinatário (ADMIN com e-mail cadastrado).
+-- ---------------------------------------------------------------------
+create or replace function fa_owner_email_claim_due(p_now_ms bigint) returns table (
+  notification_id uuid, title text, body text, recipient_email text
+) as $$
+  with due as (
+    update fa_kiosk_owner_notifications
+    set emailed_at_ms = p_now_ms
+    where emailed_at_ms is null
+      and due_at_ms <= p_now_ms
+      and report_type in ('ABERTURA', 'FECHAMENTO', 'DIVERGENCIA_FECHAMENTO')
+    returning id, title, body
+  )
+  select d.id, d.title, d.body, e.email
+  from due d
+  cross join fa_kiosk_employees e
+  where e.role = 'ADMIN' and e.email is not null and length(trim(e.email)) > 0;
+$$ language sql volatile security definer;
+
+revoke execute on function fa_owner_email_claim_due(bigint) from public;
+grant execute on function fa_owner_email_claim_due(bigint) to service_role;
+
+-- =====================================================================
+-- Foto do Envelope no e-mail de Fechamento
+-- =====================================================================
+-- fa_kiosk_cash_movements.photo_url (20260808070000) já guarda a URL
+-- pública (bucket envelope-fotos, leitura pública) da foto tirada no
+-- registro do envelope (SANGRIA). fa_owner_report_build_fechamento já
+-- lê esse movimento para calcular o valor do envelope — passa a também
+-- levar a foto até o e-mail.
+--
+-- O push continua texto puro (photo_url é ignorada no payload do
+-- webpush) — só o canal de e-mail (owner-email-dispatch) monta um corpo
+-- HTML com a imagem embutida quando photo_url não é nula.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. Coluna nova na fila — nula para todo relatório que não seja
+--    Fechamento com envelope fotografado.
+-- ---------------------------------------------------------------------
+alter table fa_kiosk_owner_notifications add column if not exists photo_url text;
+
+-- ---------------------------------------------------------------------
+-- 2. fa_owner_report_enqueue ganha p_photo_url (trailing, default null —
+--    todo chamador existente continua funcionando sem alteração).
+-- ---------------------------------------------------------------------
+create or replace function fa_owner_report_enqueue(
+  p_unit_id uuid, p_report_type text, p_business_date date, p_title text, p_body text,
+  p_dedupe_key text default null, p_photo_url text default null
+) returns void as $$
+begin
+  if p_dedupe_key is not null then
+    insert into fa_kiosk_owner_notifications (unit_id, report_type, business_date, title, body, due_at_ms, dedupe_key, photo_url)
+      values (p_unit_id, p_report_type, p_business_date, p_title, p_body, (extract(epoch from now()) * 1000)::bigint, p_dedupe_key, p_photo_url)
+      on conflict (report_type, dedupe_key) where dedupe_key is not null do nothing;
+  else
+    insert into fa_kiosk_owner_notifications (unit_id, report_type, business_date, title, body, due_at_ms, photo_url)
+      values (p_unit_id, p_report_type, p_business_date, p_title, p_body, (extract(epoch from now()) * 1000)::bigint, p_photo_url)
+      on conflict (unit_id, report_type, business_date) where dedupe_key is null do nothing;
+  end if;
+end;
+$$ language plpgsql volatile security definer;
+
+-- ---------------------------------------------------------------------
+-- 3. Fechamento — busca a foto do envelope mais recente do turno
+--    (mesma condição já usada para somar v_envelope_cents) e repassa
+--    para o enqueue.
+-- ---------------------------------------------------------------------
+create or replace function fa_owner_report_build_fechamento(p_shift_id uuid) returns void as $$
+declare
+  v_shift record;
+  v_unit record;
+  v_operador text;
+  v_envelope_cents bigint;
+  v_envelope_photo_url text;
+  v_fundo_cents bigint;
+  v_dinheiro_cents bigint;
+  v_credito_cents bigint;
+  v_debito_cents bigint;
+  v_pix_cents bigint;
+  v_outros_cents bigint;
+  v_faturado_total_cents bigint;
+  v_visitas integer;
+  v_daily_goal_cents bigint := 0;
+  v_meta_pct numeric;
+  v_meta_str text := '';
+begin
+  select s.*, e.full_name as operador_name into v_shift
+    from fa_kiosk_shifts s left join fa_kiosk_employees e on e.id = coalesce(s.closed_by_employee_id, s.opened_by_employee_id)
+    where s.id = p_shift_id;
+  select * into v_unit from fa_kiosk_units where id = v_shift.unit_id;
+  v_operador := coalesce(v_shift.operador_name, 'Operador');
+
+  select coalesce(sum(amount_cents), 0) into v_envelope_cents
+    from fa_kiosk_cash_movements where shift_id = p_shift_id and kind = 'SANGRIA' and envelope_number is not null;
+
+  select photo_url into v_envelope_photo_url
+    from fa_kiosk_cash_movements
+    where shift_id = p_shift_id and kind = 'SANGRIA' and envelope_number is not null and photo_url is not null
+    order by at_ms desc limit 1;
+
+  select fundo_caixa_cents into v_fundo_cents
+    from fa_kiosk_cash_movements where shift_id = p_shift_id and fundo_caixa_cents is not null
+    order by at_ms desc limit 1;
+
+  select
+      coalesce(sum(p.amount_cents) filter (where p.method = 'DINHEIRO'), 0),
+      coalesce(sum(p.amount_cents) filter (where p.method = 'CREDITO'), 0),
+      coalesce(sum(p.amount_cents) filter (where p.method = 'DEBITO'), 0),
+      coalesce(sum(p.amount_cents) filter (where p.method = 'PIX'), 0),
+      coalesce(sum(p.amount_cents) filter (where p.method not in ('DINHEIRO', 'CREDITO', 'DEBITO', 'PIX')), 0)
+    into v_dinheiro_cents, v_credito_cents, v_debito_cents, v_pix_cents, v_outros_cents
+    from fa_kiosk_payments p join fa_kiosk_orders o on o.id = p.order_id
+    where o.shift_id = p_shift_id and o.status = 'PAGA';
+
+  v_faturado_total_cents := v_dinheiro_cents + v_credito_cents + v_debito_cents + v_pix_cents + v_outros_cents;
+
+  -- Sessões/locações do dia
+  select count(*) into v_visitas
+    from fa_kiosk_sessions
+    where unit_id = v_shift.unit_id
+      and (to_timestamp(checkin_at_ms / 1000.0) at time zone v_unit.timezone)::date = v_shift.business_date;
+
+  -- Meta de faturamento diária em fa_kiosk_app_settings
+  select coalesce(value::bigint, 0) into v_daily_goal_cents
+    from fa_kiosk_app_settings
+    where unit_id = v_shift.unit_id and key = 'daily_goal_cents';
+
+  if v_daily_goal_cents > 0 then
+    v_meta_pct := round(((v_faturado_total_cents::numeric / v_daily_goal_cents::numeric) * 100), 1);
+    v_meta_str := E'\nMeta do dia: ' || fa_owner_report_money(v_daily_goal_cents) ||
+                  ' (' || v_meta_pct || '% atingida)';
+  else
+    v_meta_str := E'\nMeta do dia: Não definida';
+  end if;
+
+  perform fa_owner_report_enqueue(
+    v_shift.unit_id, 'FECHAMENTO', v_shift.business_date,
+    v_unit.emoji || ' Fechamento ' || v_unit.name,
+    v_operador || ' - Data: ' ||
+      to_char(to_timestamp(v_shift.closed_at_ms / 1000.0) at time zone v_unit.timezone, 'DD/MM/YYYY, HH24:MI') ||
+      E'\nValor Faturado: ' || fa_owner_report_money(v_faturado_total_cents) ||
+      v_meta_str ||
+      E'\nTotal de sessões/locações: ' || v_visitas ||
+      E'\nFundo de Caixa: ' || fa_owner_report_money(coalesce(v_fundo_cents, v_shift.opening_cash_cents)) ||
+      E'\nValor em Envelope: ' || fa_owner_report_money(v_envelope_cents) ||
+      E'\nDetalhamento faturado — Dinheiro: ' || fa_owner_report_money(v_dinheiro_cents) ||
+      ', Crédito: ' || fa_owner_report_money(v_credito_cents) ||
+      ', Débito: ' || fa_owner_report_money(v_debito_cents) ||
+      ', Pix: ' || fa_owner_report_money(v_pix_cents) ||
+      case when v_outros_cents > 0 then ', Outros: ' || fa_owner_report_money(v_outros_cents) else '' end,
+    p_photo_url := v_envelope_photo_url
+  );
+end;
+$$ language plpgsql volatile security definer;
+
+-- ---------------------------------------------------------------------
+-- 4. Canal de e-mail passa a levar a photo_url junto — muda a forma do
+--    retorno (nova coluna), então precisa de drop antes do create.
+-- ---------------------------------------------------------------------
+drop function if exists fa_owner_email_claim_due(bigint);
+
+create function fa_owner_email_claim_due(p_now_ms bigint) returns table (
+  notification_id uuid, title text, body text, recipient_email text, photo_url text
+) as $$
+  with due as (
+    update fa_kiosk_owner_notifications
+    set emailed_at_ms = p_now_ms
+    where emailed_at_ms is null
+      and due_at_ms <= p_now_ms
+      and report_type in ('ABERTURA', 'FECHAMENTO', 'DIVERGENCIA_FECHAMENTO')
+    returning id, title, body, photo_url
+  )
+  select d.id, d.title, d.body, e.email, d.photo_url
+  from due d
+  cross join fa_kiosk_employees e
+  where e.role = 'ADMIN' and e.email is not null and length(trim(e.email)) > 0;
+$$ language sql volatile security definer;
+
+revoke execute on function fa_owner_email_claim_due(bigint) from public;
+grant execute on function fa_owner_email_claim_due(bigint) to service_role;

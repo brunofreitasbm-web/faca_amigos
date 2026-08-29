@@ -42,7 +42,7 @@ async function reservarNumeroRps(supabase: SupabaseClient, doc: ClaimedFiscalDoc
   return data as number;
 }
 
-export async function processarNfseSimulado(supabase: SupabaseClient, item: ClaimedFiscalDoc): Promise<void> {
+export async function processarNfseSimulado(supabase: SupabaseClient, item: ClaimedFiscalDoc, originDeviceId: string | null = null): Promise<void> {
   const { doc, unit } = item;
   const numero = await reservarNumeroRps(supabase, doc, unit.id);
   const nowMs = Date.now();
@@ -63,6 +63,7 @@ export async function processarNfseSimulado(supabase: SupabaseClient, item: Clai
     await supabase.from("fa_kiosk_print_jobs").insert({
       unit_id: unit.id,
       kind: "RECEIPT",
+      origin_device_id: originDeviceId,
       payload_json: {
         title: "COMPROVANTE NFS-e (SIMULADO)",
         unitName: unit.cnpj ? `CNPJ: ${unit.cnpj}` : "FAÇA AMIGOS",
@@ -124,7 +125,7 @@ async function bloquear(supabase: SupabaseClient, docId: string, motivo: string)
  * responsável vinculado) bloqueia o documento com um motivo específico em
  * vez de deixar a exceção genérica confundir quem for investigar depois.
  */
-export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedFiscalDoc, onLog?: (message: string) => void): Promise<void> {
+export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedFiscalDoc, onLog?: (message: string) => void, originDeviceId: string | null = null): Promise<void> {
   const { doc, order, unit } = item;
 
   const { data: unitFiscal, error: unitError } = await supabase
@@ -278,6 +279,7 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
     await supabase.from("fa_kiosk_print_jobs").insert({
       unit_id: unit.id,
       kind: "RECEIPT",
+      origin_device_id: originDeviceId,
       payload_json: {
         title: "COMPROVANTE NFS-e NACIONAL",
         unitName: unitFiscal.cnpj ? `CNPJ: ${unitFiscal.cnpj}` : "FAÇA AMIGOS",
