@@ -38,7 +38,7 @@ function loadOrCreateTerminalId(userDataPath: string): string {
   return id;
 }
 
-export function startFiscalWorker(userDataPath: string): void {
+export function startFiscalWorker(userDataPath: string, deviceId?: string | null): void {
   const url = process.env.FACAAMIGOS_SUPABASE_URL;
   const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
@@ -67,6 +67,7 @@ export function startFiscalWorker(userDataPath: string): void {
           {
             supabase,
             terminalId,
+            deviceId,
             simulado,
             userDataPath,
             crypto: electronSafeStorageCrypto(),

@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
+import { ensureDeviceId, getTerminalUnitId, setTerminalUnitId } from "@facaamigos/db-local";
 import type { AppContext } from "../context.js";
 import { getUpdateStatus, checkForUpdates, applyUpdate } from "../../main/autoUpdater.js";
+import { rebindPrintBridge } from "../../main/printBridgeControl.js";
 
 export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get("/api/system/info", async () => {
@@ -12,54 +13,58 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): voi
   });
 
   /**
-   * Identifica este computador (não a unidade) para o print bridge só
-   * imprimir os jobs que ele mesmo enfileirou — sem isto, 2 terminais na
-   * mesma unidade imprimem cada pulseira/cupom em dobro. Gerado uma vez e
-   * persistido localmente; cada instalação do Electron tem o seu.
+   * Identifica este COMPUTADOR (não a unidade). Gravado em
+   * `terminal_settings` — a versão anterior gravava em `app_settings`
+   * com unit_id 'global', o que sempre falhava na FK para `units`
+   * (vazia em produção) e devolvia 500 sem ninguém perceber.
    */
-  app.get("/api/system/device-id", async () => {
-    const row = ctx.db.prepare("SELECT value FROM app_settings WHERE unit_id = 'global' AND key = 'device_id'").get() as
-      | { value: string }
-      | undefined;
-    if (row?.value) return { deviceId: row.value };
-
-    const deviceId = randomUUID();
-    ctx.db
-      .prepare(
-        `INSERT INTO app_settings (unit_id, key, value, updated_at_ms)
-         VALUES ('global', 'device_id', ?, ?)
-         ON CONFLICT (unit_id, key) DO NOTHING`
-      )
-      .run(deviceId, Date.now());
-    const persisted = ctx.db.prepare("SELECT value FROM app_settings WHERE unit_id = 'global' AND key = 'device_id'").get() as {
-      value: string;
-    };
-    return { deviceId: persisted.value };
-  });
-
-  app.get("/api/system/terminal-unit", async () => {
+  app.get("/api/system/device-id", async (_req, reply) => {
     try {
-      const row = ctx.db.prepare("SELECT value FROM app_settings WHERE key = 'terminal_unit_id'").get() as { value: string } | undefined;
-      return { unitId: row?.value ?? process.env.FACAAMIGOS_UNIT_ID ?? null };
-    } catch {
-      return { unitId: process.env.FACAAMIGOS_UNIT_ID ?? null };
+      return { deviceId: ensureDeviceId(ctx.db, ctx.nowMs()) };
+    } catch (err) {
+      app.log.error({ err }, "[system] falha ao gerar/ler o device-id deste terminal");
+      return reply.code(500).send({ error: "DEVICE_ID_INDISPONIVEL", message: err instanceof Error ? err.message : String(err) });
     }
   });
 
-  app.post<{ Body: { unitId: string } }>("/api/system/terminal-unit", async (req) => {
-    const { unitId } = req.body ?? {};
-    if (!unitId || typeof unitId !== "string") {
-      return { ok: false, message: "unitId inválido" };
+  /**
+   * Unidade a que este computador pertence. É o que faz o print bridge
+   * imprimir só os jobs da própria unidade — sem isso ele aceita job de
+   * todas elas e a impressão de uma unidade sai também na outra.
+   */
+  app.get("/api/system/terminal-unit", async (_req, reply) => {
+    try {
+      return { unitId: getTerminalUnitId(ctx.db) ?? process.env.FACAAMIGOS_UNIT_ID ?? null };
+    } catch (err) {
+      app.log.error({ err }, "[system] falha ao ler a unidade deste terminal");
+      return reply.code(500).send({ error: "TERMINAL_UNIT_INDISPONIVEL", message: err instanceof Error ? err.message : String(err) });
     }
-    const nowMs = Date.now();
-    ctx.db
-      .prepare(
-        `INSERT INTO app_settings (unit_id, key, value, updated_at_ms)
-         VALUES ('global', 'terminal_unit_id', ?, ?)
-         ON CONFLICT (unit_id, key) DO UPDATE SET value = excluded.value, updated_at_ms = excluded.updated_at_ms`
-      )
-      .run(unitId.trim(), nowMs);
-    return { ok: true, unitId: unitId.trim() };
+  });
+
+  app.post<{ Body: { unitId: string } }>("/api/system/terminal-unit", async (req, reply) => {
+    const { unitId } = req.body ?? {};
+    if (!unitId || typeof unitId !== "string" || !unitId.trim()) {
+      return reply.code(400).send({ error: "UNIT_ID_INVALIDO", message: "Informe a unidade deste computador." });
+    }
+
+    // O filtro do Realtime e o claim no Postgres comparam o unit_id como
+    // texto: um UUID em maiúsculas casaria no Realtime e não casaria no
+    // claim, deixando o terminal amarrado "no papel" e mudo na prática.
+    const normalized = unitId.trim().toLowerCase();
+
+    try {
+      setTerminalUnitId(ctx.db, normalized, ctx.nowMs());
+    } catch (err) {
+      app.log.error({ err }, "[system] falha ao gravar a unidade deste terminal");
+      return reply.code(500).send({ error: "TERMINAL_UNIT_NAO_SALVA", message: err instanceof Error ? err.message : String(err) });
+    }
+
+    // Reassina o Realtime na unidade nova sem exigir reinício do app: o
+    // operador amarra o terminal na tela e a impressão já passa a sair
+    // no lugar certo.
+    rebindPrintBridge();
+
+    return { ok: true, unitId: normalized };
   });
 
   app.post("/api/system/update/check", async () => {
