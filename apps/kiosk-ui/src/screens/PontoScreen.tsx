@@ -97,6 +97,8 @@ export function PontoScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [myDescriptor, setMyDescriptor] = useState<number[] | null>(null);
 
+  const [selectedKind, setSelectedKind] = useState<(typeof KINDS)[number]["value"] | null>(null);
+
   // Status de escaneamento facial rápido
   const [scanState, setScanState] = useState<"idle" | "scanning" | "detected" | "success" | "fail">("idle");
   const [detectedName, setDetectedName] = useState<string | null>(null);
@@ -218,7 +220,7 @@ export function PontoScreen() {
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
       const userTodayPunches = await Api.pontoHistory(empMatch.id, startOfDay.getTime(), Date.now());
-      const nextKind = getNextLogicalKind(userTodayPunches);
+      const targetKind = selectedKind ?? getNextLogicalKind(userTodayPunches);
 
       const punchPhotoPath = await Api.uploadPontoFoto(empMatch.id, photo, "punch");
 
@@ -235,24 +237,25 @@ export function PontoScreen() {
       const res = await Api.ponto({
         unitId: unit.id,
         employeeId: empMatch.id,
-        kind: nextKind,
+        kind: targetKind,
         registeredByEmployeeId: empMatch.id,
         lat,
         lng,
         punchPhotoPath,
       });
 
-      const kindObj = KINDS.find((k) => k.value === nextKind);
+      const kindObj = KINDS.find((k) => k.value === targetKind);
       setScanState("success");
       const punchData = {
         fullName: empMatch.full_name,
         role: empMatch.role,
-        kind: kindObj?.label ?? nextKind,
+        kind: kindObj?.label ?? targetKind,
         atMs: res.atMs,
         nsr: res.nsr,
       };
       setAutoPunchResult(punchData);
       setPunchSuccessModal(punchData);
+      setSelectedKind(null);
       playSuccessChime();
 
       setTimeout(() => {
@@ -382,6 +385,103 @@ export function PontoScreen() {
             scanState={scanState}
             detectedName={detectedName}
           />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>👉</span> Selecione o momento da jornada de trabalho:
+            </span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", width: "100%" }}>
+              {KINDS.map((k) => {
+                const isSelected = selectedKind === k.value;
+
+                let bg = "#fdf2d4";
+                let borderColor = "#976a16";
+                let textColor = "#4c3407";
+                let borderStyle = "solid";
+                let IconComponent = IconAlmoco;
+
+                if (k.value === "ENTRADA") {
+                  bg = "#e4f2dc";
+                  borderColor = "#507a32";
+                  textColor = "#233816";
+                  IconComponent = IconEntrada;
+                } else if (k.value === "INTERVALO_INICIO") {
+                  bg = "#fdf2d4";
+                  borderColor = "#976a16";
+                  textColor = "#4c3407";
+                  IconComponent = IconAlmoco;
+                } else if (k.value === "INTERVALO_FIM") {
+                  bg = "#fdf2d4";
+                  borderColor = "#976a16";
+                  textColor = "#4c3407";
+                  borderStyle = "dashed";
+                  IconComponent = IconRetorno;
+                } else if (k.value === "SAIDA") {
+                  bg = "#fde4e4";
+                  borderColor = "#b82e2e";
+                  textColor = "#5e1313";
+                  IconComponent = IconSaida;
+                }
+
+                return (
+                  <button
+                    key={k.value}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setSelectedKind(k.value)}
+                    title={k.help}
+                    style={{
+                      position: "relative",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      padding: "18px 12px",
+                      borderRadius: "18px",
+                      background: bg,
+                      border: `2px ${borderStyle} ${borderColor}`,
+                      boxShadow: isSelected
+                        ? `0 6px 0 ${borderColor}, 0 8px 18px rgba(0,0,0,0.18)`
+                        : `0 4px 0 ${borderColor}`,
+                      color: textColor,
+                      cursor: busy ? "not-allowed" : "pointer",
+                      opacity: busy ? 0.6 : isSelected ? 1 : 0.85,
+                      transform: isSelected ? "scale(1.03)" : "scale(1)",
+                      transition: "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+                      outline: "none",
+                      fontFamily: "var(--font-sans, system-ui, sans-serif)",
+                    }}
+                  >
+                    {isSelected && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: "6px",
+                          right: "8px",
+                          fontSize: "11px",
+                          fontWeight: "bold",
+                          background: borderColor,
+                          color: "#fff",
+                          padding: "2px 8px",
+                          borderRadius: "10px",
+                          boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+                        }}
+                      >
+                        ✓ Selecionado
+                      </span>
+                    )}
+
+                    <IconComponent size={32} color={textColor} />
+
+                    <span style={{ fontSize: "18px", fontWeight: "700", letterSpacing: "-0.3px" }}>
+                      {k.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {faceCapture.ready && scanState === "scanning" && (
             <Button
