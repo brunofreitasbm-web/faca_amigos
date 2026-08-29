@@ -1572,9 +1572,6 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   // texto livre.
   const [installedPrinters, setInstalledPrinters] = useState<string[] | undefined>(undefined);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
-  const [terminalUnitId, setTerminalUnitId] = useState<string>("");
-  const [savingTerminalUnit, setSavingTerminalUnit] = useState(false);
-
   // Unidade amarrada a ESTE computador — diferente da unidade selecionada
   // na sessão. É o que decide quais jobs de impressão este terminal pega:
   // sem amarração ele não imprime nada (antes imprimia os de TODAS as
