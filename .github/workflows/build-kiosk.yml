@@ -44,7 +44,17 @@ jobs:
       # (extraResources), então um .env aqui faria a chave voltar a viajar
       # dentro de cada instalador. Cada terminal recebe a sua em
       # %APPDATA%\FacaAmigos\.env — ver apps/kiosk/.env.example.
+      #
+      # VITE_SUPABASE_URL/VITE_SUPABASE_PUBLISHABLE_KEY entram como
+      # `vars`, não `secrets`: o vite build embute os dois no bundle
+      # (apps/kiosk-ui/src/lib/supabase/client.ts), então já vão expostos
+      # no instalador e em toda requisição do navegador — a publishable
+      # key do Supabase é feita pra isso, não é segredo. Configure em
+      # Settings > Secrets and variables > Actions > Variables.
       - name: Empacotar instalador
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: pnpm dist:kiosk
 
       # Confere o ARTEFATO, não o código-fonte: é o bundle que vai para as
