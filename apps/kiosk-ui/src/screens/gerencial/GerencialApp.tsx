@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button, BrandLockup, HelpText, Tabs } from "@facaamigos/ui";
 import { useAppState } from "../../state/AppState.js";
+import { useAuth } from "../../auth/AuthContext.js";
 import { RequireCapability } from "../../auth/RequireCapability.js";
-import { ROLE_LABEL } from "../../auth/capabilities.js";
+import { ROLE_LABEL, type Capability } from "../../auth/capabilities.js";
 import { PlanosTab } from "./tabs/PlanosTab.js";
 import { PacotesTab } from "./tabs/PacotesTab.js";
 import { ProdutosTab } from "./tabs/ProdutosTab.js";
@@ -26,6 +27,41 @@ import { ClientesTab } from "./tabs/ClientesTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
 type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "FREQUENCIA" | "OCORRENCIAS" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
+
+/**
+ * Capacidade exigida por aba — mesmo padrão de auth/screens.ts e da aba
+ * TAB_CAPABILITY de ConfiguracoesScreen.tsx: `Record<GerencialTab, ...>`
+ * quebra o build se uma aba nova nascer sem declarar o que exige.
+ *
+ * Todas exigem `config.write` (Owner) exceto Relatórios: o Líder já lê
+ * relatório por unidade (`relatorio.read`, tela Relatório do balcão) —
+ * fica igualmente aberto a ele o mesmo relatório agregado das 3 unidades
+ * aqui dentro do Gerencial, sem herdar o resto do console (preço,
+ * colaborador, folha etc.), que continua exclusividade do Owner.
+ */
+const TAB_CAPABILITY: Record<GerencialTab, Capability> = {
+  COPILOT_IA: "config.write",
+  PLANOS: "config.write",
+  PACOTES: "config.write",
+  PRODUTOS: "config.write",
+  CUPONS: "config.write",
+  FIDELIDADE: "config.write",
+  METAS: "config.write",
+  COLABORADORES: "config.write",
+  FREQUENCIA: "config.write",
+  OCORRENCIAS: "config.write",
+  PERMISSOES: "config.write",
+  CLIENTES: "config.write",
+  TALENTOS: "config.write",
+  FOLHA: "config.write",
+  RELATORIOS: "relatorio.read",
+  ABERTURA_FECHAMENTO: "config.write",
+  FOTOS_ENVELOPE: "config.write",
+  SALDO_ENVELOPES: "config.write",
+  HISTORICO: "config.write",
+  AUDITORIA: "config.write",
+  CONTRATO: "config.write",
+};
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "COPILOT_IA", label: "✦ ZoeIA (Copilot)" },
@@ -78,7 +114,14 @@ const TAB_HELP: Record<GerencialTab, string> = {
 
 export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogout: () => void | Promise<void> }) {
   const { employee } = useAppState();
+  const { can } = useAuth();
   const [tab, setTab] = useState<GerencialTab>("PLANOS");
+  const canFull = can("config.write");
+
+  // Só as abas que este colaborador enxerga — e nunca a "Planos" default
+  // de quem entrou sem config.write, que cairia direto num "Área restrita".
+  const tabs = TABS.filter((t) => can(TAB_CAPABILITY[t.value]));
+  const activeTab = tabs.some((t) => t.value === tab) ? tab : (tabs[0]?.value ?? tab);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -114,43 +157,51 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
       </header>
 
       <main style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        <RequireCapability capability="config.write">
+        <RequireCapability capability={["config.write", "relatorio.read"]}>
           <div className="gerencial-shell" style={{ padding: "24px", maxWidth: "1100px", margin: "0 auto" }}>
             <h1 style={{ fontFamily: "var(--font-display)" }}>Gerencial</h1>
             <HelpText>
-              Configurações macro, fora das 3 unidades — o que é cadastrado aqui aparece nas unidades escolhidas.
+              {canFull
+                ? "Configurações macro, fora das 3 unidades — o que é cadastrado aqui aparece nas unidades escolhidas."
+                : "Relatórios das 3 unidades juntas, ou filtrados por uma só. O restante do Gerencial (preço, cadastro, folha) é exclusivo do Owner."}
             </HelpText>
 
             <div className="gerencial-body">
               <div className="gerencial-tabs-col">
-                <Tabs value={tab} onChange={setTab} tabs={TABS} />
+                <Tabs value={activeTab} onChange={setTab} tabs={tabs} />
               </div>
 
               <div className="gerencial-content-col">
-                <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
+                <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[activeTab]}</HelpText>
 
                 <div role="tabpanel">
-                  {tab === "COPILOT_IA" && <GeminiGerencialCopilot />}
-                  {tab === "PLANOS" && <PlanosTab />}
-                  {tab === "PACOTES" && <PacotesTab />}
-                  {tab === "PRODUTOS" && <ProdutosTab />}
-                  {tab === "CUPONS" && <CuponsTab />}
-                  {tab === "FIDELIDADE" && <FidelidadeTab />}
-                  {tab === "METAS" && <MetasTab />}
-                  {tab === "COLABORADORES" && <ColaboradoresTab />}
-                  {tab === "FREQUENCIA" && <FrequenciaTab />}
-                  {tab === "OCORRENCIAS" && <OcorrenciasTab />}
-                  {tab === "PERMISSOES" && <PermissoesTab />}
-                  {tab === "CLIENTES" && <ClientesTab />}
-                  {tab === "TALENTOS" && <BancoTalentosTab />}
-                  {tab === "FOLHA" && <FolhaPagamentoTab />}
-                  {tab === "RELATORIOS" && <GerencialRelatorioTab />}
-                  {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
-                  {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
-                  {tab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
-                  {tab === "HISTORICO" && <HistoricoTab />}
-                  {tab === "AUDITORIA" && <AuditoriaTab />}
-                  {tab === "CONTRATO" && <ContratoTab />}
+                  {/* Guardado de novo aqui dentro (não só a lista de abas
+                      acima): estado residual de `tab` não deve bastar para
+                      renderizar conteúdo de uma capacidade que o colaborador
+                      não tem. */}
+                  <RequireCapability capability={TAB_CAPABILITY[activeTab]}>
+                    {activeTab === "COPILOT_IA" && <GeminiGerencialCopilot />}
+                    {activeTab === "PLANOS" && <PlanosTab />}
+                    {activeTab === "PACOTES" && <PacotesTab />}
+                    {activeTab === "PRODUTOS" && <ProdutosTab />}
+                    {activeTab === "CUPONS" && <CuponsTab />}
+                    {activeTab === "FIDELIDADE" && <FidelidadeTab />}
+                    {activeTab === "METAS" && <MetasTab />}
+                    {activeTab === "COLABORADORES" && <ColaboradoresTab />}
+                    {activeTab === "FREQUENCIA" && <FrequenciaTab />}
+                    {activeTab === "OCORRENCIAS" && <OcorrenciasTab />}
+                    {activeTab === "PERMISSOES" && <PermissoesTab />}
+                    {activeTab === "CLIENTES" && <ClientesTab />}
+                    {activeTab === "TALENTOS" && <BancoTalentosTab />}
+                    {activeTab === "FOLHA" && <FolhaPagamentoTab />}
+                    {activeTab === "RELATORIOS" && <GerencialRelatorioTab />}
+                    {activeTab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
+                    {activeTab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
+                    {activeTab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
+                    {activeTab === "HISTORICO" && <HistoricoTab />}
+                    {activeTab === "AUDITORIA" && <AuditoriaTab />}
+                    {activeTab === "CONTRATO" && <ContratoTab />}
+                  </RequireCapability>
                 </div>
               </div>
             </div>

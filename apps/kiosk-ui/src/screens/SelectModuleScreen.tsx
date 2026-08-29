@@ -109,60 +109,64 @@ export function SelectModuleScreen() {
           );
         })}
 
-        {!isOperador && can("config.write") && (
-          <Card
-            key="gerencial"
-            onClick={() => setGerencial(true)}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              padding: "24px",
-              borderRadius: "24px",
-              border: "2px solid var(--border-subtle)",
-              borderTop: "6px solid var(--color-primary)",
-              transition: "all 0.25s ease",
-              cursor: "pointer",
-              position: "relative",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-              <div
-                style={{
-                  fontSize: "42px",
-                  lineHeight: 1,
-                  background: "var(--surface-sunken)",
-                  padding: "12px",
-                  borderRadius: "16px",
-                }}
-              >
-                🗂️
-              </div>
-              <Badge variant="vip">Owner</Badge>
-            </div>
-
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
-              Gerencial
-            </h2>
-
-            <p style={{ fontSize: "14px", fontWeight: "bold", color: "var(--color-primary)", margin: "0 0 12px 0" }}>
-              Configurações macro, fora das 3 unidades
-            </p>
-
-            <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 24px 0", flex: 1 }}>
-              Preço, pacote, produto, cupom, fidelidade, meta e colaboradores — decida em quais unidades cada um vale, e
-              acompanhe relatórios das três de uma vez.
-            </p>
-
-            <Button
-              variant="primary"
-              size="md"
+        {!isOperador && (can("config.write") || can("relatorio.read")) && (() => {
+          const canFull = can("config.write");
+          return (
+            <Card
+              key="gerencial"
               onClick={() => setGerencial(true)}
-              style={{ width: "100%", borderRadius: "9999px", fontWeight: "bold" }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                padding: "24px",
+                borderRadius: "24px",
+                border: "2px solid var(--border-subtle)",
+                borderTop: "6px solid var(--color-primary)",
+                transition: "all 0.25s ease",
+                cursor: "pointer",
+                position: "relative",
+              }}
             >
-              Entrar no Gerencial ➔
-            </Button>
-          </Card>
-        )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                <div
+                  style={{
+                    fontSize: "42px",
+                    lineHeight: 1,
+                    background: "var(--surface-sunken)",
+                    padding: "12px",
+                    borderRadius: "16px",
+                  }}
+                >
+                  🗂️
+                </div>
+                <Badge variant="vip">{canFull ? "Owner" : "Líder"}</Badge>
+              </div>
+
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
+                Gerencial
+              </h2>
+
+              <p style={{ fontSize: "14px", fontWeight: "bold", color: "var(--color-primary)", margin: "0 0 12px 0" }}>
+                {canFull ? "Configurações macro, fora das 3 unidades" : "Relatórios gerenciais das 3 unidades"}
+              </p>
+
+              <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 24px 0", flex: 1 }}>
+                {canFull
+                  ? "Preço, pacote, produto, cupom, fidelidade, meta e colaboradores — decida em quais unidades cada um vale, e acompanhe relatórios das três de uma vez."
+                  : "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só."}
+              </p>
+
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setGerencial(true)}
+                style={{ width: "100%", borderRadius: "9999px", fontWeight: "bold" }}
+              >
+                Entrar no Gerencial ➔
+              </Button>
+            </Card>
+          );
+        })()}
       </div>
     </div>
   );

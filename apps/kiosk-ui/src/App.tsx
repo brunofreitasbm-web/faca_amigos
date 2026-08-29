@@ -55,6 +55,7 @@ import { Api } from "./api/client.js";
 import { MobileShell } from "./mobile/MobileShell.js";
 import { MobileScreenFrame } from "./mobile/MobileScreenFrame.js";
 import { MobileGerencial } from "./mobile/MobileGerencial.js";
+import { MobileRelatorios } from "./mobile/MobileRelatorios.js";
 import { MobileLogin } from "./mobile/MobileLogin.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
 
@@ -290,14 +291,24 @@ export function App() {
   // em mobile/MobileGerencial.tsx.
   // Modo Gerencial: fora do contexto das 3 unidades, é onde o Owner configura
   // o que vale para várias unidades de uma vez e vê relatórios cross-unit.
-  // Operador NUNCA acessa o módulo Gerencial.
+  // Operador NUNCA acessa o módulo Gerencial. O Líder (GERENTE) entra só
+  // pelos relatórios: sem `config.write` não vê a Home administrativa do
+  // Owner (receita, caixa e envelope das 3 unidades) nem o console de 21
+  // abas — cai direto no mesmo relatório de fechamento que o Owner abre
+  // pela Home (MobileRelatorios), e no desktop o GerencialApp já restringe
+  // sozinho as abas a "Relatórios".
   if (gerencial) {
-    if (employee?.role === "OPERADOR" || !can("config.write")) {
+    const canFullGerencial = can("config.write");
+    const canGerencialReports = can("relatorio.read");
+    if (employee?.role === "OPERADOR" || (!canFullGerencial && !canGerencialReports)) {
       setGerencial(false);
+    } else if (mobile.active) {
+      return canFullGerencial ? (
+        <MobileGerencial units={units} onExit={() => setGerencial(false)} onLogout={handleLogout} />
+      ) : (
+        <MobileRelatorios units={units} onBack={() => setGerencial(false)} />
+      );
     } else {
-      if (mobile.active) {
-        return <MobileGerencial units={units} onExit={() => setGerencial(false)} onLogout={handleLogout} />;
-      }
       return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
     }
   }
