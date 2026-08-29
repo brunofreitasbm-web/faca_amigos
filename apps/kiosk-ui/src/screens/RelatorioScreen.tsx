@@ -14,35 +14,54 @@ import { exportFrequenciaCsv } from "../lib/csvExport.js";
 type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 export type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
 
+// Data corrida em UTC (só usada para presets de N dias corridos, onde o
+// eventual desvio de fuso de +/-1 dia na borda do intervalo não importa).
 export function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function computeDatesForPeriod(period: PeriodPreset, customFrom: string, customTo: string): { from: string; to: string } {
+// Mesma regra usada no banco por `fa_kiosk_business_date` (ver migração
+// 20260830000003): converte o instante para o horário de Belém (UTC-3, sem
+// horário de verão) e só então aplica o corte do "dia" — para que "Hoje" e
+// "Ontem" no relatório caiam exatamente no mesmo `business_date` que os
+// pedidos gravados no banco, em vez de usar a data corrida em UTC (que troca
+// de dia às 21h/00h em Belém, fora de sincronia com o corte real).
+const BELEM_UTC_OFFSET_MS = -3 * 60 * 60 * 1000;
+export function businessDate(d: Date, cutoffHour: number): string {
+  const shifted = new Date(d.getTime() + BELEM_UTC_OFFSET_MS - cutoffHour * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+}
+
+export function computeDatesForPeriod(
+  period: PeriodPreset,
+  customFrom: string,
+  customTo: string,
+  cutoffHour = 4,
+): { from: string; to: string } {
   const now = new Date();
   if (period === "today") {
-    const todayStr = isoDate(now);
+    const todayStr = businessDate(now, cutoffHour);
     return { from: todayStr, to: todayStr };
   }
   if (period === "yesterday") {
     const y = new Date(now);
     y.setDate(now.getDate() - 1);
-    const yStr = isoDate(y);
+    const yStr = businessDate(y, cutoffHour);
     return { from: yStr, to: yStr };
   }
   if (period === "7d") {
     const from = new Date(now);
     from.setDate(now.getDate() - 7);
-    return { from: isoDate(from), to: isoDate(now) };
+    return { from: businessDate(from, cutoffHour), to: businessDate(now, cutoffHour) };
   }
   if (period === "90d") {
     const from = new Date(now);
     from.setDate(now.getDate() - 90);
-    return { from: isoDate(from), to: isoDate(now) };
+    return { from: businessDate(from, cutoffHour), to: businessDate(now, cutoffHour) };
   }
   if (period === "this_month") {
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { from: isoDate(from), to: isoDate(now) };
+    return { from: isoDate(from), to: businessDate(now, cutoffHour) };
   }
   if (period === "last_month") {
     const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -51,7 +70,7 @@ export function computeDatesForPeriod(period: PeriodPreset, customFrom: string, 
   }
   if (period === "this_year") {
     const from = new Date(now.getFullYear(), 0, 1);
-    return { from: isoDate(from), to: isoDate(now) };
+    return { from: isoDate(from), to: businessDate(now, cutoffHour) };
   }
   if (period === "last_year") {
     const from = new Date(now.getFullYear() - 1, 0, 1);
@@ -64,7 +83,7 @@ export function computeDatesForPeriod(period: PeriodPreset, customFrom: string, 
   // 30d default
   const from = new Date(now);
   from.setDate(now.getDate() - 30);
-  return { from: isoDate(from), to: isoDate(now) };
+  return { from: businessDate(from, cutoffHour), to: businessDate(now, cutoffHour) };
 }
 
 export function RelatorioScreen() {
@@ -78,7 +97,7 @@ export function RelatorioScreen() {
 
   if (!unit) return null;
 
-  const { from, to } = computeDatesForPeriod(period, customFrom, customTo);
+  const { from, to } = computeDatesForPeriod(period, customFrom, customTo, unit.business_day_cutoff_hour);
 
   const tabs: { value: Tab; label: string }[] = [
     { value: "VENDAS", label: "Vendas" },

@@ -2382,3 +2382,12 @@ $$ language sql volatile security definer;
 
 revoke execute on function fa_owner_email_claim_due(bigint) from public;
 grant execute on function fa_owner_email_claim_due(bigint) to service_role;
+
+-- 2026-08-30 (20260830000003): fa_kiosk_business_date fazia o corte do dia
+-- em UTC (timezone da sessão do banco), não no timezone da unidade
+-- (America/Belem, UTC-3) -- fazendo pedidos pagos à noite caírem num
+-- business_date fora de sincronia com o "Hoje"/"Ontem" calculado no
+-- front-end (RelatorioScreen.tsx), que já usa data corrida em UTC.
+create or replace function fa_kiosk_business_date(p_now_ms bigint, p_cutoff_hour integer) returns date as $$
+  select ((to_timestamp(p_now_ms / 1000.0) at time zone 'America/Belem') - (p_cutoff_hour || ' hours')::interval)::date
+$$ language sql immutable;
