@@ -29,6 +29,7 @@ import { isPushSupported, subscribeToPush, getExistingPushSubscription, pushSubs
 import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/WristbandQRCode.js";
 import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
 import { money } from "../format.js";
+import { AutoUpdateCard } from "../components/AutoUpdateCard.js";
 
 type Tab =
   | "PLANOS"
@@ -1776,6 +1777,9 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* ATUALIZAÇÕES DO SISTEMA (AUTO UPDATE) */}
+      <AutoUpdateCard />
+
       <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
         Escolha a impressora pela lista das que estão instaladas neste terminal — o print bridge local usa exatamente esse nome para imprimir direto, sem abrir diálogo nenhum na tela.
       </p>

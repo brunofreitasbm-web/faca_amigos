@@ -1290,6 +1290,30 @@ export const Api = {
   setTerminalUnit: (unitId: string) => setTerminalUnit(unitId),
   /** ID desta instalação; null fora do Electron. */
   deviceId: () => localDeviceId(),
+  /** Info de atualizações do sistema local (quiosque/Electron). */
+  systemInfo: async () => {
+    try {
+      const res = await fetch("/api/system/info");
+      if (!res.ok) return null;
+      return (await res.json()) as { update: { status: string; version?: string; progress?: number; error?: string }; now: number };
+    } catch {
+      return null;
+    }
+  },
+  checkSystemUpdate: async () => {
+    try {
+      const res = await fetch("/api/system/update/check", { method: "POST" });
+      if (!res.ok) return null;
+      return (await res.json()) as { ok: boolean; update?: { status: string; version?: string; progress?: number; error?: string } };
+    } catch {
+      return null;
+    }
+  },
+  applySystemUpdate: async () => {
+    try {
+      await fetch("/api/system/update/apply", { method: "POST" });
+    } catch {}
+  },
   units: () =>
     unwrap<Unit[]>(
       supabase()
