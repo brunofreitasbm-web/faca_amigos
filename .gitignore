@@ -115,3 +115,8 @@ view-source_*.html
 
 .vercel
 .env*
+# Reafirma a exceção: a regra `.env*` acima é posterior ao `!.env.example`
+# da seção "Env / secrets" e sozinha voltaria a ignorar os exemplos, que
+# são justamente a documentação do que cada instalação precisa provisionar.
+!.env.example
+!**/.env.example

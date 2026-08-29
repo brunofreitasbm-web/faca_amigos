@@ -37,9 +37,11 @@ const envPath = join(kioskDir, ".env");
 if (!existsSync(envPath)) throw new Error(`Não encontrei ${envPath}`);
 const env = loadEnv(envPath);
 const supabaseUrl = env.FACAAMIGOS_SUPABASE_URL;
-const serviceRoleKey = env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+// Aceita o nome novo (sb_secret_..., rotacionável sozinho) e mantém o
+// antigo funcionando para não quebrar um .env já preenchido.
+const serviceRoleKey = env.FACAAMIGOS_SUPABASE_SECRET_KEY || env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
 if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error("FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ausentes em apps/kiosk/.env");
+  throw new Error("FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SECRET_KEY ausentes em apps/kiosk/.env");
 }
 
 async function storageFetch(path, options) {

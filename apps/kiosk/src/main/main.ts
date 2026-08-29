@@ -29,9 +29,13 @@ function loadDotEnvFromCandidates(): void {
     // app.getPath pode falhar se chamado antes da inicialização completa dos caminhos
   }
 
+  // userData ANTES do .env que veio dentro do instalador: o primeiro que
+  // define uma variável vence, e o instalador é idêntico nas duas
+  // máquinas. Sem esta ordem não há como trocar a chave de um terminal
+  // (ou rotacioná-la) sem gerar um instalador novo.
   const candidates: string[] = [
-    process.resourcesPath ? join(process.resourcesPath, ".env") : "",
     userDataEnv,
+    process.resourcesPath ? join(process.resourcesPath, ".env") : "",
     join(process.cwd(), ".env"),
     join(import.meta.dirname, "../.env"),
     process.execPath ? join(process.execPath, "../.env") : "",
@@ -227,11 +231,18 @@ if (isPrimaryInstance) {
     // saía e ninguém no balcão descobria até a família já ter ido embora.
     const printBridgeResult = startPrintBridge(serverRes.db);
     if (!printBridgeResult.started) {
+      // O caminho do arquivo entra no aviso porque, sem a chave, quem
+      // está no balcão é quem precisa resolver — e sem o caminho a
+      // mensagem vira só "está desligado", sem o que fazer a respeito.
+      const envPath = join(app.getPath("userData"), ".env");
       dialog.showMessageBox({
         type: "warning",
         title: "Impressão automática desligada",
         message: "A impressão automática de pulseira/recibo está desligada neste terminal.",
-        detail: `${printBridgeResult.reason}\n\nOs check-ins continuam funcionando normalmente, mas nada será impresso até isso ser corrigido e o app reiniciado.`,
+        detail:
+          `${printBridgeResult.reason}\n\n` +
+          `Arquivo de configuração deste computador:\n${envPath}\n\n` +
+          "Os check-ins continuam funcionando normalmente, mas nada será impresso até isso ser corrigido e o app reiniciado.",
         buttons: ["OK"],
       });
     }
