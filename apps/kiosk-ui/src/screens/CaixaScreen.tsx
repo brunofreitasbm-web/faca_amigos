@@ -152,6 +152,13 @@ export function CaixaScreen() {
   // OFFLINE_FLUSH_EVENT abaixo resolve isso quando a fila reenviar sozinha.
   const [pendingCloseKey, setPendingCloseKey] = useState<string | null>(null);
 
+  // Mesma lógica do fechamento (pendingCloseKey) aplicada a sangria/suprimento:
+  // sem isso, uma queda breve de rede fazia o operador ver "Erro" numa
+  // movimentação que na verdade já tinha sido salva na fila offline — e ao
+  // tentar de novo (idempotencyKey novo a cada chamada) o valor entrava
+  // duplicado quando a fila reenviava sozinha. Ver fa_record_cash_movement.
+  const [pendingMovementKey, setPendingMovementKey] = useState<string | null>(null);
+
   // Estados do Modal "Registrar Envelope"
   const [envelopeModalOpen, setEnvelopeModalOpen] = useState(false);
   const [envelopeNum, setEnvelopeNum] = useState("");
@@ -195,8 +202,22 @@ export function CaixaScreen() {
       setEnvelopeFundoCaixa("0");
       setEnvelopePhoto(null);
       await refresh();
-    } catch {
-      alert("Erro ao registrar o envelope.");
+    } catch (err) {
+      if (err instanceof OfflineQueuedError) {
+        // A movimentação FOI salva (fila offline) e será reenviada sozinha —
+        // fechar o modal e limpar o formulário evita que o operador registre
+        // o mesmo envelope de novo (o que criaria uma sangria duplicada,
+        // já que cada chamada usa uma idempotencyKey nova).
+        alert(`Sem conexão: envelope #${envelopeNum} foi salvo e será enviado automaticamente quando a rede voltar. Não registre este envelope novamente.`);
+        setPendingMovementKey(err.idempotencyKey);
+        setEnvelopeModalOpen(false);
+        setEnvelopeNum("");
+        setEnvelopeVal("0");
+        setEnvelopeFundoCaixa("0");
+        setEnvelopePhoto(null);
+      } else {
+        alert("Erro ao registrar o envelope.");
+      }
     } finally {
       setEnvelopeBusy(false);
     }
@@ -251,6 +272,23 @@ export function CaixaScreen() {
     return () => window.removeEventListener(OFFLINE_FLUSH_EVENT, onFlush);
   }, [pendingCloseKey]);
 
+  useEffect(() => {
+    if (!pendingMovementKey) return;
+    function onFlush(event: Event) {
+      const detail = (event as CustomEvent<OfflineFlushDetail>).detail;
+      if (detail.idempotencyKey !== pendingMovementKey) return;
+      setPendingMovementKey(null);
+      if (!detail.success) {
+        // Erro de regra de negócio no reenvio (ex.: turno fechado nesse meio
+        // tempo) — a movimentação NÃO aconteceu; precisa ser refeita manualmente.
+        setError("Uma movimentação enviada sem conexão não pôde ser concluída. Confira o Fluxo de Dinheiro e registre novamente se necessário.");
+      }
+      refresh();
+    }
+    window.addEventListener(OFFLINE_FLUSH_EVENT, onFlush);
+    return () => window.removeEventListener(OFFLINE_FLUSH_EVENT, onFlush);
+  }, [pendingMovementKey]);
+
   async function openShift() {
     if (!unit || !employee) return;
     setBusy(true);
@@ -288,8 +326,16 @@ export function CaixaScreen() {
       setMovementReason("");
       await refresh();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao registrar movimentação";
-      setError(msg);
+      if (err instanceof OfflineQueuedError) {
+        // Idem ao envelope: já foi salva na fila, limpa o formulário para
+        // não convidar um reenvio duplicado quando ela sincronizar sozinha.
+        setPendingMovementKey(err.idempotencyKey);
+        setMovementAmount("0");
+        setMovementReason("");
+      } else {
+        const msg = err instanceof Error ? err.message : "Erro ao registrar movimentação";
+        setError(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -411,6 +457,7 @@ export function CaixaScreen() {
                 loading={envelopeBusy}
                 disabled={
                   envelopeBusy ||
+                  !!pendingMovementKey ||
                   !envelopeNum ||
                   Number(envelopeVal) <= 0 ||
                   !envelopePhoto ||
@@ -419,7 +466,7 @@ export function CaixaScreen() {
                 }
                 onClick={handleSaveEnvelope}
               >
-                💾 Confirmar Registro
+                {pendingMovementKey ? "Aguardando conexão..." : "💾 Confirmar Registro"}
               </Button>
             </div>
           </div>
@@ -946,8 +993,8 @@ export function CaixaScreen() {
         </div>
         <Input label="Valor (R$)" type="number" value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} />
         <Input label="Motivo / N° Envelope" placeholder="Ex: Sangria depósito banco, envelope #104..." value={movementReason} onChange={(e) => setMovementReason(e.target.value)} />
-        <Button variant="secondary" loading={busy} disabled={busy} onClick={addMovement} style={{ marginTop: "8px" }}>
-          Registrar Lançamento
+        <Button variant="secondary" loading={busy} disabled={busy || !!pendingMovementKey} onClick={addMovement} style={{ marginTop: "8px" }}>
+          {pendingMovementKey ? "Aguardando conexão..." : "Registrar Lançamento"}
         </Button>
 
         <ul style={{ marginTop: "12px", paddingLeft: "20px" }}>
