@@ -30,6 +30,7 @@ import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/W
 import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
 import { money } from "../format.js";
 import { AutoUpdateCard } from "../components/AutoUpdateCard.js";
+import { getPublicAppUrl } from "../lib/appUrl.js";
 
 type Tab =
   | "PLANOS"
@@ -2157,14 +2158,8 @@ function UnidadeTab({ unitId }: { unitId: string }) {
     );
   }
 
-  // Mesmo endereço público usado no QR de acompanhamento (EntradaScreen) e
-  // no pareamento de celular/tablet (ConnectDeviceModal) — no Electron
-  // local, window.location.origin é 127.0.0.1, que o celular de quem
-  // escaneia o cartaz na entrada não alcança.
-  const envAppUrl = import.meta.env.VITE_PUBLIC_APP_URL as string | undefined;
-  const isLocalOrigin = ["127.0.0.1", "localhost"].includes(window.location.hostname);
-  const publicAppOrigin = envAppUrl ?? (isLocalOrigin ? undefined : window.location.origin);
-  const acessoRapidoUrl = publicAppOrigin ? `${publicAppOrigin.replace(/\/$/, "")}/?acesso-rapido=${unitId}` : null;
+  const publicAppOrigin = getPublicAppUrl();
+  const acessoRapidoUrl = `${publicAppOrigin.replace(/\/$/, "")}/?acesso-rapido=${unitId}`;
   const [printingPoster, setPrintingPoster] = useState(false);
 
   async function printPoster() {
@@ -2249,23 +2244,15 @@ function UnidadeTab({ unitId }: { unitId: string }) {
           responsável pelo próprio celular, escolhe o plano e aceita os Termos de Uso — os dados já chegam prontos
           para o educador só confirmar a entrada no Painel.
         </HelpText>
-        {acessoRapidoUrl ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-            <WristbandQRCode value={acessoRapidoUrl} size={120} />
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <HelpText style={{ margin: 0, wordBreak: "break-all" }}>{acessoRapidoUrl}</HelpText>
-              <Button variant="secondary" loading={printingPoster} disabled={printingPoster} onClick={printPoster} style={{ alignSelf: "flex-start" }}>
-                🖨️ Imprimir cartaz (A4)
-              </Button>
-            </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+          <WristbandQRCode value={acessoRapidoUrl} size={120} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <HelpText style={{ margin: 0, wordBreak: "break-all" }}>{acessoRapidoUrl}</HelpText>
+            <Button variant="secondary" loading={printingPoster} disabled={printingPoster} onClick={printPoster} style={{ alignSelf: "flex-start" }}>
+              🖨️ Imprimir cartaz (A4)
+            </Button>
           </div>
-        ) : (
-          <HelpText>
-            Este computador está rodando no endereço local ({window.location.origin}), que o celular do responsável
-            não alcança. Defina <code>VITE_PUBLIC_APP_URL</code> (URL do deploy na Vercel) no build para o QR
-            funcionar aqui — o mesmo endereço já usado em "Conectar celular ou tablet" e no QR de acompanhamento.
-          </HelpText>
-        )}
+        </div>
       </Card>
 
       <Button variant="primary" disabled={saving || !name} onClick={save}>

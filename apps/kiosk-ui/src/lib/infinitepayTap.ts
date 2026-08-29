@@ -1,3 +1,5 @@
+import { getPublicAppUrl } from "./appUrl.js";
+
 /**
  * Integração InfiniteTap (InfinitePay): cobrança por aproximação usando o
  * próprio celular/tablet como maquininha. Documentação oficial:
@@ -28,11 +30,7 @@ export interface TapChargeParams {
 }
 
 function tapResultUrl(): string {
-  // Usa sempre o domínio público (o mesmo do QR de pareamento), nunca
-  // window.location.origin: no Electron desktop isso seria um servidor
-  // local (sem sentido pro app InfinitePay reabrir), e no tablet o app
-  // precisa reabrir exatamente a URL pública que o operador já tem em uso.
-  const base = (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined) || window.location.origin;
+  const base = getPublicAppUrl();
   return `${base}/?${TAP_RETURN_PARAM}=1`;
 }
 

@@ -12,6 +12,7 @@ import { formatPlanoHoras } from "../contract/contractTemplate.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useAcompanhar } from "../api/useAcompanhar.js";
+import { getPublicAppUrl } from "../lib/appUrl.js";
 import {
   normalizePhoneE164,
   formatPhoneBr,
@@ -174,12 +175,9 @@ export function EntradaScreen({
   const [contractOpen, setContractOpen] = useState(false);
   const [acompanharOpen, setAcompanharOpen] = useState(false);
 
-  // Mesmo endereço público (Vercel) já usado no pareamento de celular/tablet
-  // em ConnectDeviceModal — no Electron local, window.location.origin é
-  // 127.0.0.1, que o celular do responsável não alcança.
-  const envAppUrl = import.meta.env.VITE_PUBLIC_APP_URL as string | undefined;
-  const isLocalOrigin = ["127.0.0.1", "localhost"].includes(window.location.hostname);
-  const publicAppOrigin = envAppUrl ?? (isLocalOrigin ? undefined : window.location.origin);
+  // Endereço público (Vercel) para o QR de acompanhamento — em localhost/Electron,
+  // utiliza o fallback automático de produção.
+  const publicAppOrigin = getPublicAppUrl();
   const acompanharUrl =
     done && publicAppOrigin ? `${publicAppOrigin.replace(/\/$/, "")}/?acompanhar=${done.accessCode}` : null;
 
@@ -1340,51 +1338,37 @@ export function EntradaScreen({
           scanner do operador na saída via fa_kiosk_normalize_access_code,
           que quebraria se virasse uma URL). Este é só para o responsável
           apontar a câmera do próprio celular, oferecido pela operadora. */}
-      {acompanharOpen && done && (
+      {acompanharOpen && done && acompanharUrl && (
         <Modal title="📱 Apresentar ao Responsável" onClose={() => setAcompanharOpen(false)}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "8px 0" }}>
-            {acompanharUrl ? (
-              <>
-                <p
-                  style={{
-                    margin: 0,
-                    textAlign: "center",
-                    fontSize: "15px",
-                    fontWeight: 600,
-                    color: "var(--color-teal-text)",
-                  }}
-                >
-                  Vire a tela e apresente este QR Code ao responsável de {done.childName.split(" ")[0]}
-                </p>
-                <p style={{ margin: 0, textAlign: "center", fontSize: "13px", color: "var(--text-muted)" }}>
-                  Basta apontar a câmera do celular para o QR abaixo — o painel de acompanhamento abre na hora, sem
-                  precisar de cadastro.
-                </p>
-                {/* Mesmo cronômetro que o responsável vê no celular assim que
-                    escaneia o QR — roda aqui no balcão em paralelo, pela
-                    mesma sessão, para o operador confirmar de relance que o
-                    tempo já está contando antes de liberar a criança. */}
-                {acompanharTiming && (
-                  <StatusBadge
-                    phase={acompanharTiming.phase}
-                    detail={formatElapsed(acompanharTiming.elapsedMs)}
-                    size="lg"
-                    style={{ width: "100%", alignItems: "center", textAlign: "center" }}
-                  />
-                )}
-                <WristbandQRCode value={acompanharUrl} size={220} />
-              </>
-            ) : (
-              <div style={{ background: "var(--surface-sunken)", borderRadius: "12px", padding: "14px", fontSize: "13px" }}>
-                <strong>Endereço público ainda não configurado.</strong>
-                <HelpText>
-                  Este computador está rodando no endereço local ({window.location.origin}), que o celular do
-                  responsável não alcança. Defina <code>VITE_PUBLIC_APP_URL</code> (URL do deploy na Vercel) no build
-                  para o QR de acompanhamento funcionar aqui — o mesmo endereço já usado em "Conectar celular ou
-                  tablet".
-                </HelpText>
-              </div>
+            <p
+              style={{
+                margin: 0,
+                textAlign: "center",
+                fontSize: "15px",
+                fontWeight: 600,
+                color: "var(--color-teal-text)",
+              }}
+            >
+              Vire a tela e apresente este QR Code ao responsável de {done.childName.split(" ")[0]}
+            </p>
+            <p style={{ margin: 0, textAlign: "center", fontSize: "13px", color: "var(--text-muted)" }}>
+              Basta apontar a câmera do celular para o QR abaixo — o painel de acompanhamento abre na hora, sem
+              precisar de cadastro.
+            </p>
+            {/* Mesmo cronômetro que o responsável vê no celular assim que
+                escaneia o QR — roda aqui no balcão em paralelo, pela
+                mesma sessão, para o operador confirmar de relance que o
+                tempo já está contando antes de liberar a criança. */}
+            {acompanharTiming && (
+              <StatusBadge
+                phase={acompanharTiming.phase}
+                detail={formatElapsed(acompanharTiming.elapsedMs)}
+                size="lg"
+                style={{ width: "100%", alignItems: "center", textAlign: "center" }}
+              />
             )}
+            <WristbandQRCode value={acompanharUrl} size={220} />
           </div>
         </Modal>
       )}
