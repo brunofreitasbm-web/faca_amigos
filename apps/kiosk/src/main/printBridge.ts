@@ -279,8 +279,34 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
 
   async function printerNameFor(unitId: string, kind: PrintJobRow["kind"]): Promise<string | null> {
     const key = kind === "WRISTBAND" ? "printer_wristband" : "printer_receipt";
-    const { data } = await supabase.from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId).eq("key", key).maybeSingle();
-    return (data?.value as string | undefined) ?? null;
+    let configuredValue: string | null = null;
+
+    try {
+      const { data } = await supabase.from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId).eq("key", key).maybeSingle();
+      if (data?.value) configuredValue = data.value as string;
+    } catch (err) {
+      console.warn(`[print-bridge] Erro ao consultar Supabase em fa_kiosk_app_settings (${key}):`, err);
+    }
+
+    if (!configuredValue && unitId !== unitId.toLowerCase()) {
+      try {
+        const { data } = await supabase.from("fa_kiosk_app_settings").select("value").eq("unit_id", unitId.toLowerCase()).eq("key", key).maybeSingle();
+        if (data?.value) configuredValue = data.value as string;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!configuredValue && db) {
+      try {
+        const row = db.prepare("SELECT value FROM app_settings WHERE key = ? ORDER BY updated_at_ms DESC").get(key) as { value: string } | undefined;
+        if (row?.value?.trim()) configuredValue = row.value.trim();
+      } catch {
+        // ignore
+      }
+    }
+
+    return configuredValue;
   }
 
   async function resolvePrinterDeviceName(unitId: string, kind: PrintJobRow["kind"]): Promise<string | null> {

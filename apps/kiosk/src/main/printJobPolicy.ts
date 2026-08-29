@@ -45,14 +45,16 @@ export function getTerminalUnitIds(db?: Db): Set<string> {
   return allowed;
 }
 
-/** ID desta instalação; null quando não há banco local (ex.: teste sem DB). */
+/** ID desta instalação; null quando não há banco local e nem env var. */
 export function getLocalDeviceId(db?: Db): string | null {
-  if (!db) return null;
-  try {
-    return ensureDeviceId(db, Date.now());
-  } catch {
-    return null;
+  if (db) {
+    try {
+      return ensureDeviceId(db, Date.now());
+    } catch {
+      // fallback
+    }
   }
+  return process.env.FACAAMIGOS_DEVICE_ID ?? process.env.DEVICE_ID ?? null;
 }
 
 export interface JobDecision {

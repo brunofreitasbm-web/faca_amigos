@@ -2473,7 +2473,7 @@ export const Api = {
         supabase()
           .from("fa_kiosk_print_jobs")
           .insert({
-            unit_id: unitId,
+            unit_id: unitId.trim().toLowerCase(),
             kind,
             payload_json: payload,
             status: "PENDING",
