@@ -44,7 +44,19 @@ jobs:
       # (extraResources), então um .env aqui faria a chave voltar a viajar
       # dentro de cada instalador. Cada terminal recebe a sua em
       # %APPDATA%\FacaAmigos\.env — ver apps/kiosk/.env.example.
+      #
+      # VITE_SUPABASE_URL/VITE_SUPABASE_PUBLISHABLE_KEY já são embutidas
+      # aqui: o Vite grava import.meta.env.VITE_* no bundle no momento do
+      # build (`vite build` dentro de `pnpm dist:kiosk`), não em runtime —
+      # sem elas aqui o kiosk-ui empacotado nunca teria essas variáveis e
+      # travaria em "VITE_SUPABASE_URL/VITE_SUPABASE_PUBLISHABLE_KEY não
+      # configurados" assim que abrisse. É a chave PUBLICÁVEL (protegida
+      # por RLS, não é segredo — ver apps/kiosk-ui/.env.example), por isso
+      # não precisa vir de secrets.
       - name: Empacotar instalador
+        env:
+          VITE_SUPABASE_URL: https://ivjvpdzsfjdpyabbzzuj.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh
         run: pnpm dist:kiosk
 
       # Confere o ARTEFATO, não o código-fonte: é o bundle que vai para as
@@ -101,8 +113,14 @@ jobs:
       # As credenciais entram como variáveis de ambiente, nunca como
       # arquivo: release-kiosk.mjs lê process.env primeiro justamente para
       # o publish ter a chave sem que ela entre no instalador.
+      # VITE_SUPABASE_URL/VITE_SUPABASE_PUBLISHABLE_KEY: mesma razão do job
+      # "build" acima — release-kiosk.mjs builda o kiosk-ui de novo aqui
+      # (checkout próprio), e sem elas o instalador publicado no feed sai
+      # com o app quebrado.
       - name: Buildar e publicar no feed
         env:
           FACAAMIGOS_SUPABASE_URL: ${{ secrets.FACAAMIGOS_SUPABASE_URL }}
           FACAAMIGOS_SUPABASE_SECRET_KEY: ${{ secrets.FACAAMIGOS_SUPABASE_SECRET_KEY }}
+          VITE_SUPABASE_URL: https://ivjvpdzsfjdpyabbzzuj.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh
         run: pnpm release:kiosk
