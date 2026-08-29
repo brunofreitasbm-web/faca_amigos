@@ -21,6 +21,10 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: { "Content-Type": "application/json" } });
 
@@ -44,6 +48,7 @@ Deno.serve(async (req) => {
     title: string;
     body: string;
     recipient_email: string;
+    photo_url: string | null;
   }>;
 
   if (rows.length === 0) return jsonResponse({ checked: 0, sent: 0, failed: 0 });
@@ -62,6 +67,13 @@ Deno.serve(async (req) => {
         to: row.recipient_email,
         subject: row.title,
         text: row.body,
+        ...(row.photo_url
+          ? {
+              html:
+                `<pre style="font-family: inherit; white-space: pre-wrap; font-size: 14px;">${escapeHtml(row.body)}</pre>` +
+                `<p><img src="${row.photo_url}" alt="Foto do envelope" style="max-width: 480px; width: 100%; border-radius: 8px;" /></p>`,
+            }
+          : {}),
       }),
     ),
   );
