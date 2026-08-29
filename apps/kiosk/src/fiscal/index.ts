@@ -38,7 +38,7 @@ function loadOrCreateTerminalId(userDataPath: string): string {
   return id;
 }
 
-export function startFiscalWorker(userDataPath: string): void {
+export function startFiscalWorker(userDataPath: string, deviceId?: string | null): void {
   const url = process.env.FACAAMIGOS_SUPABASE_URL;
   // Mesma ordem do print bridge: chave nova primeiro, nome antigo como
   // ponte para os .env já instalados. Nunca há padrão embutido aqui —
@@ -71,6 +71,7 @@ export function startFiscalWorker(userDataPath: string): void {
           {
             supabase,
             terminalId,
+            deviceId,
             simulado,
             userDataPath,
             crypto: electronSafeStorageCrypto(),

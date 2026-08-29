@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { app, BrowserWindow, Menu, ipcMain, dialog } from "electron";
-import { openDatabase, migrate } from "@facaamigos/db-local";
+import { openDatabase, migrate, ensureDeviceId } from "@facaamigos/db-local";
 import { buildApp } from "../server/app.js";
 import { seedDevData } from "../server/seed-dev.js";
 import { loadOrCreateTls } from "../server/tls.js";
@@ -113,6 +113,12 @@ async function startLocalServer() {
 
   const nowMs = Date.now();
   if (process.env.FACAAMIGOS_SEED_DEV === "true") seedDevData(db, nowMs);
+
+  // Garante o ID desta instalação já na subida, antes de qualquer tela
+  // pedir: o print bridge precisa dele para reservar job, e depender da
+  // UI chamar /api/system/device-id foi o que deixou o campo nulo em
+  // produção por semanas.
+  ensureDeviceId(db, nowMs);
 
   const hmacKey = randomBytes(32).toString("hex");
   // Tablets da LAN precisam de HTTPS (câmera exige contexto seguro); o
@@ -231,18 +237,21 @@ if (isPrimaryInstance) {
     // saía e ninguém no balcão descobria até a família já ter ido embora.
     const printBridgeResult = startPrintBridge(serverRes.db);
     if (!printBridgeResult.started) {
-      // O caminho do arquivo entra no aviso porque, sem a chave, quem
-      // está no balcão é quem precisa resolver — e sem o caminho a
-      // mensagem vira só "está desligado", sem o que fazer a respeito.
+      // Duas causas diferentes, dois consertos diferentes — e quem lê
+      // isto está no balcão, então cada uma mostra só o que serve para
+      // ela. Sem unidade amarrada: resolve na própria tela, sem
+      // reiniciar. Amarrado e mesmo assim parado: o que falta é a chave,
+      // e o caminho do .env é a única coisa acionável.
       const envPath = join(app.getPath("userData"), ".env");
+      const comoResolver = printBridgeResult.bound
+        ? `Arquivo de configuração deste computador:\n${envPath}\n\n` +
+          "Os check-ins continuam funcionando normalmente, mas nada será impresso até isso ser corrigido e o app reiniciado."
+        : "Os check-ins continuam funcionando normalmente. Assim que você escolher a unidade em Configurações > Impressoras, a impressão volta sozinha — não precisa reiniciar.";
       dialog.showMessageBox({
         type: "warning",
         title: "Impressão automática desligada",
         message: "A impressão automática de pulseira/recibo está desligada neste terminal.",
-        detail:
-          `${printBridgeResult.reason}\n\n` +
-          `Arquivo de configuração deste computador:\n${envPath}\n\n` +
-          "Os check-ins continuam funcionando normalmente, mas nada será impresso até isso ser corrigido e o app reiniciado.",
+        detail: `${printBridgeResult.reason}\n\n${comoResolver}`,
         buttons: ["OK"],
       });
     }
@@ -253,7 +262,7 @@ if (isPrimaryInstance) {
     // acima não tem essa proteção porque foi escrito antes; o worker fiscal
     // não repete essa lacuna.
     try {
-      startFiscalWorker(app.getPath("userData"));
+      startFiscalWorker(app.getPath("userData"), ensureDeviceId(serverRes.db, Date.now()));
     } catch (err) {
       console.error("[fiscal] falha ao iniciar o worker fiscal — emissão de NFC-e desligada neste terminal:", err);
     }

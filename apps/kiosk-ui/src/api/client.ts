@@ -34,6 +34,50 @@ function localDeviceId(): Promise<string | null> {
   return deviceIdPromise;
 }
 
+/**
+ * Unidade a que ESTE computador pertence — diferente da unidade
+ * selecionada na sessão, que muda conforme quem está operando. É o que
+ * o print bridge usa para só imprimir os jobs da própria unidade.
+ *
+ * Devolve `{ unitId: null, available: false }` fora do Electron
+ * (tablet/PWA sem o servidor local): esses aparelhos não imprimem nada
+ * sozinhos, então não faz sentido pedir a amarração ao operador ali.
+ */
+export interface TerminalUnitInfo {
+  unitId: string | null;
+  available: boolean;
+}
+
+async function getTerminalUnit(): Promise<TerminalUnitInfo> {
+  try {
+    const res = await fetch("/api/system/terminal-unit");
+    if (!res.ok) return { unitId: null, available: false };
+    const data = (await res.json()) as { unitId?: string | null };
+    return { unitId: typeof data.unitId === "string" && data.unitId ? data.unitId : null, available: true };
+  } catch {
+    return { unitId: null, available: false };
+  }
+}
+
+/**
+ * Lança quando não dá para gravar. A versão anterior engolia o erro num
+ * `try/catch` em volta do `fetch` — e `fetch` não lança em 500, então a
+ * gravação falhava (FK do SQLite local) enquanto a tela dizia "salvo com
+ * sucesso" e o terminal seguia sem unidade, imprimindo job de todas.
+ */
+async function setTerminalUnit(unitId: string): Promise<string> {
+  const res = await fetch("/api/system/terminal-unit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ unitId }),
+  });
+  const data = (await res.json().catch(() => null)) as { ok?: boolean; unitId?: string; message?: string } | null;
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.message ?? `Não foi possível vincular este computador à unidade (HTTP ${res.status}).`);
+  }
+  return data.unitId ?? unitId;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -1241,6 +1285,11 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
 }
 
 export const Api = {
+  /** Unidade amarrada a ESTE computador (Configurações > Impressoras > Este terminal). */
+  terminalUnit: () => getTerminalUnit(),
+  setTerminalUnit: (unitId: string) => setTerminalUnit(unitId),
+  /** ID desta instalação; null fora do Electron. */
+  deviceId: () => localDeviceId(),
   units: () =>
     unwrap<Unit[]>(
       supabase()
@@ -2267,15 +2316,16 @@ export const Api = {
     } catch (err) {
       console.warn("Supabase RLS impediu gravação remota em fa_kiosk_app_settings (salvo localmente no quiosque):", err);
     }
+    // Amarração implícita do terminal só como BOOTSTRAP de instalação
+    // nova. Antes ela gravava sempre, com a unidade SELECIONADA na tela —
+    // configurar a impressora da outra unidade a partir deste computador
+    // reamarrava a máquina para lá, em silêncio.
     if (key === "printer_receipt" || key === "printer_wristband") {
       try {
-        await fetch("/api/system/terminal-unit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ unitId }),
-        });
-      } catch {
-        // ignora se não estiver rodando sob o servidor local do Fastify
+        const current = await getTerminalUnit();
+        if (current.available && !current.unitId) await setTerminalUnit(unitId);
+      } catch (err) {
+        console.warn("Não foi possível vincular automaticamente este computador à unidade:", err);
       }
     }
   },
@@ -2380,14 +2430,31 @@ export const Api = {
     ),
   /** Reimprime pulseira + recibo de guarda da mesma sessão, sem gerar código novo. */
   reimprimirEntrada: (sessionId: string, employeeId?: string) =>
-    unwrap<{ accessCode: string }>(
-      supabase().rpc("fa_reimprimir_entrada", { p_session_id: sessionId, p_employee_id: employeeId ?? null }),
+    localDeviceId().then((deviceId) =>
+      unwrap<{ accessCode: string }>(
+        supabase().rpc("fa_reimprimir_entrada", {
+          p_session_id: sessionId,
+          p_employee_id: employeeId ?? null,
+          p_device_id: deviceId,
+        }),
+      ),
     ),
   queuePrintJob: (unitId: string, kind: "WRISTBAND" | "RECEIPT", payload: unknown) =>
-    unwrap(
-      supabase()
-        .from("fa_kiosk_print_jobs")
-        .insert({ unit_id: unitId, kind, payload_json: payload, status: "PENDING", created_at_ms: Date.now() }),
+    // origin_device_id dá preferência de impressão ao computador que
+    // pediu; passada a carência, qualquer terminal daquela unidade
+    // assume — importante porque venda feita em tablet/PWA chega sem
+    // origem e, com regra estrita, nunca imprimiria em lugar nenhum.
+    localDeviceId().then((deviceId) =>
+      unwrap(
+        supabase().from("fa_kiosk_print_jobs").insert({
+          unit_id: unitId,
+          kind,
+          payload_json: payload,
+          status: "PENDING",
+          created_at_ms: Date.now(),
+          origin_device_id: deviceId,
+        }),
+      ),
     ),
   todayRevenue: async (unitId: string, cutoffHour: number) => {
     const totalCents = await unwrap<number>(
