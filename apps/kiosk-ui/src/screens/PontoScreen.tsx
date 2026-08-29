@@ -12,11 +12,54 @@ import { useGeolocation } from "../hooks/useGeolocation.js";
 import { isSameFace, findBestFaceMatch, playSuccessChime } from "../lib/faceRecognition.js";
 
 const KINDS = [
-  { value: "ENTRADA", label: "Entrada", help: "Registrar que você chegou para trabalhar agora" },
-  { value: "INTERVALO_INICIO", label: "Início do intervalo", help: "Registrar que você está saindo para o intervalo/almoço" },
-  { value: "INTERVALO_FIM", label: "Fim do intervalo", help: "Registrar que você voltou do intervalo/almoço" },
-  { value: "SAIDA", label: "Saída", help: "Registrar que você está indo embora ao final do expediente" },
+  { value: "ENTRADA", label: "Entrada", help: "Registrar chegada / início de jornada" },
+  { value: "INTERVALO_INICIO", label: "Almoço", help: "Registrar saída para intervalo / almoço" },
+  { value: "INTERVALO_FIM", label: "Retorno", help: "Registrar retorno do intervalo / almoço" },
+  { value: "SAIDA", label: "Saída", help: "Registrar término da jornada de trabalho" },
 ] as const;
+
+function IconEntrada({ size = 28, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7" />
+      <path d="M13 3v18l7-3V6l-7-3z" fill={color} fillOpacity="0.12" />
+      <path d="M2 12h9" />
+      <path d="m8 9 3 3-3 3" />
+    </svg>
+  );
+}
+
+function IconAlmoco({ size = 28, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 2v8a2 2 0 0 0 4 0V2" />
+      <path d="M9 10v12" />
+      <path d="M9 2v4" />
+      <path d="M16 2v20" />
+      <path d="M16 2c3 0 4 3 4 8v2h-4" fill={color} fillOpacity="0.15" />
+    </svg>
+  );
+}
+
+function IconRetorno({ size = 28, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h11.5a4.5 4.5 0 0 1 4.5 4.5v0a4.5 4.5 0 0 1-4.5 4.5H11" />
+    </svg>
+  );
+}
+
+function IconSaida({ size = 28, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7" />
+      <path d="M13 3v18l7-3V6l-7-3z" fill={color} fillOpacity="0.12" />
+      <path d="M11 12h10" />
+      <path d="m18 9 3 3-3 3" />
+    </svg>
+  );
+}
 
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -442,25 +485,125 @@ export function PontoScreen() {
                 Próxima marcação: <strong>{KINDS.find((k) => k.value === nextKind)?.label ?? nextKind}</strong>
               </HelpText>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "16px 0" }}>
                 {KINDS.map((k) => {
                   const isNext = k.value === nextKind;
                   const isDone = KINDS.findIndex((x) => x.value === k.value) < KINDS.findIndex((x) => x.value === nextKind);
+
+                  let bg = "#fdf2d4";
+                  let borderColor = "#976a16";
+                  let textColor = "#4c3407";
+                  let borderStyle = "solid";
+                  let IconComponent = IconAlmoco;
+
+                  if (k.value === "ENTRADA") {
+                    bg = "#e4f2dc";
+                    borderColor = "#507a32";
+                    textColor = "#233816";
+                    IconComponent = IconEntrada;
+                  } else if (k.value === "INTERVALO_INICIO") {
+                    bg = "#fdf2d4";
+                    borderColor = "#976a16";
+                    textColor = "#4c3407";
+                    IconComponent = IconAlmoco;
+                  } else if (k.value === "INTERVALO_FIM") {
+                    bg = "#fdf2d4";
+                    borderColor = "#976a16";
+                    textColor = "#4c3407";
+                    borderStyle = "dashed";
+                    IconComponent = IconRetorno;
+                  } else if (k.value === "SAIDA") {
+                    bg = "#fde4e4";
+                    borderColor = "#b82e2e";
+                    textColor = "#5e1313";
+                    IconComponent = IconSaida;
+                  }
+
                   return (
-                    <Button
+                    <button
                       key={k.value}
-                      variant={isNext ? "primary" : "secondary"}
-                      size="lg"
-                      disabled={busy || !isNext}
-                      title={isNext ? k.help : isDone ? "Já registrado hoje" : "Aguarde a marcação anterior"}
+                      type="button"
+                      disabled={busy || (!isNext && !isDone)}
                       onClick={() => bater(k.value)}
-                      style={isDone ? { opacity: 0.5 } : undefined}
+                      title={isNext ? k.help : isDone ? "Já registrado hoje" : "Aguarde a sequência de marcação"}
+                      style={{
+                        position: "relative",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        padding: "24px 16px",
+                        borderRadius: "20px",
+                        background: bg,
+                        border: `2px ${borderStyle} ${borderColor}`,
+                        boxShadow: isDone
+                          ? `0 2px 0 ${borderColor}`
+                          : isNext
+                            ? `0 6px 0 ${borderColor}, 0 10px 20px rgba(0,0,0,0.12)`
+                            : `0 4px 0 ${borderColor}`,
+                        color: textColor,
+                        cursor: busy || (!isNext && !isDone) ? "not-allowed" : "pointer",
+                        opacity: isDone ? 0.7 : !isNext ? 0.8 : 1,
+                        transform: isNext ? "scale(1.02)" : "scale(1)",
+                        transition: "all 0.15s ease-in-out",
+                        outline: "none",
+                        fontFamily: "var(--font-sans, system-ui, sans-serif)",
+                      }}
                     >
-                      {isDone ? "✓ " : ""}
-                      {k.label}
-                    </Button>
+                      {isDone && (
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: "8px",
+                            right: "10px",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                            background: borderColor,
+                            color: "#fff",
+                            padding: "2px 8px",
+                            borderRadius: "10px",
+                          }}
+                        >
+                          ✓ Registrado
+                        </span>
+                      )}
+
+                      <IconComponent size={34} color={textColor} />
+
+                      <span style={{ fontSize: "20px", fontWeight: "700", letterSpacing: "-0.3px" }}>
+                        {k.label}
+                      </span>
+                    </button>
                   );
                 })}
+              </div>
+
+              {/* Badge de Conformidade MTP Portaria 671/2021 & Geofencing */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  padding: "8px 14px",
+                  borderRadius: "12px",
+                  background: "var(--surface-sunken, #f4f4f5)",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  fontSize: "12px",
+                  color: "var(--text-muted, #666)",
+                  fontWeight: "500",
+                }}
+              >
+                <span>🛡️ Marcação de Jornada REP-P</span>
+                <span>•</span>
+                <span>Portaria 671/2021 MTP</span>
+                {geofenceRadiusM !== null && (
+                  <>
+                    <span>•</span>
+                    <span style={{ color: "#059669", fontWeight: "600" }}>📍 Geofencing Ativo</span>
+                  </>
+                )}
               </div>
 
               {message && <p style={{ color: "var(--color-teal-text)" }}>{message}</p>}
