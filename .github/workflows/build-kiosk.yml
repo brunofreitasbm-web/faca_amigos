@@ -5,17 +5,19 @@
 # depende de alguém rodar na própria máquina, e a versão distribuída passa
 # a variar conforme quem buildou.
 #
-# Disparo manual apenas: o instalador tem ~105MB e leva vários minutos, não
-# faz sentido rodar a cada push.
+# Disparo automático a cada push na main, ou manual via workflow_dispatch.
 name: Build do instalador (kiosk)
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       publicar:
         description: "Publicar no feed de auto-update? ATENÇÃO: os terminais em operação se atualizam sozinhos."
         type: boolean
-        default: false
+        default: true
 
 jobs:
   build:
@@ -85,7 +87,7 @@ jobs:
   # revisores obrigatórios) — não removendo o environment daqui.
   publicar:
     needs: build
-    if: inputs.publicar
+    if: github.event_name == 'push' || inputs.publicar == true
     runs-on: windows-latest
     timeout-minutes: 40
     environment: producao
