@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       publicar:
-        description: "Publicar no feed de auto-update? ATENÇÃO: os terminais em operação se atualizam sozinhos."
+        description: "Publicar no feed de auto-update? ATENÇÃO: publica direto, sem aprovação manual depois — os terminais em operação se atualizam sozinhos."
         type: boolean
         default: false
 
@@ -75,15 +75,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  # Job separado e apontado para um Environment: assim dá para exigir
-  # aprovação manual antes de qualquer coisa chegar aos terminais. Configure
-  # a proteção em Settings > Environments > producao > Required reviewers.
+  # Sem Environment/aprovação manual: publica direto assim que "publicar"
+  # está marcado no disparo do workflow. A confirmação passou a ser o
+  # próprio input "publicar" do workflow_dispatch — não há mais um segundo
+  # checkpoint humano depois disso.
   publicar:
     needs: build
     if: inputs.publicar
     runs-on: windows-latest
     timeout-minutes: 40
-    environment: producao
     steps:
       - uses: actions/checkout@v4
 
