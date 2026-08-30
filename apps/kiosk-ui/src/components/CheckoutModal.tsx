@@ -258,7 +258,7 @@ export function CheckoutModal({
             guardianName: e.session.guardian_name_snapshot,
             phone: e.session.guardian_phone_snapshot,
           },
-          footerNote: `Entrada ${new Date(e.session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} → Saída ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} (+${e.quote.timing.overMinutes}min)`,
+          footerNote: `Entrada ${new Date(e.session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} → Saída ${new Date(closedAtMs).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} (+${e.quote.timing.overMinutes}min)`,
         })),
       );
     } catch (err) {
@@ -304,7 +304,7 @@ export function CheckoutModal({
         guardianName: e.session.guardian_name_snapshot,
         phone: e.session.guardian_phone_snapshot,
       },
-      footerNote: `Entrada ${new Date(e.session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} → Saída ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} (+${e.quote.timing.overMinutes}min)`,
+      footerNote: `Entrada ${new Date(e.session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} → Saída ${new Date(closedAtMs).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} (+${e.quote.timing.overMinutes}min)`,
     }));
 
     savePendingTap(orderId, {
