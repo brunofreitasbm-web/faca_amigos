@@ -22,7 +22,6 @@ import {
   isValidCpf,
   formatCpf,
   planDurationMinutes,
-  minutesUntilClosing,
   formatAccessCode,
 } from "@facaamigos/domain";
 import { money, formatElapsed } from "../format.js";
@@ -206,19 +205,10 @@ export function EntradaScreen({
   const [crossSellModalOpen, setCrossSellModalOpen] = useState(false);
 
   const [lastGuardianId, setLastGuardianId] = useState<string | null>(null);
-  const [closingTime, setClosingTime] = useState<string | undefined>(undefined);
-  const [nowTick, setNowTick] = useState(() => Date.now());
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   const [geminiOffers, setGeminiOffers] = useState<CheckinOffer[]>([]);
   const [loadingGemini, setLoadingGemini] = useState(false);
-
-  useEffect(() => {
-    if (!unit) return;
-    Api.unitSetting(unit.id, "closing_time")
-      .then((r) => setClosingTime(r.value ?? undefined))
-      .catch(() => {});
-  }, [unit]);
 
   // Configuração do cross-sell rápido: qual produto oferecer e a partir de
   // quantos minutos de plano. Se não houver id configurado, tenta localizar "Água".
@@ -243,14 +233,6 @@ export function EntradaScreen({
       })
       .catch(() => setQuickProduct(null));
   }, [unit]);
-
-  // Reavalia quais planos ainda cabem até o fechamento conforme o tempo passa.
-  useEffect(() => {
-    const interval = setInterval(() => setNowTick(Date.now()), 30_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const remainingMinutes = closingTime ? minutesUntilClosing(nowTick, closingTime) : null;
 
   useEffect(() => {
     if (!unit) return;
@@ -1032,31 +1014,19 @@ export function EntradaScreen({
               visual separada — cada um já chegou aqui como um Plan
               sintético (packagePlans). */}
           {[...plans, ...packagePlans].map((plan) => {
-            const isPackage = plan.id.startsWith(PACKAGE_PREFIX);
             const minutes = planDurationMinutes(plan);
-            // Planos acima de 2h não são mais bloqueados perto do fechamento:
-            // a sobra vira crédito no banco de horas em vez de se perder.
-            // Só continuam bloqueados quando o shopping já está fechando.
-            // Pacotes seguem a mesma regra (o saldo comprado não se perde).
-            const fits =
-              remainingMinutes === null ||
-              minutes <= remainingMinutes ||
-              ((minutes > threshold || isPackage) && remainingMinutes > 0);
             const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
             return (
               <Card
                 key={plan.id}
                 onClick={() => {
-                  if (!fits) return;
                   setPlanId(plan.id);
                   if (minutes >= quickTriggerMinutes) {
                     setCrossSellModalOpen(true);
                   }
                 }}
-                title={fits ? undefined : `Não cabe até o fechamento — faltam ${Math.max(0, remainingMinutes ?? 0)} min`}
                 style={{
-                  cursor: fits ? "pointer" : "not-allowed",
-                  opacity: fits ? 1 : 0.4,
+                  cursor: "pointer",
                   padding: "14px 18px",
                   minWidth: "150px",
                   borderRadius: "16px",
@@ -1086,7 +1056,6 @@ export function EntradaScreen({
                     </div>
                   )}
                 </div>
-                {!fits && <div style={{ fontSize: "11px", color: "var(--color-error-text)", fontWeight: "bold", marginTop: "4px" }}>Não cabe até o fechamento</div>}
               </Card>
             );
           })}
