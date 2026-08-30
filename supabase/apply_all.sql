@@ -2247,6 +2247,9 @@ alter table fa_kiosk_owner_notifications add column if not exists photo_url text
 -- 2. fa_owner_report_enqueue ganha p_photo_url (trailing, default null —
 --    todo chamador existente continua funcionando sem alteração).
 -- ---------------------------------------------------------------------
+drop function if exists public.fa_owner_report_enqueue(uuid, text, date, text, text, text);
+drop function if exists fa_owner_report_enqueue(uuid, text, date, text, text, text);
+
 create or replace function fa_owner_report_enqueue(
   p_unit_id uuid, p_report_type text, p_business_date date, p_title text, p_body text,
   p_dedupe_key text default null, p_photo_url text default null
