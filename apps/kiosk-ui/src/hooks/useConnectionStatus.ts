@@ -33,12 +33,8 @@ export function useConnectionStatus(): ConnectionState {
         setStatus("offline");
         return;
       }
-      const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-      if (!base) {
-        setStatus("online");
-        return;
-      }
+      const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
+      const key = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) || "sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh";
       try {
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), PING_TIMEOUT_MS);
