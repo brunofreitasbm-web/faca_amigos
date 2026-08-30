@@ -2,15 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@facaamigos/ui";
 
 /**
- * Foto da criança pela câmera do tablet — só identificação visual para o
- * monitor no salão, nunca biometria. Estritamente webcam: sem input de
- * arquivo, sem galeria, porque a foto tem que ser tirada ali na hora, com a
- * criança na frente do balcão, e não escolhida de um álbum de outra pessoa.
+ * Foto pela câmera do tablet — usada tanto para a criança (identificação
+ * visual para o monitor no salão, nunca biometria) quanto para o envelope de
+ * sangria no caixa. Estritamente webcam via getUserMedia: nunca `<input
+ * type="file" capture>`, porque esse input dispara o app de câmera nativo do
+ * sistema operacional — o que tira o navegador de primeiro plano e, em
+ * tablets travados em modo kiosk, derruba a tela de volta pro launcher/home
+ * em vez de voltar pro formulário. Sem input de arquivo, sem galeria: a foto
+ * tem que ser tirada ali na hora (a criança na frente do balcão, o envelope
+ * em cima do caixa), não escolhida de um álbum de outra pessoa.
  *
  * Câmera só liga quando o operador toca em "Tirar foto" — ao contrário do
  * QrScanner (que abre sozinha porque é o primeiro passo do fluxo), aqui é
- * opcional, então manter a câmera ligada por padrão seria pedir permissão
- * de vídeo para quem nem vai usar o recurso.
+ * opcional/sob demanda, então manter a câmera ligada por padrão seria pedir
+ * permissão de vídeo para quem nem vai usar o recurso.
  */
 
 const CAPTURE_WIDTH = 640;
@@ -20,9 +25,20 @@ type Status = "idle" | "starting" | "streaming" | "denied" | "unsupported" | "er
 interface PhotoCaptureProps {
   /** Chamado com o blob capturado (JPEG), ou `null` quando a foto é removida. */
   onChange: (photo: Blob | null) => void;
+  /** Texto do rótulo acima do botão/preview. */
+  label?: string;
+  /** Texto do botão que liga a câmera. */
+  buttonLabel?: string;
+  /** `alt` da miniatura após a captura. */
+  previewAlt?: string;
 }
 
-export function PhotoCapture({ onChange }: PhotoCaptureProps) {
+export function PhotoCapture({
+  onChange,
+  label = "Foto da criança (opcional)",
+  buttonLabel = "📷 Tirar foto pela câmera",
+  previewAlt = "Foto capturada da criança",
+}: PhotoCaptureProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -112,12 +128,12 @@ export function PhotoCapture({ onChange }: PhotoCaptureProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <span style={{ fontFamily: "var(--font-body)", fontWeight: "var(--weight-semibold)" as unknown as number, fontSize: "13px", color: "var(--text-secondary)" }}>
-        Foto da criança (opcional)
+        {label}
       </span>
 
       {status === "idle" && (
         <Button variant="ghost" size="sm" onClick={openCamera} style={{ alignSelf: "flex-start" }}>
-          📷 Tirar foto pela câmera
+          {buttonLabel}
         </Button>
       )}
 
@@ -168,7 +184,7 @@ export function PhotoCapture({ onChange }: PhotoCaptureProps) {
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           <img
             src={previewUrl}
-            alt="Foto capturada da criança"
+            alt={previewAlt}
             style={{ width: "96px", height: "96px", objectFit: "cover", borderRadius: "14px", border: "2px solid var(--color-teal)" }}
           />
           <div style={{ display: "flex", gap: "8px" }}>
