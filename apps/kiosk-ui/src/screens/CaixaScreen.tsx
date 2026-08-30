@@ -10,6 +10,7 @@ import { money } from "../format.js";
 import { OFFLINE_FLUSH_EVENT, OfflineQueuedError } from "../lib/supabase/offlineQueue.js";
 import type { OfflineFlushDetail } from "../lib/supabase/offlineQueue.js";
 import { NfceModal } from "../components/NfceModal.js";
+import { PhotoCapture } from "../components/PhotoCapture.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
@@ -434,15 +435,14 @@ export function CaixaScreen() {
               value={envelopeFundoCaixa}
               onChange={(e) => setEnvelopeFundoCaixa(e.target.value)}
             />
-            <div>
-              <label style={{ fontSize: "13px", fontWeight: "bold", display: "block", marginBottom: "4px" }}>Foto do Envelope (obrigatória — JPG ou PNG)</label>
-              <input
-                type="file"
-                accept="image/jpeg,image/png"
-                capture="environment"
-                onChange={(e) => setEnvelopePhoto(e.target.files?.[0] ?? null)}
-              />
-            </div>
+            <PhotoCapture
+              label="Foto do Envelope (obrigatória)"
+              buttonLabel="📷 Tirar foto do envelope"
+              previewAlt="Foto capturada do envelope"
+              onChange={(blob) =>
+                setEnvelopePhoto(blob ? new File([blob], `envelope-${Date.now()}.jpg`, { type: "image/jpeg" }) : null)
+              }
+            />
 
             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "16px" }}>
               <Button
