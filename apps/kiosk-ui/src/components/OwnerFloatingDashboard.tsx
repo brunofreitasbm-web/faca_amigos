@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { ArrowClockwiseIcon, XIcon } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { Api, businessDateFor } from "../api/client.js";
@@ -11,6 +12,29 @@ interface UnitSummary {
   revenueCents: number;
   sessionsCount: number;
 }
+
+// Cartão flat sem sombra pesada — borda fina + raio grande, igual ao
+// `.m-card` da casca mobile (apps/kiosk-ui/src/mobile/mobile.css) — em
+// vez do visual escuro/emoji que este widget tinha antes de usar os
+// tokens do design system.
+const cardSurfaceStyle: React.CSSProperties = {
+  background: "var(--surface-card)",
+  border: "1px solid var(--color-gray-200)",
+  boxShadow: "var(--shadow-sm)",
+};
+
+const iconButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  color: "var(--text-muted)",
+  fontSize: "16px",
+  cursor: "pointer",
+  padding: "8px",
+  borderRadius: "var(--radius-sm)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
 
 export function OwnerFloatingDashboard() {
   const { employee, units } = useAppState();
@@ -77,106 +101,87 @@ export function OwnerFloatingDashboard() {
 
   if (!isOwner) return null;
 
-  // Botão flutuante fechado
+  // Botão flutuante fechado — já mostra o total consolidado, sem
+  // precisar abrir nada.
   if (!isOpen) {
     return (
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        title="Abrir resumo do dia"
+        aria-label={`Abrir resumo do dia. Faturamento: ${money(totalRevenueCents)}, ${totalSessionsCount} sessões.`}
         style={{
           position: "fixed",
-          bottom: "24px",
-          right: "24px",
+          bottom: "var(--space-6)",
+          right: "var(--space-6)",
           zIndex: 999,
-          padding: "10px 16px",
-          borderRadius: "9999px",
-          background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
-          color: "#2ECFB5",
-          border: "1px solid rgba(46, 207, 181, 0.4)",
-          boxShadow: "0 8px 30px rgba(0, 0, 0, 0.4)",
-          fontWeight: 700,
-          fontSize: "13px",
-          cursor: "pointer",
           display: "flex",
           alignItems: "center",
-          gap: "8px",
+          gap: "var(--space-2)",
+          minHeight: "44px",
+          padding: "10px 18px",
+          borderRadius: "var(--radius-full)",
+          fontFamily: "var(--font-body)",
+          fontWeight: "var(--weight-bold)" as unknown as number,
+          fontSize: "var(--text-sm)",
+          color: "var(--text-primary)",
+          cursor: "pointer",
+          ...cardSurfaceStyle,
         }}
       >
-        <span>👑 {money(totalRevenueCents)}</span>
-        <span style={{ color: "#CBD5E1", fontWeight: 500 }}>· {totalSessionsCount} sessões</span>
+        <span aria-hidden="true" style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--color-teal)", flexShrink: 0 }} />
+        <span style={{ fontFamily: "var(--font-display)", color: "var(--color-primary-hover)" }}>{money(totalRevenueCents)}</span>
+        <span style={{ color: "var(--text-muted)", fontWeight: "var(--weight-medium)" as unknown as number }}>
+          · {totalSessionsCount} sessões
+        </span>
       </button>
     );
   }
 
-  // Cartão compacto ancorado no canto — não é uma modal de tela cheia
+  // Cartão compacto ancorado no canto — não é uma modal de tela cheia.
   return (
     <div
+      role="region"
+      aria-label="Resumo do dia — OWNER"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setIsOpen(false);
+      }}
       style={{
         position: "fixed",
-        bottom: "24px",
-        right: "24px",
+        bottom: "var(--space-6)",
+        right: "var(--space-6)",
         zIndex: 999,
         width: "300px",
         maxWidth: "calc(100vw - 32px)",
-        background: "#0F172A",
-        border: "1px solid rgba(255, 255, 255, 0.12)",
-        borderRadius: "16px",
-        boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6)",
-        color: "#F8FAFC",
+        borderRadius: "20px",
         overflow: "hidden",
+        fontFamily: "var(--font-body)",
+        ...cardSurfaceStyle,
       }}
     >
       {/* CABEÇALHO */}
       <div
         style={{
           padding: "12px 14px",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+          borderBottom: "1px solid var(--color-gray-200)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: "linear-gradient(180deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.6) 100%)",
         }}
       >
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: "13px", fontWeight: 800, color: "#FFFFFF" }}>👑 Hoje</span>
-          <span style={{ fontSize: "11px", color: "#94A3B8" }}>
+          <span style={{ fontSize: "13px", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--text-primary)" }}>
+            Hoje
+          </span>
+          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
             {loading ? "Atualizando…" : lastUpdated ? `Atualizado às ${lastUpdated}` : ""}
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          <button
-            type="button"
-            onClick={loadDashboardData}
-            disabled={loading}
-            title="Atualizar agora"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#94A3B8",
-              fontSize: "14px",
-              cursor: "pointer",
-              padding: "4px",
-              borderRadius: "6px",
-            }}
-          >
-            🔄
+        <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+          <button type="button" onClick={loadDashboardData} disabled={loading} aria-label="Atualizar agora" style={iconButtonStyle}>
+            <ArrowClockwiseIcon aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            onClick={() => setIsOpen(false)}
-            title="Fechar"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#64748B",
-              fontSize: "16px",
-              cursor: "pointer",
-              padding: "4px 6px",
-              borderRadius: "6px",
-            }}
-          >
-            ✕
+          <button type="button" onClick={() => setIsOpen(false)} aria-label="Fechar" style={iconButtonStyle}>
+            <XIcon aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -184,22 +189,30 @@ export function OwnerFloatingDashboard() {
       {/* LISTA POR UNIDADE */}
       <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: "10px" }}>
         {unitSummaries.map((u) => (
-          <div
-            key={u.unitId}
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}
-          >
-            <span style={{ fontSize: "13px", color: "#CBD5E1", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              📍 {u.unitName}
+          <div key={u.unitId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+            <span
+              style={{
+                fontSize: "13px",
+                color: "var(--text-secondary)",
+                fontWeight: "var(--weight-semibold)" as unknown as number,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {u.unitName}
             </span>
             <div style={{ display: "flex", alignItems: "baseline", gap: "6px", flexShrink: 0 }}>
-              <span style={{ fontSize: "14px", fontWeight: 800, color: "#2ECFB5" }}>{money(u.revenueCents)}</span>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>· {u.sessionsCount} sessões</span>
+              <span style={{ fontSize: "14px", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-primary-hover)" }}>
+                {money(u.revenueCents)}
+              </span>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>· {u.sessionsCount} sessões</span>
             </div>
           </div>
         ))}
 
         {unitSummaries.length === 0 && !loading && (
-          <span style={{ fontSize: "12px", color: "#64748B" }}>Sem dados para hoje ainda.</span>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Sem dados para hoje ainda.</span>
         )}
 
         {units.length > 1 && unitSummaries.length > 0 && (
@@ -211,13 +224,17 @@ export function OwnerFloatingDashboard() {
               gap: "8px",
               marginTop: "2px",
               paddingTop: "10px",
-              borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+              borderTop: "1px solid var(--color-gray-200)",
             }}
           >
-            <span style={{ fontSize: "13px", color: "#F8FAFC", fontWeight: 800 }}>Total</span>
+            <span style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: "var(--weight-extrabold)" as unknown as number }}>
+              Total
+            </span>
             <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-              <span style={{ fontSize: "15px", fontWeight: 800, color: "#2ECFB5" }}>{money(totalRevenueCents)}</span>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>· {totalSessionsCount} sessões</span>
+              <span style={{ fontSize: "15px", fontWeight: "var(--weight-extrabold)" as unknown as number, color: "var(--color-primary-hover)" }}>
+                {money(totalRevenueCents)}
+              </span>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>· {totalSessionsCount} sessões</span>
             </div>
           </div>
         )}
