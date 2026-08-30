@@ -6,9 +6,13 @@
 -- causam o erro: function fa_owner_report_enqueue(uuid, unknown, date, text, text) is not unique.
 -- ---------------------------------------------------------------------
 
--- 1. Remove a assinatura antiga de 6 parâmetros
+-- 1. Remove todas as assinaturas antigas e sobrecarregadas
+drop function if exists public.fa_owner_report_enqueue(uuid, text, date, text, text);
+drop function if exists fa_owner_report_enqueue(uuid, text, date, text, text);
 drop function if exists public.fa_owner_report_enqueue(uuid, text, date, text, text, text);
 drop function if exists fa_owner_report_enqueue(uuid, text, date, text, text, text);
+drop function if exists public.fa_owner_report_enqueue(uuid, text, date, text, text, text, text);
+drop function if exists fa_owner_report_enqueue(uuid, text, date, text, text, text, text);
 
 -- 2. Recria a assinatura atualizada e única com 7 parâmetros
 create or replace function public.fa_owner_report_enqueue(
