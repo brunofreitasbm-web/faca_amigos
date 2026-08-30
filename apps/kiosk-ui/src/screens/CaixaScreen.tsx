@@ -514,7 +514,7 @@ export function CaixaScreen() {
           </div>
 
           <HelpText style={{ marginBottom: "16px" }}>
-            "Esperado" é o valor calculado pelo sistema; "Declarado" é a contagem informada. "✓ bateu" confirma a convergência dos valores.
+            "Declarado" é a contagem informada. "✓ Zero divergência" confirma que bateu com o esperado pelo sistema.
           </HelpText>
 
           <div style={{ overflowX: "auto", marginBottom: "20px" }}>
@@ -522,32 +522,28 @@ export function CaixaScreen() {
               <thead>
                 <tr style={{ borderBottom: "2px solid var(--border-subtle)" }}>
                   <th style={{ textAlign: "left", padding: "8px" }}>Método</th>
-                  <th style={{ textAlign: "right", padding: "8px" }}>Esperado</th>
                   <th style={{ textAlign: "right", padding: "8px" }}>Declarado</th>
-                  <th style={{ textAlign: "right", padding: "8px" }}>Diferença</th>
+                  <th style={{ textAlign: "left", padding: "8px" }}>Situação</th>
                   <th style={{ textAlign: "left", padding: "8px" }}>Justificativa</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.keys(closeResult.divergence).map((method) => {
-                  const balanced = closeResult.divergence[method] === 0;
+                  const isShortage = (closeResult.divergence[method] ?? 0) < 0;
                   return (
                     <tr key={method} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                       <td style={{ padding: "8px", fontWeight: "600" }}>{method}</td>
-                      <td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{money(closeResult.expected[method] ?? 0)}</td>
                       <td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{money(closeResult.declared[method] ?? 0)}</td>
                       <td
                         style={{
-                          textAlign: "right",
                           padding: "8px",
-                          fontVariantNumeric: "tabular-nums",
                           fontWeight: "bold",
-                          color: balanced ? "var(--color-teal-text)" : "var(--color-error-text)",
+                          color: isShortage ? "var(--color-error-text)" : "var(--color-teal-text)",
                         }}
                       >
-                        {balanced ? "✓ bateu" : `⚠ ${money(closeResult.divergence[method] ?? 0)}`}
+                        {isShortage ? "⚠ Divergência" : "✓ Zero divergência"}
                       </td>
-                      <td style={{ fontSize: "13px", padding: "8px" }}>{balanced ? "—" : closeResult.justifications[method] ?? "—"}</td>
+                      <td style={{ fontSize: "13px", padding: "8px" }}>{isShortage ? closeResult.justifications[method] ?? "—" : "—"}</td>
                     </tr>
                   );
                 })}
@@ -588,7 +584,8 @@ export function CaixaScreen() {
   if (closing) {
     const canConfirmClose = METHODS.every((method) => {
       const divergenceCents = Math.round(Number(declared[method]) * 100) - expectedHint(method, revenue, movements);
-      return divergenceCents === 0 || (closeJustifications[method] ?? "").trim().length >= 3;
+      const isShortage = divergenceCents < 0;
+      return !isShortage || (closeJustifications[method] ?? "").trim().length >= 3;
     });
     return (
       <div style={{ maxWidth: "420px", margin: "40px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -596,18 +593,17 @@ export function CaixaScreen() {
         <h1 style={{ fontFamily: "var(--font-display)" }}>Fechar turno</h1>
         <HelpText>
           Conte o dinheiro e confira os comprovantes de cada forma de pagamento e digite o valor total que você
-          encontrou em cada um. O sistema mostra ao lado o que era esperado — se o valor contado for diferente, a
-          diferença aparece destacada depois de confirmar.
+          encontrou em cada um. Se houver alguma divergência com o esperado pelo sistema, será pedida uma
+          justificativa (sem mostrar o valor esperado).
         </HelpText>
-        <p>Digite o que foi contado por método (o sistema já mostra o esperado ao lado — sem fechamento cego):</p>
+        <p>Digite o que foi contado por método:</p>
         <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
               <th style={{ textAlign: "left" }}>Método</th>
-              <th style={{ textAlign: "right" }}>Esperado</th>
               <th style={{ textAlign: "right" }}>Declarado</th>
-              <th style={{ textAlign: "right" }}>Divergência</th>
+              <th style={{ textAlign: "left" }}>Situação</th>
               <th style={{ textAlign: "left" }}>Justificativa</th>
             </tr>
           </thead>
@@ -616,11 +612,10 @@ export function CaixaScreen() {
               const expectedCents = expectedHint(method, revenue, movements);
               const declaredCents = Math.round(Number(declared[method]) * 100);
               const divergenceCents = declaredCents - expectedCents;
-              const hasDivergence = divergenceCents !== 0;
+              const isShortage = divergenceCents < 0;
               return (
                 <tr key={method}>
                   <td>{method}</td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{money(expectedCents)}</td>
                   <td style={{ textAlign: "right" }}>
                     <Input
                       type="number"
@@ -630,15 +625,14 @@ export function CaixaScreen() {
                   </td>
                   <td
                     style={{
-                      textAlign: "right",
-                      fontVariantNumeric: "tabular-nums",
-                      color: hasDivergence ? "var(--color-error-text)" : "var(--color-teal-text)",
+                      fontWeight: isShortage ? "bold" : "normal",
+                      color: isShortage ? "var(--color-error-text)" : "var(--color-teal-text)",
                     }}
                   >
-                    {hasDivergence ? money(divergenceCents) : "✓"}
+                    {isShortage ? "⚠ Divergência — justifique abaixo" : "✓ Zero divergência"}
                   </td>
                   <td>
-                    {hasDivergence && (
+                    {isShortage && (
                       <Input
                         placeholder="Por que houve diferença? (mín. 3 caracteres)"
                         value={closeJustifications[method] ?? ""}
