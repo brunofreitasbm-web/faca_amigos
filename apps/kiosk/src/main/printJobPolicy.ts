@@ -144,6 +144,14 @@ export function resolvePrinterName(configured: string | null | undefined, instal
       };
     }
 
+    const physicalInstalled = installedNames.filter((n) => !isVirtualOrPdfPrinter(n));
+    if (physicalInstalled.length === 1) {
+      return {
+        name: physicalInstalled[0]!,
+        warning: `Impressora configurada "${trimmed}" não foi encontrada neste terminal; usando "${physicalInstalled[0]}", a única impressora física instalada.`,
+      };
+    }
+
     return { name: null, warning: `Impressora "${trimmed}" não foi encontrada neste terminal.` };
   }
 

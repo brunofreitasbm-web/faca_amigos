@@ -89,8 +89,14 @@ describe("resolvePrinterName", () => {
     expect(match.warning).toContain("ambíguo");
   });
 
-  it("devolve null quando a impressora configurada não existe neste terminal", () => {
-    expect(resolvePrinterName("Gainscha X", ["Gainscha Y", "Microsoft Print to PDF"]).name).toBeNull();
+  it("devolve null quando a impressora configurada não existe e há mais de uma física conectada", () => {
+    expect(resolvePrinterName("Gainscha X", ["Gainscha Y", "Gainscha Z", "Microsoft Print to PDF"]).name).toBeNull();
+  });
+
+  it("recupera automaticamente usando a única impressora física conectada se a configurada tiver nome divergente", () => {
+    const match = resolvePrinterName("POS-80 Genérica", ["Thermal Printer POS-80", "Microsoft Print to PDF"]);
+    expect(match.name).toBe("Thermal Printer POS-80");
+    expect(match.warning).toContain("única impressora física instalada");
   });
 
   it("sem configuração, cai na primeira impressora física e avisa", () => {
