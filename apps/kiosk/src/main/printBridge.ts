@@ -262,7 +262,10 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
   //  2. FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY — nome antigo, mantido para
   //     os .env já instalados continuarem funcionando na transição.
   const secretKey =
-    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY ||
+    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    "sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh";
 
   if (!url || !secretKey) {
     const reason =

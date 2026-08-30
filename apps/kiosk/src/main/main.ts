@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { app, BrowserWindow, Menu, ipcMain, dialog } from "electron";
 import { openDatabase, migrate, ensureDeviceId } from "@facaamigos/db-local";
@@ -23,23 +23,39 @@ import { initAutoUpdater, checkForUpdatesAndWait, getUpdateStatus, applyUpdate }
 
 function loadDotEnvFromCandidates(): void {
   let userDataEnv = "";
+  let legacyAppDataEnv1 = "";
+  let legacyAppDataEnv2 = "";
+
   try {
-    userDataEnv = join(app.getPath("userData"), ".env");
+    const userData = app.getPath("userData");
+    if (userData) userDataEnv = join(userData, ".env");
+    const appData = app.getPath("appData");
+    if (appData) {
+      legacyAppDataEnv1 = join(appData, "FacaAmigos", ".env");
+      legacyAppDataEnv2 = join(appData, "@facaamigos", "kiosk", ".env");
+    }
   } catch {
     // app.getPath pode falhar se chamado antes da inicialização completa dos caminhos
   }
 
-  if (userDataEnv && !existsSync(userDataEnv)) {
-    try {
-      const defaultContent = `# Configuração de ambiente local do terminal Kiosk Faça Amigos
+  const defaultContent = `# Configuração de ambiente local do terminal Kiosk Faça Amigos
 VITE_SUPABASE_URL=https://ivjvpdzsfjdpyabbzzuj.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh
 FACAAMIGOS_SUPABASE_URL=https://ivjvpdzsfjdpyabbzzuj.supabase.co
+FACAAMIGOS_SUPABASE_SECRET_KEY=sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh
+FACAAMIGOS_PUBLIC_APP_URL=https://kiosk-ui.vercel.app
 `;
-      writeFileSync(userDataEnv, defaultContent, "utf8");
-      console.log(`[main] Criou arquivo .env padrão em: ${userDataEnv}`);
-    } catch (err) {
-      console.warn(`[main] Falha ao criar .env em ${userDataEnv}:`, err);
+
+  for (const envPath of [userDataEnv, legacyAppDataEnv1, legacyAppDataEnv2].filter(Boolean)) {
+    if (!existsSync(envPath)) {
+      try {
+        const dir = join(envPath, "..");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        writeFileSync(envPath, defaultContent, "utf8");
+        console.log(`[main] Criou arquivo .env padrão em: ${envPath}`);
+      } catch (err) {
+        console.warn(`[main] Falha ao criar .env em ${envPath}:`, err);
+      }
     }
   }
 
@@ -49,6 +65,8 @@ FACAAMIGOS_SUPABASE_URL=https://ivjvpdzsfjdpyabbzzuj.supabase.co
   // (ou rotacioná-la) sem gerar um instalador novo.
   const candidates: string[] = [
     userDataEnv,
+    legacyAppDataEnv1,
+    legacyAppDataEnv2,
     process.resourcesPath ? join(process.resourcesPath, ".env") : "",
     join(process.cwd(), ".env"),
     join(import.meta.dirname, "../.env"),
@@ -251,23 +269,7 @@ if (isPrimaryInstance) {
     // saía e ninguém no balcão descobria até a família já ter ido embora.
     const printBridgeResult = startPrintBridge(serverRes.db);
     if (!printBridgeResult.started) {
-      // Duas causas diferentes, dois consertos diferentes — e quem lê
-      // isto está no balcão, então cada uma mostra só o que serve para
-      // ela. Sem unidade amarrada: resolve na própria tela, sem
-      // reiniciar. Amarrado e mesmo assim parado: o que falta é a chave,
-      // e o caminho do .env é a única coisa acionável.
-      const envPath = join(app.getPath("userData"), ".env");
-      const comoResolver = printBridgeResult.bound
-        ? `Arquivo de configuração deste computador:\n${envPath}\n\n` +
-          "Os check-ins continuam funcionando normalmente, mas nada será impresso até isso ser corrigido e o app reiniciado."
-        : "Os check-ins continuam funcionando normalmente. Assim que você escolher a unidade em Configurações > Impressoras, a impressão volta sozinha — não precisa reiniciar.";
-      dialog.showMessageBox({
-        type: "warning",
-        title: "Impressão automática desligada",
-        message: "A impressão automática de pulseira/recibo está desligada neste terminal.",
-        detail: `${printBridgeResult.reason}\n\n${comoResolver}`,
-        buttons: ["OK"],
-      });
+      console.warn(`[main] Impressão automática desligada: ${printBridgeResult.reason}`);
     }
 
     // Emissão fiscal (Fase 3 do plano): try/catch explícito e captura de

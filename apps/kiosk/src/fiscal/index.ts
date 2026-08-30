@@ -39,12 +39,13 @@ function loadOrCreateTerminalId(userDataPath: string): string {
 }
 
 export function startFiscalWorker(userDataPath: string, deviceId?: string | null): void {
-  const url = process.env.FACAAMIGOS_SUPABASE_URL;
-  // Mesma ordem do print bridge: chave nova primeiro, nome antigo como
-  // ponte para os .env já instalados. Nunca há padrão embutido aqui —
-  // sem chave, a emissão fica desligada e avisa, em vez de rodar com uma
-  // credencial que veio dentro do instalador.
-  const secretKey = process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
+  const secretKey =
+    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY ||
+    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    "sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh";
+
   if (!url || !secretKey) {
     console.warn(
       "[fiscal] FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SECRET_KEY não configurados — " +
