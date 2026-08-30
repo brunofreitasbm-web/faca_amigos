@@ -7,6 +7,21 @@ export interface PrintJobRow {
   payload_json: Record<string, unknown>;
   status?: string;
   origin_device_id?: string | null;
+  claim_attempts?: number;
+}
+
+/**
+ * Espelha o `p_max_attempts` default de fa_kiosk_claim_print_jobs/_job no
+ * Postgres. Um job cuja reserva já passou desse número de tentativas não
+ * volta mais pra fila — quem reservou por último finaliza (PDF/erro) em vez
+ * de devolver, senão dois terminais sem impressora ficariam se passando o
+ * job pra frente indefinidamente.
+ */
+export const MAX_CLAIM_ATTEMPTS = 2;
+
+/** Se este job ainda vale a pena devolver pra fila em vez de finalizar aqui. */
+export function isRetryableClaim(job: Pick<PrintJobRow, "claim_attempts">): boolean {
+  return (job.claim_attempts ?? MAX_CLAIM_ATTEMPTS) < MAX_CLAIM_ATTEMPTS;
 }
 
 function splitUnitList(raw: string | undefined | null, into: Set<string>): void {
@@ -227,4 +242,26 @@ export async function claimPrintJob(
     return null;
   }
   return (data as PrintJobRow | null) ?? null;
+}
+
+/**
+ * Devolve a reserva de um job pra fila (volta a PENDING) quando este
+ * terminal não conseguiu de fato imprimir (ex.: impressora não resolvida) e
+ * ainda vale a pena outro terminal amarrado à mesma unidade tentar — em vez
+ * de finalizar aqui como PDF/erro. `claim_attempts` não é resetado: é o que
+ * garante que não fique indo e voltando pra sempre entre dois terminais mal
+ * configurados.
+ */
+export async function releasePrintJob(client: ClaimRpcClient, jobId: string, deviceId: string | null): Promise<boolean> {
+  if (!deviceId) return false;
+
+  const { data, error } = await client.rpc("fa_kiosk_release_print_job", {
+    p_job_id: jobId,
+    p_device_id: deviceId,
+  });
+  if (error) {
+    console.error(`[print-bridge] falha ao devolver o job ${jobId} pra fila:`, error.message);
+    return false;
+  }
+  return data === true;
 }

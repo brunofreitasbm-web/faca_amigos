@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, migrate, setTerminalSetting, type Db } from "@facaamigos/db-local";
-import { getTerminalUnitIds, shouldConsiderJob, resolvePrinterName } from "../src/main/printJobPolicy.js";
+import { getTerminalUnitIds, shouldConsiderJob, resolvePrinterName, isRetryableClaim, MAX_CLAIM_ATTEMPTS } from "../src/main/printJobPolicy.js";
 
 const CIRCUITO = "e43ba7a8-bd5f-47ad-b81d-dae7ea19d504";
 const PLAYGROUND = "11111111-1111-1111-1111-111111111111";
@@ -107,5 +107,19 @@ describe("resolvePrinterName", () => {
 
   it("sem nenhuma impressora instalada, devolve null", () => {
     expect(resolvePrinterName("", []).name).toBeNull();
+  });
+});
+
+describe("isRetryableClaim", () => {
+  it("fail-closed quando claim_attempts não veio do RPC: finaliza em vez de arriscar loop", () => {
+    expect(isRetryableClaim({})).toBe(false);
+  });
+
+  it("é retryable abaixo do limite de tentativas", () => {
+    expect(isRetryableClaim({ claim_attempts: 1 })).toBe(true);
+  });
+
+  it("não é mais retryable ao atingir o limite (evita ping-pong infinito entre dois terminais sem impressora)", () => {
+    expect(isRetryableClaim({ claim_attempts: MAX_CLAIM_ATTEMPTS })).toBe(false);
   });
 });

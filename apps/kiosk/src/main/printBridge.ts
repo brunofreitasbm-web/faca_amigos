@@ -15,6 +15,8 @@ import {
   shouldConsiderJob,
   claimPrintJobs,
   claimPrintJob,
+  releasePrintJob,
+  isRetryableClaim,
   isVirtualOrPdfPrinter,
   resolvePrinterName,
   type PrintJobRow,
@@ -397,13 +399,25 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
         deviceName = null;
       }
 
-      if (!deviceName && job.kind === "RECEIPT") {
-        await handleReceiptPdfFallback(job, "Nenhuma impressora de cupom configurada", deviceId);
-        return;
-      }
-
       if (!deviceName) {
-        throw new Error(`Nenhuma impressora de ${job.kind === "WRISTBAND" ? "pulseira" : "cupom"} configurada (Configurações > Impressoras)`);
+        const reason = `Nenhuma impressora de ${job.kind === "WRISTBAND" ? "pulseira" : "cupom"} configurada (Configurações > Impressoras)`;
+
+        // Este terminal está amarrado à unidade mas não resolveu a
+        // impressora localmente (ex.: dois terminais na mesma unidade, só
+        // um com a impressora instalada). Em vez de finalizar aqui (PDF ou
+        // erro), devolve pra fila pro próximo sweep de QUALQUER terminal
+        // amarrado à unidade tentar — inclusive um com a impressora certa.
+        if (isRetryableClaim(job) && (await releasePrintJob(supabase, job.id, deviceId))) {
+          console.warn(`[print-bridge] ${reason} — job ${job.id} devolvido pra fila para outro terminal tentar.`);
+          return;
+        }
+
+        if (job.kind === "RECEIPT") {
+          await handleReceiptPdfFallback(job, reason, deviceId);
+          return;
+        }
+
+        throw new Error(reason);
       }
 
       const isVirtualOrPdf = isVirtualOrPdfPrinter(deviceName);
