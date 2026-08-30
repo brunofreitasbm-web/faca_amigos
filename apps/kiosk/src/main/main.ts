@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { app, BrowserWindow, Menu, ipcMain, dialog } from "electron";
 import { openDatabase, migrate, ensureDeviceId } from "@facaamigos/db-local";
@@ -27,6 +27,20 @@ function loadDotEnvFromCandidates(): void {
     userDataEnv = join(app.getPath("userData"), ".env");
   } catch {
     // app.getPath pode falhar se chamado antes da inicialização completa dos caminhos
+  }
+
+  if (userDataEnv && !existsSync(userDataEnv)) {
+    try {
+      const defaultContent = `# Configuração de ambiente local do terminal Kiosk Faça Amigos
+VITE_SUPABASE_URL=https://ivjvpdzsfjdpyabbzzuj.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh
+FACAAMIGOS_SUPABASE_URL=https://ivjvpdzsfjdpyabbzzuj.supabase.co
+`;
+      writeFileSync(userDataEnv, defaultContent, "utf8");
+      console.log(`[main] Criou arquivo .env padrão em: ${userDataEnv}`);
+    } catch (err) {
+      console.warn(`[main] Falha ao criar .env em ${userDataEnv}:`, err);
+    }
   }
 
   // userData ANTES do .env que veio dentro do instalador: o primeiro que
