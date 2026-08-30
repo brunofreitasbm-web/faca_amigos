@@ -1643,6 +1643,16 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     }
   }
 
+  interface PrintBridgeStatus {
+    started: boolean;
+    bound: boolean;
+    hasServiceRoleKey: boolean;
+    reason?: string;
+    lastError?: string | null;
+    lastJobPrintedAtMs?: number | null;
+  }
+  const [bridgeStatus, setBridgeStatus] = useState<PrintBridgeStatus | null>(null);
+
   function refreshPrinters() {
     const list = window.facaamigos?.listPrinters;
     if (!list) {
@@ -1659,14 +1669,13 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       .finally(() => setLoadingPrinters(false));
   }
 
-  // Logo depois do login do Windows (app abre sozinho, openAtLogin), o
-  // spooler de impressão ou uma impressora de rede podem ainda não estar
-  // prontos no instante exato em que esta tela monta — sem isto, a única
-  // saída era o operador perceber e clicar em "Buscar novamente" à mão.
-  // Tenta de novo automaticamente algumas vezes só enquanto a lista volta
-  // vazia, sem incomodar quando já achou alguma impressora.
   useEffect(() => {
     refreshPrinters();
+    fetch("/api/system/print-bridge-status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setBridgeStatus(data))
+      .catch(() => setBridgeStatus(null));
+
     const retryDelaysMs = [2000, 5000, 10000];
     const timers = retryDelaysMs.map((delay) =>
       setTimeout(() => {
@@ -1780,6 +1789,22 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {/* ATUALIZAÇÕES DO SISTEMA (AUTO UPDATE) */}
       <AutoUpdateCard />
+
+      {bridgeStatus && !bridgeStatus.hasServiceRoleKey && (
+        <HelpText icon="🛑" style={{ background: "#fff0f0", borderColor: "#f5c6cb", color: "#721c24", fontWeight: "bold" }}>
+          Erro de Autenticação do Print Bridge: A chave de serviço (FACAAMIGOS_SUPABASE_SECRET_KEY) não está configurada no arquivo .env deste computador. Sem ela, o banco rejeita a reserva de cupons e a impressão não sai.
+        </HelpText>
+      )}
+      {bridgeStatus && bridgeStatus.hasServiceRoleKey && bridgeStatus.started && (
+        <HelpText icon="🟢" style={{ background: "#f0fff4", borderColor: "#c3e6cb", color: "#155724", fontWeight: "600" }}>
+          Ponte de Impressão Ativa e Autenticada (Print Bridge OK — escutando a fila de impressão neste terminal).
+        </HelpText>
+      )}
+      {bridgeStatus && bridgeStatus.reason && bridgeStatus.hasServiceRoleKey && !bridgeStatus.started && (
+        <HelpText icon="⚠️" style={{ color: "var(--warning, #856404)" }}>
+          Aviso da Ponte de Impressão: {bridgeStatus.reason}
+        </HelpText>
+      )}
 
       <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
         Escolha a impressora pela lista das que estão instaladas neste terminal — o print bridge local usa exatamente esse nome para imprimir direto, sem abrir diálogo nenhum na tela.

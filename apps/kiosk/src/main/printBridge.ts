@@ -237,30 +237,37 @@ export interface PrintBridgeStartResult {
   reason?: string;
 }
 
+export interface PrintBridgeStatusInfo {
+  started: boolean;
+  bound: boolean;
+  hasServiceRoleKey: boolean;
+  reason?: string;
+  lastError?: string | null;
+  lastJobPrintedAtMs?: number | null;
+}
+
+let bridgeStatus: PrintBridgeStatusInfo = {
+  started: false,
+  bound: false,
+  hasServiceRoleKey: false,
+  reason: "Print bridge ainda não iniciado.",
+  lastError: null,
+  lastJobPrintedAtMs: null,
+};
+
+export function getPrintBridgeStatus(): PrintBridgeStatusInfo {
+  return bridgeStatus;
+}
+
 /**
  * Se isto retornar `started: false`, NENHUM job de fa_kiosk_print_jobs vai
  * ser processado neste terminal — os jobs ficam acumulando como PENDING
  * para sempre, sem nenhum aviso além deste retorno. Quem chama isto deve avisar o operador visivelmente.
  */
 export function startPrintBridge(db?: Db): PrintBridgeStartResult {
-  // A URL do projeto não é segredo (ela vai em toda requisição do
-  // navegador), então continua com padrão embutido — assim só a CHAVE
-  // precisa ser provisionada e um .env incompleto não desliga a
-  // impressão sozinho.
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
 
-  // A chave NUNCA fica no código. Até esta versão havia uma service_role
-  // embutida aqui como fallback: ela ignora todo o RLS do banco e viajava
-  // dentro de cada instalador distribuído, além de estar no histórico do
-  // git. Quem tivesse o instalador lia e escrevia qualquer tabela,
-  // inclusive os dados bancários da folha (fa_kiosk_employee_payroll_info).
-  //
-  // Ordem de preferência:
-  //  1. FACAAMIGOS_SUPABASE_SECRET_KEY — formato novo (sb_secret_...),
-  //     que pode ser rotacionado sozinho, sem invalidar a chave
-  //     publicável usada pela SPA nem a anon usada nas landing pages;
-  //  2. FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY — nome antigo, mantido para
-  //     os .env já instalados continuarem funcionando na transição.
+  const hasServiceRoleKey = Boolean(process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY);
   const secretKey =
     process.env.FACAAMIGOS_SUPABASE_SECRET_KEY ||
     process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
@@ -272,7 +279,16 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
       "A chave de acesso ao banco não está configurada neste terminal (FACAAMIGOS_SUPABASE_SECRET_KEY). " +
       "Ela precisa estar no arquivo .env da instalação — impressão automática de pulseira/cupom está desligada até lá.";
     console.warn(`[print-bridge] ${reason}`);
-    return { started: false, bound: getTerminalUnitIds(db).size > 0, reason };
+    bridgeStatus = { started: false, bound: getTerminalUnitIds(db).size > 0, hasServiceRoleKey, reason, lastError: reason };
+    return bridgeStatus;
+  }
+
+  if (!hasServiceRoleKey) {
+    const reason =
+      "A chave de serviço (FACAAMIGOS_SUPABASE_SECRET_KEY) não está configurada no arquivo .env deste terminal. A chave pública não possui permissão para reservar impressões.";
+    console.warn(`[print-bridge] ${reason}`);
+    bridgeStatus = { started: false, bound: getTerminalUnitIds(db).size > 0, hasServiceRoleKey: false, reason, lastError: reason };
+    return bridgeStatus;
   }
 
   // supabase-js/realtime-js precisa de um WebSocket explícito fora do
@@ -577,13 +593,12 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
 
   const bound = currentUnitIds().length > 0;
   if (!bound) {
-    return {
-      started: false,
-      bound: false,
-      reason:
-        "Este computador ainda não foi vinculado a uma unidade. Abra Configurações > Impressoras > Este terminal e escolha a unidade — enquanto isso, nada será impresso aqui.",
-    };
+    const reason =
+      "Este computador ainda não foi vinculado a uma unidade. Abra Configurações > Impressoras > Este terminal e escolha a unidade — enquanto isso, nada será impresso aqui.";
+    bridgeStatus = { started: false, bound: false, hasServiceRoleKey: true, reason, lastError: reason };
+    return bridgeStatus;
   }
 
-  return { started: true, bound: true };
+  bridgeStatus = { started: true, bound: true, hasServiceRoleKey: true, reason: undefined, lastError: null };
+  return bridgeStatus;
 }

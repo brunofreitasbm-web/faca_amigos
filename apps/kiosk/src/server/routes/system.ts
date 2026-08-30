@@ -3,6 +3,7 @@ import { ensureDeviceId, getTerminalUnitId, setTerminalUnitId } from "@facaamigo
 import type { AppContext } from "../context.js";
 import { getUpdateStatus, checkForUpdates, applyUpdate } from "../../main/autoUpdater.js";
 import { rebindPrintBridge } from "../../main/printBridgeControl.js";
+import { getPrintBridgeStatus } from "../../main/printBridge.js";
 
 export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get("/api/system/info", async () => {
@@ -10,6 +11,10 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): voi
       update: getUpdateStatus(),
       now: Date.now(),
     };
+  });
+
+  app.get("/api/system/print-bridge-status", async () => {
+    return getPrintBridgeStatus();
   });
 
   /**
