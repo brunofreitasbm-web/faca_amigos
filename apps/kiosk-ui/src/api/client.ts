@@ -199,6 +199,7 @@ export interface ClosedPayrollItem {
   total_cents: number;
   hours_contracted: number | null;
   hours_worked_minutes: number | null;
+  hours_worked_incomplete: boolean | null;
 }
 
 export interface ClosedRun {
@@ -946,9 +947,10 @@ export interface ShiftSummary {
 }
 export interface FolhaPontoRow {
   employee_id: string;
+  unit_id: string;
   full_name: string;
   weekly_hours_contracted: number | null;
-  kind: string;
+  kind: PontoKind;
   at_ms: number;
   nsr: number;
 }
@@ -3139,9 +3141,10 @@ export const Api = {
       const emp = empMap.get(r.employee_id as string);
       return {
         employee_id: r.employee_id as string,
+        unit_id: r.unit_id as string,
         full_name: (emp?.full_name as string) ?? "Colaborador",
         weekly_hours_contracted: (emp?.weekly_hours_contracted as number | null) ?? null,
-        kind: r.kind as string,
+        kind: r.kind as PontoKind,
         at_ms: r.at_ms as number,
         nsr: r.nsr as number,
       } satisfies FolhaPontoRow;
@@ -3293,6 +3296,7 @@ export const Api = {
         total_cents: item.total_cents as number,
         hours_contracted: (item.hours_contracted as number | null) ?? null,
         hours_worked_minutes: (item.hours_worked_minutes as number | null) ?? null,
+        hours_worked_incomplete: (item.hours_worked_incomplete as boolean | null) ?? null,
       })),
     }));
 

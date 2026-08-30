@@ -3,6 +3,13 @@ import { Button, Modal, Select, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Employee, EspelhoPonto, EspelhoPontoRecord } from "../api/client.js";
 import { ROLE_LABEL } from "../auth/capabilities.js";
+import { computeWorkedMinutes } from "../lib/ponto.js";
+
+function formatMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h${String(m).padStart(2, "0")}`;
+}
 
 const MONTH_LABEL = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -87,21 +94,39 @@ function Timbre() {
 interface DayRow {
   day: number;
   byKind: Record<EspelhoPontoRecord["kind"], string[]>;
+  workedMinutes: number;
+  incomplete: boolean;
 }
 
+/**
+ * Além da grade de horários (para assinatura), também soma o total
+ * trabalhado por dia com `computeWorkedMinutes` (mesmo cálculo do Controle
+ * de Frequência e da Folha de Pagamento) — sem isso o Espelho de Ponto,
+ * apesar do nome, nunca mostrava horas trabalhadas nem sinalizava jornada
+ * incompleta, só a lista de marcações brutas.
+ */
 function buildDayRows(data: EspelhoPonto): DayRow[] {
   const daysInMonth = new Date(data.year, data.month, 0).getDate();
+  const recordsByDay: EspelhoPontoRecord[][] = Array.from({ length: daysInMonth }, () => []);
   const rows: DayRow[] = Array.from({ length: daysInMonth }, (_, i) => ({
     day: i + 1,
     byKind: { ENTRADA: [], SAIDA: [], INTERVALO_INICIO: [], INTERVALO_FIM: [] },
+    workedMinutes: 0,
+    incomplete: false,
   }));
   for (const rec of data.records || []) {
     const { day, time } = dayAndTimeInTz(rec.atMs, data.timezone);
     const row = rows[day - 1];
     if (row && row.byKind && row.byKind[rec.kind]) {
       row.byKind[rec.kind].push(time);
+      recordsByDay[day - 1]!.push(rec);
     }
   }
+  rows.forEach((row, i) => {
+    const { minutes, incomplete } = computeWorkedMinutes(recordsByDay[i]!.map((r) => ({ kind: r.kind, at_ms: r.atMs })));
+    row.workedMinutes = minutes;
+    row.incomplete = incomplete;
+  });
   return rows;
 }
 
@@ -297,6 +322,7 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
                 {KIND_COLUMNS.map((c) => (
                   <th key={c.kind}>{c.label}</th>
                 ))}
+                <th>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -306,10 +332,21 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
                   {KIND_COLUMNS.map((c) => (
                     <td key={c.kind}>{row.byKind[c.kind].join(", ") || "—"}</td>
                   ))}
+                  <td>
+                    {KIND_COLUMNS.every((c) => row.byKind[c.kind].length === 0) ? "—" : formatMinutes(row.workedMinutes)}
+                    {row.incomplete && <span title="Marcação incompleta neste dia"> ⚠️</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          <p style={{ fontSize: "12px", color: "#555", marginTop: "8px" }}>
+            Total do mês: <strong>{formatMinutes(rows.reduce((sum, r) => sum + r.workedMinutes, 0))}</strong>
+            {rows.some((r) => r.incomplete) && (
+              <> — ⚠️ {rows.filter((r) => r.incomplete).length} dia(s) com marcação incompleta (total aproximado)</>
+            )}
+          </p>
 
           <div className="signature">
             Declaro que as marcações acima correspondem à minha jornada de trabalho no período.

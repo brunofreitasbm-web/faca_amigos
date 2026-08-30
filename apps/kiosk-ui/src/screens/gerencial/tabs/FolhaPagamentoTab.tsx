@@ -117,7 +117,7 @@ function ClosedPayrollView({ closedRun }: { closedRun: ClosedRun }) {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              {["Colaborador", "CPF", "Salário base", "Ajuste", "Total Líquido", "Dados Bancários"].map((h) => (
+              {["Colaborador", "CPF", "Horas no mês", "Salário base", "Ajuste", "Total Líquido", "Dados Bancários"].map((h) => (
                 <th key={h} style={{ textAlign: "left", padding: "10px 12px", fontSize: "12px", color: "var(--text-secondary)", borderBottom: "1.5px solid var(--border-subtle)", textTransform: "uppercase" }}>
                   {h}
                 </th>
@@ -131,6 +131,10 @@ function ClosedPayrollView({ closedRun }: { closedRun: ClosedRun }) {
                   <strong style={{ color: "var(--text-primary)" }}>{item.full_name_snapshot}</strong>
                 </td>
                 <td style={cellStyle}>{item.cpf_snapshot ?? "—"}</td>
+                <td style={cellStyle}>
+                  {item.hours_worked_minutes != null ? formatMinutes(item.hours_worked_minutes) : "—"}
+                  {item.hours_worked_incomplete && <div style={{ fontSize: "11px", color: "var(--color-error-text)" }}>marcação incompleta</div>}
+                </td>
                 <td style={cellStyle}>{formatCentsBRL(item.salary_base_cents)}</td>
                 <td style={cellStyle}>{formatCentsBRL(item.adjustment_cents)}</td>
                 <td style={{ ...cellStyle, fontWeight: 600, color: "var(--color-primary)" }}>{formatCentsBRL(item.total_cents)}</td>

@@ -1,5 +1,8 @@
+import { dateTimeLabelsInTz } from "./ponto.js";
+
 /** Formato mínimo aceito para exportação — tanto `FolhaPontoRow` (Relatório > Folha de Ponto) quanto os registros do Controle de Frequência têm essas 4 colunas. */
 export interface CsvExportableRecord {
+  unit_id: string;
   full_name: string;
   kind: string;
   at_ms: number;
@@ -24,18 +27,17 @@ function csvEscape(value: string): string {
  * nenhum — mesma ideia do `handleExportCSV` do sistema irmão Porto Terapia.
  * Separador `;` porque é o que o Excel em pt-BR reconhece sem precisar de
  * import manual de CSV.
+ *
+ * `unitTimezones` mapeia unit_id -> fuso IANA da unidade — sem ele, Data/Hora
+ * cairiam no fuso do navegador de quem exporta, podendo jogar marcações perto
+ * da meia-noite para o dia errado (mesmo bug já corrigido no Espelho de Ponto
+ * e em `lib/ponto.ts`, agora propagado para esta exportação).
  */
-export function exportFrequenciaCsv(rows: CsvExportableRecord[]): void {
+export function exportFrequenciaCsv(rows: CsvExportableRecord[], unitTimezones: Record<string, string | null | undefined> = {}): void {
   const header = ["Data", "Hora", "Colaborador", "Marcação", "NSR"];
   const body = rows.map((r) => {
-    const date = new Date(r.at_ms);
-    return [
-      date.toLocaleDateString("pt-BR"),
-      date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      r.full_name,
-      KIND_LABEL[r.kind] ?? r.kind,
-      String(r.nsr),
-    ];
+    const { dateLabel, timeLabel } = dateTimeLabelsInTz(r.at_ms, unitTimezones[r.unit_id]);
+    return [dateLabel, timeLabel, r.full_name, KIND_LABEL[r.kind] ?? r.kind, String(r.nsr)];
   });
 
   const csv = [header, ...body].map((row) => row.map(csvEscape).join(";")).join("\n");

@@ -60,6 +60,36 @@ export function computeWorkedMinutes(records: PontoRecordForCalc[]): WorkedMinut
 /** Fuso do negócio usado quando a unidade não tem timezone cadastrado — mesmo default do servidor (fa_kiosk_espelho_ponto). */
 const DEFAULT_BUSINESS_TIMEZONE = "America/Belem";
 
+/**
+ * "dd/mm/aaaa" e "HH:mm" de um timestamp, no fuso informado — mesma lógica
+ * de `dayAndTimeInTz` do EspelhoPontoModal, centralizada aqui para que
+ * qualquer tela que agrupe/exiba marcações por dia (Relatório > Folha de
+ * Ponto, Controle de Frequência, exportação CSV) use o fuso da unidade em
+ * vez do fuso do navegador de quem está olhando o relatório.
+ */
+export function dateTimeLabelsInTz(atMs: number, timeZone?: string | null): { dateLabel: string; timeLabel: string } {
+  const tz = timeZone && timeZone.trim() ? timeZone : DEFAULT_BUSINESS_TIMEZONE;
+  try {
+    const parts = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: tz,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(atMs));
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+    return { dateLabel: `${get("day")}/${get("month")}/${get("year")}`, timeLabel: `${get("hour")}:${get("minute")}` };
+  } catch {
+    const d = new Date(atMs);
+    return {
+      dateLabel: d.toLocaleDateString("pt-BR"),
+      timeLabel: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+    };
+  }
+}
+
 /** ms UTC correspondente a um instante "de parede" (ano/mês/dia/hora local) num fuso IANA arbitrário. */
 function zonedWallTimeToUtcMs(year: number, month: number, day: number, hour: number, timeZone: string): number {
   const utcGuessMs = Date.UTC(year, month - 1, day, hour);

@@ -10,6 +10,7 @@ import { money } from "../format.js";
 import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { AssetUsageChart, CheckinsByHourChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
 import { exportFrequenciaCsv } from "../lib/csvExport.js";
+import { computeWorkedMinutes, dateTimeLabelsInTz } from "../lib/ponto.js";
 
 type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
 export type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
@@ -727,12 +728,21 @@ interface DailyHoursSummary {
   dateLabel: string;
   workedMs: number;
   targetMs: number | null;
+  incomplete: boolean;
 }
 
-function summarizeDailyHours(rows: FolhaPontoRow[]): DailyHoursSummary[] {
+/**
+ * Agrupa por dia no fuso da unidade (não no fuso do navegador de quem olha o
+ * relatório — perto da meia-noite isso já jogou marcações para o dia/mês
+ * errado) e reusa `computeWorkedMinutes` (mesmo cálculo do Controle de
+ * Frequência e da Folha de Pagamento) em vez de reimplementar o pareamento
+ * ENTRADA/INTERVALO/SAÍDA aqui, para não divergir silenciosamente dessas
+ * outras telas nem perder o sinal de jornada incompleta.
+ */
+function summarizeDailyHours(rows: FolhaPontoRow[], timeZone: string | null | undefined): DailyHoursSummary[] {
   const byGroup = new Map<string, FolhaPontoRow[]>();
   for (const r of rows) {
-    const dateLabel = new Date(r.at_ms).toLocaleDateString("pt-BR");
+    const { dateLabel } = dateTimeLabelsInTz(r.at_ms, timeZone);
     const key = `${r.employee_id}|${dateLabel}`;
     byGroup.set(key, [...(byGroup.get(key) ?? []), r]);
   }
@@ -740,28 +750,15 @@ function summarizeDailyHours(rows: FolhaPontoRow[]): DailyHoursSummary[] {
   const summaries: DailyHoursSummary[] = [];
   for (const [key, group] of byGroup) {
     const [, dateLabel] = key.split("|") as [string, string];
-    const sorted = [...group].sort((a, b) => a.at_ms - b.at_ms);
-    let workedMs = 0;
-    let entradaAt: number | null = null;
-    let intervaloAt: number | null = null;
-    for (const r of sorted) {
-      if (r.kind === "ENTRADA") entradaAt = r.at_ms;
-      else if (r.kind === "SAIDA" && entradaAt !== null) {
-        workedMs += r.at_ms - entradaAt;
-        entradaAt = null;
-      } else if (r.kind === "INTERVALO_INICIO") intervaloAt = r.at_ms;
-      else if (r.kind === "INTERVALO_FIM" && intervaloAt !== null) {
-        workedMs -= r.at_ms - intervaloAt;
-        intervaloAt = null;
-      }
-    }
-    const first = sorted[0]!;
+    const first = group[0]!;
+    const { minutes, incomplete } = computeWorkedMinutes(group);
     summaries.push({
       employeeId: first.employee_id,
       fullName: first.full_name,
       dateLabel,
-      workedMs: Math.max(0, workedMs),
+      workedMs: minutes * 60_000,
       targetMs: first.weekly_hours_contracted ? (first.weekly_hours_contracted / 5) * 60 * 60 * 1000 : null,
+      incomplete,
     });
   }
   return summaries.sort((a, b) => a.fullName.localeCompare(b.fullName) || a.dateLabel.localeCompare(b.dateLabel));
@@ -777,6 +774,7 @@ function formatDurationMs(ms: number): string {
 function PontoTab({ from, to }: { from: string; to: string }) {
   const { unit } = useAppState();
   const [rows, setRows] = useState<FolhaPontoRow[]>([]);
+  const [ocorrencias, setOcorrencias] = useState<Awaited<ReturnType<typeof Api.ocorrencias>>>([]);
 
   useEffect(() => {
     const fParts = from.split("-").map((v) => Number(v) || 0);
@@ -790,9 +788,32 @@ function PontoTab({ from, to }: { from: string; to: string }) {
     const fromMs = new Date(fY, fM - 1, fD, 0, 0, 0, 0).getTime();
     const toMs = new Date(tY, tM - 1, tD, 23, 59, 59, 999).getTime();
     Api.reportPonto(fromMs, toMs, unit?.id).then(setRows).catch(() => setRows([]));
+    if (unit?.id) {
+      Api.ocorrencias(unit.id).then(setOcorrencias).catch(() => setOcorrencias([]));
+    } else {
+      setOcorrencias([]);
+    }
   }, [from, to, unit?.id]);
 
-  const dailySummaries = summarizeDailyHours(rows);
+  const dailySummaries = summarizeDailyHours(rows, unit?.timezone);
+  const unitTimezones = unit?.id ? { [unit.id]: unit.timezone } : {};
+
+  // fromMs/toMs recalculados aqui só para filtrar ocorrências que se
+  // sobrepõem ao período — o afastamento cobre [created_at_ms, created_at_ms
+  // + days_away dias), não é um instante único como uma marcação de ponto.
+  const { fromMs: periodFromMs, toMs: periodToMs } = (() => {
+    const fParts = from.split("-").map((v) => Number(v) || 0);
+    const tParts = to.split("-").map((v) => Number(v) || 0);
+    return {
+      fromMs: new Date(fParts[0] || 2026, (fParts[1] || 1) - 1, fParts[2] || 1, 0, 0, 0, 0).getTime(),
+      toMs: new Date(tParts[0] || 2026, (tParts[1] || 1) - 1, tParts[2] || 1, 23, 59, 59, 999).getTime(),
+    };
+  })();
+  const ocorrenciasNoPeriodo = ocorrencias.filter((o) => {
+    const start = o.created_at_ms;
+    const end = start + o.days_away * 86_400_000;
+    return start < periodToMs && end > periodFromMs;
+  });
 
   return (
     <div>
@@ -806,6 +827,7 @@ function PontoTab({ from, to }: { from: string; to: string }) {
               <th>Horas trabalhadas</th>
               <th>Jornada contratada (dia)</th>
               <th>Diferença</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -826,13 +848,52 @@ function PontoTab({ from, to }: { from: string; to: string }) {
                   >
                     {diffMs === null ? "—" : `${diffMs >= 0 ? "+" : "-"}${formatDurationMs(Math.abs(diffMs))}`}
                   </td>
+                  <td style={{ textAlign: "center", color: s.incomplete ? "var(--color-amber-text)" : "var(--color-teal-text)" }}>
+                    {s.incomplete ? "⚠️ Incompleta" : "✓ Completa"}
+                  </td>
                 </tr>
               );
             })}
             {dailySummaries.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                <td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
                   Nenhuma marcação no período.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
+
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Ocorrências no período (faltas/atestados)</h3>
+      <HelpText style={{ marginTop: "-8px" }}>
+        Dias sem nenhuma marcação de ponto não aparecem no resumo acima — confira aqui se a ausência já tem falta ou atestado lançado em Gerencial &gt; Ocorrências.
+      </HelpText>
+      <Card style={{ padding: "8px", marginBottom: "24px", marginTop: "8px", overflowX: "auto" }}>
+        <table className="report-table">
+          <thead>
+            <tr>
+              <th>Colaborador</th>
+              <th>Tipo</th>
+              <th>Início</th>
+              <th>Dias</th>
+              <th>Observações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ocorrenciasNoPeriodo.map((o) => (
+              <tr key={o.id}>
+                <td>{o.fa_kiosk_employees?.full_name ?? "—"}</td>
+                <td>{o.tipo === "FALTA" ? "Falta" : "Atestado"}</td>
+                <td>{dateTimeLabelsInTz(o.created_at_ms, unit?.timezone).dateLabel}</td>
+                <td style={{ textAlign: "center" }}>{o.days_away}</td>
+                <td>{o.notes ?? "—"}</td>
+              </tr>
+            ))}
+            {ocorrenciasNoPeriodo.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                  Nenhuma ocorrência lançada para este período.
                 </td>
               </tr>
             )}
@@ -842,7 +903,7 @@ function PontoTab({ from, to }: { from: string; to: string }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
         <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Marcações (registro de auditoria)</h3>
-        <Button variant="secondary" size="sm" disabled={rows.length === 0} onClick={() => exportFrequenciaCsv(rows)}>
+        <Button variant="secondary" size="sm" disabled={rows.length === 0} onClick={() => exportFrequenciaCsv(rows, unitTimezones)}>
           ⬇️ Exportar CSV
         </Button>
       </div>
@@ -857,14 +918,17 @@ function PontoTab({ from, to }: { from: string; to: string }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={i}>
-                <td>{r.full_name}</td>
-                <td>{r.kind}</td>
-                <td>{new Date(r.at_ms).toLocaleString("pt-BR")}</td>
-                <td style={{ textAlign: "center" }}>{r.nsr}</td>
-              </tr>
-            ))}
+            {rows.map((r, i) => {
+              const { dateLabel, timeLabel } = dateTimeLabelsInTz(r.at_ms, unit?.timezone);
+              return (
+                <tr key={i}>
+                  <td>{r.full_name}</td>
+                  <td>{r.kind}</td>
+                  <td>{dateLabel} {timeLabel}</td>
+                  <td style={{ textAlign: "center" }}>{r.nsr}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </Card>

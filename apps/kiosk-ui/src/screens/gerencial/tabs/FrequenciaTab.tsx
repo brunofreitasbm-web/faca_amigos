@@ -4,7 +4,7 @@ import { Api } from "../../../api/client.js";
 import type { Employee } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { supabase } from "../../../lib/supabase/client.js";
-import { computeWorkedMinutes, type PontoKind } from "../../../lib/ponto.js";
+import { computeWorkedMinutes, dateTimeLabelsInTz, type PontoKind } from "../../../lib/ponto.js";
 import { exportFrequenciaCsv } from "../../../lib/csvExport.js";
 import { computeDatesForPeriod, isoDate } from "../../RelatorioScreen.js";
 import type { PeriodPreset } from "../../RelatorioScreen.js";
@@ -45,6 +45,7 @@ function formatMinutes(min: number): string {
  */
 export function FrequenciaTab() {
   const { units } = useAppState();
+  const unitTimezones = useMemo(() => Object.fromEntries(units.map((u) => [u.id, u.timezone])), [units]);
   const [unitFilter, setUnitFilter] = useState<string>("ALL");
   const [period, setPeriod] = useState<PeriodPreset>("today");
   const [customFrom, setCustomFrom] = useState(() => isoDate(new Date()));
@@ -120,7 +121,7 @@ export function FrequenciaTab() {
           <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>Controle de Frequência</h2>
           <HelpText style={{ margin: 0 }}>Marcações de ponto ao vivo — CLT e Estagiários, por unidade e período.</HelpText>
         </div>
-        <Button variant="secondary" size="sm" disabled={records.length === 0} onClick={() => exportFrequenciaCsv(records)}>
+        <Button variant="secondary" size="sm" disabled={records.length === 0} onClick={() => exportFrequenciaCsv(records, unitTimezones)}>
           ⬇️ Exportar CSV
         </Button>
       </div>
@@ -168,7 +169,9 @@ export function FrequenciaTab() {
               </tr>
             </thead>
             <tbody>
-              {records.map((r) => (
+              {records.map((r) => {
+                const { dateLabel, timeLabel } = dateTimeLabelsInTz(r.at_ms, unitTimezones[r.unit_id]);
+                return (
                 <tr key={r.id}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -183,7 +186,7 @@ export function FrequenciaTab() {
                   <td>{r.role ? ROLE_LABEL[r.role] : "—"}</td>
                   <td>{units.find((u) => u.id === r.unit_id)?.name ?? "—"}</td>
                   <td>{KIND_LABEL[r.kind]}</td>
-                  <td>{new Date(r.at_ms).toLocaleString("pt-BR")}</td>
+                  <td>{dateLabel} {timeLabel}</td>
                   <td style={{ textAlign: "center" }}>
                     {r.punch_photo_path ? (
                       <Button variant="ghost" size="sm" onClick={() => openPhoto(r)} title="Ver foto da marcação">
@@ -194,7 +197,8 @@ export function FrequenciaTab() {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {!loading && records.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
