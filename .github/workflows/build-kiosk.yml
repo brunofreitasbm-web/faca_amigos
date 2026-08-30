@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       publicar:
-        description: "Publicar no feed de auto-update? ATENÇÃO: publica direto, sem aprovação manual depois — os terminais em operação se atualizam sozinhos."
+        description: "Publicar no feed de auto-update? ATENÇÃO: os terminais em operação se atualizam sozinhos."
         type: boolean
         default: false
 
@@ -75,15 +75,20 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  # Sem Environment/aprovação manual: publica direto assim que "publicar"
-  # está marcado no disparo do workflow. A confirmação passou a ser o
-  # próprio input "publicar" do workflow_dispatch — não há mais um segundo
-  # checkpoint humano depois disso.
+  # O Environment "producao" precisa continuar aqui: é dele que vêm
+  # FACAAMIGOS_SUPABASE_URL/FACAAMIGOS_SUPABASE_SECRET_KEY (Environment
+  # secrets, não secrets do repositório) — tirar essa linha derruba o
+  # publish por falta de credencial, mesmo com "publicar: true" marcado
+  # (visto em produção: run 33288814977, "ausentes" em release-kiosk.mjs).
+  # Se o objetivo é publicar sem esperar aprovação, ajuste isso em
+  # Settings > Environments > producao > Required reviewers (remover os
+  # revisores obrigatórios) — não removendo o environment daqui.
   publicar:
     needs: build
     if: inputs.publicar
     runs-on: windows-latest
     timeout-minutes: 40
+    environment: producao
     steps:
       - uses: actions/checkout@v4
 
