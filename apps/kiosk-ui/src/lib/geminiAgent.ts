@@ -14,6 +14,20 @@ const LOCAL_STORAGE_KEY_ENABLED = "facaamigos_gemini_enabled";
 
 const DEFAULT_API_KEY = "";
 
+/**
+ * Data (AAAA-MM-DD) a partir da qual o histórico de caixa/faturamento é
+ * real e confiável — ver migration fa_cleanup_test_records, que removeu os
+ * lançamentos de teste do período de homologação. A ZoeIA nunca deve
+ * analisar nem citar dados anteriores a esta data, mesmo que ainda existam
+ * registros legados no banco.
+ */
+export const ZOEIA_DATA_START_DATE = "2026-08-28";
+
+/** Empurra `dateIso` para a frente até `ZOEIA_DATA_START_DATE`, se for anterior a ela. */
+export function clampToZoeiaDataStart(dateIso: string): string {
+  return dateIso < ZOEIA_DATA_START_DATE ? ZOEIA_DATA_START_DATE : dateIso;
+}
+
 export type GeminiModel = "gemini-flash-latest" | "gemini-1.5-flash" | "gemini-2.0-flash" | "gemini-1.5-pro";
 
 export interface GeminiAgentSettings {
@@ -492,6 +506,11 @@ As 3 únicas unidades existentes da rede FaçaAmigos são:
 2. Playground (Parque Shopping)
 3. Playground (Grão-Pará)
 
+REGRA ABSOLUTA E INEGOCIÁVEL SOBRE OS DADOS:
+1. Use SOMENTE os números reais fornecidos no contexto abaixo (faturamento, pedidos, visitas, planos vendidos). NUNCA invente, estime ou arredonde valores que não estejam explicitamente no contexto.
+2. O contexto cobre exclusivamente o período de ${ZOEIA_DATA_START_DATE} em diante — dados de datas anteriores a essa não são confiáveis e nunca devem ser mencionados ou assumidos.
+3. Se o contexto indicar que não há dados suficientes no período, diga isso explicitamente em vez de fabricar uma projeção.
+
 Gere um relatório gerencial estratégico em JSON para "${targetUnit}" considerando a realidade e sinergia entre estas 3 unidades da rede, cobrindo:
 1. Projeções de Faturamento & Como Aumentar Receita (comparações entre as 3 unidades se for análise consolidada).
 2. Pontos de Atenção & Onde melhorar (identifique gargalos específicos ou compartilhados).
@@ -589,7 +608,8 @@ Responda EXCLUSIVAMENTE em formato JSON:
 export async function chatGerencialCopilot(history: ChatMessage[], newMessage: string, metricsContext: string): Promise<string> {
   const systemInstruction = `Você é a ZoeIA, a assistente comercial humana, perspicaz e parceira do FaçaAmigos.
 Seu objetivo é ajudar o gerente de unidade a aumentar as vendas, ticket médio, otimizar pacotes, cupons e a performance dos colaboradores de forma acolhedora e eficiente.
-Seja direta, calorosa, prática e utilize dados e estratégias de varejo e entretenimento infantil em shoppings.`;
+Seja direta, calorosa, prática e utilize dados e estratégias de varejo e entretenimento infantil em shoppings.
+Use SOMENTE os números reais do "Contexto Gerencial Atual" abaixo, que cobre exclusivamente o período de ${ZOEIA_DATA_START_DATE} em diante — nunca invente valores nem cite dados de datas anteriores a essa.`;
   const conversationHistory = history
     .map((m) => `${m.role === "user" ? "Gerente" : "ZoeIA"}: ${m.text}`)
     .join("\n");
