@@ -18,7 +18,8 @@ export function RequireCapability({
   children,
   fallback,
 }: {
-  capability: Capability;
+  /** Uma capacidade, ou uma lista — lista é "qualquer uma delas" (OR), não todas. */
+  capability: Capability | Capability[];
   children: ReactNode;
   fallback?: ReactNode;
 }) {
@@ -32,7 +33,9 @@ export function RequireCapability({
     );
   }
 
-  if (!can(capability)) {
+  const allowed = Array.isArray(capability) ? capability.some((c) => can(c)) : can(capability);
+
+  if (!allowed) {
     if (fallback !== undefined) return <>{fallback}</>;
     return (
       <div style={{ padding: "48px", maxWidth: "480px", margin: "0 auto" }}>
