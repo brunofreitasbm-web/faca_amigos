@@ -58,13 +58,20 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
   const [busy, setBusy] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [lastReleased, setLastReleased] = useState<string | null>(null);
+  // Congela o card no instante do clique em "Cobrar e liberar" — o
+  // CheckoutModal já trava o valor cobrado nesse instante (closedAtMs),
+  // mas sem isto o painel de confirmação por baixo do modal seguia
+  // recalculando a cada segundo enquanto o operador escolhia a forma de
+  // pagamento, dando a impressão de que o tempo/excedente continuava subindo.
+  const [closingSnapshot, setClosingSnapshot] = useState<ActiveSessionEntry | null>(null);
 
   // A sessão vem da lista já carregada em vez de uma consulta nova: o valor a
   // cobrar precisa ser exatamente o mesmo que o Painel mostra no balcão, e
   // são no máximo algumas dezenas de crianças no espaço.
-  const entry: ActiveSessionEntry | undefined = resolved?.sessionId
+  const liveEntry: ActiveSessionEntry | undefined = resolved?.sessionId
     ? entries.find((e) => e.session.id === resolved.sessionId)
     : undefined;
+  const entry: ActiveSessionEntry | undefined = closingSnapshot ?? liveEntry;
 
   const busyRef = useRef(false);
 
@@ -301,7 +308,10 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
             <Button
               variant="primary"
               size="lg"
-              onClick={() => setCheckoutOpen(true)}
+              onClick={() => {
+                setClosingSnapshot(entry);
+                setCheckoutOpen(true);
+              }}
               style={{ borderRadius: "9999px", flex: 1 }}
               title="Cobrar e liberar a criança"
             >
@@ -359,9 +369,13 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
       {checkoutOpen && entry && (
         <CheckoutModal
           entries={[entry]}
-          onClose={() => setCheckoutOpen(false)}
+          onClose={() => {
+            setCheckoutOpen(false);
+            setClosingSnapshot(null);
+          }}
           onDone={() => {
             setCheckoutOpen(false);
+            setClosingSnapshot(null);
             setLastReleased(entry.session.child_name_snapshot);
             toast.success(`${entry.session.child_name_snapshot} liberado(a).`);
             setResolved(null);

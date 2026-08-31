@@ -62,6 +62,13 @@ export function PainelScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionBusy, setActionBusy] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  // Congela o cartão de quem está sendo fechado no instante do clique em
+  // "Fechar sessões" — o CheckoutModal já trava o VALOR cobrado nesse
+  // mesmo instante (ver client.ts: closedAtMs), mas o card por baixo do
+  // modal seguia recalculando a cada segundo via useActiveSessions, dando
+  // a impressão (falsa, mas visível) de que o tempo/excedente continuava
+  // subindo enquanto o operador escolhia a forma de pagamento.
+  const [closingSnapshot, setClosingSnapshot] = useState<Map<string, ActiveSessionEntry>>(new Map());
   const [printData, setPrintData] = useState<WristbandData | null>(null);
   const [timelineFor, setTimelineFor] = useState<ActiveSessionEntry | null>(null);
   const [planOptions, setPlanOptions] = useState<Plan[]>([]);
@@ -491,7 +498,7 @@ export function PainelScreen() {
       <div className="painel-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: "4px" }}>
         <div className="painel-grid">
         {entries.map((entry) => {
-          const { session, quote, plan, asset } = entry;
+          const { session, quote, plan, asset } = closingSnapshot.get(entry.session.id) ?? entry;
           const isSelected = selected.has(session.id);
           const isExceeded = quote.timing.phase === "EXCEDENTE" || quote.timing.phase === "VERMELHO";
           const isPaused = quote.timing.isPaused;
@@ -974,7 +981,15 @@ export function PainelScreen() {
 
       {selected.size > 0 && (
         <div style={{ position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 100 }}>
-          <Button variant="primary" size="lg" onClick={() => setCheckoutOpen(true)} style={{ boxShadow: "var(--shadow-lg)" }}>
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => {
+              setClosingSnapshot(new Map(selectedEntries.map((e) => [e.session.id, e])));
+              setCheckoutOpen(true);
+            }}
+            style={{ boxShadow: "var(--shadow-lg)" }}
+          >
             Fechar {selected.size} {selected.size === 1 ? "sessão" : "sessões"}
           </Button>
         </div>
@@ -983,9 +998,13 @@ export function PainelScreen() {
       {checkoutOpen && (
         <CheckoutModal
           entries={selectedEntries}
-          onClose={() => setCheckoutOpen(false)}
+          onClose={() => {
+            setCheckoutOpen(false);
+            setClosingSnapshot(new Map());
+          }}
           onDone={() => {
             setCheckoutOpen(false);
+            setClosingSnapshot(new Map());
             setSelected(new Set());
           }}
         />
@@ -1000,6 +1019,7 @@ export function PainelScreen() {
             // do fechamento normal, para não existir uma segunda forma de
             // fechar venda no sistema.
             setSelected(new Set([manualExitFor.session.id]));
+            setClosingSnapshot(new Map([[manualExitFor.session.id, manualExitFor]]));
             setManualExitFor(null);
             setCheckoutOpen(true);
             toast.success("Conferência registrada. Finalize o pagamento.");
