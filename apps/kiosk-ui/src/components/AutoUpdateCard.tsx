@@ -149,7 +149,7 @@ export function AutoUpdateCard() {
 
       <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
         Versão atual em execução: <strong>{currentVersionStr}</strong> (build <code style={{ fontFamily: "monospace" }}>{buildShaStr}</code>).
-        {isElectron ? " O auto-updater verifica novas versões a cada 15 minutos e instala automaticamente durante a madrugada." : " Atualizações de PWA/Web são aplicadas sincronizadas com a versão do servidor."}
+        {isElectron ? " O auto-updater verifica novas versões a cada 15 minutos. Se já estiver baixada na abertura do terminal, instala na hora, antes do expediente; se baixar durante o dia, só instala no fechamento do terminal ou na abertura seguinte, para não interromper um atendimento." : " Atualizações de PWA/Web são aplicadas sincronizadas com a versão do servidor."}
       </p>
 
       {/* Barra de Progresso de Download */}

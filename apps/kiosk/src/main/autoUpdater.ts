@@ -31,35 +31,25 @@ let initialized = false;
 
 const PERIODIC_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
-// O quiosque fica ligado 24/7 — o autoInstallOnAppQuit sozinho nunca dispara
-// porque o app não é fechado no dia a dia. Sem uma janela de instalação
-// automática, a atualização baixada fica pendente para sempre e o terminal
-// "congela" na versão antiga (foi exatamente o que prendeu a loja na 0.1.5).
-// 03:30 é madrugada: loja fechada, nenhum check-in em andamento.
-const IDLE_INSTALL_HOUR = 3;
-const IDLE_INSTALL_MINUTE = 30;
-
-let idleInstallTimer: ReturnType<typeof setTimeout> | null = null;
-
-function msUntilNextIdleWindow(): number {
-  const now = new Date();
-  const next = new Date(now);
-  next.setHours(IDLE_INSTALL_HOUR, IDLE_INSTALL_MINUTE, 0, 0);
-  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
-  return next.getTime() - now.getTime();
-}
-
-function scheduleIdleInstall(version: string): void {
-  if (idleInstallTimer) clearTimeout(idleInstallTimer);
-  const delay = msUntilNextIdleWindow();
-  log?.info?.(
-    `[auto-updater] Instalação automática da versão ${version} agendada para daqui a ${Math.round(delay / 60000)} min (janela ociosa da madrugada).`,
-  );
-  idleInstallTimer = setTimeout(() => {
-    log?.info?.(`[auto-updater] Janela ociosa atingida — aplicando a versão ${version} agora.`);
-    applyUpdate();
-  }, delay);
-}
+// O terminal NÃO fica ligado 24/7 — a loja liga o PC por volta das 10h e
+// desliga por volta das 22h (energia cortada, não um "Desligar" do Windows
+// com tempo de sobra). Uma janela de instalação fixa de madrugada (versão
+// antiga desta lógica, 03:30) nunca chega a rodar: o processo já está morto
+// a essa hora todo santo dia, e a atualização baixada ficava pendente para
+// sempre — o terminal "congelava" na versão antiga (foi o que prendeu a loja
+// na 0.1.5, e de novo aqui: nenhum terminal saiu da 0.1.21 sozinho).
+//
+// A única janela ociosa real é a abertura do dia: os primeiros minutos após
+// o boot, antes de qualquer check-in. Por isso, se a atualização já estava
+// baixada de um dia anterior (ou termina de baixar) dentro desse período
+// logo após o app subir, instala na hora — quitAndInstall(true, true) fecha,
+// instala em silêncio e o próprio instalador reabre o app, então a loja só
+// vê o terminal demorar um pouco mais para aparecer na tela de login.
+// Fora dessa janela (baixou no meio do expediente), não força: fica
+// pendente para o fechamento do terminal (window-all-closed, main.ts) ou,
+// na pior hipótese, para a abertura do dia seguinte.
+const STARTUP_INSTALL_GRACE_MS = 5 * 60 * 1000;
+const appStartMs = Date.now();
 
 function notifyWindows(state: UpdateState): void {
   currentUpdateState = state;
@@ -237,7 +227,15 @@ export function initAutoUpdater(): void {
       version: info.version,
       progress: 100,
     });
-    scheduleIdleInstall(info.version);
+
+    if (Date.now() - appStartMs < STARTUP_INSTALL_GRACE_MS) {
+      log.info(`[auto-updater] Baixada logo na abertura do terminal — aplicando a versão ${info.version} agora, antes do expediente.`);
+      applyUpdate();
+    } else {
+      log.info(
+        `[auto-updater] Versão ${info.version} baixada durante o expediente — não instala agora para não interromper um atendimento. Fica pendente para o fechamento do terminal ou a próxima abertura.`,
+      );
+    }
   });
 
   checkForUpdates();
