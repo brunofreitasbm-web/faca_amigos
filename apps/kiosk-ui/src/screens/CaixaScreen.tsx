@@ -217,7 +217,9 @@ export function CaixaScreen() {
         setEnvelopeFundoCaixa("0");
         setEnvelopePhoto(null);
       } else {
-        alert("Erro ao registrar o envelope.");
+        console.warn("[handleSaveEnvelope]", err);
+        const msg = err instanceof Error && err.message ? err.message : "Erro ao registrar o envelope.";
+        alert(msg);
       }
     } finally {
       setEnvelopeBusy(false);
@@ -657,9 +659,11 @@ export function CaixaScreen() {
           <Button variant="ghost" onClick={() => setClosing(false)} disabled={busy || !!pendingCloseKey}>
             Cancelar
           </Button>
-          <Button variant="secondary" onClick={() => setEnvelopeModalOpen(true)} disabled={busy || !!pendingCloseKey}>
-            ✉️ Registrar Envelope
-          </Button>
+          <IfCan capability="caixa.open_close">
+            <Button variant="secondary" onClick={() => setEnvelopeModalOpen(true)} disabled={busy || !!pendingCloseKey}>
+              ✉️ Registrar Envelope
+            </Button>
+          </IfCan>
           <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy || !!pendingCloseKey || !canConfirmClose}>
             {pendingCloseKey ? "Aguardando conexão..." : "Confirmar fechamento"}
           </Button>
@@ -680,9 +684,11 @@ export function CaixaScreen() {
             final do dia.
           </HelpText>
         </div>
-        <Button variant="secondary" onClick={() => setEnvelopeModalOpen(true)}>
-          ✉️ Registrar Envelope
-        </Button>
+        <IfCan capability="caixa.open_close">
+          <Button variant="secondary" onClick={() => setEnvelopeModalOpen(true)}>
+            ✉️ Registrar Envelope
+          </Button>
+        </IfCan>
       </div>
 
 
