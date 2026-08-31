@@ -137,7 +137,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
 
   // Sem `metricsSummary` explícito (uso padrão no painel), busca os números
   // reais no Supabase em vez de usar dados fictícios — só o período a
-  // partir de ZOEIA_DATA_START_DATE (28/08/2026), quando o histórico de
+  // partir de ZOEIA_DATA_START_DATE (29/08/2026), quando o histórico de
   // teste foi limpo e o caixa passou a refletir a operação real.
   useEffect(() => {
     if (metricsSummary) return;

@@ -21,7 +21,7 @@ const DEFAULT_API_KEY = "";
  * analisar nem citar dados anteriores a esta data, mesmo que ainda existam
  * registros legados no banco.
  */
-export const ZOEIA_DATA_START_DATE = "2026-08-28";
+export const ZOEIA_DATA_START_DATE = "2026-08-29";
 
 /** Empurra `dateIso` para a frente até `ZOEIA_DATA_START_DATE`, se for anterior a ela. */
 export function clampToZoeiaDataStart(dateIso: string): string {
