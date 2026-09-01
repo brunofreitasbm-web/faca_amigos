@@ -1375,6 +1375,14 @@ export const Api = {
         p_photo_path: photoPath,
       }),
     ),
+
+  /** Reseta a biometria facial de um colaborador — RPC fa_kiosk_reset_face (self ou config.employees.write). */
+  resetFace: (employeeId: string) =>
+    unwrap(
+      supabase().rpc("fa_kiosk_reset_face", {
+        p_employee_id: employeeId,
+      }),
+    ),
   /** Upload da foto de rosto (cadastro OU marcação de ponto) — bucket privado `ponto-fotos`, path prefixado por employeeId. */
   uploadPontoFoto: async (employeeId: string, photo: Blob, kind: "enroll" | "punch"): Promise<string> => {
     assertValidImageUpload(photo);
@@ -1917,6 +1925,10 @@ export const Api = {
       "fa_close_shift",
       { p_shift_id: shiftId, p_employee_id: body.employeeId, p_declared: body.declared, p_justifications: body.justifications ?? {} },
     ),
+  // Número do envelope não é mais digitado pelo operador: sequência global
+  // (independente da unidade) gerada pelo servidor, 2 dígitos, reiniciando
+  // de "00" a cada 100 (ver migration fa_envelope_number_auto_sequencial).
+  nextEnvelopeNumber: () => unwrap<string>(supabase().rpc("fa_next_envelope_number")),
   cashMovement: (shiftId: string, body: { employeeId: string; kind: string; amountCents: number; reason?: string; envelopeNumber?: string; photoUrl?: string; fundoCaixaCents?: number }) =>
     callResilient("fa_record_cash_movement", {
       p_shift_id: shiftId,

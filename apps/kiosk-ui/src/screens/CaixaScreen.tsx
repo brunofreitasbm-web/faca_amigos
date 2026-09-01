@@ -163,10 +163,29 @@ export function CaixaScreen() {
   // Estados do Modal "Registrar Envelope"
   const [envelopeModalOpen, setEnvelopeModalOpen] = useState(false);
   const [envelopeNum, setEnvelopeNum] = useState("");
+  const [envelopeNumLoading, setEnvelopeNumLoading] = useState(false);
   const [envelopeVal, setEnvelopeVal] = useState("0");
   const [envelopeFundoCaixa, setEnvelopeFundoCaixa] = useState("0");
   const [envelopePhoto, setEnvelopePhoto] = useState<File | null>(null);
   const [envelopeBusy, setEnvelopeBusy] = useState(false);
+
+  // Número do envelope é gerado pelo servidor (sequência global, não por
+  // unidade) assim que o modal abre — o operador não digita mais.
+  async function openEnvelopeModal() {
+    setEnvelopeModalOpen(true);
+    setEnvelopeNum("");
+    setEnvelopeNumLoading(true);
+    try {
+      const num = await Api.nextEnvelopeNumber();
+      setEnvelopeNum(num);
+    } catch (err) {
+      console.warn("[openEnvelopeModal]", err);
+      alert("Não foi possível gerar o número do envelope. Tente novamente.");
+      setEnvelopeModalOpen(false);
+    } finally {
+      setEnvelopeNumLoading(false);
+    }
+  }
 
   async function handleSaveEnvelope() {
     if (!unit || !employee || !shift) return;
@@ -420,9 +439,9 @@ export function CaixaScreen() {
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <Input
               label="Número do Envelope"
-              placeholder="Ex: #104, #205..."
-              value={envelopeNum}
-              onChange={(e) => setEnvelopeNum(e.target.value)}
+              value={envelopeNumLoading ? "Gerando..." : `#${envelopeNum}`}
+              disabled
+              readOnly
             />
             <Input
               label="Valor do Envelope (R$)"
@@ -459,6 +478,7 @@ export function CaixaScreen() {
                 loading={envelopeBusy}
                 disabled={
                   envelopeBusy ||
+                  envelopeNumLoading ||
                   !!pendingMovementKey ||
                   !envelopeNum ||
                   Number(envelopeVal) <= 0 ||
@@ -660,7 +680,7 @@ export function CaixaScreen() {
             Cancelar
           </Button>
           <IfCan capability="caixa.open_close">
-            <Button variant="secondary" onClick={() => setEnvelopeModalOpen(true)} disabled={busy || !!pendingCloseKey}>
+            <Button variant="secondary" onClick={() => void openEnvelopeModal()} disabled={busy || !!pendingCloseKey}>
               ✉️ Registrar Envelope
             </Button>
           </IfCan>
@@ -685,7 +705,7 @@ export function CaixaScreen() {
           </HelpText>
         </div>
         <IfCan capability="caixa.open_close">
-          <Button variant="secondary" onClick={() => setEnvelopeModalOpen(true)}>
+          <Button variant="secondary" onClick={() => void openEnvelopeModal()}>
             ✉️ Registrar Envelope
           </Button>
         </IfCan>
