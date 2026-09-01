@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RevealPin } from "@facaamigos/ui";
+import { RevealPin, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Asset } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
@@ -128,6 +128,13 @@ export function MobilePainel({
         <div className="m-stack" style={{ gap: 10 }}>
           {entries.map((entry) => {
             const u = urgency(entry);
+            const isNeurodivergent = Boolean(
+              (entry.session.sensory_tags?.length ?? 0) > 0 ||
+              entry.session.notes?.toLowerCase().includes("neuro") ||
+              entry.session.notes?.toLowerCase().includes("autis") ||
+              entry.session.notes?.toLowerCase().includes("tea") ||
+              entry.session.child_name_snapshot.includes("🧩")
+            );
             return (
               <div
                 key={entry.session.id}
@@ -142,6 +149,8 @@ export function MobilePainel({
                   }
                 }}
                 style={{
+                  position: "relative",
+                  overflow: "hidden",
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
@@ -152,9 +161,35 @@ export function MobilePainel({
                   padding: "13px 15px",
                 }}
               >
-                <div className="m-grow">
-                  <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>
-                    {entry.session.child_name_snapshot}{((entry.session.sensory_tags?.length ?? 0) > 0 || entry.session.notes?.toLowerCase().includes("neuro")) && !entry.session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
+                {/* Símbolo do autismo discreto com fundo transparente */}
+                {isNeurodivergent && (
+                  <div
+                    aria-hidden="true"
+                    title="Criança Neurodivergente / TEA"
+                    style={{
+                      position: "absolute",
+                      right: 14,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      opacity: 0.1,
+                      pointerEvents: "none",
+                      zIndex: 0,
+                    }}
+                  >
+                    <AutismRibbonIcon width={36} height={45} />
+                  </div>
+                )}
+                <div className="m-grow" style={{ position: "relative", zIndex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>{entry.session.child_name_snapshot}</span>
+                    {isNeurodivergent && (
+                      <span
+                        title="Criança Neurodivergente / TEA — Sinalização para o operador"
+                        style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}
+                      >
+                        <AutismRibbonIcon width={13} height={16} />
+                      </span>
+                    )}
                   </p>
                   <p style={{ margin: "3px 0 0", fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>
                     {entry.plan.name} · pulseira {entry.session.access_code ?? entry.session.wristband_code ?? "—"}
@@ -164,7 +199,7 @@ export function MobilePainel({
                     {u.status}
                   </p>
                 </div>
-                <div style={{ textAlign: "right", flex: "none" }}>
+                <div style={{ textAlign: "right", flex: "none", position: "relative", zIndex: 1 }}>
                   <p
                     className="m-num"
                     style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 22, lineHeight: 1.15, color: u.color }}
@@ -211,8 +246,19 @@ export function MobilePainel({
       {selected && (
         <div className="m-sheet" role="dialog" aria-label={`Ações de ${selected.session.child_name_snapshot}`}>
           <div className="m-row" style={{ justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-            <p className="m-title-sm m-trunc m-grow">
-              {selected.session.child_name_snapshot}{((selected.session.sensory_tags?.length ?? 0) > 0 || selected.session.notes?.toLowerCase().includes("neuro")) && !selected.session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
+            <p className="m-title-sm m-trunc m-grow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span>{selected.session.child_name_snapshot}</span>
+              {Boolean(
+                (selected.session.sensory_tags?.length ?? 0) > 0 ||
+                selected.session.notes?.toLowerCase().includes("neuro") ||
+                selected.session.notes?.toLowerCase().includes("autis") ||
+                selected.session.notes?.toLowerCase().includes("tea") ||
+                selected.session.child_name_snapshot.includes("🧩")
+              ) && (
+                <span title="Criança Neurodivergente / TEA — Atendimento Inclusivo" style={{ display: "inline-flex", alignItems: "center" }}>
+                  <AutismRibbonIcon width={14} height={18} />
+                </span>
+              )}
             </p>
             <button
               type="button"

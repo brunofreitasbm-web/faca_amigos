@@ -163,3 +163,72 @@ export function ArrowClockwiseIcon(props: SVGProps<SVGSVGElement>) {
     </IconBase>
   );
 }
+
+/**
+ * Símbolo oficial da Conscientização do Autismo (Laço de fita com padrão de quebra-cabeça).
+ * Fundo 100% transparente, vetorizado em alta definição para uso tanto em badges/ícones
+ * quanto como sinalização/marca d'água discreta nos cards de sessão.
+ */
+export function AutismRibbonIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 64 80"
+      width="1em"
+      height="1em"
+      fill="none"
+      aria-hidden="true"
+      {...props}
+    >
+      <defs>
+        <clipPath id="fa-autism-ribbon-clip">
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M32 40 C39 33 50 25 50 16 C50 7 42 2 32 2 C22 2 14 7 14 16 C14 25 25 33 32 40 L16 78 L23 72 L30 78 L32 46 L34 78 L41 72 L48 78 Z M32 30 C28 25 22 20 22 15 C22 10 26 7 32 7 C38 7 42 10 42 15 C42 20 36 25 32 30 Z"
+          />
+        </clipPath>
+      </defs>
+      <g clipPath="url(#fa-autism-ribbon-clip)">
+        {/* Pedaços do quebra-cabeça em cores vibrantes oficiais */}
+        <path d="M10 0 H32 V18 H10 Z" fill="#FBC02D" />
+        <path d="M32 0 H54 V18 H32 Z" fill="#1565C0" />
+        <path d="M10 18 H32 V36 H10 Z" fill="#E53935" />
+        <path d="M32 18 H54 V36 H32 Z" fill="#00ACC1" />
+        <path d="M18 36 H46 V52 H18 Z" fill="#FBC02D" />
+        <path d="M10 52 H32 V66 H10 Z" fill="#1565C0" />
+        <path d="M32 52 H54 V66 H32 Z" fill="#E53935" />
+        <path d="M10 66 H32 V82 H10 Z" fill="#00ACC1" />
+        <path d="M32 66 H54 V82 H32 Z" fill="#FBC02D" />
+
+        {/* Encaixes circulares (Tabs) do quebra-cabeça */}
+        <circle cx="32" cy="9" r="3.5" fill="#FBC02D" />
+        <circle cx="18" cy="18" r="3.5" fill="#E53935" />
+        <circle cx="46" cy="18" r="3.5" fill="#1565C0" />
+        <circle cx="26" cy="36" r="3.5" fill="#FBC02D" />
+        <circle cx="38" cy="36" r="3.5" fill="#00ACC1" />
+        <circle cx="21" cy="66" r="3.5" fill="#1565C0" />
+        <circle cx="43" cy="66" r="3.5" fill="#E53935" />
+
+        {/* Linhas de divisão sutis das peças */}
+        <path
+          d="M32 2 V18 M14 18 H50 M32 18 V36 M16 36 H48 M20 52 H44 M12 66 H52"
+          stroke="#000"
+          strokeWidth="0.75"
+          strokeOpacity="0.2"
+          strokeLinecap="round"
+        />
+      </g>
+      {/* Contorno sutil do laço */}
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M32 40 C39 33 50 25 50 16 C50 7 42 2 32 2 C22 2 14 7 14 16 C14 25 25 33 32 40 L16 78 L23 72 L30 78 L32 46 L34 78 L41 72 L48 78 Z M32 30 C28 25 22 20 22 15 C22 10 26 7 32 7 C38 7 42 10 42 15 C42 20 36 25 32 30 Z"
+        stroke="#000"
+        strokeWidth="0.8"
+        strokeOpacity="0.22"
+        fill="none"
+      />
+    </svg>
+  );
+}

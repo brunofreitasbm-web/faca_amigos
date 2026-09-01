@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Input, Tag, HelpText, AsyncState } from "@facaamigos/ui";
+import { Button, Input, Tag, HelpText, AsyncState, AutismRibbonIcon } from "@facaamigos/ui";
 import { formatAccessCode } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, ResolvedAccessCode, Package, Coupon } from "../api/client.js";
@@ -72,6 +72,14 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
     ? entries.find((e) => e.session.id === resolved.sessionId)
     : undefined;
   const entry: ActiveSessionEntry | undefined = closingSnapshot ?? liveEntry;
+  const isNeurodivergent = Boolean(
+    entry &&
+      ((entry.session.sensory_tags?.length ?? 0) > 0 ||
+        entry.session.notes?.toLowerCase().includes("neuro") ||
+        entry.session.notes?.toLowerCase().includes("autis") ||
+        entry.session.notes?.toLowerCase().includes("tea") ||
+        entry.session.child_name_snapshot.includes("🧩")),
+  );
 
   const busyRef = useRef(false);
 
@@ -247,6 +255,8 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
       {resolved && entry && (
         <div
           style={{
+            position: "relative",
+            overflow: "hidden",
             border: "2px solid var(--color-primary)",
             background: "var(--surface-card)",
             borderRadius: "18px",
@@ -257,12 +267,49 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
             boxShadow: "var(--shadow-md)",
           }}
         >
-          <div>
-            <strong style={{ fontSize: "22px", fontFamily: "var(--font-display)", display: "block" }}>
-              {entry.session.child_name_snapshot}
+          {isNeurodivergent && (
+            <div
+              aria-hidden="true"
+              title="Criança Neurodivergente / TEA — Sinalização para o operador"
+              style={{
+                position: "absolute",
+                right: "16px",
+                bottom: "16px",
+                opacity: 0.12,
+                pointerEvents: "none",
+                zIndex: 0,
+                userSelect: "none",
+              }}
+            >
+              <AutismRibbonIcon width={58} height={72} />
+            </div>
+          )}
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <strong style={{ fontSize: "22px", fontFamily: "var(--font-display)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <span>{entry.session.child_name_snapshot}</span>
+              {isNeurodivergent && (
+                <span
+                  title="Criança com Autismo / Neurodivergente — Atendimento Inclusivo"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "2px 8px",
+                    borderRadius: "10px",
+                    background: "rgba(0, 168, 89, 0.08)",
+                    border: "1px solid rgba(0, 168, 89, 0.25)",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "var(--color-teal-hover, #007A3E)",
+                  }}
+                >
+                  <AutismRibbonIcon width={13} height={16} />
+                  <span>Neurodivergente</span>
+                </span>
+              )}
             </strong>
             {entry.session.guardian_name_snapshot && (
-              <span style={{ fontSize: "14px", color: "var(--text-muted)" }}>
+              <span style={{ fontSize: "14px", color: "var(--text-muted)", display: "block" }}>
                 Responsável: {entry.session.guardian_name_snapshot}
               </span>
             )}
