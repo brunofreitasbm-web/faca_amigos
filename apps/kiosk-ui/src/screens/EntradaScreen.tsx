@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge } from "@facaamigos/ui";
+import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Package, Plan, Product, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
@@ -795,8 +795,13 @@ export function EntradaScreen({
                 <strong style={{ fontSize: "17px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   {childName}{isNeurodivergent && !childName.includes("🧩") ? " 🧩" : ""}
                   {isNeurodivergent && (
-                    <Badge variant="teal" title="Criança Neurodivergente">
-                      🧩 Neurodivergente
+                    <Badge
+                      variant="teal"
+                      title="Criança com Autismo / Neurodivergente — Atendimento Inclusivo"
+                      style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}
+                    >
+                      <AutismRibbonIcon width={13} height={16} style={{ flexShrink: 0 }} />
+                      <span>Neurodivergente</span>
                     </Badge>
                   )}
                   {matchedChild?.is_vip && (

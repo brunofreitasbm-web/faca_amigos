@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin } from "@facaamigos/ui";
+import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, Plan, Asset } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
@@ -509,6 +509,13 @@ export function PainelScreen() {
           // circulam no pulso de quem entrou naquele dia.
           const wristbandCode = session.access_code || session.wristband_code || session.id.slice(0, 6).toUpperCase();
           const careSummary = [...(session.sensory_tags ?? []), session.notes].filter(Boolean).join(" · ");
+          const isNeurodivergent = Boolean(
+            (session.sensory_tags?.length ?? 0) > 0 ||
+            session.notes?.toLowerCase().includes("neuro") ||
+            session.notes?.toLowerCase().includes("autis") ||
+            session.notes?.toLowerCase().includes("tea") ||
+            session.child_name_snapshot.includes("🧩")
+          );
 
           return (
             <Card
@@ -531,6 +538,7 @@ export function PainelScreen() {
               // bodyStyle porque é lá que os filhos ficam; `flex:1` é o que
               // permite ao rodapé de valor grudar embaixo com marginTop:auto.
               bodyStyle={{
+                position: "relative",
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
@@ -556,7 +564,28 @@ export function PainelScreen() {
                 opacity: isPaused ? 0.85 : 1,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              {/* Símbolo do autismo com fundo transparente, sutil no fundo para sinalização discreta do operador sem atrapalhar a visualização */}
+              {isNeurodivergent && (
+                <div
+                  aria-hidden="true"
+                  title="Criança Neurodivergente / TEA — Sinalização para o operador"
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    bottom: "10px",
+                    opacity: 0.12,
+                    pointerEvents: "none",
+                    zIndex: 0,
+                    userSelect: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <AutismRibbonIcon width={58} height={72} />
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "relative", zIndex: 1 }}>
                 <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", minWidth: 0, flex: 1 }}>
                   {asset && (
                     asset.photo_url ? (
@@ -575,14 +604,23 @@ export function PainelScreen() {
                   )}
                   <div style={{ minWidth: 0 }}>
                     <strong className="painel-card-name" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      {/* Selo estático e de alto contraste, ao lado do nome:
-                          é o sinal de que esta família merece um atendimento
-                          diferenciado, e precisa ser lido de relance num
-                          painel cheio. Sem animação de propósito — ver a
-                          variante `vip` do Badge. */}
-                      {((session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && (
-                        <Badge variant="teal" title="Criança Neurodivergente — Atendimento Inclusivo">
-                          🧩 Neurodivergente
+                      {/* Selo estático com o Símbolo oficial do Autismo, ao lado do nome:
+                          sinaliza ao operador de forma visual e acolhedora. */}
+                      {isNeurodivergent && (
+                        <Badge
+                          variant="teal"
+                          title="Criança com Autismo / Neurodivergente — Atendimento Inclusivo"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            padding: "2px 7px",
+                            background: "rgba(0, 168, 89, 0.08)",
+                            border: "1px solid rgba(0, 168, 89, 0.25)",
+                          }}
+                        >
+                          <AutismRibbonIcon width={13} height={16} style={{ flexShrink: 0 }} />
+                          <span>Neurodivergente</span>
                         </Badge>
                       )}
                       {vipChildIds.has(session.child_id) && (
@@ -590,7 +628,7 @@ export function PainelScreen() {
                           ★ VIP
                         </Badge>
                       )}
-                      {session.child_name_snapshot}{((session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
+                      {session.child_name_snapshot}{isNeurodivergent && !session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
                       {session.child_birth_date && (
                         <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}>· {formatAge(session.child_birth_date)}</span>
                       )}
