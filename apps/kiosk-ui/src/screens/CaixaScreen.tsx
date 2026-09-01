@@ -460,6 +460,7 @@ export function CaixaScreen() {
               label="Foto do Envelope (obrigatória)"
               buttonLabel="📷 Tirar foto do envelope"
               previewAlt="Foto capturada do envelope"
+              showEnvelopeGrid={true}
               onChange={(blob) =>
                 setEnvelopePhoto(blob ? new File([blob], `envelope-${Date.now()}.jpg`, { type: "image/jpeg" }) : null)
               }

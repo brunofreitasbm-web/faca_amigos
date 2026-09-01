@@ -2273,9 +2273,12 @@ export const Api = {
   /** Upload do anexo (atestado etc.) — bucket privado `ocorrencia-documentos`, path prefixado por employeeId. */
   uploadOcorrenciaDocumento: async (employeeId: string, file: File): Promise<string> => {
     assertValidImageUpload(file);
-    const path = `${employeeId}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
-    const { error } = await supabase().storage.from("ocorrencia-documentos").upload(path, file, {
-      contentType: file.type,
+    const optimized = (await compressImageForUpload(file)) as File;
+    const ext = optimized.type === "image/png" ? "png" : "jpg";
+    const fileName = optimized.name || file.name || "documento.jpg";
+    const path = `${employeeId}/${Date.now()}-${fileName.replace(/[^\w.\-]/g, "_")}`;
+    const { error } = await supabase().storage.from("ocorrencia-documentos").upload(path, optimized, {
+      contentType: optimized.type || "image/jpeg",
       upsert: false,
     });
     if (error) throw new Error(error.message);
@@ -2694,8 +2697,9 @@ export const Api = {
   // fora do escopo deste formulário.
   uploadChildPhoto: async (childId: string, photo: Blob): Promise<void> => {
     assertValidImageUpload(photo);
+    const optimized = await compressImageForUpload(photo);
     const path = `${childId}/${Date.now()}.jpg`;
-    const { error: uploadError } = await supabase().storage.from("crianca-fotos").upload(path, photo, {
+    const { error: uploadError } = await supabase().storage.from("crianca-fotos").upload(path, optimized, {
       contentType: "image/jpeg",
       upsert: false,
     });
@@ -2703,14 +2707,14 @@ export const Api = {
     await unwrap(supabase().rpc("fa_set_child_photo_path", { p_child_id: childId, p_photo_path: path }));
   },
   // Upload direto para o bucket público `carrinho-fotos` (ver migration
-  // fa_kiosk_asset_photos) — aceita apenas JPG/PNG, nome do arquivo prefixado
-  // com timestamp para evitar colisão ao trocar a foto de um mesmo carrinho.
+  // fa_kiosk_asset_photos) — comprimida antes do upload para economizar storage.
   uploadAssetPhoto: async (unitId: string, file: File): Promise<string> => {
     assertValidImageUpload(file);
-    const ext = file.type === "image/png" ? "png" : "jpg";
+    const optimized = (await compressImageForUpload(file)) as File;
+    const ext = optimized.type === "image/png" ? "png" : "jpg";
     const path = `${unitId}/${Date.now()}.${ext}`;
-    const { error } = await supabase().storage.from("carrinho-fotos").upload(path, file, {
-      contentType: file.type,
+    const { error } = await supabase().storage.from("carrinho-fotos").upload(path, optimized, {
+      contentType: optimized.type || "image/jpeg",
       upsert: false,
     });
     if (error) throw new Error(error.message);

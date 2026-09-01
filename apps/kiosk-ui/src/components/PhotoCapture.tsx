@@ -31,6 +31,8 @@ interface PhotoCaptureProps {
   buttonLabel?: string;
   /** `alt` da miniatura após a captura. */
   previewAlt?: string;
+  /** Exibe grade/moldura retangular de enquadramento sobre o vídeo para orientar o alinhamento de envelopes. */
+  showEnvelopeGrid?: boolean;
 }
 
 export function PhotoCapture({
@@ -38,6 +40,7 @@ export function PhotoCapture({
   label = "Foto da criança (opcional)",
   buttonLabel = "📷 Tirar foto pela câmera",
   previewAlt = "Foto capturada da criança",
+  showEnvelopeGrid = false,
 }: PhotoCaptureProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -153,6 +156,55 @@ export function PhotoCapture({
         >
           <video ref={videoRef} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           {status === "starting" && <span style={{ position: "absolute", color: "#fff", fontSize: "13px" }}>Abrindo a câmera…</span>}
+
+          {status === "streaming" && showEnvelopeGrid && (
+            <>
+              {/* Etiqueta superior de instrução */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: "10px",
+                  background: "rgba(0, 0, 0, 0.75)",
+                  color: "#ffffff",
+                  padding: "4px 12px",
+                  borderRadius: "20px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  pointerEvents: "none",
+                  zIndex: 2,
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                📐 Centralize o envelope no retângulo
+              </div>
+
+              {/* Guia retangular com sombra de foco e cantos destacados */}
+              <div
+                style={{
+                  position: "absolute",
+                  width: "76%",
+                  height: "56%",
+                  boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.38)",
+                  border: "1.5px dashed rgba(255, 255, 255, 0.7)",
+                  borderRadius: "8px",
+                  pointerEvents: "none",
+                  zIndex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {/* Cantos destacados estilo scanner em tom ciano/turquesa */}
+                <div style={{ position: "absolute", top: "-2px", left: "-2px", width: "16px", height: "16px", borderTop: "3px solid #06b6d4", borderLeft: "3px solid #06b6d4", borderTopLeftRadius: "6px" }} />
+                <div style={{ position: "absolute", top: "-2px", right: "-2px", width: "16px", height: "16px", borderTop: "3px solid #06b6d4", borderRight: "3px solid #06b6d4", borderTopRightRadius: "6px" }} />
+                <div style={{ position: "absolute", bottom: "-2px", left: "-2px", width: "16px", height: "16px", borderBottom: "3px solid #06b6d4", borderLeft: "3px solid #06b6d4", borderBottomLeftRadius: "6px" }} />
+                <div style={{ position: "absolute", bottom: "-2px", right: "-2px", width: "16px", height: "16px", borderBottom: "3px solid #06b6d4", borderRight: "3px solid #06b6d4", borderBottomRightRadius: "6px" }} />
+              </div>
+            </>
+          )}
+
           {status === "streaming" && (
             <button
               type="button"
@@ -168,6 +220,7 @@ export function PhotoCapture({
                 border: "3px solid #fff",
                 background: "var(--gradient-ring)",
                 cursor: "pointer",
+                zIndex: 3,
               }}
             />
           )}
