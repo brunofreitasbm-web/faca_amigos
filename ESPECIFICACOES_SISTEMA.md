@@ -55,6 +55,8 @@ faca_amigos/
 - **Venda de Produtos:** Catálogo de vendas avulsas (meias antiderrapantes, bebidas, souvenires) com abatimento automático de estoque.
 - **Pagamentos:** Suporte a Dinheiro, PIX, Cartões de Crédito/Débito e Vouchers.
 - **Controle de Caixa:** Abertura, suprimento, sangria, conferência cega e fechamento de turno por operador.
+  - **Fechamento:** além do total vendido por forma de pagamento, o operador informa o **dinheiro total contado na gaveta** (comparado ao calculado: fundo inicial + faturamento em dinheiro ± movimentações, apurando quebra/sobra) e o **fundo de caixa para o próximo dia**. O **valor do envelope** é calculado (contado − fundo do próximo dia) e precisa ser registrado com número e foto antes de concluir.
+  - **Abertura:** o fundo contado na abertura é conciliado com o fundo declarado no último fechamento da unidade; qualquer divergência gera alerta (push + e-mail) para o Owner e fica registrada no turno e na auditoria.
 - **Emissão Fiscal (NFC-e):** Integração com SEFAZ/PA para emissão automática de Nota Fiscal ao Consumidor Eletrônica.
 
 ### 3.3. Módulo de Ponto Eletrônico de Colaboradores
