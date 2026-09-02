@@ -83,6 +83,22 @@ describe("buscarCredenciaisFiscais", () => {
     }
   });
 
+  it("acrescenta uma dica sobre a chave do terminal quando o motivo é 'não autorizado'", async () => {
+    const response = new Response(JSON.stringify({ error: "não autorizado" }), { status: 401 });
+    const invoke = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "Edge Function returned a non-2xx status code", context: response },
+    });
+
+    const result = await buscarCredenciaisFiscais(fakeSupabase(invoke), "unit-1");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.motivo).toContain("Certificado A1 não disponível: não autorizado");
+      expect(result.motivo).toContain("FACAAMIGOS_SUPABASE_SECRET_KEY");
+    }
+  });
+
   it("usa o cofre local (readCredentials) e nunca chama a Edge Function quando há credenciais no disco", async () => {
     readCredentialsMock.mockReturnValue({
       pfxBuffer: Buffer.from("pfx-local"),

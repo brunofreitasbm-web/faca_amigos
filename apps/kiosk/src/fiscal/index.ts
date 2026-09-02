@@ -4,6 +4,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
+import { resolveTerminalSupabaseKey } from "../config/supabaseTerminalKey.js";
 import { electronSafeStorageCrypto } from "./electron-crypto.js";
 import { runFiscalClaimOnce } from "./claim.js";
 import { startFiscalHeartbeatLoop } from "./heartbeat.js";
@@ -40,18 +41,13 @@ function loadOrCreateTerminalId(userDataPath: string): string {
 
 export function startFiscalWorker(userDataPath: string, deviceId?: string | null): void {
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
-  // Igual à guarda do print bridge (main/printBridge.ts): sem a chave secreta
-  // real, o fallback abaixo cairia pra uma chave pública que a Edge Function
+  // Mesma guarda do print bridge (main/printBridge.ts), via helper
+  // compartilhado: sem uma chave secreta real (ou com a publicável colada
+  // por engano em FACAAMIGOS_SUPABASE_SECRET_KEY, como já aconteceu em
+  // produção), o fallback cairia numa chave que a Edge Function
   // `nfse-certificate-fetch` SEMPRE rejeita com "não autorizado" — um erro
   // que parece problema no certificado mas na verdade é .env deste terminal.
-  const hasServiceRoleKey = Boolean(
-    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY,
-  );
-  const secretKey =
-    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY ||
-    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    "sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh";
+  const { secretKey, hasServiceRoleKey } = resolveTerminalSupabaseKey();
 
   if (!url || !secretKey) {
     console.warn(

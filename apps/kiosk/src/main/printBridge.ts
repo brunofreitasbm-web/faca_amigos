@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createClient, type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
 import type { Db } from "@facaamigos/db-local";
+import { resolveTerminalSupabaseKey } from "../config/supabaseTerminalKey.js";
 import { generateEscPosReceipt, generateEscPosCircuitoTermo, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import type { ReceiptPrintPayload, WristbandPrintPayload } from "@facaamigos/domain";
 import { printRawWindows } from "./rawPrint.js";
@@ -283,12 +284,7 @@ export function getPrintBridgeStatus(): PrintBridgeStatusInfo {
 export function startPrintBridge(db?: Db): PrintBridgeStartResult {
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
 
-  const hasServiceRoleKey = Boolean(process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY);
-  const secretKey =
-    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY ||
-    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    "sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh";
+  const { secretKey, hasServiceRoleKey } = resolveTerminalSupabaseKey();
 
   if (!url || !secretKey) {
     const reason =
@@ -301,7 +297,8 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
 
   if (!hasServiceRoleKey) {
     const reason =
-      "A chave de serviço (FACAAMIGOS_SUPABASE_SECRET_KEY) não está configurada no arquivo .env deste terminal. A chave pública não possui permissão para reservar impressões.";
+      "A chave de serviço (FACAAMIGOS_SUPABASE_SECRET_KEY) não está configurada corretamente no arquivo .env deste terminal " +
+      "(está ausente, ou foi preenchida com a chave publicável sb_publishable_... por engano). A chave pública não possui permissão para reservar impressões.";
     console.warn(`[print-bridge] ${reason}`);
     bridgeStatus = { started: false, bound: getTerminalUnitIds(db).size > 0, hasServiceRoleKey: false, reason, lastError: reason };
     return bridgeStatus;
