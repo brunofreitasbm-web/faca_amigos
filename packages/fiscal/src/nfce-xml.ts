@@ -3,7 +3,7 @@ import { montarChaveAcesso } from "./chave-acesso.js";
 import { anoMesLocal, formatarDataHoraFiscal } from "./data-hora.js";
 import { montarUrlQrCodeNfce } from "./qrcode-nfce.js";
 import { sanitizarTextoNfe } from "./texto.js";
-import { tpAmbFromAmbiente, type DocumentoFiscalInput, type FormaPagamento } from "./types.js";
+import { tpAmbFromAmbiente, type DocumentoFiscalInput, type FormaPagamento, type ItemFiscal } from "./types.js";
 
 /**
  * Monta o XML da NFC-e (modelo 65), grupos `ide`/`emit`/`dest`/`det`/`total`/
@@ -78,6 +78,22 @@ function grupoCofins(cst: string) {
   return { COFINSOutr: { CST: cst, vBC: money(0), pCOFINS: money(0), vCOFINS: money(0) } };
 }
 
+/**
+ * CSOSN 500: mercadoria já teve o ICMS recolhido antes, por substituição
+ * tributária (ex.: água mineral no Pará) — confirmado pelo contador em
+ * 2026-09-02. Os campos de valor retido (vBCSTRet/pST/vICMSSTRet) são
+ * opcionais no XSD e não temos essa informação vinda da nota de compra do
+ * fornecedor, então ficam de fora — igual à abordagem já usada em
+ * PIS/COFINS "Outr" (zero-valor em vez de estimar).
+ */
+function grupoIcms(item: ItemFiscal) {
+  const orig = String(item.origem);
+  if (item.csosn === "500") return { ICMSSN500: { orig, CSOSN: item.csosn } };
+  // ICMSSN102: Simples Nacional, sem permissão de crédito (CSOSN
+  // 102/103/300/400) — mapeamento padrão para o que não é ST.
+  return { ICMSSN102: { orig, CSOSN: item.csosn } };
+}
+
 /** Textos fixos exigidos pelo MOC quando o documento é emitido em homologação. */
 const TEXTO_HOMOLOGACAO_PROD = "NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL";
 const TEXTO_HOMOLOGACAO_DEST = "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL";
@@ -135,15 +151,7 @@ export function montarXmlNfce(input: DocumentoFiscalInput): MontarXmlNfceResult 
       indTot: "1",
     },
     imposto: {
-      ICMS: {
-        // ICMSSN102: Simples Nacional, sem permissão de crédito (CSOSN
-        // 102/103/300/400). Se o contador confirmar outro CSOSN na Fase 0,
-        // este mapeamento precisa ganhar os grupos correspondentes.
-        ICMSSN102: {
-          orig: String(item.origem),
-          CSOSN: item.csosn,
-        },
-      },
+      ICMS: grupoIcms(item),
       PIS: grupoPis(item.pisCst),
       COFINS: grupoCofins(item.cofinsCst),
     },

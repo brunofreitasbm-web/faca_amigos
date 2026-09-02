@@ -209,6 +209,33 @@ describe("montarXmlNfce", () => {
     expect(xml).toMatch(/<COFINSOutr>.*<vCOFINS>0\.00<\/vCOFINS>.*<\/COFINSOutr>/);
   });
 
+  it("usa ICMSSN500 (substituição tributária) quando o CSOSN do item é 500, e ICMSSN102 nos demais", () => {
+    const { xml } = montarXmlNfce(
+      buildInput({
+        itens: [
+          {
+            descricao: "Água mineral 500ml",
+            quantidade: 1,
+            valorUnitario: 5,
+            valorTotal: 5,
+            ncm: "22011000",
+            cest: "0300500",
+            cfop: "5102",
+            csosn: "500",
+            origem: 0,
+            unidadeComercial: "UN",
+            gtin: "SEM GTIN",
+            pisCst: "04",
+            cofinsCst: "04",
+          },
+        ],
+      }),
+    );
+
+    expect(xml).toContain("<ICMSSN500><orig>0</orig><CSOSN>500</CSOSN></ICMSSN500>");
+    expect(xml).not.toContain("ICMSSN102");
+  });
+
   it("em homologação, força os textos fixos do MOC no primeiro item e no destinatário", () => {
     const { xml } = montarXmlNfce(
       buildInput({
