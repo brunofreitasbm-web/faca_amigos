@@ -53,6 +53,15 @@ export interface ReceiptPrintPayload {
   careNotes?: string;
   activity?: string;
   assetName?: string;
+
+  // --- DANFE NFC-e (recibo fiscal, emitido pelo worker fiscal) ----------
+  /** URL completa do QR Code de consulta da NFC-e. A presença deste campo transforma o cupom num DANFE fiscal. */
+  fiscalQrUrl?: string;
+  fiscalAccessKey?: string;
+  fiscalProtocol?: string;
+  fiscalNumero?: number;
+  fiscalSerie?: string;
+  fiscalAmbiente?: "HOMOLOGACAO" | "PRODUCAO";
 }
 
 const WIDTH = 42;
@@ -162,6 +171,11 @@ function qrCommandHex(data: string, moduleSize = 6): string {
   return bytesToHex([...selectModel, ...setModuleSize, ...setErrorCorrection, ...storeData, ...printQr]);
 }
 
+/** Formata a chave de acesso de 44 dígitos em grupos de 4, como no DANFE oficial. */
+function formatarChaveEmGrupos(chave: string): string {
+  return chave.replace(/(\d{4})(?=\d)/g, "$1 ");
+}
+
 /** Quebra uma string sem espaços (URL, código) em pedaços de até `width` colunas. */
 function chunkString(str: string, width = WIDTH): string[] {
   const out: string[] = [];
@@ -201,6 +215,7 @@ function wrap(str: string, width = WIDTH): string[] {
 export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: string; commandsHex: string } {
   const dateTime = payload.dateTime || new Date().toLocaleString("pt-BR");
   const isGuardReceipt = Boolean(payload.accessCode);
+  const isFiscalReceipt = Boolean(payload.fiscalQrUrl);
   const lines: string[] = [];
 
   const divider = "==========================================";
@@ -209,8 +224,15 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   lines.push(divider);
   lines.push(centerText("FAÇA AMIGOS"));
   lines.push(centerText(payload.unitName.toUpperCase()));
+  if (isFiscalReceipt) {
+    if (payload.unitCnpj) lines.push(centerText(`CNPJ: ${payload.unitCnpj}`));
+    if (payload.unitAddress) for (const line of wrap(payload.unitAddress)) lines.push(centerText(line));
+  }
   lines.push(divider);
   lines.push(centerText(`*** ${payload.title.toUpperCase()} ***`));
+  if (isFiscalReceipt && payload.fiscalAmbiente === "HOMOLOGACAO") {
+    lines.push(centerText("EMITIDA EM HOMOLOGACAO - SEM VALOR FISCAL"));
+  }
   if (payload.code) lines.push(centerText(`Código: ${payload.code}`));
   lines.push(centerText(payload.employeeName ? `${dateTime} - ${payload.employeeName}` : dateTime));
   lines.push(subDivider);
@@ -308,6 +330,27 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
     }
   }
 
+  // DANFE NFC-e: chave de acesso, protocolo de autorização e número/série,
+  // seguidos do QR Code de consulta — reaproveita o mesmo mecanismo de
+  // inserção de QR usado no recibo de guarda (ver qrInsertAt mais abaixo).
+  if (isFiscalReceipt) {
+    lines.push(subDivider);
+    if (payload.fiscalAccessKey) {
+      lines.push(centerText("Chave de acesso:"));
+      for (const line of chunkString(formatarChaveEmGrupos(payload.fiscalAccessKey))) lines.push(centerText(line));
+    }
+    if (payload.fiscalProtocol) lines.push(centerText(`Protocolo de autorização: ${payload.fiscalProtocol}`));
+    if (payload.fiscalNumero != null) lines.push(centerText(`NFC-e nº ${payload.fiscalNumero} Série ${payload.fiscalSerie ?? ""}`));
+    if (payload.fiscalQrUrl) {
+      lines.push("");
+      lines.push(centerText("CONSULTE A NFC-e"));
+      lines.push(centerText("Aponte a câmera para o QR abaixo"));
+      qrInsertAt = lines.length;
+      for (const line of chunkString(payload.fiscalQrUrl.replace(/^https?:\/\//, ""))) lines.push(centerText(line));
+      lines.push("");
+    }
+  }
+
   lines.push(divider);
   const isTermsFooter = Boolean(payload.footerNote && /termo/i.test(payload.footerNote));
   // Termos de Uso nunca são impressos no recibo de guarda (cupom de entrada)
@@ -320,10 +363,12 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
     for (const line of wrap(payload.footerNote!)) lines.push(centerText(line));
   } else if (showFooterNote && isTermsFooter && payload.activity === "CARRINHO" && !isGuardReceipt) {
     for (const line of wrap(payload.footerNote!)) lines.push(centerText(line));
-  } else if (!isGuardReceipt) {
+  } else if (!isGuardReceipt && !isFiscalReceipt) {
     lines.push(centerText("Obrigado por brincar com a gente!"));
   }
-  lines.push(centerText("Comprovante interno, sem valor fiscal"));
+  // NFC-e é documento fiscal de verdade — a ressalva "sem valor fiscal" do
+  // cupom interno não se aplica e seria juridicamente errada de imprimir.
+  if (!isFiscalReceipt) lines.push(centerText("Comprovante interno, sem valor fiscal"));
   lines.push(divider);
 
   // Avanço de 3 linhas de papel para garantir que o corte da guilhotina não atinja o texto
@@ -341,11 +386,15 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   // Quando há QR de acompanhamento, os bytes do comando de QR entram no meio
   // do stream ESC/POS — text/lines seguem só como transcrição legível
   // (preview na tela e fallback HTML), o QR em si é comando de impressora.
+  // trackingUrl (recibo de guarda) e fiscalQrUrl (DANFE NFC-e) são mutuamente
+  // exclusivos na prática — um recibo é ou de guarda, ou fiscal, ou nenhum
+  // dos dois — por isso um único ponto de inserção cobre os dois casos.
+  const qrData = payload.trackingUrl ?? payload.fiscalQrUrl;
   let hexBody: string;
-  if (qrInsertAt >= 0 && payload.trackingUrl) {
+  if (qrInsertAt >= 0 && qrData) {
     const before = lines.slice(0, qrInsertAt).join("\n") + "\n";
     const after = "\n" + lines.slice(qrInsertAt).join("\n");
-    hexBody = textToHex(before) + qrCommandHex(payload.trackingUrl) + textToHex(after);
+    hexBody = textToHex(before) + qrCommandHex(qrData) + textToHex(after);
   } else {
     hexBody = textToHex(text);
   }

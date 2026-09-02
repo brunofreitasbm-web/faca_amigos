@@ -401,14 +401,16 @@ export interface Product {
 }
 
 /**
- * Dados fiscais do emitente. NFC-e (modelo 65, mercadoria, autorizada pela
- * SEFAZ-PA) e o CADASTRO de NFS-e (serviço, ISS, Prefeitura de Belém) — a emissão
- * de NFS-e (serviço, ISS, Prefeitura de Belém) — a emissão de NFS-e está
- * fora de escopo, ver migration 20260807000004.
+ * Dados fiscais do emitente: NFC-e (modelo 65, mercadoria, autorizada pela
+ * SEFAZ-PA) e NFS-e (serviço, ISS, Prefeitura de Belém / Sistema Nacional).
  *
  * Nenhum segredo trafega aqui: `nfce_csc_id` é só o identificador do CSC
- * (ex. '000001'), que não é secreto. O TOKEN do CSC e o certificado A1
- * (.pfx) vivem exclusivamente no cofre local do PC do balcão.
+ * (ex. '000001'), que não é secreto. O TOKEN do CSC e a senha do certificado
+ * A1 ficam cifrados na nuvem (gravados pelas Edge Functions fiscal-csc-upload
+ * e nfse-certificate-upload) e só o worker fiscal do PC do balcão consegue
+ * lê-los, via Edge Function. O cofre local do PC é apenas um fallback
+ * opcional — o Gerencial nunca lê nem exibe esses valores; só o status
+ * (ver fiscalCscStatus / fiscalCertificateStatus).
  */
 export interface UnitFiscal {
   id: string;
@@ -425,6 +427,8 @@ export interface UnitFiscal {
   end_complemento: string | null;
   end_bairro: string | null;
   end_municipio_ibge: string | null;
+  /** Nome do município (xMun da NFC-e), ex. "BELEM". */
+  end_municipio_nome: string | null;
   end_uf: string | null;
   end_cep: string | null;
   fone: string | null;
@@ -499,6 +503,12 @@ export interface FiscalDoc {
   reject_message: string | null;
   created_at_ms: number;
   authorized_at_ms: number | null;
+  /**
+   * NFC-e: URL do QR Code calculada pelo worker (com hash do CSC) e gravada
+   * só depois da autorização. O kiosk-ui nunca monta essa URL — sem o token
+   * do CSC ela seria inválida; só exibe o que veio do banco.
+   */
+  qrcode_url: string | null;
   /** NFS-e: número municipal (RPS -> NFS-e) e carimbo do envio por WhatsApp ao Responsável. */
   nfse_numero?: string | null;
   guardian_whatsapp_sent_at_ms?: number | null;
@@ -2948,7 +2958,7 @@ export const Api = {
         .from("fa_kiosk_units")
         .select(
           "id, name, cnpj, razao_social, nome_fantasia, inscricao_estadual, inscricao_municipal, cnae_principal, crt, " +
-            "end_logradouro, end_numero, end_complemento, end_bairro, end_municipio_ibge, end_uf, end_cep, fone, " +
+            "end_logradouro, end_numero, end_complemento, end_bairro, end_municipio_ibge, end_municipio_nome, end_uf, end_cep, fone, " +
             "fiscal_ambiente, fiscal_enabled, nfce_serie, nfce_csc_id, nfce_qrcode_url_consulta, " +
             "nfse_item_lista_servico, nfse_codigo_tributacao_municipio, nfse_aliquota_iss_bp, nfse_iss_retido, " +
             "nfse_regime_especial, nfse_serie_rps, nfse_ambiente, nfse_enabled",
@@ -2956,8 +2966,36 @@ export const Api = {
         .eq("id", unitId)
         .single(),
     ),
+  /**
+   * As chaves do payload são as do formulário da FiscalTab (camelCase:
+   * endMunicipioIbge, endMunicipioNome, nfceCscId...); a RPC
+   * fa_config_update_unit_fiscal é quem mapeia para as colunas.
+   */
   updateUnitFiscal: (unitId: string, payload: Record<string, unknown>) =>
     unwrap(supabase().rpc("fa_config_update_unit_fiscal", { p_unit_id: unitId, p_payload: payload })),
+  /**
+   * Status do token do CSC (NFC-e) — a view fa_kiosk_fiscal_csc_status só
+   * diz SE existe e QUANDO foi gravado; o token em si nunca sai da nuvem
+   * para o Gerencial.
+   */
+  fiscalCscStatus: (unitId: string) =>
+    unwrap<{ unit_id: string; updated_at_ms: number } | null>(
+      supabase().from("fa_kiosk_fiscal_csc_status").select("unit_id, updated_at_ms").eq("unit_id", unitId).maybeSingle(),
+    ),
+  /**
+   * Grava o token do CSC (SEFA-PA) cifrado na nuvem pela Edge Function
+   * fiscal-csc-upload (exige config.fiscal.write). Só o worker fiscal do PC
+   * do balcão consegue lê-lo depois, para assinar o QR Code da NFC-e.
+   */
+  uploadFiscalCsc: (unitId: string, cscId: string, cscToken: string) =>
+    unwrap<{ ok: boolean }>(supabase().functions.invoke("fiscal-csc-upload", { body: { unitId, cscId, cscToken } })),
+  /**
+   * Volta uma NFC-e BLOQUEADA/REJEITADA para PENDENTE, para o worker tentar
+   * de novo (ex.: depois de corrigir o NCM do produto ou o CSC). Capability
+   * nfce.retry (OPERADOR+).
+   */
+  retryNfce: (fiscalDocId: string) =>
+    unwrap<{ fiscalDocId: string; status: string }>(supabase().rpc("fa_fiscal_retry_nfce", { p_fiscal_doc_id: fiscalDocId })),
   /**
    * Status do certificado A1 configurado para a unidade — nunca traz a
    * senha (nem cifrada): a view fa_kiosk_fiscal_certificate_status já

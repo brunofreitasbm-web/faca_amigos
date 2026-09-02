@@ -1,50 +1,46 @@
-// Devolve o certificado A1 (.pfx) + senha decifrados de uma unidade, para o
-// worker fiscal do kiosk (apps/kiosk/src/fiscal/nfse.ts) assinar e
-// transmitir a DPS ao Sistema Nacional NFS-e.
+// Devolve o certificado A1 (.pfx) + senha decifrados de uma unidade, e o CSC
+// (id + token) da NFC-e, para o worker fiscal do kiosk (apps/kiosk/src/fiscal)
+// assinar e transmitir DPS (NFS-e) e NFC-e.
 //
-// Only-service-role: o worker já guarda a service role key (mesma usada
-// para tudo mais na fila fiscal, ver apps/kiosk/src/fiscal/index.ts) —
-// exigir esse mesmo bearer aqui, em vez de inventar mais um secret
-// compartilhado, é o suficiente para garantir que só o worker de um
-// terminal legítimo chega até a chave privada. Nunca aceita a anon key
-// nem uma sessão de usuário comum: isso é o inverso de requireCapability
-// (nenhum humano deveria conseguir puxar a chave privada pelo navegador).
+// Só o worker chama isto — nunca um humano pelo navegador. A autorização é
+// por segredo exato: o bearer tem que ser IGUAL à service role key legada
+// (SUPABASE_SERVICE_ROLE_KEY, JWT) ou à chave nova do worker
+// (FISCAL_WORKER_SECRET_KEY, formato `sb_secret_...`). Comparação em tempo
+// constante, sem `includes()`, sem fallback pra sessão de usuário: a chave
+// privada do certificado não pode ser puxada por ninguém com
+// config.fiscal.write, que hoje é qualquer Operador (migration 20260830000004).
+//
+// A chave `sb_secret_` NÃO é JWT, então o portão do Supabase recusaria a
+// chamada antes dela chegar aqui — por isso `verify_jwt = false` em
+// supabase/config.toml. A checagem de verdade é a deste arquivo.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { jsonResponse, preflight } from "../_shared/http.ts";
-import { requireCapability } from "../_shared/requireCapability.ts";
+import { bytesToBase64, decryptSecret, hasFiscalEncryptionKey } from "../_shared/fiscalCrypto.ts";
 
 interface FetchBody {
   unitId: string;
 }
 
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
+// Mesmo comprimento + XOR de todos os bytes: o tempo de resposta não conta
+// quantos caracteres do segredo o chamador acertou.
+function constantTimeEqual(a: string, b: string): boolean {
+  const ab = new TextEncoder().encode(a);
+  const bb = new TextEncoder().encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i]! ^ bb[i]!;
+  return diff === 0;
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin);
-}
-
-async function importDecryptionKey(): Promise<CryptoKey> {
-  const raw = Deno.env.get("FISCAL_CERT_ENCRYPTION_KEY");
-  if (!raw) throw new Error("FISCAL_CERT_ENCRYPTION_KEY não configurado");
-  return crypto.subtle.importKey("raw", base64ToBytes(raw), "AES-GCM", false, ["decrypt"]);
-}
-
-// Espelha o formato gravado por nfse-certificate-upload: iv (12 bytes) + ciphertext, tudo em base64.
-async function decryptPassword(encrypted: string): Promise<string> {
-  const key = await importDecryptionKey();
-  const combined = base64ToBytes(encrypted);
-  const iv = combined.slice(0, 12);
-  const ciphertext = combined.slice(12);
-  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-  return new TextDecoder().decode(plaintext);
+function isAuthorized(req: Request): boolean {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!bearer) return false;
+  const allowed = [Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"), Deno.env.get("FISCAL_WORKER_SECRET_KEY")].filter(
+    (s): s is string => Boolean(s),
+  );
+  return allowed.some((secret) => constantTimeEqual(bearer, secret));
 }
 
 Deno.serve(async (req) => {
@@ -52,25 +48,7 @@ Deno.serve(async (req) => {
   if (pre) return pre;
   if (req.method !== "POST") return jsonResponse(req, { error: "method_not_allowed" }, 405);
 
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const authHeader = req.headers.get("Authorization");
-
-  let authorized = false;
-  if (serviceRoleKey && authHeader && (authHeader === `Bearer ${serviceRoleKey}` || authHeader.includes(serviceRoleKey))) {
-    authorized = true;
-  } else if (authHeader) {
-    const capCheck = await requireCapability(req, "config.fiscal.write");
-    if (capCheck.ok) {
-      authorized = true;
-    } else {
-      const capCheckRead = await requireCapability(req, "config.fiscal.read");
-      if (capCheckRead.ok) {
-        authorized = true;
-      }
-    }
-  }
-
-  if (!authorized) {
+  if (!isAuthorized(req)) {
     return jsonResponse(req, { error: "não autorizado" }, 401);
   }
 
@@ -81,11 +59,11 @@ Deno.serve(async (req) => {
     return jsonResponse(req, { error: "corpo inválido" }, 400);
   }
   if (!body.unitId) return jsonResponse(req, { error: "envie unitId" }, 400);
-  if (!Deno.env.get("FISCAL_CERT_ENCRYPTION_KEY")) {
+  if (!hasFiscalEncryptionKey()) {
     return jsonResponse(req, { error: "certificado fiscal não configurado neste ambiente" }, 503);
   }
 
-  const adminClient = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+  const adminClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   const { data: cert, error } = await adminClient
     .from("fa_kiosk_fiscal_certificates")
@@ -103,7 +81,20 @@ Deno.serve(async (req) => {
   }
 
   const pfxBytes = new Uint8Array(await pfxFile.arrayBuffer());
-  const password = await decryptPassword(cert.encrypted_password);
+  const password = await decryptSecret(cert.encrypted_password);
 
-  return jsonResponse(req, { pfxBase64: bytesToBase64(pfxBytes), password });
+  // CSC da NFC-e: o id mora em fa_kiosk_units (não é segredo), o token só
+  // cifrado em fa_kiosk_fiscal_unit_secrets (gravado por fiscal-csc-upload).
+  // Ausência não é erro — NFS-e não usa CSC; quem decide se bloqueia é o
+  // worker, na hora de montar o QR Code.
+  const [{ data: unit }, { data: secrets }] = await Promise.all([
+    adminClient.from("fa_kiosk_units").select("nfce_csc_id").eq("id", body.unitId).maybeSingle(),
+    adminClient.from("fa_kiosk_fiscal_unit_secrets").select("nfce_csc_token_encrypted").eq("unit_id", body.unitId).maybeSingle(),
+  ]);
+  const cscId: string | null = unit?.nfce_csc_id ?? null;
+  const cscToken: string | null = secrets?.nfce_csc_token_encrypted
+    ? await decryptSecret(secrets.nfce_csc_token_encrypted)
+    : null;
+
+  return jsonResponse(req, { pfxBase64: bytesToBase64(pfxBytes), password, cscId, cscToken });
 });

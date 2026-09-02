@@ -1,15 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { randomInt, createHash } from "node:crypto";
 import {
+  anoMesLocal,
   assinarXmlNfce,
   gerarChaveAcessoNfceOuFallback,
   montarXmlNfce,
+  URLS_NFCE_PA,
   type DocumentoFiscalInput,
+  type FormaPagamento,
 } from "@facaamigos/fiscal";
 // Fora do barrel principal (`@facaamigos/fiscal`) de propósito — usa
 // `node:https`, e o kiosk-ui (bundle de navegador) importa esse pacote.
 import { SvrsNfceTransport } from "@facaamigos/fiscal/svrs-transport";
+import { buscarCredenciaisFiscais } from "./certificado.js";
 import { processarNfseReal, processarNfseSimulado } from "./nfse.js";
-import { extrairChaveECertificadoPem, readCredentials, type CofreCrypto } from "./vault.js";
+import { extrairChaveECertificadoPem, type CofreCrypto } from "./vault.js";
 
 /**
  * Consumidor da fila `fa_kiosk_fiscal_docs` (Fase 3/5 do plano). Reivindica
@@ -30,15 +35,62 @@ export interface ClaimedFiscalDoc {
     status: string;
     emissionType: string;
     serie: string | null;
+    rpsSerie: string | null;
     numero: number | null;
     accessKey: string | null;
+    qrcodeUrl: string | null;
     attempts: number;
     totalCents: number;
   };
-  order: { id: string; orderCode: string; businessDate: string };
-  unit: { id: string; cnpj: string | null };
-  items: unknown[];
-  payments: unknown[];
+  order: {
+    id: string;
+    orderCode: string;
+    businessDate: string;
+    closedAtMs: number | null;
+    fiscalCpf: string | null;
+    fiscalNome: string | null;
+    fiscalEmail: string | null;
+  };
+  unit: {
+    id: string;
+    cnpj: string | null;
+    razaoSocial: string | null;
+    nomeFantasia: string | null;
+    inscricaoEstadual: string | null;
+    crt: number | null;
+    endLogradouro: string | null;
+    endNumero: string | null;
+    endComplemento: string | null;
+    endBairro: string | null;
+    endMunicipioIbge: string | null;
+    endMunicipioNome: string | null;
+    endUf: string | null;
+    endCep: string | null;
+    fone: string | null;
+    timezone: string | null;
+    nfceSerie: number | null;
+    fiscalAmbiente: string | null;
+    nfceCscId: string | null;
+    nfceQrcodeUrlConsulta: string | null;
+  };
+  items: Array<{
+    description: string;
+    quantity: number;
+    unitPriceCents: number;
+    totalCents: number;
+    productId: string | null;
+    ncm: string | null;
+    cest: string | null;
+    cfop: string | null;
+    csosn: string | null;
+    origem: number | null;
+    unidadeComercial: string | null;
+    gtin: string | null;
+    pisCst: string | null;
+    cofinsCst: string | null;
+    fiscalReady: boolean | null;
+  }>;
+  payments: Array<{ method: string; amountCents: number }>;
 }
 
 export interface ClaimDeps {
@@ -57,178 +109,339 @@ export interface ClaimDeps {
   onLog?: (message: string) => void;
 }
 
-async function processarNfceReal(supabase: SupabaseClient, deps: ClaimDeps, item: ClaimedFiscalDoc): Promise<void> {
+async function bloquear(supabase: SupabaseClient, docId: string, motivo: string): Promise<void> {
+  await supabase
+    .from("fa_kiosk_fiscal_docs")
+    .update({ status: "BLOQUEADO", last_error: motivo, updated_at_ms: Date.now() })
+    .eq("id", docId);
+}
+
+/**
+ * Faz a NFC-e completa: valida cadastro/itens, garante credenciais e
+ * numeração, monta+assina+transmite o XML à SVRS e registra o resultado.
+ * Cada etapa que não pode prosseguir sem intervenção humana (cadastro
+ * incompleto, produto sem tributação, certificado indisponível, CSC
+ * ausente, forma de pagamento sem mapeamento fiscal) bloqueia o documento
+ * com um motivo específico em vez de deixar a exceção genérica confundir
+ * quem for investigar depois.
+ */
+export async function processarNfceReal(deps: ClaimDeps, item: ClaimedFiscalDoc): Promise<void> {
+  const { supabase } = deps;
   const nowMs = Date.now();
-  const doc = item.doc;
+  const { doc, order, unit } = item;
 
-  let pfxBuffer: Buffer | null = null;
-  let password = "";
-
-  // 1. Tenta carregar do cofre local do terminal (se configurado neste dispositivo)
-  if (deps.userDataPath && deps.crypto) {
-    const creds = readCredentials({ userDataPath: deps.userDataPath, crypto: deps.crypto });
-    if (creds) {
-      pfxBuffer = creds.pfxBuffer;
-      password = creds.password;
-    }
+  // a. Validação de cadastro do emitente
+  const camposObrigatorios: Array<[string, string | null]> = [
+    ["CNPJ", unit.cnpj],
+    ["Razão Social", unit.razaoSocial],
+    ["Inscrição Estadual", unit.inscricaoEstadual],
+    ["Logradouro", unit.endLogradouro],
+    ["Número", unit.endNumero],
+    ["Bairro", unit.endBairro],
+    ["Código IBGE do Município", unit.endMunicipioIbge],
+    ["Nome do Município", unit.endMunicipioNome],
+    ["CEP", unit.endCep],
+  ];
+  const faltando = camposObrigatorios.filter(([, valor]) => !valor).map(([label]) => label);
+  if (faltando.length > 0) {
+    await bloquear(supabase, doc.id, `Emitente incompleto em Configurações → Fiscal: preencha ${faltando.join(", ")}.`);
+    return;
   }
 
-  // 2. Se não encontrou no disco local, busca via Edge Function do Supabase (upload feito via Painel Gerencial)
-  if (!pfxBuffer) {
-    const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const { data: certData, error: certError } = await supabase.functions.invoke<{ pfxBase64: string; password: string }>(
-      "nfse-certificate-fetch",
-      {
-        body: { unitId: item.unit.id },
-        headers: serviceRoleKey ? { Authorization: `Bearer ${serviceRoleKey}` } : undefined,
-      }
+  // b. Validação dos itens fiscais
+  if (item.items.length === 0) {
+    await supabase.from("fa_kiosk_fiscal_docs").update({ status: "DESCARTADO", updated_at_ms: nowMs }).eq("id", doc.id);
+    return;
+  }
+  const itensSemTributacao = item.items.filter((it) => !it.fiscalReady || !it.ncm);
+  if (itensSemTributacao.length > 0) {
+    const nomes = itensSemTributacao.map((it) => it.description).join(", ");
+    await bloquear(
+      supabase,
+      doc.id,
+      `Produto(s) sem tributação completa: ${nomes}. Preencha NCM/CFOP/CSOSN em Configurações → Fiscal → Tributação por produto e clique em Tentar Novamente.`,
     );
-    if (certData?.pfxBase64 && certData?.password) {
-      pfxBuffer = Buffer.from(certData.pfxBase64, "base64");
-      password = certData.password;
-    } else {
-      let detail = certError?.message ?? "não configurado em Configurações → Fiscal";
-      if (certError && "context" in certError && (certError as any).context instanceof Response) {
-        try {
-          const bodyText = await (certError as any).context.clone().text();
-          try {
-            const parsed = JSON.parse(bodyText);
-            if (parsed?.error) detail = parsed.error;
-            else if (parsed?.message) detail = parsed.message;
-            else if (bodyText) detail = `HTTP ${(certError as any).context.status}: ${bodyText}`;
-          } catch {
-            if (bodyText) detail = `HTTP ${(certError as any).context.status}: ${bodyText}`;
-          }
-        } catch {
-          // ignora falha de leitura do corpo
-        }
-      }
-      await supabase
-        .from("fa_kiosk_fiscal_docs")
-        .update({
-          status: "BLOQUEADO",
-          last_error: `Certificado digital A1 (.pfx) não disponível para esta unidade: ${detail}. Instale no terminal ou faça upload em Configurações.`,
-          updated_at_ms: nowMs,
-        })
-        .eq("id", doc.id);
-      return;
-    }
+    return;
+  }
+
+  // VOUCHER ainda não tem tPag definido — bloqueia antes de gastar
+  // numeração/certificado com um documento que não pode ser transmitido.
+  if (item.payments.some((p) => p.method === "VOUCHER")) {
+    await bloquear(
+      supabase,
+      doc.id,
+      "Forma de pagamento 'Voucher' ainda não tem mapeamento fiscal definido — confirme com o contador o tPag correto antes de emitir esta NFC-e.",
+    );
+    return;
+  }
+
+  // c. Credenciais (certificado A1 + CSC)
+  const cred = await buscarCredenciaisFiscais(
+    supabase,
+    unit.id,
+    deps.userDataPath && deps.crypto ? { userDataPath: deps.userDataPath, crypto: deps.crypto } : undefined,
+  );
+  if (!cred.ok) {
+    await bloquear(supabase, doc.id, cred.motivo);
+    return;
   }
 
   let certPem: string;
   let privateKeyPem: string;
   try {
-    const pem = extrairChaveECertificadoPem(pfxBuffer, password);
-    certPem = pem.certPem;
-    privateKeyPem = pem.privateKeyPem;
+    ({ certPem, privateKeyPem } = extrairChaveECertificadoPem(cred.credenciais.pfxBuffer, cred.credenciais.password));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await supabase
-      .from("fa_kiosk_fiscal_docs")
-      .update({
-        status: "BLOQUEADO",
-        last_error: `Falha ao extrair chave privada do certificado A1: ${msg}`,
-        updated_at_ms: nowMs,
-      })
-      .eq("id", doc.id);
+    await bloquear(supabase, doc.id, `Falha ao extrair chave privada do certificado A1: ${msg}`);
     return;
   }
 
-  const inputFiscal: DocumentoFiscalInput = {
-    ambiente: doc.environment,
-    tipoEmissao: doc.emissionType === "CONTINGENCIA_OFFLINE" ? 9 : 1,
-    serie: Number.parseInt(doc.serie ?? "1", 10) || 1,
-    numero: doc.numero ?? 1,
-    codigoNumerico: doc.id.replace(/\D/g, "").slice(0, 8).padStart(8, "0"),
-    dataHoraEmissao: new Date().toISOString(),
-    contingencia: null,
-    destinatario: null,
-    emitente: {
-      cnpj: item.unit.cnpj ?? "00000000000000",
-      razaoSocial: "FAÇA AMIGOS CAFETERIA",
-      nomeFantasia: "FAÇA AMIGOS",
-      inscricaoEstadual: "150000000",
-      crt: 1,
-      endLogradouro: "Av Presidente Vargas",
-      endNumero: "100",
-      endComplemento: null,
-      endBairro: "Campina",
-      endMunicipioIbge: "1501402",
-      endMunicipioNome: "Belém",
-      endUf: "PA",
-      endCep: "66000000",
-      fone: null,
-    },
-    itens: (item.items as Array<Record<string, unknown>>).map((it, idx) => ({
-      descricao: String(it.description ?? it.name ?? `Item ${idx + 1}`),
-      gtin: "SEM GTIN",
-      ncm: "21069090",
-      cest: null,
-      cfop: "5102",
-      unidadeComercial: "UN",
-      quantidade: Number(it.quantity ?? 1),
-      valorUnitario: Number(it.unitPriceCents ?? 0) / 100,
-      valorTotal: Number(it.totalCents ?? 0) / 100,
-      origem: 0,
-      csosn: "102",
-      pisCst: "49",
-      cofinsCst: "49",
-    })),
-    pagamentos: (item.payments as Array<Record<string, unknown>>).map((p) => ({
-      metodo: (p.method as "DINHEIRO" | "CREDITO" | "DEBITO" | "PIX") ?? "PIX",
-      valor: Number(p.amountCents ?? doc.totalCents) / 100,
-    })),
-  };
-
-
-  const { xml, chaveAcesso } = montarXmlNfce(inputFiscal);
-  const xmlAssinado = assinarXmlNfce({
-    xml,
-    chaveAcesso,
-    privateKeyPem,
-    certPem,
-  });
+  if (!cred.credenciais.cscToken) {
+    await bloquear(supabase, doc.id, "Token do CSC não configurado (Configurações → Fiscal → NFC-e → Salvar CSC).");
+    return;
+  }
+  // O cofre local não guarda o id do CSC — cai para o já cadastrado na unidade.
+  const cscId = cred.credenciais.cscId ?? unit.nfceCscId;
 
   const transport = new SvrsNfceTransport({ certPem, privateKeyPem });
-  const resultado = await transport.autorizar(xmlAssinado, doc.environment);
 
-  if (resultado.autorizado) {
-    deps.onLog?.(`[fiscal] NFC-e ${doc.id} autorizada na SVRS! Protocolo: ${resultado.protocolo}`);
-    await supabase
+  // d. Numeração — reserva um número novo só quando o documento ainda não tem
+  // um (retentativas reaproveitam o número/cNF já usado na tentativa anterior).
+  const serie = doc.serie ?? String(unit.nfceSerie ?? 1);
+  let numero = doc.numero;
+  let codigoNumerico: string;
+
+  if (doc.accessKey) {
+    // Retentativa de um documento que já chegou a montar uma chave de
+    // acesso antes — reaproveita número e cNF para a chave sair idêntica.
+    numero = doc.numero;
+    codigoNumerico = doc.accessKey.slice(35, 43);
+  } else {
+    if (numero == null) {
+      const { data: reservado, error: reserveError } = await supabase.rpc("fa_fiscal_reserve_number", {
+        p_unit_id: unit.id,
+        p_doc_type: "NFCE",
+        p_environment: doc.environment,
+        p_serie: serie,
+      });
+      if (reserveError) {
+        await bloquear(supabase, doc.id, `Falha ao reservar numeração da NFC-e: ${reserveError.message}`);
+        return;
+      }
+      numero = reservado as number;
+    }
+    codigoNumerico = randomInt(0, 1e8).toString().padStart(8, "0");
+    // cNF aleatório não pode coincidir com nNF — montarXmlNfce lançaria erro
+    // de validação; regenera uma vez para evitar isso na prática.
+    if (codigoNumerico === String(numero).padStart(8, "0")) {
+      codigoNumerico = randomInt(0, 1e8).toString().padStart(8, "0");
+    }
+  }
+
+  if (numero == null) {
+    await bloquear(supabase, doc.id, "Não foi possível determinar o número da NFC-e.");
+    return;
+  }
+
+  // e. Idempotência: se este documento já tem chave de acesso, pode já ter
+  // sido enviado numa tentativa anterior que morreu antes de gravar o
+  // resultado — consulta por chave antes de gerar/transmitir de novo.
+  let resultado: Awaited<ReturnType<SvrsNfceTransport["autorizar"]>> | undefined;
+  let chaveAcesso: string | undefined;
+  let qrCodeUrl: string | null | undefined;
+
+  let resolvidoPorConsulta = false;
+  if (doc.accessKey) {
+    try {
+      const consulta = await transport.consultarPorChave(doc.accessKey, doc.environment);
+      if (consulta.autorizado) {
+        resultado = consulta;
+        chaveAcesso = doc.accessKey;
+        qrCodeUrl = doc.qrcodeUrl ?? null;
+        resolvidoPorConsulta = true;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await bloquear(supabase, doc.id, `Falha de comunicação com a SVRS: ${msg}`);
+      return;
+    }
+  }
+
+  if (!resolvidoPorConsulta) {
+    // f. Montar XML
+    const inputFiscal: DocumentoFiscalInput = {
+      ambiente: doc.environment,
+      serie: Number(serie),
+      numero,
+      codigoNumerico,
+      tipoEmissao: doc.emissionType === "CONTINGENCIA_OFFLINE" ? 9 : 1,
+      dataHoraEmissao: new Date().toISOString(),
+      contingencia: null,
+      timeZone: unit.timezone ?? undefined,
+      emitente: {
+        cnpj: unit.cnpj!,
+        razaoSocial: unit.razaoSocial!,
+        nomeFantasia: unit.nomeFantasia ?? null,
+        inscricaoEstadual: unit.inscricaoEstadual!,
+        crt: unit.crt ?? 1,
+        endLogradouro: unit.endLogradouro!,
+        endNumero: unit.endNumero!,
+        endComplemento: unit.endComplemento ?? null,
+        endBairro: unit.endBairro!,
+        endMunicipioIbge: unit.endMunicipioIbge!,
+        endMunicipioNome: unit.endMunicipioNome!,
+        endUf: unit.endUf ?? "PA",
+        endCep: unit.endCep!,
+        fone: unit.fone ?? null,
+      },
+      destinatario: order.fiscalCpf ? { cpf: order.fiscalCpf, nome: order.fiscalNome ?? null } : null,
+      itens: item.items.map((it) => ({
+        descricao: it.description,
+        quantidade: it.quantity,
+        valorUnitario: it.unitPriceCents / 100,
+        valorTotal: it.totalCents / 100,
+        ncm: it.ncm!,
+        cest: it.cest ?? null,
+        cfop: it.cfop!,
+        csosn: it.csosn!,
+        origem: it.origem ?? 0,
+        unidadeComercial: it.unidadeComercial ?? "UN",
+        gtin: it.gtin ?? "SEM GTIN",
+        pisCst: it.pisCst ?? "49",
+        cofinsCst: it.cofinsCst ?? "49",
+      })),
+      pagamentos: item.payments.map((p) => ({ metodo: (p.method as FormaPagamento) ?? "PIX", valor: p.amountCents / 100 })),
+      qrCode: {
+        idCsc: cscId!,
+        cscToken: cred.credenciais.cscToken!,
+        urlConsulta: unit.nfceQrcodeUrlConsulta || URLS_NFCE_PA[doc.environment].qrCode,
+        urlChave: URLS_NFCE_PA[doc.environment].urlChave,
+      },
+    };
+
+    let montado: ReturnType<typeof montarXmlNfce>;
+    try {
+      montado = montarXmlNfce(inputFiscal);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await bloquear(supabase, doc.id, `Falha ao montar o XML da NFC-e: ${msg}`);
+      return;
+    }
+    chaveAcesso = montado.chaveAcesso;
+    qrCodeUrl = montado.qrCodeUrl;
+
+    const xmlAssinado = assinarXmlNfce({ xml: montado.xml, chaveAcesso, privateKeyPem, certPem });
+
+    // g. Persiste ANTES de transmitir — se der corrida com outro terminal
+    // (unique index em access_key), aborta sem transmitir.
+    const { error: persistError } = await supabase
       .from("fa_kiosk_fiscal_docs")
       .update({
-        status: "AUTORIZADO",
+        status: "ASSINADO",
+        numero,
+        serie,
         access_key: chaveAcesso,
-        numero: doc.numero ?? 1,
-        serie: doc.serie ?? "1",
-        protocol_number: resultado.protocolo ?? "153260000000000",
-        authorized_at_ms: nowMs,
+        qrcode_url: qrCodeUrl,
         updated_at_ms: nowMs,
-        last_error: null,
       })
       .eq("id", doc.id);
+    if (persistError) {
+      await bloquear(supabase, doc.id, `Falha ao gravar NFC-e assinada antes da transmissão: ${persistError.message}`);
+      return;
+    }
+
+    // h. Transmite
+    try {
+      resultado = await transport.autorizar(xmlAssinado, doc.environment);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await bloquear(supabase, doc.id, `Falha de comunicação com a SVRS: ${msg}`);
+      return;
+    }
+  }
+
+  // Os dois blocos acima (e/f-h) são mutuamente exclusivos em runtime — um
+  // deles sempre atribui `resultado`/`chaveAcesso` antes daqui, ou a função
+  // já retornou num `return` cedo. O guarda abaixo só existe para o
+  // compilador (e como rede de segurança contra um bug futuro que quebre
+  // essa invariante).
+  if (resultado === undefined || chaveAcesso === undefined) {
+    await bloquear(supabase, doc.id, "Falha interna ao processar a NFC-e: nenhum resultado de autorização obtido.");
+    return;
+  }
+
+  if (resultado.autorizado) {
+    if (!resultado.protocolo) {
+      await bloquear(supabase, doc.id, "SVRS autorizou sem devolver protocolo — investigar.");
+      return;
+    }
+
+    deps.onLog?.(`[fiscal] NFC-e ${doc.id} autorizada na SVRS! Protocolo: ${resultado.protocolo}`);
+
+    const updatePayload: Record<string, unknown> = {
+      status: "AUTORIZADO",
+      protocol_number: resultado.protocolo,
+      authorized_at_ms: nowMs,
+      updated_at_ms: nowMs,
+      last_error: null,
+    };
+
+    if (resultado.xmlAutorizado) {
+      try {
+        const { ano, mes } = anoMesLocal(new Date(nowMs), unit.timezone ?? undefined);
+        const path = `${unit.id}/nfce/${ano}/${mes}/${chaveAcesso}.xml`;
+        const xmlBuffer = Buffer.from(resultado.xmlAutorizado, "utf-8");
+        const { error: uploadError } = await supabase.storage
+          .from("fiscal-xml")
+          .upload(path, xmlBuffer, { contentType: "application/xml", upsert: true });
+        if (uploadError) {
+          deps.onLog?.(`[fiscal] Erro ao subir XML autorizado da NFC-e ${doc.id}: ${uploadError.message}`);
+        } else {
+          updatePayload.xml_storage_path = path;
+          updatePayload.xml_sha256 = createHash("sha256").update(xmlBuffer).digest("hex");
+        }
+      } catch (errUpload) {
+        deps.onLog?.(`[fiscal] Erro ao processar/subir XML autorizado da NFC-e ${doc.id}: ${errUpload}`);
+      }
+    }
+
+    await supabase.from("fa_kiosk_fiscal_docs").update(updatePayload).eq("id", doc.id);
+
+    try {
+      await supabase.from("fa_kiosk_fiscal_doc_events").insert({
+        fiscal_doc_id: doc.id,
+        kind: "NFCE_AUTORIZACAO",
+        cstat: resultado.cstat,
+        xmotivo: resultado.xmotivo,
+        detail_json: { protocolo: resultado.protocolo, chaveAcesso },
+      });
+    } catch (errEvent) {
+      deps.onLog?.(`[fiscal] Erro ao gravar evento NFCE_AUTORIZACAO para ${doc.id}: ${errEvent}`);
+    }
 
     try {
       await supabase.from("fa_kiosk_print_jobs").insert({
-        unit_id: item.unit.id,
+        unit_id: unit.id,
         kind: "RECEIPT",
         origin_device_id: deps.deviceId ?? null,
         payload_json: {
-          title: "DANFE NFC-e SIMPLIFICADO",
-          unitName: item.unit.cnpj ? `CNPJ: ${item.unit.cnpj}` : "FAÇA AMIGOS",
-          code: item.order.orderCode,
+          title: "DANFE NFC-e",
+          unitName: unit.nomeFantasia ?? unit.razaoSocial ?? "FAÇA AMIGOS",
+          code: order.orderCode,
           dateTime: new Date(nowMs).toLocaleString("pt-BR"),
-          items: (item.items as Array<Record<string, unknown>>).map((it) => ({
-            description: String(it.description ?? it.name ?? "Item"),
-            quantity: Number(it.quantity ?? 1),
-            amountCents: Number(it.totalCents ?? 0),
+          items: item.items.map((it) => ({
+            description: it.description,
+            quantity: it.quantity,
+            amountCents: it.totalCents,
           })),
           totalCents: doc.totalCents,
-          payments: (item.payments as Array<Record<string, unknown>>).map((p) => ({
-            method: String(p.method ?? "PIX"),
-            amountCents: Number(p.amountCents ?? doc.totalCents),
-          })),
-          footerNote: `NFC-e nº ${doc.numero ?? 1} Série ${doc.serie ?? "1"}\nChave: ${chaveAcesso}\nProt: ${resultado.protocolo ?? "153260000000000"}`,
+          payments: item.payments.map((p) => ({ method: p.method, amountCents: p.amountCents })),
+          fiscalQrUrl: qrCodeUrl ?? undefined,
+          fiscalAccessKey: chaveAcesso,
+          fiscalProtocol: resultado.protocolo,
+          fiscalNumero: numero,
+          fiscalSerie: serie,
+          fiscalAmbiente: doc.environment,
         },
       });
     } catch (errPrint) {
@@ -239,24 +452,53 @@ async function processarNfceReal(supabase: SupabaseClient, deps: ClaimDeps, item
     await supabase
       .from("fa_kiosk_fiscal_docs")
       .update({
-        status: "BLOQUEADO",
-        last_error: `Rejeição SVRS (cStat ${resultado.cstat}): ${resultado.xmotivo}`,
+        status: "REJEITADO",
+        reject_code: resultado.cstat,
+        reject_message: resultado.xmotivo,
+        last_error: resultado.xmotivo,
         updated_at_ms: nowMs,
       })
       .eq("id", doc.id);
+
+    try {
+      await supabase.from("fa_kiosk_fiscal_doc_events").insert({
+        fiscal_doc_id: doc.id,
+        kind: "NFCE_REJEICAO",
+        cstat: resultado.cstat,
+        xmotivo: resultado.xmotivo,
+        detail_json: { chaveAcesso },
+      });
+    } catch (errEvent) {
+      deps.onLog?.(`[fiscal] Erro ao gravar evento NFCE_REJEICAO para ${doc.id}: ${errEvent}`);
+    }
   }
+}
+
+async function reservarNumeroNfceSimulado(supabase: SupabaseClient, doc: ClaimedFiscalDoc["doc"], unitId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("fa_fiscal_reserve_number", {
+    p_unit_id: unitId,
+    p_doc_type: "NFCE",
+    p_environment: doc.environment,
+    p_serie: doc.serie ?? "1",
+  });
+  if (error) throw new Error(`fa_fiscal_reserve_number (NFCE simulado) falhou: ${error.message}`);
+  return data as number;
 }
 
 async function processarDocumentoSimulado(supabase: SupabaseClient, item: ClaimedFiscalDoc, originDeviceId: string | null = null): Promise<void> {
   const nowMs = Date.now();
   const doc = item.doc;
+  // Simulado também não pode colidir número entre documentos — reserva um
+  // número real na mesma numeração usada pelo caminho real quando o
+  // documento ainda não tiver um.
+  const numero = doc.numero ?? (await reservarNumeroNfceSimulado(supabase, doc, item.unit.id));
   const accessKey = doc.accessKey && doc.accessKey.length === 44 && !doc.accessKey.startsWith("000000")
     ? doc.accessKey
     : gerarChaveAcessoNfceOuFallback({
         emissaoData: nowMs,
         cnpj: item.unit.cnpj,
         serie: doc.serie,
-        numero: doc.numero,
+        numero,
         seedId: doc.id,
       });
 
@@ -268,7 +510,7 @@ async function processarDocumentoSimulado(supabase: SupabaseClient, item: Claime
     .update({
       status: "AUTORIZADO",
       access_key: accessKey,
-      numero: doc.numero ?? 1,
+      numero,
       serie: doc.serie ?? "1",
       protocol_number: protocolNumber,
       authorized_at_ms: nowMs,
@@ -287,7 +529,7 @@ async function processarDocumentoSimulado(supabase: SupabaseClient, item: Claime
         code: item.order.orderCode,
         dateTime: new Date(nowMs).toLocaleString("pt-BR"),
         items: (item.items as Array<Record<string, unknown>>).map((it) => ({
-          description: String(it.description ?? it.name ?? "Item"),
+          description: String(it.description ?? "Item"),
           quantity: Number(it.quantity ?? 1),
           amountCents: Number(it.totalCents ?? 0),
         })),
@@ -296,7 +538,7 @@ async function processarDocumentoSimulado(supabase: SupabaseClient, item: Claime
           method: String(p.method ?? "PIX"),
           amountCents: Number(p.amountCents ?? doc.totalCents),
         })),
-        footerNote: `NFC-e nº ${doc.numero ?? 1} Série ${doc.serie ?? "1"}\nChave: ${accessKey}\nProt: ${protocolNumber}`,
+        footerNote: `NFC-e nº ${numero} Série ${doc.serie ?? "1"}\nChave: ${accessKey}\nProt: ${protocolNumber}`,
       },
     });
   } catch (errPrint) {
@@ -323,13 +565,13 @@ export async function runFiscalClaimOnce(deps: ClaimDeps, limit = 5): Promise<nu
           await processarNfseSimulado(deps.supabase, item, deps.deviceId ?? null);
           deps.onLog?.(`[fiscal] NFS-e ${item.doc.id} (venda ${item.order.orderCode}) autorizada (SIMULADO).`);
         } else {
-          await processarNfseReal(deps.supabase, item, deps.onLog, deps.deviceId ?? null);
+          await processarNfseReal(deps, item);
         }
       } else if (deps.simulado) {
         await processarDocumentoSimulado(deps.supabase, item, deps.deviceId ?? null);
         deps.onLog?.(`[fiscal] documento ${item.doc.id} (venda ${item.order.orderCode}) autorizado (SIMULADO).`);
       } else {
-        await processarNfceReal(deps.supabase, deps, item);
+        await processarNfceReal(deps, item);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -338,4 +580,3 @@ export async function runFiscalClaimOnce(deps: ClaimDeps, limit = 5): Promise<nu
   }
   return claimed.length;
 }
-

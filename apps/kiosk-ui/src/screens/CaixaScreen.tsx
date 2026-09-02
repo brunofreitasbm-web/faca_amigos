@@ -39,9 +39,61 @@ export function CaixaScreen() {
   const [nfseLoadingMap, setNfseLoadingMap] = useState<Record<string, boolean>>({});
   const [whatsappPhoneModal, setWhatsappPhoneModal] = useState<{ sale: ShiftSale; doc: FiscalDoc } | null>(null);
   const [customWhatsappPhone, setCustomWhatsappPhone] = useState("");
-  const [nfseErrorModal, setNfseErrorModal] = useState<{ sale: ShiftSale; doc: FiscalDoc } | null>(null);
+  // Modal de motivo de bloqueio/rejeição — serve para NFS-e e NFC-e; o
+  // doc.doc_type decide o que aparece (edição de CPF só faz sentido na NFS-e).
+  const [fiscalErrorModal, setFiscalErrorModal] = useState<{ sale: ShiftSale; doc: FiscalDoc } | null>(null);
   const [cpfInputModal, setCpfInputModal] = useState("");
   const [cpfUpdating, setCpfUpdating] = useState(false);
+
+  // NFC-e das vendas do PDV — a emissão é automática (worker do balcão);
+  // aqui só acompanhamos o status e liberamos o "Tentar Novamente".
+  const [nfceDocsMap, setNfceDocsMap] = useState<Record<string, FiscalDoc | null>>({});
+  const [nfceRetryingMap, setNfceRetryingMap] = useState<Record<string, boolean>>({});
+
+  async function loadNfceDocsForSales(salesList: ShiftSale[]) {
+    const pdvSales = salesList.filter((s) => s.kind === "PDV");
+    if (pdvSales.length === 0) return;
+    const docs: Record<string, FiscalDoc | null> = {};
+    await Promise.all(
+      pdvSales.map(async (s) => {
+        const doc = await Api.fiscalDocByOrder(s.orderId).catch(() => null);
+        if (doc) {
+          docs[s.orderId] = doc;
+        }
+      })
+    );
+    setNfceDocsMap((prev) => ({ ...prev, ...docs }));
+  }
+
+  async function handleRetryNfce(sale: ShiftSale, doc: FiscalDoc) {
+    setNfceRetryingMap((prev) => ({ ...prev, [sale.orderId]: true }));
+    try {
+      await Api.retryNfce(doc.id);
+      setNfceDocsMap((prev) => ({
+        ...prev,
+        [sale.orderId]: { ...doc, status: "PENDENTE", last_error: null, reject_code: null, reject_message: null },
+      }));
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts += 1;
+        const fresh = await Api.fiscalDocByOrder(sale.orderId).catch(() => null);
+        if (fresh) {
+          setNfceDocsMap((prev) => ({ ...prev, [sale.orderId]: fresh }));
+          if (fresh.status === "AUTORIZADO" || ["BLOQUEADO", "REJEITADO", "DENEGADO", "CANCELADO"].includes(fresh.status)) {
+            clearInterval(interval);
+            setNfceRetryingMap((prev) => ({ ...prev, [sale.orderId]: false }));
+          }
+        }
+        if (attempts >= 10) {
+          clearInterval(interval);
+          setNfceRetryingMap((prev) => ({ ...prev, [sale.orderId]: false }));
+        }
+      }, 2000);
+    } catch (err) {
+      alert(err instanceof Error && err.message ? err.message : "Não foi possível reenviar a NFC-e. Tente novamente.");
+      setNfceRetryingMap((prev) => ({ ...prev, [sale.orderId]: false }));
+    }
+  }
 
   async function loadNfseDocsForSales(salesList: ShiftSale[]) {
     const sessionSales = salesList.filter((s) => s.kind === "SESSAO");
@@ -281,6 +333,7 @@ export function CaixaScreen() {
         const fetchedSales = await Api.shiftSales(current.id);
         setSales(fetchedSales);
         loadNfseDocsForSales(fetchedSales);
+        loadNfceDocsForSales(fetchedSales);
       }
       setRefreshError(false);
     } catch {
@@ -955,11 +1008,70 @@ export function CaixaScreen() {
                     <td style={{ padding: "6px 8px", textAlign: "right" }}>{s.discountCents > 0 ? `−${money(s.discountCents)}` : "—"}</td>
                     <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}>{money(s.amountCents)}</td>
                     <td style={{ padding: "6px 8px", textAlign: "center" }}>
-                      {s.kind === "PDV" && (
-                        <Button variant="ghost" size="sm" onClick={() => openNfceForSale(s)} title="Ver / Imprimir Cupom Fiscal NFC-e">
-                          📄 NFC-e
-                        </Button>
-                      )}
+                      {s.kind === "PDV" && (() => {
+                        const doc = nfceDocsMap[s.orderId];
+                        const isRetrying = !!nfceRetryingMap[s.orderId];
+
+                        if (!doc) {
+                          return <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>— (sem NFC-e)</span>;
+                        }
+
+                        if (isRetrying || ["PENDENTE", "ASSINADO", "TRANSMITIDO"].includes(doc.status)) {
+                          return (
+                            <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "500" }}>
+                              ⏳ Emitindo…
+                            </span>
+                          );
+                        }
+
+                        if (doc.status === "AUTORIZADO") {
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                              <span style={{ fontSize: "11px", color: "var(--success-color, #10b981)", fontWeight: "bold" }}>
+                                ✅ NFC-e nº {doc.numero ?? "—"}
+                              </span>
+                              <Button variant="ghost" size="sm" onClick={() => openNfceForSale(s)} title="Ver / Imprimir Cupom Fiscal NFC-e">
+                                📄 Ver cupom
+                              </Button>
+                            </div>
+                          );
+                        }
+
+                        if (doc.status === "BLOQUEADO" || doc.status === "REJEITADO") {
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                              <span style={{ fontSize: "11px", color: "var(--error-color, #ef4444)", fontWeight: "bold" }}>
+                                ❌ {doc.status}
+                              </span>
+                              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center" }}>
+                                <IfCan capability="nfce.retry">
+                                  <Button variant="ghost" size="sm" onClick={() => handleRetryNfce(s, doc)} title="Reenviar a NFC-e para a SEFAZ-PA">
+                                    🔄 Tentar Novamente
+                                  </Button>
+                                </IfCan>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setFiscalErrorModal({ sale: s, doc })}
+                                  title="Ver o motivo detalhado do erro"
+                                >
+                                  Ver motivo
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // DENEGADO, CANCELADO, CONTINGENCIA_OFFLINE etc.: só informa e deixa abrir o cupom.
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                            <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "bold" }}>{doc.status}</span>
+                            <Button variant="ghost" size="sm" onClick={() => openNfceForSale(s)} title="Ver detalhes da NFC-e">
+                              📄 Ver cupom
+                            </Button>
+                          </div>
+                        );
+                      })()}
                       {s.kind === "SESSAO" && (() => {
                         const doc = nfseDocsMap[s.orderId];
                         const isLoading = !!nfseLoadingMap[s.orderId] || (doc && ["PENDENTE", "ASSINADO", "TRANSMITIDO"].includes(doc.status));
@@ -997,7 +1109,7 @@ export function CaixaScreen() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setNfseErrorModal({ sale: s, doc });
+                                  setFiscalErrorModal({ sale: s, doc });
                                   setCpfInputModal(s.guardianCpf ? formatCpf(s.guardianCpf) : "");
                                 }}
                                 style={{
@@ -1085,26 +1197,38 @@ export function CaixaScreen() {
         </Modal>
       )}
 
-      {nfseErrorModal && (
+      {fiscalErrorModal && (() => {
+        const isNfse = fiscalErrorModal.doc.doc_type === "NFSE";
+        const docLabel = isNfse ? "NFS-e" : "NFC-e";
+        return (
         <Modal
-          title={`❌ Detalhes da Falha na NFS-e ${nfseErrorModal.sale.orderCode ? `(#${nfseErrorModal.sale.orderCode})` : ""}`}
-          onClose={() => setNfseErrorModal(null)}
+          title={`❌ Detalhes da Falha na ${docLabel} ${fiscalErrorModal.sale.orderCode ? `(#${fiscalErrorModal.sale.orderCode})` : ""}`}
+          onClose={() => setFiscalErrorModal(null)}
           maxWidth="520px"
         >
           <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "14px" }}>
             <div style={{ background: "#FEE2E2", color: "#991B1B", padding: "12px 14px", borderRadius: "10px", fontSize: "13px" }}>
-              <strong>Motivo do bloqueio / rejeição:</strong>
+              <strong>Motivo do bloqueio / rejeição{fiscalErrorModal.doc.reject_code ? ` (código ${fiscalErrorModal.doc.reject_code})` : ""}:</strong>
               <p style={{ margin: "4px 0 0 0", fontWeight: 500, lineHeight: "1.4" }}>
-                {nfseErrorModal.doc.last_error || nfseErrorModal.doc.reject_message || "Documento fiscal bloqueado sem motivo especificado."}
+                {fiscalErrorModal.doc.last_error ?? fiscalErrorModal.doc.reject_message ?? "Documento fiscal bloqueado sem motivo especificado."}
               </p>
             </div>
 
-            <div style={{ background: "var(--surface-sunken)", padding: "12px 14px", borderRadius: "10px", fontSize: "13px" }}>
-              <div><strong>Responsável:</strong> {nfseErrorModal.sale.guardianName ?? "Não especificado"}</div>
-              <div><strong>CPF Atual no Cadastro:</strong> {nfseErrorModal.sale.guardianCpf ? formatCpf(nfseErrorModal.sale.guardianCpf) : "⚠️ Sem CPF cadastrado"}</div>
-            </div>
+            {!isNfse && (
+              <HelpText>
+                Corrija a causa (NCM/CFOP do produto, CSC ou certificado em Gerencial &gt; Dados Fiscais) e use
+                "Tentar Novamente" — a venda já está registrada; só o cupom fiscal é reenviado.
+              </HelpText>
+            )}
 
-            {nfseErrorModal.sale.guardianId && (
+            {isNfse && (
+              <div style={{ background: "var(--surface-sunken)", padding: "12px 14px", borderRadius: "10px", fontSize: "13px" }}>
+                <div><strong>Responsável:</strong> {fiscalErrorModal.sale.guardianName ?? "Não especificado"}</div>
+                <div><strong>CPF Atual no Cadastro:</strong> {fiscalErrorModal.sale.guardianCpf ? formatCpf(fiscalErrorModal.sale.guardianCpf) : "⚠️ Sem CPF cadastrado"}</div>
+              </div>
+            )}
+
+            {isNfse && fiscalErrorModal.sale.guardianId && (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-card)", border: "1px solid var(--border-subtle)", padding: "14px", borderRadius: "12px" }}>
                 <strong style={{ fontSize: "13px" }}>✏️ Cadastrar/Atualizar CPF do Responsável:</strong>
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
@@ -1124,12 +1248,12 @@ export function CaixaScreen() {
                     loading={cpfUpdating}
                     disabled={cpfUpdating || !isValidCpf(cpfInputModal)}
                     onClick={async () => {
-                      if (!nfseErrorModal.sale.guardianId) return;
+                      if (!fiscalErrorModal.sale.guardianId) return;
                       setCpfUpdating(true);
                       try {
-                        await Api.updateGuardianCpf(nfseErrorModal.sale.guardianId, cpfInputModal);
-                        const updatedSale = { ...nfseErrorModal.sale, guardianCpf: cpfInputModal };
-                        setNfseErrorModal(null);
+                        await Api.updateGuardianCpf(fiscalErrorModal.sale.guardianId, cpfInputModal);
+                        const updatedSale = { ...fiscalErrorModal.sale, guardianCpf: cpfInputModal };
+                        setFiscalErrorModal(null);
                         await handleEmitNfse(updatedSale);
                       } catch (err) {
                         const msg = err instanceof Error ? err.message : "Erro ao atualizar CPF";
@@ -1149,23 +1273,39 @@ export function CaixaScreen() {
             )}
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
-              <Button variant="ghost" onClick={() => setNfseErrorModal(null)}>
+              <Button variant="ghost" onClick={() => setFiscalErrorModal(null)}>
                 Fechar
               </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  const sale = nfseErrorModal.sale;
-                  setNfseErrorModal(null);
-                  handleEmitNfse(sale);
-                }}
-              >
-                🔄 Tentar Emissão Novamente
-              </Button>
+              {isNfse ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const sale = fiscalErrorModal.sale;
+                    setFiscalErrorModal(null);
+                    handleEmitNfse(sale);
+                  }}
+                >
+                  🔄 Tentar Emissão Novamente
+                </Button>
+              ) : (
+                <IfCan capability="nfce.retry">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      const { sale, doc } = fiscalErrorModal;
+                      setFiscalErrorModal(null);
+                      handleRetryNfce(sale, doc);
+                    }}
+                  >
+                    🔄 Tentar Novamente
+                  </Button>
+                </IfCan>
+              )}
             </div>
           </div>
         </Modal>
-      )}
+        );
+      })()}
 
       {/* Sangria/suprimento tira e põe dinheiro na gaveta fora de uma venda —
           é a operação em que a diferença entre Operador e Líder tem

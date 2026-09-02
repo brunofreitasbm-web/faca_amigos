@@ -49,3 +49,11 @@ verify_jwt = false
 
 [functions.general-onboarding-complete]
 verify_jwt = false
+
+# Só o worker fiscal do kiosk chama esta function, com a chave do worker
+# (FISCAL_WORKER_SECRET_KEY, formato `sb_secret_...`) — que NÃO é JWT, então
+# o portão do Supabase a recusaria. A autorização real é feita dentro da
+# function: bearer igual (comparação em tempo constante) à service role key
+# ou à chave do worker; nada de sessão de usuário.
+[functions.nfse-certificate-fetch]
+verify_jwt = false

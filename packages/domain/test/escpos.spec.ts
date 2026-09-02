@@ -127,6 +127,81 @@ describe("generateEscPosReceipt", () => {
     expect(receipt.text).not.toContain("ITEM");
     expect(receipt.text).toContain("PREVISTO (pagar na saída):  R$       60,00");
   });
+
+  it("imprime o DANFE NFC-e (chave, protocolo, número/série e QR de consulta) quando fiscalQrUrl é informado", () => {
+    const receipt = generateEscPosReceipt({
+      title: "DANFE NFC-e",
+      unitName: "Playground Parque Shopping",
+      unitCnpj: "12.345.678/0001-99",
+      unitAddress: "Av Presidente Vargas, 100 - Campina - Belém/PA",
+      dateTime: "06/08/2026 15:30:00",
+      items: [{ description: "Plano 30 minutos", quantity: 1, amountCents: 4000 }],
+      totalCents: 4000,
+      payments: [{ method: "PIX", amountCents: 4000 }],
+      fiscalQrUrl: "https://appnfc.sefa.pa.gov.br/portal/view/consultas/nfce/consultanfce.seam?p=123",
+      fiscalAccessKey: "15260812345678000199650010000001231234567890",
+      fiscalProtocol: "153260000000000",
+      fiscalNumero: 123,
+      fiscalSerie: "1",
+    });
+
+    expect(receipt.text).toContain("CNPJ: 12.345.678/0001-99");
+    expect(receipt.text).toContain("Av Presidente Vargas");
+    expect(receipt.text).toContain("Protocolo de autorização: 153260000000000");
+    expect(receipt.text).toContain("NFC-e nº 123 Série 1");
+    // Chave de acesso formatada em grupos de 4 dígitos (a quebra de linha de
+    // 42 colunas pode cair no meio da string completa, então checamos um
+    // trecho curto que cabe dentro de uma única linha).
+    expect(receipt.text).toContain("1526 0812 3456 7800");
+
+    // GS ( k = comando ESC/POS de QR Code embutido no meio do stream RAW.
+    expect(receipt.commandsHex).toContain("1d286b");
+    const urlHex = Buffer.from(
+      "https://appnfc.sefa.pa.gov.br/portal/view/consultas/nfce/consultanfce.seam?p=123",
+      "utf8",
+    ).toString("hex");
+    expect(receipt.commandsHex).toContain(urlHex);
+
+    // NFC-e é documento fiscal de verdade: a ressalva do cupom interno não se aplica.
+    expect(receipt.text).not.toContain("sem valor fiscal");
+    // "sem valor fiscal" é puro ASCII — hex igual em CP860 e UTF-8.
+    expect(receipt.commandsHex).not.toContain(Buffer.from("sem valor fiscal", "utf8").toString("hex"));
+  });
+
+  it("destaca a emissão em homologação no DANFE NFC-e", () => {
+    const receipt = generateEscPosReceipt({
+      title: "DANFE NFC-e",
+      unitName: "Playground Parque Shopping",
+      items: [{ description: "Plano 30 minutos", quantity: 1, amountCents: 4000 }],
+      totalCents: 4000,
+      payments: [{ method: "PIX", amountCents: 4000 }],
+      fiscalQrUrl: "https://appnfc.sefa.pa.gov.br/portal-homologacao/view/consultas/nfce/consultanfce.seam?p=123",
+      fiscalAccessKey: "15260812345678000199650010000001231234567890",
+      fiscalProtocol: "153260000000000",
+      fiscalNumero: 123,
+      fiscalSerie: "1",
+      fiscalAmbiente: "HOMOLOGACAO",
+    });
+
+    expect(receipt.text).toContain("SEM VALOR FISCAL");
+  });
+
+  it("não altera a saída de um cupom sem campos fiscais (branch fiscal é estritamente aditiva)", () => {
+    const receipt = generateEscPosReceipt({
+      title: "Comprovante PDV",
+      unitName: "Playground Parque Shopping",
+      unitCnpj: "12.345.678/0001-99",
+      unitAddress: "Av Presidente Vargas, 100",
+      dateTime: "06/08/2026 15:30:00",
+      items: [{ description: "Água mineral", quantity: 1, amountCents: 1000 }],
+      totalCents: 1000,
+      payments: [{ method: "PIX", amountCents: 1000 }],
+    });
+    // unitCnpj/unitAddress continuam não impressos fora do caminho fiscal.
+    expect(receipt.text).not.toContain("12.345.678/0001-99");
+    expect(receipt.text).not.toContain("Av Presidente Vargas");
+    expect(receipt.text).toContain("Comprovante interno, sem valor fiscal");
+  });
 });
 
 
