@@ -104,7 +104,7 @@ export async function buscarCredenciaisFiscais(
     // problema de upload/configuração do certificado.
     const dica =
       detail === "não autorizado"
-        ? " (verifique se FACAAMIGOS_SUPABASE_SECRET_KEY no .env deste terminal bate com a chave configurada na Edge Function nfse-certificate-fetch)"
+        ? " (troque FACAAMIGOS_SUPABASE_SECRET_KEY no .env deste terminal pela service_role key legada de Project Settings > API Keys > Legacy API Keys no Supabase — funciona sempre, sem precisar configurar nenhum secret extra no projeto)"
         : "";
     return { ok: false, motivo: `Certificado A1 não disponível: ${detail}${dica}` };
   }
