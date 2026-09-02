@@ -135,3 +135,43 @@ describe("assinarXmlNfce / verificarAssinaturaXmlNfce", () => {
     expect(verificarAssinaturaXmlNfce(tamperedInfNFe, cert.cert)).toBe(false);
   });
 });
+
+/**
+ * Regressão do cStat 225 ("Falha no Schema XML da NFe — Atributo:
+ * Algorithm").
+ *
+ * O XSD da NF-e restringe `Algorithm` a uma lista fechada. A assinatura
+ * usava canonicalização EXCLUSIVA (`exc-c14n`), que não está nessa lista,
+ * e a SEFAZ recusou em homologação em 2026-09-02 com a nota já montada,
+ * numerada e transmitida.
+ *
+ * Nenhum teste olhava para esses atributos — validavam que a assinatura
+ * existia e batia, o que continua verdade com o algoritmo errado. Estes
+ * comparam as URIs exatas que a SEFAZ aceita.
+ */
+describe("URIs de Algorithm exigidas pelo XSD da NF-e", () => {
+  const C14N_INCLUSIVO = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
+  const assinado = assinarXmlNfce({
+    xml: montarXmlNfce(input).xml,
+    chaveAcesso: montarXmlNfce(input).chaveAcesso,
+    privateKeyPem: cert.private,
+    certPem: cert.cert,
+  });
+
+  it("canonicaliza com C14N inclusivo, nunca com exc-c14n", () => {
+    expect(assinado).toContain(`<CanonicalizationMethod Algorithm="${C14N_INCLUSIVO}"`);
+    expect(assinado, "exc-c14n não está na lista fechada do XSD — é o cStat 225").not.toContain(
+      "xml-exc-c14n",
+    );
+  });
+
+  it("assina com rsa-sha1 e digest sha1", () => {
+    expect(assinado).toContain('<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"');
+    expect(assinado).toContain('<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"');
+  });
+
+  it("usa os dois Transforms do manual: enveloped-signature e C14N inclusivo", () => {
+    expect(assinado).toContain('<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"');
+    expect(assinado).toContain(`<Transform Algorithm="${C14N_INCLUSIVO}"`);
+  });
+});
