@@ -99,7 +99,24 @@ export function formatAuditDetails(
       if (d.childName) lines.push(`Criança: ${d.childName}`);
       break;
     case "CAIXA_TURNO_ABERTO":
-      if (typeof d.openingCashCents === "number") lines.push(`Troco inicial: ${money(d.openingCashCents)}`);
+      if (typeof d.openingCashCents === "number") lines.push(`Fundo de caixa contado na abertura: ${money(d.openingCashCents)}`);
+      if (typeof d.expectedOpeningCashCents === "number") lines.push(`Fundo previsto (fechamento anterior): ${money(d.expectedOpeningCashCents)}`);
+      if (typeof d.openingDivergenceCents === "number" && d.openingDivergenceCents !== 0) {
+        lines.push(
+          d.openingDivergenceCents > 0
+            ? `⚠ Sobra na abertura: ${money(d.openingDivergenceCents)}`
+            : `⚠ Falta na abertura: ${money(Math.abs(d.openingDivergenceCents))}`,
+        );
+      }
+      break;
+    case "CAIXA_TURNO_FECHADO":
+      if (typeof d.countedCashCents === "number") lines.push(`Dinheiro contado na gaveta: ${money(d.countedCashCents)}`);
+      if (typeof d.drawerExpectedCents === "number") lines.push(`Esperado na gaveta: ${money(d.drawerExpectedCents)}`);
+      if (typeof d.cashBreakCents === "number" && d.cashBreakCents !== 0) {
+        lines.push(d.cashBreakCents > 0 ? `⚠ Sobra: ${money(d.cashBreakCents)}` : `⚠ Quebra: ${money(Math.abs(d.cashBreakCents))}`);
+      }
+      if (typeof d.nextDayFloatCents === "number") lines.push(`Fundo para o próximo dia: ${money(d.nextDayFloatCents)}`);
+      if (typeof d.envelopeCents === "number") lines.push(`Envelope: ${money(d.envelopeCents)}`);
       break;
     case "CAIXA_TROCO_INICIAL":
     case "CAIXA_SANGRIA":
