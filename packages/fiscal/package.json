@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./dps-nacional-transport": "./src/dps-nacional-transport.ts",
-    "./svrs-transport": "./src/nfce/svrs-transport.ts"
+    "./svrs-transport": "./src/nfce/svrs-transport.ts",
+    "./ca-bundle": "./src/nfce/ca-bundle.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

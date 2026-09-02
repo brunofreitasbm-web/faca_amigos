@@ -53,10 +53,14 @@ export function assinarXmlNfce(input: AssinarXmlNfceInput): string {
     digestAlgorithm: ALGORITMO_DIGEST,
   });
 
-  // A assinatura entra como irmã do infNFe, dentro do elemento raiz <NFe> —
-  // é onde o XSD oficial espera o grupo <Signature>.
+  // A assinatura entra como o ÚLTIMO filho do elemento raiz <NFe> — isso
+  // funciona tanto com quanto sem o grupo opcional <infNFeSupl> (QR Code,
+  // ver nfce-xml.ts): a sequência exigida pelo layout 4.00 é
+  // infNFe -> infNFeSupl (opcional) -> Signature. A Reference, de propósito,
+  // continua cobrindo só o <infNFe> (xpath acima) — o <infNFeSupl> fica
+  // fora do digest assinado, como o XSD/manual da NFC-e determina.
   sig.computeSignature(input.xml, {
-    location: { reference: "//*[local-name(.)='infNFe']", action: "after" },
+    location: { reference: "//*[local-name(.)='NFe']", action: "append" },
   });
 
   return sig.getSignedXml();

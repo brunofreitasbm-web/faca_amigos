@@ -99,6 +99,20 @@ async function receiptHtml(payload: ReceiptPrintPayload): Promise<string> {
     }
   }
 
+  // DANFE NFC-e: mesmo padrão do QR de acompanhamento acima, mas para a
+  // consulta pública da nota na SEFA-PA — usado só quando a impressão RAW
+  // direta falhar e este fallback HTML entrar em ação (ver
+  // handleReceiptPdfFallback mais abaixo).
+  let fiscalQrBlock = "";
+  if (payload.fiscalQrUrl) {
+    try {
+      const fiscalSvg = await QRCode.toString(payload.fiscalQrUrl, { type: "svg", margin: 0, errorCorrectionLevel: "M" });
+      fiscalQrBlock = `<div class="qr"><div class="qr-label">CONSULTE A NFC-e</div>${fiscalSvg}</div>`;
+    } catch (err) {
+      console.error("[print-bridge] Erro ao gerar QR Code da NFC-e:", err);
+    }
+  }
+
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <style>
       @page { size: 80mm auto; margin: 0; }
@@ -107,7 +121,7 @@ async function receiptHtml(payload: ReceiptPrintPayload): Promise<string> {
       .qr { display: flex; flex-direction: column; align-items: center; margin: 2mm 0 3mm 0; }
       .qr svg { width: 34mm; height: 34mm; }
       .qr-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 1mm; }
-    </style></head><body>${trackingQrBlock}<pre>${esc}</pre></body></html>`;
+    </style></head><body>${trackingQrBlock}<pre>${esc}</pre>${fiscalQrBlock}</body></html>`;
 }
 
 async function circuitoTermoHtml(payload: ReceiptPrintPayload): Promise<string> {

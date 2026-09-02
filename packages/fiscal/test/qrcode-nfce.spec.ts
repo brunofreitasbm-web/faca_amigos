@@ -45,8 +45,35 @@ describe("montarUrlQrCodeNfce", () => {
     expect(chave).toBe(CHAVE);
     expect(versao).toBe("2");
     expect(tpAmb).toBe("2");
-    expect(idCsc).toBe("000001");
+    // O manual exige o id do CSC SEM zeros não significativos na URL.
+    expect(idCsc).toBe("1");
     expect(hash).toHaveLength(40);
+  });
+
+  it("normaliza o id do CSC removendo zeros não significativos na URL (ex.: '000002' -> '2')", () => {
+    const url = montarUrlQrCodeNfce({
+      chaveAcesso: CHAVE,
+      tpAmb: "2",
+      idCsc: "000002",
+      cscToken: "segredo-csc",
+      urlConsulta: URL_CONSULTA,
+    });
+
+    const p = new URL(url).searchParams.get("p")!;
+    expect(`|${p}|`).toContain("|2|");
+    expect(p).not.toContain("|000002|");
+
+    const [, , , , hash] = p.split("|");
+    expect(hash).toMatch(/^[0-9A-F]{40}$/);
+  });
+
+  it("gera o mesmo hash para o mesmo id do CSC em paddings diferentes", () => {
+    const semPadding = hashQrCode(CHAVE, "2", "2", "segredo-csc");
+    const paddingCurto = hashQrCode(CHAVE, "2", "02", "segredo-csc");
+    const paddingOriginal = hashQrCode(CHAVE, "2", "000002", "segredo-csc");
+
+    expect(paddingCurto).toBe(semPadding);
+    expect(paddingOriginal).toBe(semPadding);
   });
 
   it("nunca inclui o token do CSC na URL resultante", () => {

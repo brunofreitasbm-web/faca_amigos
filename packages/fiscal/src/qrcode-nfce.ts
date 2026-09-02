@@ -73,10 +73,21 @@ export interface QrCodeNfceInput {
   urlConsulta: string;
 }
 
+/**
+ * Normaliza o id do CSC removendo zeros não significativos — o Manual de
+ * Especificações Técnicas do DANFE NFC-e e QR Code exige o id "sem os
+ * zeros não significativos" tanto no hash quanto na URL (ex.: "000001"
+ * vira "1"). Entrada não numérica/vazia cai para "0".
+ */
+function normalizarIdCsc(idCsc: string): string {
+  return String(Number(idCsc.replace(/\D/g, "")) || 0);
+}
+
 /** SHA-1 em hex maiúsculo, como o hash do QR Code exige. */
 export function hashQrCode(chaveAcesso: string, tpAmb: string, idCsc: string, cscToken: string): string {
   const chave = chaveAcesso.replace(/\D/g, "");
-  const input = `${chave}${QRCODE_VERSAO}${tpAmb}${idCsc}${cscToken}`;
+  const idCscNormalizado = normalizarIdCsc(idCsc);
+  const input = `${chave}${QRCODE_VERSAO}${tpAmb}${idCscNormalizado}${cscToken}`;
   return sha1Hex(input);
 }
 
@@ -94,6 +105,7 @@ export function montarUrlQrCodeNfce(input: QrCodeNfceInput): string {
   }
 
   const hash = hashQrCode(chave, input.tpAmb, input.idCsc, input.cscToken);
-  const p = [chave, QRCODE_VERSAO, input.tpAmb, input.idCsc, hash].join("|");
+  const idCscNormalizado = normalizarIdCsc(input.idCsc);
+  const p = [chave, QRCODE_VERSAO, input.tpAmb, idCscNormalizado, hash].join("|");
   return `${input.urlConsulta}?p=${p}`;
 }

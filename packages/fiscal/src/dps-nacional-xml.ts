@@ -1,4 +1,6 @@
 import { create } from "xmlbuilder2";
+import { formatarDataFiscal, formatarDataHoraFiscal } from "./data-hora.js";
+import { sanitizarTextoFiscal } from "./texto.js";
 
 /**
  * Monta o XML da DPS (Declaração de Prestação de Serviços) no Modelo
@@ -15,6 +17,12 @@ import { create } from "xmlbuilder2";
  * DPS_v1.01.xsd/tiposComplexos_v1.01.xsd e o Anexo I (regras de negócio)
  * de 2026-08-19 — ver comentários pontuais abaixo para as decisões menos
  * óbvias.
+ *
+ * dhEmi/dCompet/dtIni/dtFim usam o dia/mês LOCAL (fuso `input.timeZone`,
+ * padrão America/Belem — ver data-hora.ts), não UTC. Todo campo de texto
+ * livre (xNome, xDescServ, xLgr, xCpl, xBairro) passa por
+ * `sanitizarTextoFiscal` (texto.ts) antes de entrar no XML, porque o
+ * layout usa faixa ISO-8859-1 e não aceita emoji/tipografia "esperta".
  */
 
 export interface DpsPrestador {
@@ -38,7 +46,7 @@ export interface DpsEnderecoEvento {
 
 export interface DpsInput {
   ambiente: "HOMOLOGACAO" | "PRODUCAO";
-  /** Instante da emissão (Date real, não string) — vira dhEmi em UTC com offset. */
+  /** Instante da emissão (Date real, não string) — vira dhEmi local com offset numérico. */
   dataHoraEmissao: Date;
   /** Data de início da prestação (competência) — normalmente a mesma data da sessão. */
   dataCompetencia: Date;
@@ -64,19 +72,8 @@ export interface DpsInput {
    * do ar.
    */
   aliquotaIssManual?: number | null;
-}
-
-function pad(n: number, len: number): string {
-  return String(n).padStart(len, "0");
-}
-
-function dataYyyyMmDd(d: Date): string {
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1, 2)}-${pad(d.getUTCDate(), 2)}`;
-}
-
-/** dhEmi/TSDateTimeUTC exige offset numérico (+hh:mm/-hh:mm) — "Z" não bate no pattern do XSD. */
-function dataHoraUtcComOffset(d: Date): string {
-  return `${dataYyyyMmDd(d)}T${pad(d.getUTCHours(), 2)}:${pad(d.getUTCMinutes(), 2)}:${pad(d.getUTCSeconds(), 2)}+00:00`;
+  /** Fuso horário usado para dhEmi/dCompet/dtIni/dtFim — padrão "America/Belem". */
+  timeZone?: string;
 }
 
 function money(value: number): string {
@@ -105,15 +102,20 @@ export interface MontarXmlDpsResult {
 export function montarXmlDps(input: DpsInput): MontarXmlDpsResult {
   const idDps = montarIdDps(input);
   const tpAmb = input.ambiente === "PRODUCAO" ? "1" : "2";
+  const tz = input.timeZone ?? "America/Belem";
+  const descricaoServicoSanitizada = sanitizarTextoFiscal(input.descricaoServico, 255);
+  // cTribMun só entra quando há um código municipal válido e diferente de
+  // zero — "0"/vazio/ausente não é um código real.
+  const cTribMunDigits = input.codigoTribMunicipal?.replace(/\D/g, "");
 
   const infDPS: Record<string, unknown> = {
     "@Id": idDps,
     tpAmb,
-    dhEmi: dataHoraUtcComOffset(input.dataHoraEmissao),
+    dhEmi: formatarDataHoraFiscal(input.dataHoraEmissao, tz),
     verAplic: "facaamigos-1.0",
     serie: input.serieDps.replace(/\D/g, ""),
     nDPS: String(input.numeroDps),
-    dCompet: dataYyyyMmDd(input.dataCompetencia),
+    dCompet: formatarDataFiscal(input.dataCompetencia, tz),
     tpEmit: "1",
     cLocEmi: input.codigoMunicipioIbge,
     prest: {
@@ -129,27 +131,29 @@ export function montarXmlDps(input: DpsInput): MontarXmlDpsResult {
     },
     toma: {
       CPF: input.tomador.cpf.replace(/\D/g, ""),
-      xNome: input.tomador.nome,
+      xNome: sanitizarTextoFiscal(input.tomador.nome, 300),
     },
     serv: {
       locPrest: { cLocPrestacao: input.codigoMunicipioIbge },
       cServ: {
         cTribNac: input.codigoTribNacional,
-        ...(input.codigoTribMunicipal ? { cTribMun: input.codigoTribMunicipal } : {}),
-        xDescServ: input.descricaoServico,
+        ...(cTribMunDigits && Number(cTribMunDigits) > 0 ? { cTribMun: cTribMunDigits } : {}),
+        xDescServ: descricaoServicoSanitizada,
       },
       // Obrigatório por regra de negócio (não pelo XSD) quando cTribNac
       // pertence ao item 12 da lista de serviços — RN Anexo I linha 277.
       atvEvento: {
-        xNome: input.descricaoServico,
-        dtIni: dataYyyyMmDd(input.dataCompetencia),
-        dtFim: dataYyyyMmDd(input.dataCompetencia),
+        xNome: descricaoServicoSanitizada,
+        dtIni: formatarDataFiscal(input.dataCompetencia, tz),
+        dtFim: formatarDataFiscal(input.dataCompetencia, tz),
         end: {
           CEP: input.enderecoEvento.cep.replace(/\D/g, ""),
-          xLgr: input.enderecoEvento.logradouro,
+          xLgr: sanitizarTextoFiscal(input.enderecoEvento.logradouro, 125),
           nro: input.enderecoEvento.numero,
-          ...(input.enderecoEvento.complemento ? { xCpl: input.enderecoEvento.complemento } : {}),
-          xBairro: input.enderecoEvento.bairro,
+          ...(input.enderecoEvento.complemento
+            ? { xCpl: sanitizarTextoFiscal(input.enderecoEvento.complemento, 60) }
+            : {}),
+          xBairro: sanitizarTextoFiscal(input.enderecoEvento.bairro, 60),
         },
       },
     },

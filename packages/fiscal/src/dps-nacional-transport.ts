@@ -1,5 +1,6 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 import { request } from "node:https";
+import { montarCaBundle } from "./nfce/ca-bundle.js";
 
 /**
  * Transporte da DPS ao SEFIN Nacional do Sistema Nacional NFS-e —
@@ -70,6 +71,8 @@ export async function transmitirDps(input: TransmitirDpsInput): Promise<Transmit
           method: "POST",
           cert: input.certPem,
           key: input.privateKeyPem,
+          ca: montarCaBundle(),
+          servername: host,
           timeout: input.timeoutMs ?? 30_000,
           headers: {
             "Content-Type": "application/json",

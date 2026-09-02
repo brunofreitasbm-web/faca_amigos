@@ -91,4 +91,47 @@ describe("assinarXmlNfce / verificarAssinaturaXmlNfce", () => {
       assinarXmlNfce({ xml, chaveAcesso: "123", privateKeyPem: cert.private, certPem: cert.cert }),
     ).toThrow();
   });
+
+  it("com infNFeSupl (QR Code), assina com a ordem infNFe -> infNFeSupl -> Signature, e a Reference cobre só infNFe", () => {
+    const { xml, chaveAcesso } = montarXmlNfce({
+      ...input,
+      qrCode: {
+        idCsc: "000001",
+        cscToken: "segredo-csc",
+        urlConsulta: "https://www.sefa.pa.gov.br/nfce/qrcode",
+        urlChave: "https://www.sefa.pa.gov.br/nfce/consulta",
+      },
+    });
+    expect(xml).toContain("<infNFeSupl>");
+
+    const signed = assinarXmlNfce({
+      xml,
+      chaveAcesso,
+      privateKeyPem: cert.private,
+      certPem: cert.cert,
+    });
+
+    const idxInfNFeClose = signed.indexOf("</infNFe>");
+    const idxInfNFeSupl = signed.indexOf("<infNFeSupl>");
+    const idxSignature = signed.indexOf("<Signature");
+    expect(idxInfNFeClose).toBeGreaterThan(-1);
+    expect(idxInfNFeSupl).toBeGreaterThan(idxInfNFeClose);
+    expect(idxSignature).toBeGreaterThan(idxInfNFeSupl);
+
+    expect(verificarAssinaturaXmlNfce(signed, cert.cert)).toBe(true);
+
+    // infNFeSupl fica FORA do digest assinado — mutar só o urlChave não
+    // pode invalidar a assinatura.
+    const tamperedSupl = signed.replace(
+      "https://www.sefa.pa.gov.br/nfce/consulta",
+      "https://exemplo-adulterado.invalido/consulta",
+    );
+    expect(verificarAssinaturaXmlNfce(tamperedSupl, cert.cert)).toBe(true);
+
+    // Mutar algo DENTRO de infNFe já invalida a assinatura (mesmo teste de
+    // adulteração já coberto acima para o caso sem infNFeSupl — aqui só
+    // confirmamos que continua valendo quando infNFeSupl está presente).
+    const tamperedInfNFe = signed.replace("<vNF>5.00</vNF>", "<vNF>999.00</vNF>");
+    expect(verificarAssinaturaXmlNfce(tamperedInfNFe, cert.cert)).toBe(false);
+  });
 });

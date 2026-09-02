@@ -81,6 +81,15 @@ export interface DocumentoFiscalInput {
   destinatario: Destinatario | null;
   itens: ItemFiscal[];
   pagamentos: PagamentoFiscal[];
+  /** Fuso horário usado para AAMM da chave de acesso e dhEmi — padrão "America/Belem". */
+  timeZone?: string;
+  /** Dados do CSC do emitente para montar o QR Code impresso no DANFE (ver qrcode-nfce.ts). */
+  qrCode?: {
+    idCsc: string;
+    cscToken: string;
+    urlConsulta: string;
+    urlChave: string;
+  };
 }
 
 export interface ResultadoEmissao {

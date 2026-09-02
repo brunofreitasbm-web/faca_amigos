@@ -1,5 +1,6 @@
 import { request } from "node:https";
 import { DOMParser } from "@xmldom/xmldom";
+import { montarCaBundle } from "./ca-bundle.js";
 import {
   assinarXmlEvento,
   assinarXmlInutilizacao,
@@ -69,6 +70,8 @@ export class SvrsNfceTransport implements NfceTransport {
           method: "POST",
           cert: this.certPem,
           key: this.privateKeyPem,
+          ca: montarCaBundle(),
+          servername: host,
           timeout: this.timeoutMs,
           headers: {
             "Content-Type": `application/soap+xml; charset=utf-8; action="${action}"`,

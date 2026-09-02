@@ -2316,11 +2316,37 @@ function FiscalTab({ unitId }: { unitId: string }) {
   const [certFile, setCertFile] = useState<File | null>(null);
   const [certPassword, setCertPassword] = useState("");
   const [certUploading, setCertUploading] = useState(false);
+  // Token do CSC: nunca é lido de volta — só o status (existe / quando).
+  const [cscStatus, setCscStatus] = useState<{ unit_id: string; updated_at_ms: number } | null>(null);
+  const [cscToken, setCscToken] = useState("");
+  const [cscSaving, setCscSaving] = useState(false);
 
   function loadCertStatus() {
     Api.fiscalCertificateStatus(unitId)
       .then(setCertStatus)
       .catch(() => setCertStatus(null));
+  }
+
+  function loadCscStatus() {
+    Api.fiscalCscStatus(unitId)
+      .then(setCscStatus)
+      .catch(() => setCscStatus(null));
+  }
+
+  async function saveCsc() {
+    const cscId = (form.nfceCscId ?? "").trim();
+    if (!cscId || !cscToken) return;
+    setCscSaving(true);
+    try {
+      await Api.uploadFiscalCsc(unitId, cscId, cscToken);
+      toast.success("Token do CSC salvo e protegido com sucesso.");
+      setCscToken("");
+      loadCscStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o token do CSC.");
+    } finally {
+      setCscSaving(false);
+    }
   }
 
   async function uploadCertificate() {
@@ -2360,6 +2386,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
           endComplemento: f.end_complemento ?? "",
           endBairro: f.end_bairro ?? "",
           endMunicipioIbge: f.end_municipio_ibge ?? "1501402",
+          endMunicipioNome: f.end_municipio_nome ?? "BELEM",
           endUf: f.end_uf ?? "PA",
           endCep: f.end_cep ?? "",
           fone: f.fone ?? "",
@@ -2385,6 +2412,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
     Api.fiscalTerminalStatus(unitId)
       .then(setStatus)
       .catch(() => setStatus([]));
+    loadCscStatus();
   }
   useEffect(load, [unitId]);
   useEffect(loadCertStatus, [unitId]);
@@ -2414,7 +2442,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
 
   const isCnpjOk = !!form.cnpj && form.cnpj.length >= 14;
   const isIeOk = !!form.inscricaoEstadual;
-  const isCscOk = !!form.nfceCscId;
+  const isCscOk = !!form.nfceCscId && !!cscStatus;
   const isFiscalEnabled = form.fiscalEnabled === "true";
   const isTerminalActive = status.some((s) => nowMs - s.last_heartbeat_ms <= HEARTBEAT_STALE_MS);
   const isAllReady = isCnpjOk && isIeOk && isCscOk && missingNcm.length === 0 && isTerminalActive && isFiscalEnabled;
@@ -2430,7 +2458,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
             {isCnpjOk ? "✅" : "❌"} <strong>Emitente:</strong> CNPJ ({form.cnpj || "não informado"}) e Inscrição Estadual ({form.inscricaoEstadual || "não informada"}).
           </li>
           <li>
-            {isCscOk ? "✅" : "⚠️"} <strong>CSC:</strong> ID do CSC {isCscOk ? `(${form.nfceCscId})` : "pendente (obter na SEFA-PA)"}.
+            {isCscOk ? "✅" : "⚠️"} <strong>CSC:</strong> {isCscOk ? `ID do CSC (${form.nfceCscId}) e token configurados` : "pendente (ID e token da SEFA-PA)"}.
           </li>
           <li>
             {missingNcm.length === 0 ? "✅" : "❌"} <strong>Produtos:</strong> {products.length - missingNcm.length}/{products.length} cadastrados com NCM correto.
@@ -2443,7 +2471,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
           </li>
         </ul>
         <HelpText style={{ marginTop: "8px" }}>
-          Confira estes dados com seu contador antes de ligar a emissão em Produção. O token do CSC e o certificado A1 (.pfx) ficam no serviço local do PC do balcão.
+          Confira estes dados com seu contador antes de ligar a emissão em Produção. O token do CSC e a senha do certificado A1 ficam cifrados na nuvem; só o emissor do PC do balcão consegue lê-los.
         </HelpText>
       </Card>
 
@@ -2472,6 +2500,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
         <Input label="Complemento" value={form.endComplemento ?? ""} onChange={(e) => set("endComplemento", e.target.value)} />
         <Input label="Bairro" value={form.endBairro ?? ""} onChange={(e) => set("endBairro", e.target.value)} />
         <Input label="Código IBGE do município" value={form.endMunicipioIbge ?? ""} onChange={(e) => set("endMunicipioIbge", e.target.value)} />
+        <Input label="Nome do município (xMun)" value={form.endMunicipioNome ?? ""} onChange={(e) => set("endMunicipioNome", e.target.value)} />
         <Input label="UF" value={form.endUf ?? ""} onChange={(e) => set("endUf", e.target.value.toUpperCase().slice(0, 2))} />
         <Input label="CEP" value={form.endCep ?? ""} onChange={(e) => set("endCep", e.target.value)} />
         <Input label="Telefone" value={form.fone ?? ""} onChange={(e) => set("fone", e.target.value)} />
@@ -2489,7 +2518,42 @@ function FiscalTab({ unitId }: { unitId: string }) {
         </Select>
         <Input label="Série" type="number" value={form.nfceSerie ?? "1"} onChange={(e) => set("nfceSerie", e.target.value)} />
         <Input label="ID do CSC (ex.: 000001)" value={form.nfceCscId ?? ""} onChange={(e) => set("nfceCscId", e.target.value)} />
-        <Input label="URL de consulta do QR Code" value={form.nfceQrcodeUrlConsulta ?? ""} onChange={(e) => set("nfceQrcodeUrlConsulta", e.target.value)} />
+        <Input
+          label="Token do CSC (SEFA-PA)"
+          type="password"
+          autoComplete="off"
+          value={cscToken}
+          onChange={(e) => setCscToken(e.target.value)}
+        />
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <Button
+            variant="secondary"
+            disabled={cscSaving || !(form.nfceCscId ?? "").trim() || !cscToken}
+            loading={cscSaving}
+            onClick={saveCsc}
+          >
+            Salvar CSC
+          </Button>
+          {cscStatus ? (
+            <span style={{ fontSize: "13px" }}>
+              ✅ Token do CSC configurado em {new Date(cscStatus.updated_at_ms).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+            </span>
+          ) : (
+            <span style={{ fontSize: "13px", color: "var(--color-warning, #B45309)" }}>
+              ⚠️ Token do CSC ainda não configurado — sem ele a NFC-e não gera QR Code.
+            </span>
+          )}
+        </div>
+        <HelpText>
+          O token é gravado cifrado na nuvem e nunca aparece de novo nesta tela. O "ID do CSC" acima é salvo junto com
+          os demais dados fiscais (botão "Salvar dados fiscais"); o botão "Salvar CSC" envia o ID e o token juntos.
+        </HelpText>
+        <Input
+          label="URL de consulta do QR Code (opcional — padrão SEFA-PA)"
+          value={form.nfceQrcodeUrlConsulta ?? ""}
+          onChange={(e) => set("nfceQrcodeUrlConsulta", e.target.value)}
+        />
+        <HelpText>Deixe em branco para usar as URLs oficiais da SEFA-PA (appnfc.sefa.pa.gov.br) por ambiente.</HelpText>
         <Select label="Emissão de NFC-e" value={form.fiscalEnabled ?? "false"} onChange={(e) => set("fiscalEnabled", e.target.value)}>
           <option value="false">Desligada</option>
           <option value="true">Ligada</option>
@@ -2551,11 +2615,11 @@ function FiscalTab({ unitId }: { unitId: string }) {
       </Button>
 
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Certificado digital A1 (NFS-e)</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Certificado digital A1 (NFS-e e NFC-e)</h2>
         <HelpText>
-          Necessário para a transmissão real de NFS-e à prefeitura (ainda pendente de layout — ver aba acima). A
-          senha nunca fica salva em texto puro: é cifrada nesta função e só a Edge Function que emite a nota
-          consegue decifrá-la; o arquivo .pfx fica num espaço privado que o app nunca lê de volta.
+          Necessário para assinar e transmitir tanto a NFS-e (prefeitura) quanto a NFC-e (SEFAZ-PA). A senha nunca
+          fica salva em texto puro: é cifrada na nuvem e só o emissor do PC do balcão consegue decifrá-la; o arquivo
+          .pfx fica num espaço privado que o app nunca lê de volta.
         </HelpText>
         {certStatus ? (
           <p style={{ margin: 0, fontSize: "13px" }}>

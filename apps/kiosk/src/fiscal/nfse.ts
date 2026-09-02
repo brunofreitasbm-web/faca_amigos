@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { assinarXmlDps, montarXmlDps, type DpsInput } from "@facaamigos/fiscal";
+import { createHash } from "node:crypto";
+import { anoMesLocal, assinarXmlDps, montarXmlDps, type DpsInput } from "@facaamigos/fiscal";
 import { transmitirDps } from "@facaamigos/fiscal/dps-nacional-transport";
+import { buscarCredenciaisFiscais } from "./certificado.js";
 import { extrairChaveECertificadoPem } from "./vault.js";
-import type { ClaimedFiscalDoc } from "./claim.js";
+import type { ClaimDeps, ClaimedFiscalDoc } from "./claim.js";
 
 /**
  * Processamento de NFS-e (sessão de brincar = serviço) dentro da mesma
@@ -87,20 +89,6 @@ export async function processarNfseSimulado(supabase: SupabaseClient, item: Clai
   }
 }
 
-export async function bloquearNfsePorFaltaDeTransporteReal(supabase: SupabaseClient, doc: ClaimedFiscalDoc["doc"]): Promise<void> {
-  const nowMs = Date.now();
-  await supabase
-    .from("fa_kiosk_fiscal_docs")
-    .update({
-      status: "BLOQUEADO",
-      last_error: "Transmissão real de NFS-e (prefeitura de Belém, sistema próprio) ainda não implementada: " +
-        "layout/WSDL do webservice municipal pendente de confirmação. Rode com FACAAMIGOS_FISCAL_MODE=SIMULADO " +
-        "para validar a fila e o envio por WhatsApp.",
-      updated_at_ms: nowMs,
-    })
-    .eq("id", doc.id);
-}
-
 interface UnitFiscalRow {
   cnpj: string | null;
   inscricao_municipal: string | null;
@@ -112,6 +100,7 @@ interface UnitFiscalRow {
   end_complemento: string | null;
   end_bairro: string | null;
   end_municipio_ibge: string | null;
+  timezone: string | null;
 }
 
 async function bloquear(supabase: SupabaseClient, docId: string, motivo: string): Promise<void> {
@@ -125,14 +114,16 @@ async function bloquear(supabase: SupabaseClient, docId: string, motivo: string)
  * responsável vinculado) bloqueia o documento com um motivo específico em
  * vez de deixar a exceção genérica confundir quem for investigar depois.
  */
-export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedFiscalDoc, onLog?: (message: string) => void, originDeviceId: string | null = null): Promise<void> {
+export async function processarNfseReal(deps: ClaimDeps, item: ClaimedFiscalDoc): Promise<void> {
+  const { supabase, onLog, deviceId } = deps;
+  const originDeviceId = deviceId ?? null;
   const { doc, order, unit } = item;
 
   const { data: unitFiscal, error: unitError } = await supabase
     .from("fa_kiosk_units")
     .select(
       "cnpj, inscricao_municipal, nfse_item_lista_servico, nfse_codigo_tributacao_municipio, " +
-        "end_cep, end_logradouro, end_numero, end_complemento, end_bairro, end_municipio_ibge",
+        "end_cep, end_logradouro, end_numero, end_complemento, end_bairro, end_municipio_ibge, timezone",
     )
     .eq("id", unit.id)
     .maybeSingle<UnitFiscalRow>();
@@ -172,37 +163,20 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
     return;
   }
 
-  const serviceRoleKey = process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const { data: certData, error: certError } = await supabase.functions.invoke<{ pfxBase64: string; password: string }>("nfse-certificate-fetch", {
-    body: { unitId: unit.id },
-    headers: serviceRoleKey ? { Authorization: `Bearer ${serviceRoleKey}` } : undefined,
-  });
-  if (certError || !certData) {
-    let detail = certError?.message ?? "não configurado em Configurações → Fiscal";
-    if (certError && "context" in certError && (certError as any).context instanceof Response) {
-      try {
-        const bodyText = await (certError as any).context.clone().text();
-        try {
-          const parsed = JSON.parse(bodyText);
-          if (parsed?.error) detail = parsed.error;
-          else if (parsed?.message) detail = parsed.message;
-          else if (bodyText) detail = `HTTP ${(certError as any).context.status}: ${bodyText}`;
-        } catch {
-          if (bodyText) detail = `HTTP ${(certError as any).context.status}: ${bodyText}`;
-        }
-      } catch {
-        // mantém a mensagem de erro padrão se a leitura do corpo falhar
-      }
-    }
-    await bloquear(supabase, doc.id, `Certificado A1 não disponível: ${detail}.`);
+  const cred = await buscarCredenciaisFiscais(
+    supabase,
+    unit.id,
+    deps.userDataPath && deps.crypto ? { userDataPath: deps.userDataPath, crypto: deps.crypto } : undefined,
+  );
+  if (!cred.ok) {
+    await bloquear(supabase, doc.id, cred.motivo);
     return;
   }
 
   let certPem: string;
   let privateKeyPem: string;
   try {
-    const pfxBuffer = Buffer.from(certData.pfxBase64, "base64");
-    ({ certPem, privateKeyPem } = extrairChaveECertificadoPem(pfxBuffer, certData.password));
+    ({ certPem, privateKeyPem } = extrairChaveECertificadoPem(cred.credenciais.pfxBuffer, cred.credenciais.password));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await bloquear(supabase, doc.id, `Não foi possível abrir o certificado A1: ${message}`);
@@ -211,6 +185,7 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
 
   const numero = await reservarNumeroRps(supabase, doc, unit.id);
   const agora = new Date();
+  const timeZone = unitFiscal.timezone ?? undefined;
 
   const dpsInput: DpsInput = {
     ambiente: doc.environment,
@@ -226,7 +201,7 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
     tomador: { cpf: guardian.cpf, nome: guardian.full_name ?? "Responsável" },
     codigoTribNacional: unitFiscal.nfse_item_lista_servico,
     codigoTribMunicipal: unitFiscal.nfse_codigo_tributacao_municipio,
-    descricaoServico: `Sessão de recreação e brincar em playground infantil${session.child_name_snapshot ? ` — ${session.child_name_snapshot}` : ""} (pedido ${order.orderCode}).`,
+    descricaoServico: `Sessão de recreação e brincar em playground infantil${session.child_name_snapshot ? ` - ${session.child_name_snapshot}` : ""} (pedido ${order.orderCode}).`,
     enderecoEvento: {
       cep: unitFiscal.end_cep,
       logradouro: unitFiscal.end_logradouro,
@@ -235,6 +210,7 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
       bairro: unitFiscal.end_bairro,
     },
     valorServico: doc.totalCents / 100,
+    timeZone,
   };
 
   const { xml, idDps } = montarXmlDps(dpsInput);
@@ -256,24 +232,64 @@ export async function processarNfseReal(supabase: SupabaseClient, item: ClaimedF
         updated_at_ms: nowMs,
       })
       .eq("id", doc.id);
+    try {
+      await supabase.from("fa_kiosk_fiscal_doc_events").insert({
+        fiscal_doc_id: doc.id,
+        kind: "NFSE_TRANSMISSAO",
+        http_status: resultado.httpStatus,
+        detail_json: { autorizado: false, mensagemErro: resultado.mensagemErro },
+      });
+    } catch (errEvent) {
+      onLog?.(`[fiscal] Erro ao gravar evento NFSE_TRANSMISSAO (rejeição) para ${doc.id}: ${errEvent}`);
+    }
     return;
   }
 
   const nNFSeMatch = resultado.nfseXml?.match(/<nNFSe>(\d+)<\/nNFSe>/);
   const nfseNum = nNFSeMatch?.[1] ?? resultado.chaveAcesso ?? String(numero);
-  await supabase
-    .from("fa_kiosk_fiscal_docs")
-    .update({
-      status: "AUTORIZADO",
-      rps_numero: numero,
-      numero,
-      nfse_numero: nfseNum,
-      access_key: resultado.chaveAcesso,
-      protocol_number: resultado.chaveAcesso,
-      authorized_at_ms: nowMs,
-      updated_at_ms: nowMs,
-    })
-    .eq("id", doc.id);
+
+  const updatePayload: Record<string, unknown> = {
+    status: "AUTORIZADO",
+    rps_numero: numero,
+    numero,
+    nfse_numero: nfseNum,
+    access_key: resultado.chaveAcesso,
+    protocol_number: resultado.chaveAcesso,
+    authorized_at_ms: nowMs,
+    updated_at_ms: nowMs,
+  };
+
+  if (resultado.nfseXml) {
+    try {
+      const { ano, mes } = anoMesLocal(agora, timeZone);
+      const path = `${unit.id}/nfse/${ano}/${mes}/${nfseNum}.xml`;
+      const xmlBuffer = Buffer.from(resultado.nfseXml, "utf-8");
+      const { error: uploadError } = await supabase.storage
+        .from("fiscal-xml")
+        .upload(path, xmlBuffer, { contentType: "application/xml", upsert: true });
+      if (uploadError) {
+        onLog?.(`[fiscal] Erro ao subir XML da NFS-e ${doc.id} para o Storage: ${uploadError.message}`);
+      } else {
+        updatePayload.xml_storage_path = path;
+        updatePayload.xml_sha256 = createHash("sha256").update(xmlBuffer).digest("hex");
+      }
+    } catch (errUpload) {
+      onLog?.(`[fiscal] Erro ao processar/subir XML da NFS-e ${doc.id}: ${errUpload}`);
+    }
+  }
+
+  await supabase.from("fa_kiosk_fiscal_docs").update(updatePayload).eq("id", doc.id);
+
+  try {
+    await supabase.from("fa_kiosk_fiscal_doc_events").insert({
+      fiscal_doc_id: doc.id,
+      kind: "NFSE_TRANSMISSAO",
+      http_status: resultado.httpStatus,
+      detail_json: { autorizado: true, chaveAcesso: resultado.chaveAcesso, alertas: resultado.alertas },
+    });
+  } catch (errEvent) {
+    onLog?.(`[fiscal] Erro ao gravar evento NFSE_TRANSMISSAO (autorização) para ${doc.id}: ${errEvent}`);
+  }
 
   try {
     await supabase.from("fa_kiosk_print_jobs").insert({

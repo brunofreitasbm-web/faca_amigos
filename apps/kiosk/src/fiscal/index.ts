@@ -20,7 +20,7 @@ import { startFiscalHeartbeatLoop } from "./heartbeat.js";
  */
 
 const POLL_INTERVAL_MS = 30_000;
-const WORKER_VERSION = "0.1.0-fase3-simulado";
+const WORKER_VERSION = "0.2.0-real";
 
 function terminalIdPath(userDataPath: string): string {
   return join(userDataPath, "fiscal", "terminal-id.txt");
@@ -114,5 +114,5 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
     onLog: log,
   });
 
-  log(`[fiscal] worker iniciado — terminal "${terminalId}", modo ${simulado ? "SIMULADO" : "REAL (Fase 5 pendente)"}.`);
+  log(`[fiscal] worker iniciado — terminal "${terminalId}", modo ${simulado ? "SIMULADO" : "REAL"}.`);
 }

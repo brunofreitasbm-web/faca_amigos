@@ -12,6 +12,15 @@ import { hasCscConfigured, readCertificadoMetaFromVault, type CofreCrypto } from
  * `fa_kiosk_fiscal_terminal_status` tem `unit_id` como chave primária. Se
  * nenhuma unidade tiver o fiscal ligado ainda, não grava nada — coerente
  * com `fiscal_enabled = false` por padrão não emitir nada.
+ *
+ * `csc_configured` (abaixo) reflete só o cofre local DESTE terminal
+ * (`hasCscConfigured`) — desde que o CSC também passou a poder vir da nuvem
+ * (fa_kiosk_fiscal_unit_secrets + nfse-certificate-fetch, ver
+ * certificado.ts), este campo NÃO é mais a fonte de verdade sobre "a
+ * unidade tem CSC configurado" para fins de Gerencial: essa pergunta é
+ * respondida direto pela view `fa_kiosk_fiscal_csc_status`, consultada pelo
+ * kiosk-ui. Checar a nuvem aqui a cada 60s seria caro e está fora do
+ * escopo desta passada — mantém-se só o sinal local mesmo.
  */
 
 export interface HeartbeatDeps {
