@@ -16,17 +16,10 @@
 --
 -- 3. Brinquedos — NCM 9503.00.99 (outros brinquedos) x 9503.00.22 (outros
 --    bonecos, mesmo vestidos). Critério do contador: presença de figura
---    humana (boneco). Confirmado por nome:
---      9503.00.99: Balão Bichinhos, Balão brilhante, Balão Patrulha
---        canina, Massinha E.V.A., Mini Pop-it (exemplos textuais do
---        e-mail) + Helicóptero (não é boneco nem carrinho-com-boneco,
---        cai no "outros que não se encaixem").
---      9503.00.22: só "Carrinho Viatura polícia" fica aqui — o nome bate
---        com o exemplo do contador ("viatura de polícia com boneco").
---    "Miniatura carrinho" e "Miniatura Carrinho Pick Up" ficam em
---    9503.00.99 por ora: o nome não indica boneco junto, mas isso é uma
---    suposição sobre o produto físico, não confirmação do contador —
---    revisar se algum desses vier efetivamente com um boneco.
+--    humana (boneco). Perguntado direto ao dono da loja sobre cada item
+--    ambíguo: nenhum dos carrinhos/viaturas vendidos vem com bonequinho
+--    (confirmado 2026-09-02) — logo NINGUÉM cai em 9503.00.22 hoje; todos
+--    os brinquedos ficam em 9503.00.99, só corrigindo o CST abaixo.
 --
 -- 4. Pilhas comuns (zinco-carbono): NCM 8506.80.10.
 -- =====================================================================
@@ -47,14 +40,8 @@ update fa_kiosk_products
  where btrim(name) ilike 'Salgadinho'
     or btrim(name) ilike any (array['Meia antiderrapante', 'Meia Antiderrapante']);
 
--- 3. Brinquedos com boneco (viatura de polícia) — NCM 9503.00.22.
-update fa_kiosk_products
-   set ncm = '95030022',
-       pis_cst = '01',
-       cofins_cst = '01'
- where btrim(name) ilike 'Carrinho Viatura polícia';
-
--- Demais brinquedos (sem boneco) — mantém 9503.00.99, só corrige o CST.
+-- 3. Brinquedos — nenhum vem com boneco, todos ficam em 9503.00.99
+-- (já gravado desde a migration 20260819000001), só corrige o CST.
 update fa_kiosk_products
    set pis_cst = '01',
        cofins_cst = '01'
@@ -62,6 +49,7 @@ update fa_kiosk_products
    'Balão Bichinhos',
    'Balão brilhante',
    'Balão Patrulha canina',
+   'Carrinho Viatura polícia',
    'Helicóptero',
    'Massinha E.V.A',
    'Mini Popt',
