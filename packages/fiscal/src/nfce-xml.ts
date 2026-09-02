@@ -180,19 +180,27 @@ export function montarXmlNfce(input: DocumentoFiscalInput): MontarXmlNfceResult 
     TPAG_POR_METODO.PIX,
   ]);
 
-  // tpIntegra=02 ("pagamento não integrado com o sistema de automação da
+  // tpIntegra="2" ("pagamento NÃO integrado com o sistema de automação da
   // empresa"): a maquininha do balcão é autônoma, o PDV não conversa com
-  // ela por TEF, e o PIX é conferido no app do banco. Com 02, CNPJ da
+  // ela por TEF, e o PIX é conferido no app do banco. Com 2, CNPJ da
   // credenciadora, bandeira e código de autorização são opcionais — que é
   // o certo, porque o operador digita o valor na maquininha e o sistema
   // nunca vê o retorno da transação.
   //
-  // Se um dia entrar TEF integrado, isto vira 01 E passa a exigir cAut.
+  // DÍGITO ÚNICO, sem zero à esquerda — ao contrário de tPag (sempre dois
+  // dígitos: "01", "03"...), o domínio D24 de tpIntegra é só "1" ou "2".
+  // "02" não existe na enumeração do XSD: rejeitado com cStat 225,
+  // apontando o próprio elemento
+  // (enviNFe/NFe[1]/infNFe/pag/detPag/card/tpIntegra), medido em
+  // homologação em 2026-09-02 — depois que <card> em si já tinha sido
+  // aceito na posição certa.
+  //
+  // Se um dia entrar TEF integrado, isto vira "1" E passa a exigir cAut.
   const detPag = input.pagamentos.map((p) => {
     const tPag = TPAG_POR_METODO[p.metodo];
     const base: Record<string, unknown> = { indPag: "0", tPag, vPag: money(p.valor) };
     if (TPAG_EXIGE_CARD.has(tPag)) {
-      base.card = { tpIntegra: "02" };
+      base.card = { tpIntegra: "2" };
     }
     return base;
   });

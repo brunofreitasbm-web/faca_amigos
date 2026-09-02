@@ -349,7 +349,7 @@ describe("grupo <card> nas formas de pagamento", () => {
     for (const metodo of ["CREDITO", "DEBITO", "PIX"] as const) {
       const xml = comPagamento(metodo);
       expect(xml, `${metodo} sem <card> é cStat 391`).toContain("<card>");
-      expect(xml).toContain("<tpIntegra>02</tpIntegra>");
+      expect(xml).toContain("<tpIntegra>2</tpIntegra>");
     }
   });
 
