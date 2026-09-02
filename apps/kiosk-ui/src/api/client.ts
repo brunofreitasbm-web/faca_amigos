@@ -765,8 +765,53 @@ export interface Shift {
   id: string;
   unit_id: string;
   status: "ABERTO" | "FECHADO";
+  /** Fundo_Caixa_Abertura — contado pelo operador ao abrir. */
   opening_cash_cents: number;
   opened_at_ms: number;
+  /** Fundo_Caixa_Proximo_Dia declarado no último fechamento (null se não havia). */
+  expected_opening_cash_cents: number | null;
+  /** opening_cash_cents − expected_opening_cash_cents (null se não havia fechamento anterior). */
+  opening_divergence_cents: number | null;
+}
+
+/**
+ * Campos de conciliação de caixa gravados em fa_kiosk_shifts (ver migration
+ * 20260902000001). Todos nulos em turnos abertos/fechados antes da regra.
+ */
+export interface ShiftCashReconciliation {
+  /** Fundo_Caixa_Proximo_Dia do fechamento anterior. */
+  expected_opening_cash_cents: number | null;
+  /** Fundo_Caixa_Abertura − previsto. */
+  opening_divergence_cents: number | null;
+  /** Dinheiro_Total_Gaveta contado no fechamento. */
+  counted_cash_cents: number | null;
+  /** Dinheiro_Total_Gaveta calculado pelo servidor. */
+  drawer_expected_cents: number | null;
+  /** contado − calculado (negativo = quebra, positivo = sobra). */
+  cash_break_cents: number | null;
+  /** Fundo_Caixa_Proximo_Dia informado no fechamento. */
+  next_day_float_cents: number | null;
+  /** Valor que fica no envelope = contado − fundo do próximo dia. */
+  envelope_cents: number | null;
+}
+
+export interface OpenShiftResult {
+  id: string;
+  openingCashCents: number;
+  expectedOpeningCashCents: number | null;
+  openingDivergenceCents: number | null;
+}
+
+export interface CloseShiftResult {
+  expected: Record<string, number>;
+  declared: Record<string, number>;
+  divergence: Record<string, number>;
+  justifications: Record<string, string>;
+  countedCashCents: number | null;
+  drawerExpectedCents: number | null;
+  cashBreakCents: number | null;
+  nextDayFloatCents: number | null;
+  envelopeCents: number | null;
 }
 
 export interface CashMovement {
@@ -781,7 +826,7 @@ export interface CashMovement {
   at_ms: number;
 }
 
-export interface UnitShiftRow {
+export interface UnitShiftRow extends ShiftCashReconciliation {
   id: string;
   unit_id: string;
   status: "ABERTO" | "FECHADO";
@@ -1610,7 +1655,7 @@ export const Api = {
     unwrap<Shift | null>(
       supabase()
         .from("fa_kiosk_shifts")
-        .select("id, unit_id, status, opening_cash_cents, opened_at_ms")
+        .select("id, unit_id, status, opening_cash_cents, opened_at_ms, expected_opening_cash_cents, opening_divergence_cents")
         .eq("unit_id", unitId)
         .eq("status", "ABERTO")
         .maybeSingle(),
@@ -1914,17 +1959,38 @@ export const Api = {
         .limit(limit),
     ),
 
+  // Abertura: o servidor compara o fundo contado com o Fundo_Caixa_Proximo_Dia
+  // do último fechamento da unidade e devolve a divergência (o Owner é
+  // avisado por push/e-mail pelo trigger do turno — ver migration
+  // 20260902000001).
   openShift: (body: { unitId: string; employeeId: string; openingCashCents: number }) =>
-    callResilient<{ id: string }>("fa_open_shift", {
+    callResilient<OpenShiftResult>("fa_open_shift", {
       p_unit_id: body.unitId,
       p_employee_id: body.employeeId,
       p_opening_cash_cents: body.openingCashCents,
     }),
-  closeShift: (shiftId: string, body: { employeeId: string; declared: Record<string, number>; justifications?: Record<string, string> }) =>
-    callResilient<{ expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number>; justifications: Record<string, string> }>(
-      "fa_close_shift",
-      { p_shift_id: shiftId, p_employee_id: body.employeeId, p_declared: body.declared, p_justifications: body.justifications ?? {} },
-    ),
+  // Fechamento: além do declarado por forma de pagamento, manda a contagem
+  // física da gaveta (Dinheiro_Total_Gaveta) e o Fundo_Caixa_Proximo_Dia. O
+  // valor do envelope é calculado no servidor (contado − fundo) e precisa já
+  // estar registrado como envelope (SANGRIA com número + foto) com esse valor.
+  closeShift: (
+    shiftId: string,
+    body: {
+      employeeId: string;
+      declared: Record<string, number>;
+      justifications?: Record<string, string>;
+      countedCashCents?: number;
+      nextDayFloatCents?: number;
+    },
+  ) =>
+    callResilient<CloseShiftResult>("fa_close_shift", {
+      p_shift_id: shiftId,
+      p_employee_id: body.employeeId,
+      p_declared: body.declared,
+      p_justifications: body.justifications ?? {},
+      p_counted_cash_cents: body.countedCashCents ?? null,
+      p_next_day_float_cents: body.nextDayFloatCents ?? null,
+    }),
   // Número do envelope não é mais digitado pelo operador: sequência global
   // (independente da unidade) gerada pelo servidor, 2 dígitos, reiniciando
   // de "00" a cada 100 (ver migration fa_envelope_number_auto_sequencial).
@@ -1982,7 +2048,9 @@ export const Api = {
   unitShifts: (unitId: string | null) => {
     let query = supabase()
       .from("fa_kiosk_shifts")
-      .select("id, unit_id, status, opening_cash_cents, opened_at_ms, closed_at_ms, opened_by_employee_id, closed_by_employee_id, close_justifications_json")
+      // String literal única de propósito: concatenação quebra a inferência de
+      // tipos do select do supabase-js (vira GenericStringError[]).
+      .select("id, unit_id, status, opening_cash_cents, opened_at_ms, closed_at_ms, opened_by_employee_id, closed_by_employee_id, close_justifications_json, expected_opening_cash_cents, opening_divergence_cents, counted_cash_cents, drawer_expected_cents, cash_break_cents, next_day_float_cents, envelope_cents")
       .order("opened_at_ms", { ascending: false })
       .limit(100);
     if (unitId) query = query.eq("unit_id", unitId);

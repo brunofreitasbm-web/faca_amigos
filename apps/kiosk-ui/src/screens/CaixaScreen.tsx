@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, Input, HelpText, Modal, Tag } from "@facaamigos/ui";
 import { formatCpf, isValidCpf } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
-import type { CashMovement, RevenueByMethod, Shift, ShiftSale, FiscalDoc } from "../api/client.js";
+import type { CashMovement, CloseShiftResult, RevenueByMethod, Shift, ShiftSale, FiscalDoc } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useConfirm } from "../state/ConfirmContext.js";
 import { IfCan } from "../auth/RequireCapability.js";
@@ -14,7 +14,7 @@ import { PhotoCapture } from "../components/PhotoCapture.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
-type CloseResult = { expected: Record<string, number>; declared: Record<string, number>; divergence: Record<string, number>; justifications: Record<string, string> };
+type CloseResult = CloseShiftResult;
 
 export function CaixaScreen() {
   const { unit, employee } = useAppState();
@@ -141,8 +141,20 @@ export function CaixaScreen() {
   const [declared, setDeclared] = useState<Record<string, string>>({ DINHEIRO: "0", PIX: "0", CREDITO: "0", DEBITO: "0" });
   const [closeJustifications, setCloseJustifications] = useState<Record<string, string>>({});
   const [closeResult, setCloseResult] = useState<CloseResult | null>(null);
+  // Conferência física da gaveta no fechamento (regra de 2026-09-02, ver
+  // migration 20260902000001): Dinheiro_Total_Gaveta contado e
+  // Fundo_Caixa_Proximo_Dia. O valor do envelope é derivado (contado − fundo)
+  // e nunca digitado. Strings em reais, como `declared`.
+  const [countedCash, setCountedCash] = useState("");
+  const [nextDayFloat, setNextDayFloat] = useState("");
+  // Depois que o envelope derivado desses dois campos foi registrado, eles
+  // travam: mudar o contado/fundo depois deixaria o envelope registrado com
+  // um valor diferente do calculado (e o servidor recusaria o fechamento).
+  const [closingEnvelopeLocked, setClosingEnvelopeLocked] = useState(false);
   const [shiftOpenSuccessModal, setShiftOpenSuccessModal] = useState<{
     openingCashCents: number;
+    expectedOpeningCashCents: number | null;
+    openingDivergenceCents: number | null;
     openedAtMs: number;
     employeeName: string;
     unitName: string;
@@ -168,11 +180,19 @@ export function CaixaScreen() {
   const [envelopeFundoCaixa, setEnvelopeFundoCaixa] = useState("0");
   const [envelopePhoto, setEnvelopePhoto] = useState<File | null>(null);
   const [envelopeBusy, setEnvelopeBusy] = useState(false);
+  // true quando o modal foi aberto pela tela de fechamento com valor e fundo
+  // já calculados — nesse caso os dois campos ficam somente leitura.
+  const [envelopeFromClosing, setEnvelopeFromClosing] = useState(false);
 
   // Número do envelope é gerado pelo servidor (sequência global, não por
   // unidade) assim que o modal abre — o operador não digita mais.
-  async function openEnvelopeModal() {
+  // `preset` vem da tela de fechamento: valor do envelope (contado − fundo do
+  // próximo dia) e o fundo que fica na gaveta, ambos calculados lá.
+  async function openEnvelopeModal(preset?: { envelopeCents: number; fundoCents: number }) {
     setEnvelopeModalOpen(true);
+    setEnvelopeFromClosing(!!preset);
+    setEnvelopeVal(preset ? (preset.envelopeCents / 100).toFixed(2) : "0");
+    setEnvelopeFundoCaixa(preset ? (preset.fundoCents / 100).toFixed(2) : "0");
     setEnvelopeNum("");
     setEnvelopeNumLoading(true);
     try {
@@ -216,7 +236,9 @@ export function CaixaScreen() {
       });
 
       alert(`Envelope #${envelopeNum} registrado com sucesso!`);
+      if (envelopeFromClosing) setClosingEnvelopeLocked(true);
       setEnvelopeModalOpen(false);
+      setEnvelopeFromClosing(false);
       setEnvelopeNum("");
       setEnvelopeVal("0");
       setEnvelopeFundoCaixa("0");
@@ -230,7 +252,9 @@ export function CaixaScreen() {
         // já que cada chamada usa uma idempotencyKey nova).
         alert(`Sem conexão: envelope #${envelopeNum} foi salvo e será enviado automaticamente quando a rede voltar. Não registre este envelope novamente.`);
         setPendingMovementKey(err.idempotencyKey);
+        if (envelopeFromClosing) setClosingEnvelopeLocked(true);
         setEnvelopeModalOpen(false);
+        setEnvelopeFromClosing(false);
         setEnvelopeNum("");
         setEnvelopeVal("0");
         setEnvelopeFundoCaixa("0");
@@ -317,10 +341,16 @@ export function CaixaScreen() {
     setError(null);
     try {
       const openingCashCents = Math.round(Number(openingCash) * 100);
-      await Api.openShift({ unitId: unit.id, employeeId: employee.id, openingCashCents });
+      if (!Number.isFinite(openingCashCents) || openingCashCents < 0) {
+        setError("Informe um valor válido para o fundo de caixa contado.");
+        return;
+      }
+      const opened = await Api.openShift({ unitId: unit.id, employeeId: employee.id, openingCashCents });
       await refresh();
       setShiftOpenSuccessModal({
         openingCashCents,
+        expectedOpeningCashCents: opened?.expectedOpeningCashCents ?? null,
+        openingDivergenceCents: opened?.openingDivergenceCents ?? null,
         openedAtMs: Date.now(),
         employeeName: employee.full_name,
         unitName: unit.name,
@@ -376,7 +406,16 @@ export function CaixaScreen() {
         const text = (closeJustifications[method] ?? "").trim();
         if (divergenceCents !== 0 && text) justificationsToSend[method] = text;
       }
-      const result = await Api.closeShift(shift.id, { employeeId: employee.id, declared: declaredCents, justifications: justificationsToSend });
+      const cm = closingMath();
+      const gavetaText = (closeJustifications.GAVETA ?? "").trim();
+      if (cm.cashBreakCents !== 0 && gavetaText) justificationsToSend.GAVETA = gavetaText;
+      const result = await Api.closeShift(shift.id, {
+        employeeId: employee.id,
+        declared: declaredCents,
+        justifications: justificationsToSend,
+        countedCashCents: cm.countedCents,
+        nextDayFloatCents: cm.nextDayFloatCents,
+      });
       setCloseResult(result);
     } catch (err) {
       if (err instanceof OfflineQueuedError) {
@@ -391,6 +430,30 @@ export function CaixaScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Conta da gaveta na tela de fechamento. Espelha fa_close_shift:
+   *   esperado agora = fundo inicial + vendas em dinheiro + suprimentos/ajustes
+   *                    − sangrias (avulsas e envelopes já registrados)
+   *   envelope       = contado − fundo do próximo dia (calculado, não digitado)
+   *   quebra/sobra   = contado − (esperado agora + envelope já registrado)
+   * O envelope registrado entra de volta no esperado porque a contagem foi
+   * feita ANTES de separá-lo.
+   */
+  function closingMath() {
+    const dm = drawerMath(revenue, movements);
+    const countedCents = Math.round(Number(countedCash) * 100);
+    const nextDayFloatCents = Math.round(Number(nextDayFloat) * 100);
+    const countedValid = countedCash.trim() !== "" && Number.isFinite(countedCents) && countedCents >= 0;
+    const floatValid =
+      nextDayFloat.trim() !== "" && Number.isFinite(nextDayFloatCents) && nextDayFloatCents >= 0 && (!countedValid || nextDayFloatCents <= countedCents);
+    const envelopeCents = countedValid && floatValid ? countedCents - nextDayFloatCents : 0;
+    const envelopeRegistered =
+      envelopeCents === 0 || movements.some((m) => m.kind === "SANGRIA" && !!m.envelope_number && m.amount_cents === envelopeCents);
+    const drawerExpectedCents = dm.drawerNowCents + (envelopeCents > 0 && envelopeRegistered ? envelopeCents : 0);
+    const cashBreakCents = countedValid ? countedCents - drawerExpectedCents : 0;
+    return { ...dm, countedCents, nextDayFloatCents, countedValid, floatValid, envelopeCents, envelopeRegistered, drawerExpectedCents, cashBreakCents };
   }
 
   async function handleConfirmClose() {
@@ -433,7 +496,9 @@ export function CaixaScreen() {
         >
           <h2 style={{ marginTop: 0, fontSize: "20px" }}>✉️ Registrar Envelope (Sangria)</h2>
           <HelpText style={{ marginBottom: "16px" }}>
-            Registre a retirada de valores em espécie com o número do envelope correspondente.
+            {envelopeFromClosing
+              ? "Valor do envelope e fundo de caixa vêm da conferência do fechamento (contado − fundo do próximo dia). Confira o dinheiro separado, fotografe o envelope e confirme."
+              : "Registre a retirada de valores em espécie com o número do envelope correspondente."}
           </HelpText>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -448,13 +513,17 @@ export function CaixaScreen() {
               type="number"
               value={envelopeVal}
               onChange={(e) => setEnvelopeVal(e.target.value)}
+              disabled={envelopeFromClosing}
+              readOnly={envelopeFromClosing}
             />
             <Input
-              label="Fundo de Caixa (R$)"
+              label={envelopeFromClosing ? "Fundo de Caixa para o próximo dia (R$)" : "Fundo de Caixa (R$)"}
               placeholder="Valor que fica na gaveta após a sangria"
               type="number"
               value={envelopeFundoCaixa}
               onChange={(e) => setEnvelopeFundoCaixa(e.target.value)}
+              disabled={envelopeFromClosing}
+              readOnly={envelopeFromClosing}
             />
             <PhotoCapture
               label="Foto do Envelope (obrigatória)"
@@ -470,7 +539,10 @@ export function CaixaScreen() {
               <Button
                 variant="secondary"
                 disabled={envelopeBusy}
-                onClick={() => setEnvelopeModalOpen(false)}
+                onClick={() => {
+                  setEnvelopeModalOpen(false);
+                  setEnvelopeFromClosing(false);
+                }}
               >
                 Cancelar
               </Button>
@@ -575,10 +647,28 @@ export function CaixaScreen() {
             </table>
           </div>
 
+          {closeResult.countedCashCents !== null && (
+            <div style={{ background: "var(--surface-sunken)", borderRadius: "12px", padding: "12px 14px", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "6px" }}>
+              <strong style={{ fontSize: "14px" }}>💵 Conferência da gaveta</strong>
+              <SummaryRow label="Dinheiro contado na gaveta" value={money(closeResult.countedCashCents)} />
+              <SummaryRow label="Esperado pelo sistema" value={money(closeResult.drawerExpectedCents ?? 0)} />
+              <SummaryRow
+                label="Quebra / sobra"
+                value={fmtBreak(closeResult.cashBreakCents ?? 0, "quebra")}
+                tone={(closeResult.cashBreakCents ?? 0) === 0 ? "ok" : "warn"}
+              />
+              <SummaryRow label="Fundo de caixa para o próximo dia" value={money(closeResult.nextDayFloatCents ?? 0)} strong />
+              <SummaryRow label="Valor no envelope" value={money(closeResult.envelopeCents ?? 0)} strong />
+              <HelpText style={{ marginTop: "4px" }}>
+                Na próxima abertura o operador deve contar exatamente o fundo acima — qualquer diferença é avisada ao proprietário.
+              </HelpText>
+            </div>
+          )}
+
           <Button
             variant="primary"
             size="lg"
-            onClick={() => { setCloseResult(null); setClosing(false); setCloseJustifications({}); refresh(); }}
+            onClick={() => { setCloseResult(null); setClosing(false); setCloseJustifications({}); setCountedCash(""); setNextDayFloat(""); setClosingEnvelopeLocked(false); refresh(); }}
             style={{ width: "100%", borderRadius: "10px" }}
           >
             ✓ Entendido, Concluir Fechamento
@@ -593,10 +683,11 @@ export function CaixaScreen() {
       <div style={{ maxWidth: "420px", margin: "60px auto", display: "flex", flexDirection: "column", gap: "16px" }}>
         <h1 style={{ fontFamily: "var(--font-display)" }}>Abrir turno</h1>
         <HelpText>
-          É preciso abrir o turno de caixa antes de vender no PDV ou fechar atendimentos. Informe quanto dinheiro
-          (em espécie) já está na gaveta para começar — normalmente o troco combinado com a gerência.
+          É preciso abrir o turno de caixa antes de vender no PDV ou fechar atendimentos. <strong>Conte</strong> o dinheiro
+          em espécie que está na gaveta agora e informe o valor. O sistema confere com o fundo de caixa declarado no último
+          fechamento desta loja — qualquer diferença fica registrada e o proprietário é avisado.
         </HelpText>
-        <Input label="Fundo de Caixa (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
+        <Input label="Fundo de Caixa contado na abertura (R$)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         <Button variant="primary" size="lg" loading={busy} disabled={busy} onClick={openShift}>
           Abrir turno
@@ -606,11 +697,15 @@ export function CaixaScreen() {
   }
 
   if (closing) {
-    const canConfirmClose = METHODS.every((method) => {
+    const cm = closingMath();
+    const methodsOk = METHODS.every((method) => {
       const divergenceCents = Math.round(Number(declared[method]) * 100) - expectedHint(method, revenue);
       const isShortage = divergenceCents < 0;
       return !isShortage || (closeJustifications[method] ?? "").trim().length >= 3;
     });
+    const gavetaJustificationOk = cm.cashBreakCents === 0 || (closeJustifications.GAVETA ?? "").trim().length >= 3;
+    const canConfirmClose = methodsOk && cm.countedValid && cm.floatValid && cm.envelopeRegistered && gavetaJustificationOk;
+    const otherMovementsCents = cm.suprimentosCents + cm.ajustesCents - cm.sangriasAvulsasCents - cm.envelopesCents;
     return (
       <div style={{ maxWidth: "420px", margin: "40px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
         {renderEnvelopeModal()}
@@ -671,6 +766,88 @@ export function CaixaScreen() {
           </tbody>
         </table>
         </div>
+        <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <h2 style={{ margin: 0, fontSize: "18px" }}>💵 Conferência do dinheiro na gaveta</h2>
+          <HelpText>
+            Conte <strong>todo</strong> o dinheiro em espécie da gaveta (fundo + vendas) antes de separar o envelope. Depois
+            informe quanto fica na gaveta para amanhã: o valor do envelope é calculado (contado − fundo) e precisa ser
+            registrado com foto antes de confirmar.
+          </HelpText>
+          <SummaryRow label="Fundo de caixa inicial (abertura)" value={money(cm.openingCents)} />
+          <SummaryRow label="Faturamento em dinheiro" value={money(cm.cashSalesCents)} />
+          {otherMovementsCents !== 0 && (
+            <SummaryRow label="Suprimentos / ajustes − sangrias já registradas" value={money(otherMovementsCents)} />
+          )}
+          <SummaryRow label="Esperado na gaveta agora" value={money(cm.drawerNowCents)} strong />
+          <Input
+            label="Dinheiro total contado na gaveta (R$)"
+            type="number"
+            value={countedCash}
+            onChange={(e) => setCountedCash(e.target.value)}
+            disabled={closingEnvelopeLocked}
+            readOnly={closingEnvelopeLocked}
+            error={countedCash.trim() !== "" && !cm.countedValid ? "Informe um valor válido (maior ou igual a zero)." : undefined}
+          />
+          <Input
+            label="Fundo de caixa para o próximo dia (R$)"
+            type="number"
+            value={nextDayFloat}
+            onChange={(e) => setNextDayFloat(e.target.value)}
+            disabled={closingEnvelopeLocked}
+            readOnly={closingEnvelopeLocked}
+            error={
+              nextDayFloat.trim() !== "" && !cm.floatValid
+                ? "O fundo para o próximo dia não pode ser negativo nem maior que o dinheiro contado."
+                : undefined
+            }
+          />
+          {closingEnvelopeLocked && (
+            <HelpText>🔒 Valores travados: o envelope já foi registrado com base neles.</HelpText>
+          )}
+          <SummaryRow label="Valor para o envelope (contado − fundo)" value={money(cm.envelopeCents)} strong />
+          {cm.countedValid && (
+            <p
+              style={{
+                margin: 0,
+                fontWeight: "bold",
+                color: cm.cashBreakCents === 0 ? "var(--color-teal-text)" : "var(--color-error-text)",
+              }}
+            >
+              {cm.cashBreakCents === 0
+                ? "✓ Contagem bate com o esperado pelo sistema"
+                : `⚠ ${fmtBreak(cm.cashBreakCents, "quebra")} em relação ao esperado — justifique abaixo`}
+            </p>
+          )}
+          {cm.countedValid && cm.cashBreakCents !== 0 && (
+            <Input
+              placeholder="Por que a contagem não bateu? (mín. 3 caracteres)"
+              value={closeJustifications.GAVETA ?? ""}
+              onChange={(e) => setCloseJustifications((prev) => ({ ...prev, GAVETA: e.target.value }))}
+            />
+          )}
+          {cm.envelopeCents > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <p style={{ margin: 0, fontWeight: "bold", color: cm.envelopeRegistered ? "var(--color-teal-text)" : "var(--color-amber)" }}>
+                {cm.envelopeRegistered
+                  ? `✓ Envelope de ${money(cm.envelopeCents)} registrado neste turno`
+                  : pendingMovementKey
+                    ? "⏳ Envelope salvo sem conexão — aguardando a rede para confirmar"
+                    : `⚠ Registre o envelope de ${money(cm.envelopeCents)} (com foto) antes de confirmar o fechamento`}
+              </p>
+              {!cm.envelopeRegistered && !pendingMovementKey && (
+                <IfCan capability="caixa.open_close">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void openEnvelopeModal({ envelopeCents: cm.envelopeCents, fundoCents: cm.nextDayFloatCents })}
+                    disabled={busy || !!pendingCloseKey}
+                  >
+                    ✉️ Registrar Envelope de {money(cm.envelopeCents)}
+                  </Button>
+                </IfCan>
+              )}
+            </div>
+          )}
+        </Card>
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         {pendingCloseKey && (
           <p style={{ color: "var(--color-amber)" }}>
@@ -682,11 +859,6 @@ export function CaixaScreen() {
           <Button variant="ghost" onClick={() => setClosing(false)} disabled={busy || !!pendingCloseKey}>
             Cancelar
           </Button>
-          <IfCan capability="caixa.open_close">
-            <Button variant="secondary" onClick={() => void openEnvelopeModal()} disabled={busy || !!pendingCloseKey}>
-              ✉️ Registrar Envelope
-            </Button>
-          </IfCan>
           <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy || !!pendingCloseKey || !canConfirmClose}>
             {pendingCloseKey ? "Aguardando conexão..." : "Confirmar fechamento"}
           </Button>
@@ -721,6 +893,17 @@ export function CaixaScreen() {
           style={{ fontSize: "13px", color: "var(--color-error-text)", background: "rgba(232,48,48,0.08)", border: "1px solid var(--color-error)", borderRadius: "10px", padding: "8px 12px" }}
         >
           ⚠️ Não foi possível atualizar o caixa agora — os valores abaixo podem estar desatualizados.
+        </div>
+      )}
+
+      {shift.opening_divergence_cents !== null && shift.opening_divergence_cents !== 0 && (
+        <div
+          role="alert"
+          style={{ fontSize: "13px", color: "var(--color-error-text)", background: "rgba(232,48,48,0.08)", border: "1px solid var(--color-error)", borderRadius: "10px", padding: "8px 12px" }}
+        >
+          ⚠️ Abertura com divergência no fundo de caixa: contado {money(shift.opening_cash_cents)} vs previsto pelo último
+          fechamento {money(shift.expected_opening_cash_cents ?? 0)} ({fmtBreak(shift.opening_divergence_cents, "falta")}). O
+          proprietário foi avisado.
         </div>
       )}
 
@@ -1111,7 +1294,14 @@ export function CaixaScreen() {
         variant="primary"
         size="lg"
         title="Encerrar o turno atual — conte o dinheiro da gaveta antes de tocar aqui"
-        onClick={() => setClosing(true)}
+        onClick={() => {
+          // Pré-preenche com o calculado (fundo inicial + vendas em dinheiro ±
+          // movimentações) e com o mesmo fundo de hoje; o operador corrige pela
+          // contagem física. Não sobrescreve se já vinha digitando.
+          if (countedCash.trim() === "") setCountedCash((drawerMath(revenue, movements).drawerNowCents / 100).toFixed(2));
+          if (nextDayFloat.trim() === "") setNextDayFloat((shift.opening_cash_cents / 100).toFixed(2));
+          setClosing(true);
+        }}
       >
         Fechar turno
       </Button>
@@ -1148,8 +1338,28 @@ export function CaixaScreen() {
                 Operador: {shiftOpenSuccessModal.employeeName}
               </div>
               <div style={{ fontSize: "18px", color: "var(--color-teal-text)", fontWeight: "bold", background: "rgba(16, 185, 129, 0.12)", padding: "8px", borderRadius: "8px" }}>
-                Fundo de Caixa Inicial: {money(shiftOpenSuccessModal.openingCashCents)}
+                Fundo de Caixa contado: {money(shiftOpenSuccessModal.openingCashCents)}
               </div>
+              {shiftOpenSuccessModal.expectedOpeningCashCents === null ? (
+                <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  Sem fundo declarado no fechamento anterior — nada para conferir.
+                </div>
+              ) : (
+                <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+                  Fundo previsto pelo último fechamento: <strong>{money(shiftOpenSuccessModal.expectedOpeningCashCents)}</strong>
+                </div>
+              )}
+              {shiftOpenSuccessModal.openingDivergenceCents !== null && shiftOpenSuccessModal.openingDivergenceCents !== 0 ? (
+                <div
+                  role="alert"
+                  style={{ fontSize: "14px", fontWeight: "bold", color: "var(--color-error-text)", background: "rgba(232,48,48,0.08)", padding: "8px", borderRadius: "8px" }}
+                >
+                  ⚠ {fmtBreak(shiftOpenSuccessModal.openingDivergenceCents, "falta")} em relação ao fundo declarado no último
+                  fechamento. O proprietário foi avisado.
+                </div>
+              ) : shiftOpenSuccessModal.expectedOpeningCashCents !== null ? (
+                <div style={{ fontSize: "13px", color: "var(--color-teal-text)", fontWeight: "bold" }}>✓ Fundo conferido sem divergência</div>
+              ) : null}
               <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                 Horário de Abertura: {new Date(shiftOpenSuccessModal.openedAtMs).toLocaleString("pt-BR")}
               </div>
@@ -1188,4 +1398,55 @@ export function CaixaScreen() {
  */
 function expectedHint(method: string, revenue: RevenueByMethod[]): number {
   return revenue.find((r) => r.method === method)?.total_cents ?? 0;
+}
+
+/**
+ * Conta da gaveta (espelho de fa_close_shift / fa_units_cash_status): fundo
+ * inicial (TROCO_INICIAL) + vendas em dinheiro + suprimentos/ajustes −
+ * sangrias, separando os envelopes (SANGRIA com número) das sangrias avulsas.
+ * `drawerNowCents` é o que deveria estar fisicamente na gaveta neste momento.
+ */
+function drawerMath(revenue: RevenueByMethod[], movements: CashMovement[]) {
+  const cashSalesCents = expectedHint("DINHEIRO", revenue);
+  let openingCents = 0;
+  let suprimentosCents = 0;
+  let ajustesCents = 0;
+  let sangriasAvulsasCents = 0;
+  let envelopesCents = 0;
+  for (const m of movements) {
+    switch (m.kind) {
+      case "TROCO_INICIAL":
+        openingCents += m.amount_cents;
+        break;
+      case "SUPRIMENTO":
+        suprimentosCents += m.amount_cents;
+        break;
+      case "AJUSTE":
+        ajustesCents += m.amount_cents;
+        break;
+      case "SANGRIA":
+        if (m.envelope_number) envelopesCents += m.amount_cents;
+        else sangriasAvulsasCents += m.amount_cents;
+        break;
+    }
+  }
+  const drawerNowCents = openingCents + cashSalesCents + suprimentosCents + ajustesCents - sangriasAvulsasCents - envelopesCents;
+  return { openingCents, cashSalesCents, suprimentosCents, ajustesCents, sangriasAvulsasCents, envelopesCents, drawerNowCents };
+}
+
+/** "Sobra de R$ X" / "Quebra de R$ X" (ou "Falta", na abertura) / "sem diferença". */
+function fmtBreak(cents: number, negativeWord: "quebra" | "falta"): string {
+  if (cents === 0) return "sem diferença";
+  if (cents > 0) return `Sobra de ${money(cents)}`;
+  return `${negativeWord === "quebra" ? "Quebra" : "Falta"} de ${money(Math.abs(cents))}`;
+}
+
+function SummaryRow({ label, value, strong, tone }: { label: string; value: string; strong?: boolean; tone?: "ok" | "warn" }) {
+  const color = tone === "ok" ? "var(--color-teal-text)" : tone === "warn" ? "var(--color-error-text)" : undefined;
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", fontSize: "14px", fontWeight: strong ? "bold" : "normal", color }}>
+      <span>{label}</span>
+      <span style={{ fontVariantNumeric: "tabular-nums" }}>{value}</span>
+    </div>
+  );
 }
