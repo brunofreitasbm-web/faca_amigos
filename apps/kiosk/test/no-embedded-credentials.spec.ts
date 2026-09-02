@@ -66,4 +66,34 @@ describe("nenhuma credencial embutida no código-fonte", () => {
     // O `||` com literal era exatamente a forma do fallback removido.
     expect(source).not.toMatch(/FACAAMIGOS_SUPABASE_(SECRET_KEY|SERVICE_ROLE_KEY)\s*\|\|\s*["'`]/);
   });
+
+  /**
+   * O instalador vai para um bucket PÚBLICO do Supabase Storage (ver
+   * `publish` em electron-builder.yml). Um extraResource `.env` passava
+   * despercebido porque no CI o arquivo nem existe — o electron-builder
+   * ignora extraResource ausente em silêncio —, mas num build local ele
+   * existe e a chave secreta do projeto ficaria baixável por qualquer um.
+   */
+  it("o electron-builder não embute o .env no instalador", () => {
+    const yml = readFileSync(join(REPO_ROOT, "apps/kiosk/electron-builder.yml"), "utf-8");
+    const linhasAtivas = yml
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"));
+
+    expect(linhasAtivas, "extraResources não pode listar `.env` — o bucket de release é público.").not.toContainEqual(
+      "- from: .env",
+    );
+  });
+
+  /**
+   * O `.env` que o app semeia sozinho em %APPDATA% tem a precedência mais
+   * alta de todas e nunca é corrigido por reinstalar. Nascer com a chave
+   * publicável na variável da secreta parou a emissão fiscal por semanas:
+   * o valor parecia configurado e a Edge Function respondia 401.
+   */
+  it("o .env semeado pelo app não preenche a chave secreta com a publicável", () => {
+    const source = readFileSync(join(REPO_ROOT, "apps/kiosk/src/main/main.ts"), "utf-8");
+    expect(source).not.toMatch(/FACAAMIGOS_SUPABASE_(SECRET_KEY|SERVICE_ROLE_KEY)=sb_publishable_/);
+  });
 });

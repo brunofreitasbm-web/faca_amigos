@@ -78,6 +78,20 @@ async function storageFetch(path, options) {
 // 1. Build do instalador (workspace + kiosk-ui + ícones + electron-builder)
 run("pnpm dist:kiosk");
 
+// 1b. Mesma guarda que o CI faz (build-kiosk.yml), porque o build LOCAL é
+// o caso perigoso: aqui apps/kiosk/.env existe de verdade, e o destino do
+// upload logo abaixo é um bucket PÚBLICO. Um extraResource `.env` que
+// voltasse ao electron-builder.yml publicaria a chave secreta do projeto
+// para qualquer um baixar. Falhar antes do upload é a única proteção que
+// funciona nos dois ambientes.
+const envEmbutido = join(kioskDir, "release", "win-unpacked", "resources", ".env");
+if (existsSync(envEmbutido)) {
+  throw new Error(
+    `O instalador levaria um .env embutido (${envEmbutido}) e o bucket "${BUCKET}" é público. ` +
+      "Remova o extraResource `.env` de apps/kiosk/electron-builder.yml antes de publicar.",
+  );
+}
+
 // 2. Descobre a versão publicada a partir do latest.yml recém-gerado
 const latestYmlPath = join(releaseDir, "latest.yml");
 if (!existsSync(latestYmlPath)) {

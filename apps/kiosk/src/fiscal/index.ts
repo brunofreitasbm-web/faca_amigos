@@ -47,7 +47,7 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
   // produção), o fallback cairia numa chave que a Edge Function
   // `nfse-certificate-fetch` SEMPRE rejeita com "não autorizado" — um erro
   // que parece problema no certificado mas na verdade é .env deste terminal.
-  const { secretKey, hasServiceRoleKey } = resolveTerminalSupabaseKey();
+  const { secretKey, canFetchFiscalCredentials, kind } = resolveTerminalSupabaseKey();
 
   if (!url || !secretKey) {
     console.warn(
@@ -57,11 +57,23 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
     return;
   }
 
-  if (!hasServiceRoleKey) {
+  // Só a chave nova (`sb_secret_...`) autoriza em `nfse-certificate-fetch`.
+  // Subir o worker com qualquer outra coisa não emite nota nenhuma: ele
+  // reivindica o documento da fila, leva 401 ao buscar o certificado e
+  // grava BLOQUEADO "não autorizado" — e, pior, tira o documento de um
+  // terminal vizinho que estava configurado certo (a fila usa
+  // `for update skip locked`, então quem chega primeiro leva). Ficar de
+  // fora da fila é melhor que participar dela quebrado.
+  if (!canFetchFiscalCredentials) {
+    const motivo =
+      kind === "publishable" || kind === "none"
+        ? "a chave configurada é a PUBLICÁVEL (ou não há chave nenhuma)"
+        : "a service_role LEGADA (eyJ...) não é mais aceita pela Edge Function de certificado";
     console.warn(
-      "[fiscal] FACAAMIGOS_SUPABASE_SECRET_KEY não configurado neste terminal — " +
-        "emissão de NFC-e/NFS-e desligada (a chave pública não tem permissão para buscar o certificado). " +
-        "Configure em .env, ver apps/kiosk/.env.example.",
+      `[fiscal] emissão de NFC-e/NFS-e desligada neste terminal: ${motivo}. ` +
+        "Cole a chave secreta nova (sb_secret_..., em Supabase > Project Settings > API Keys > Secret keys) " +
+        "em FACAAMIGOS_SUPABASE_SECRET_KEY no .env deste terminal (%APPDATA%\\FacaAmigos\\.env) e reinicie. " +
+        "Ver apps/kiosk/.env.example.",
     );
     return;
   }

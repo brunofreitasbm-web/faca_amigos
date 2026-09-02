@@ -10,7 +10,11 @@ import { startPrintBridge } from "./printBridge.js";
 import { listWindowsPrinters } from "./listPrinters.js";
 import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
+import { classifyTerminalKey } from "../config/supabaseTerminalKey.js";
 import { initAutoUpdater, checkForUpdatesAndWait, getUpdateStatus, applyUpdate } from "./autoUpdater.js";
+
+/** Variáveis onde uma chave publicável colada por engano quebra tudo em silêncio. */
+const CREDENCIAIS_TERMINAL = new Set(["FACAAMIGOS_SUPABASE_SECRET_KEY", "FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY"]);
 
 /**
  * O bundle é puro esbuild sem `dotenv` — sem isto, `apps/kiosk/.env`
@@ -38,11 +42,26 @@ function loadDotEnvFromCandidates(): void {
     // app.getPath pode falhar se chamado antes da inicialização completa dos caminhos
   }
 
+  // A linha da chave secreta nasce VAZIA de propósito. Ela já nasceu
+  // preenchida com a chave publicável (sb_publishable_...), e isso custou
+  // semanas de emissão fiscal parada: o valor "parecia configurado", tinha
+  // a precedência mais alta (userData vem antes do .env do instalador, ver
+  // abaixo) e nunca era corrigido por reinstalar — mas a Edge Function
+  // `nfse-certificate-fetch` responde 401 a ela, e o erro chegava ao painel
+  // como "Certificado A1 não disponível: não autorizado", que parece
+  // problema no certificado.
+  //
+  // Vazia, a guarda de `resolveTerminalSupabaseKey` acusa a falta na hora,
+  // com o texto que diz o que fazer.
   const defaultContent = `# Configuração de ambiente local do terminal Kiosk Faça Amigos
 VITE_SUPABASE_URL=https://ivjvpdzsfjdpyabbzzuj.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh
 FACAAMIGOS_SUPABASE_URL=https://ivjvpdzsfjdpyabbzzuj.supabase.co
-FACAAMIGOS_SUPABASE_SECRET_KEY=sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh
+# Cole aqui a chave secreta deste terminal (Supabase > Project Settings >
+# API Keys > Secret keys). Sem ela o terminal não imprime nem emite nota.
+# NÃO use a chave publicável (sb_publishable_...) nem a service_role legada
+# (eyJ...): as duas levam 401 na emissão fiscal.
+FACAAMIGOS_SUPABASE_SECRET_KEY=
 FACAAMIGOS_PUBLIC_APP_URL=https://kiosk-ui.vercel.app
 `;
 
@@ -84,7 +103,23 @@ FACAAMIGOS_PUBLIC_APP_URL=https://kiosk-ui.vercel.app
         if (eq === -1) continue;
         const key = line.slice(0, eq).trim();
         const value = line.slice(eq + 1).trim();
-        if (key && (process.env[key] === undefined || process.env[key] === "")) {
+        if (!key) continue;
+
+        // Auto-cura dos .env que o próprio app semeou errado: uma chave
+        // PUBLICÁVEL numa das variáveis de credencial não serve para nada
+        // (nem grava no banco, nem autoriza na Edge Function) e, vindo do
+        // arquivo de maior precedência, impedia o valor bom de um arquivo
+        // seguinte de ser usado. Ignorar aqui é o que faz o terminal se
+        // consertar sozinho no primeiro boot depois da atualização.
+        if (CREDENCIAIS_TERMINAL.has(key) && classifyTerminalKey(value) === "publishable") {
+          console.warn(
+            `[main] ${key} em ${envPath} contém a chave PUBLICÁVEL, que não autoriza nada — ignorando. ` +
+              "Cole a chave secreta (sb_secret_...) desse terminal nesse arquivo.",
+          );
+          continue;
+        }
+
+        if (process.env[key] === undefined || process.env[key] === "") {
           process.env[key] = value;
         }
       }

@@ -102,9 +102,16 @@ export async function buscarCredenciaisFiscais(
     // segredo configurado na Edge Function (SUPABASE_SERVICE_ROLE_KEY ou
     // FISCAL_WORKER_SECRET_KEY). Deixa isso explícito pra não parecer
     // problema de upload/configuração do certificado.
+    //
+    // A dica ANTIGA aqui mandava usar a service_role legada (eyJ...) e
+    // dizia que ela "funciona sempre". Não funciona: medido contra o
+    // projeto de produção em 2026-09-02, o JWT legado responde 401 nesta
+    // function, porque num projeto migrado para as chaves novas o
+    // SUPABASE_SERVICE_ROLE_KEY que o runtime injeta já é `sb_secret_...`.
+    // Seguir aquela dica garantia o erro em vez de resolvê-lo.
     const dica =
       detail === "não autorizado"
-        ? " (troque FACAAMIGOS_SUPABASE_SECRET_KEY no .env deste terminal pela service_role key legada de Project Settings > API Keys > Legacy API Keys no Supabase — funciona sempre, sem precisar configurar nenhum secret extra no projeto)"
+        ? " (a chave deste terminal não é aceita: FACAAMIGOS_SUPABASE_SECRET_KEY no .env precisa ser a chave secreta NOVA, sb_secret_..., e o mesmo valor precisa estar no secret FISCAL_WORKER_SECRET_KEY do projeto. A service_role legada eyJ... NÃO serve aqui)"
         : "";
     return { ok: false, motivo: `Certificado A1 não disponível: ${detail}${dica}` };
   }
