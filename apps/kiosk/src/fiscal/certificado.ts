@@ -96,7 +96,17 @@ export async function buscarCredenciaisFiscais(
 
   if (error || !data?.pfxBase64 || !data?.password) {
     const detail = await extrairDetalheErro(error ?? null);
-    return { ok: false, motivo: `Certificado A1 não disponível: ${detail}` };
+    // "não autorizado" nunca é sobre o certificado em si (ele já foi
+    // encontrado no banco quando a function chega nesse ponto) — é sempre a
+    // chave FACAAMIGOS_SUPABASE_SECRET_KEY deste terminal não batendo com o
+    // segredo configurado na Edge Function (SUPABASE_SERVICE_ROLE_KEY ou
+    // FISCAL_WORKER_SECRET_KEY). Deixa isso explícito pra não parecer
+    // problema de upload/configuração do certificado.
+    const dica =
+      detail === "não autorizado"
+        ? " (verifique se FACAAMIGOS_SUPABASE_SECRET_KEY no .env deste terminal bate com a chave configurada na Edge Function nfse-certificate-fetch)"
+        : "";
+    return { ok: false, motivo: `Certificado A1 não disponível: ${detail}${dica}` };
   }
 
   return {

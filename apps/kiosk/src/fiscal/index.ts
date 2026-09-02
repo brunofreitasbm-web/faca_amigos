@@ -40,6 +40,13 @@ function loadOrCreateTerminalId(userDataPath: string): string {
 
 export function startFiscalWorker(userDataPath: string, deviceId?: string | null): void {
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
+  // Igual à guarda do print bridge (main/printBridge.ts): sem a chave secreta
+  // real, o fallback abaixo cairia pra uma chave pública que a Edge Function
+  // `nfse-certificate-fetch` SEMPRE rejeita com "não autorizado" — um erro
+  // que parece problema no certificado mas na verdade é .env deste terminal.
+  const hasServiceRoleKey = Boolean(
+    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY || process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY,
+  );
   const secretKey =
     process.env.FACAAMIGOS_SUPABASE_SECRET_KEY ||
     process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
@@ -50,6 +57,15 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
     console.warn(
       "[fiscal] FACAAMIGOS_SUPABASE_URL / FACAAMIGOS_SUPABASE_SECRET_KEY não configurados — " +
         "emissão de NFC-e desligada neste terminal.",
+    );
+    return;
+  }
+
+  if (!hasServiceRoleKey) {
+    console.warn(
+      "[fiscal] FACAAMIGOS_SUPABASE_SECRET_KEY não configurado neste terminal — " +
+        "emissão de NFC-e/NFS-e desligada (a chave pública não tem permissão para buscar o certificado). " +
+        "Configure em .env, ver apps/kiosk/.env.example.",
     );
     return;
   }
