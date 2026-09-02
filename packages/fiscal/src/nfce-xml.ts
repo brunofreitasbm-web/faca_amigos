@@ -165,22 +165,33 @@ export function montarXmlNfce(input: DocumentoFiscalInput): MontarXmlNfceResult 
     det[0]!.prod.xProd = TEXTO_HOMOLOGACAO_PROD;
   }
 
-  // Cartão exige o grupo <card>, senão a SEFAZ rejeita com cStat 391
-  // ("Não informados os dados do cartão de crédito/débito nas Formas de
-  // Pagamento") — medido em homologação em 2026-09-02, com a nota já
-  // assinada e transmitida.
+  // Formas de pagamento que EXIGEM o grupo <card>, senão a SEFAZ rejeita
+  // com cStat 391 ("Não informados os dados do cartão de crédito/débito
+  // nas Formas de Pagamento").
   //
+  // O PIX (17) está na lista apesar de a mensagem falar só em cartão: a
+  // regra do MOC cobre 03, 04 e 17, porque os três passam por uma
+  // credenciadora. Medido em homologação em 2026-09-02 — uma NFC-e paga
+  // 100% em PIX foi rejeitada com 391, e a mensagem manda investigar
+  // cartão, que a nota nem tinha.
+  const TPAG_EXIGE_CARD = new Set([
+    TPAG_POR_METODO.CREDITO,
+    TPAG_POR_METODO.DEBITO,
+    TPAG_POR_METODO.PIX,
+  ]);
+
   // tpIntegra=02 ("pagamento não integrado com o sistema de automação da
   // empresa"): a maquininha do balcão é autônoma, o PDV não conversa com
-  // ela por TEF. Com 02, CNPJ da credenciadora, bandeira e código de
-  // autorização são opcionais — que é o certo, porque o operador digita o
-  // valor na maquininha e o sistema nunca vê o retorno da transação.
+  // ela por TEF, e o PIX é conferido no app do banco. Com 02, CNPJ da
+  // credenciadora, bandeira e código de autorização são opcionais — que é
+  // o certo, porque o operador digita o valor na maquininha e o sistema
+  // nunca vê o retorno da transação.
   //
   // Se um dia entrar TEF integrado, isto vira 01 E passa a exigir cAut.
   const detPag = input.pagamentos.map((p) => {
     const tPag = TPAG_POR_METODO[p.metodo];
     const base: Record<string, unknown> = { indPag: "0", tPag, vPag: money(p.valor) };
-    if (tPag === TPAG_POR_METODO.CREDITO || tPag === TPAG_POR_METODO.DEBITO) {
+    if (TPAG_EXIGE_CARD.has(tPag)) {
       base.card = { tpIntegra: "02" };
     }
     return base;
