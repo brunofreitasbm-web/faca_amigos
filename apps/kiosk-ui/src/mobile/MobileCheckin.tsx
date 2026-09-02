@@ -142,7 +142,7 @@ export function MobileCheckin({
     try {
       const child = pickedPre
         ? { fullName: pickedPre.childName, birthDate: pickedPre.birthDate, inclusiveEligible: pickedPre.inclusiveEligible }
-        : { id: picked!.id, fullName: picked!.full_name, birthDate: picked!.birth_date, inclusiveEligible: false };
+        : { id: picked!.id, fullName: picked!.full_name, birthDate: picked!.birth_date, inclusiveEligible: Boolean(picked?.inclusive_eligible) };
 
       const guardian = pickedPre
         ? { fullName: pickedPre.guardianName, cpf: normalizeCpf(pickedPre.cpf ?? ""), phoneE164: normalizePhoneE164(pickedPre.phoneE164) }

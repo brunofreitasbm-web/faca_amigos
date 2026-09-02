@@ -525,6 +525,7 @@ export interface ChildMatch {
   visits_in_window: number;
   /** Selo VIP: atingiu o número de visitas na janela. Decidido no banco. */
   is_vip: boolean;
+  inclusive_eligible?: boolean;
 }
 
 /**
@@ -748,6 +749,7 @@ export interface ActiveSessionEntry {
     guardian_name_snapshot?: string;
     guardian_phone_snapshot?: string;
     child_birth_date?: string;
+    child_inclusive_eligible?: boolean;
     notes?: string;
     sensory_tags?: string[];
     paused_at_ms: number | null;
@@ -1203,7 +1205,7 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
     assetIds.length === 0
       ? Promise.resolve([])
       : unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_assets").select("id, name, emoji, photo_url").in("id", assetIds)),
-    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_children").select("id, birth_date").in("id", childIds)),
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_children").select("id, birth_date, inclusive_eligible").in("id", childIds)),
     // Saldo de pacote pré-pago. Sem isto o card mostraria o preço cheio e o
     // fechamento cobraria menos — o operador leria a diferença como erro do
     // sistema justamente na frente do cliente que comprou o pacote.
@@ -1308,6 +1310,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         guardian_name_snapshot: (guardian?.full_name as string) ?? undefined,
         guardian_phone_snapshot: (guardian?.phone_e164 as string) ?? undefined,
         child_birth_date: (childRow?.birth_date as string) ?? undefined,
+        child_inclusive_eligible: Boolean(childRow?.inclusive_eligible),
         // Estes dois chegavam do banco no select("*") e eram descartados
         // aqui — por isso o alerta de cuidados no card do Painel e o "OBS"
         // da etiqueta nunca apareciam, mesmo com a tela de Entrada tendo um

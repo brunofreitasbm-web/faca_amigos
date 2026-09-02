@@ -42,6 +42,10 @@ export function insertChild(db: Db, c: Omit<ChildRow, "created_at_ms">, nowMs: n
   ).run({ ...c, created_at_ms: nowMs });
 }
 
+export function markChildInclusive(db: Db, childId: string): void {
+  db.prepare("UPDATE children SET inclusive_eligible = 1 WHERE id = ?").run(childId);
+}
+
 export function linkChildGuardian(db: Db, childId: string, guardianId: string, isAuthorizedPickup = true): void {
   db.prepare(
     `INSERT OR IGNORE INTO child_guardians (child_id, guardian_id, is_authorized_pickup) VALUES (?, ?, ?)`,

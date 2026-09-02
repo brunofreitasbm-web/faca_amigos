@@ -74,7 +74,8 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
   const entry: ActiveSessionEntry | undefined = closingSnapshot ?? liveEntry;
   const isNeurodivergent = Boolean(
     entry &&
-      ((entry.session.sensory_tags?.length ?? 0) > 0 ||
+      (entry.session.child_inclusive_eligible ||
+        (entry.session.sensory_tags?.length ?? 0) > 0 ||
         entry.session.notes?.toLowerCase().includes("neuro") ||
         entry.session.notes?.toLowerCase().includes("autis") ||
         entry.session.notes?.toLowerCase().includes("tea") ||

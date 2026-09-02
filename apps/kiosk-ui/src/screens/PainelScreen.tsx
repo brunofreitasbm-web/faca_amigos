@@ -510,6 +510,7 @@ export function PainelScreen() {
           const wristbandCode = session.access_code || session.wristband_code || session.id.slice(0, 6).toUpperCase();
           const careSummary = [...(session.sensory_tags ?? []), session.notes].filter(Boolean).join(" · ");
           const isNeurodivergent = Boolean(
+            session.child_inclusive_eligible ||
             (session.sensory_tags?.length ?? 0) > 0 ||
             session.notes?.toLowerCase().includes("neuro") ||
             session.notes?.toLowerCase().includes("autis") ||
@@ -820,7 +821,7 @@ export function PainelScreen() {
                     e.stopPropagation();
                     setPrintData({
                       wristbandCode,
-                      childName: ((session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩")
+                      childName: (session.child_inclusive_eligible || (session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩")
                         ? `${session.child_name_snapshot} 🧩`
                         : session.child_name_snapshot,
                       guardianName: session.guardian_name_snapshot || "Responsável",

@@ -129,6 +129,7 @@ export function MobilePainel({
           {entries.map((entry) => {
             const u = urgency(entry);
             const isNeurodivergent = Boolean(
+              entry.session.child_inclusive_eligible ||
               (entry.session.sensory_tags?.length ?? 0) > 0 ||
               entry.session.notes?.toLowerCase().includes("neuro") ||
               entry.session.notes?.toLowerCase().includes("autis") ||
@@ -249,6 +250,7 @@ export function MobilePainel({
             <p className="m-title-sm m-trunc m-grow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span>{selected.session.child_name_snapshot}</span>
               {Boolean(
+                selected.session.child_inclusive_eligible ||
                 (selected.session.sensory_tags?.length ?? 0) > 0 ||
                 selected.session.notes?.toLowerCase().includes("neuro") ||
                 selected.session.notes?.toLowerCase().includes("autis") ||
