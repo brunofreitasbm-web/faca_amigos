@@ -68,12 +68,22 @@ async function extrairDetalheErro(error: { message?: string; context?: unknown }
  * tentando primeiro o cofre local (quando `vaultParams` é informado) e
  * caindo para a Edge Function em seguida.
  *
- * IMPORTANTE: não passamos nenhum header `Authorization` manual — o
- * `supabase.functions.invoke` já envia a `secretKey` com que o cliente do
- * worker foi criado (ver fiscal/index.ts) como bearer automaticamente, e a
- * função autoriza comparando esse bearer contra `SUPABASE_SERVICE_ROLE_KEY`
- * ou `FISCAL_WORKER_SECRET_KEY`. Um header manual construído aqui
- * sobrescreveria esse bearer e quebraria a autorização.
+ * IMPORTANTE: o `Authorization` vem do cliente, configurado em
+ * `global.headers` na criação dele (ver fiscal/index.ts) — e isso é
+ * OBRIGATÓRIO, não decorativo.
+ *
+ * O comentário que estava aqui afirmava o contrário: que o
+ * `supabase.functions.invoke` já mandava a `secretKey` como bearer sozinho
+ * e que um header manual "quebraria a autorização". É falso em
+ * @supabase/supabase-js 2.112.1: o invoke manda `apikey: <secretKey>`, mas
+ * deriva o bearer da sessão do usuário — que num worker headless não
+ * existe — e o header sai literalmente `Authorization: undefined`. A
+ * função então compara "undefined" com o segredo e devolve 401.
+ *
+ * Essa crença custou o diagnóstico inteiro: como o 401 aparecia como
+ * "Certificado A1 não disponível: não autorizado", a investigação foi
+ * atrás de chave errada, secret ausente e .env envenenado — enquanto a
+ * chave estava certa e nunca chegava a ser enviada.
  */
 export async function buscarCredenciaisFiscais(
   supabase: SupabaseClient,

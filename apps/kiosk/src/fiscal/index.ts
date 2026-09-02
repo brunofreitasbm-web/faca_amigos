@@ -82,8 +82,24 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
   const terminalId = loadOrCreateTerminalId(userDataPath);
   const log = (message: string) => console.log(message);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = createClient(url, secretKey, { realtime: { transport: WebSocket as any } });
+  // O `Authorization` explícito NÃO é redundante — é o que faz a emissão
+  // fiscal funcionar. Em @supabase/supabase-js 2.112.1, `functions.invoke`
+  // manda `apikey: <secretKey>` mas monta o bearer a partir da sessão do
+  // usuário, que num worker headless não existe; o header sai literalmente
+  // como `Authorization: undefined`. A Edge Function tira o "Bearer ",
+  // compara "undefined" com o segredo e responde 401 — que chegava ao
+  // painel como "Certificado A1 não disponível: não autorizado".
+  //
+  // Medido nesta máquina em 2026-09-02, mesma chave nos dois casos:
+  //   fetch cru + Authorization    -> 200
+  //   supabase.functions.invoke    -> 401  (authorization: "undefined")
+  //
+  // Ver o teste de regressão em test/fiscal-certificado.spec.ts.
+  const supabase = createClient(url, secretKey, {
+    global: { headers: { Authorization: `Bearer ${secretKey}` } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    realtime: { transport: WebSocket as any },
+  });
 
   let processing = false;
   async function drainQueue(): Promise<void> {

@@ -121,3 +121,31 @@ describe("buscarCredenciaisFiscais", () => {
     }
   });
 });
+
+/**
+ * Regressão do bug que parou a emissão fiscal por dias.
+ *
+ * Em @supabase/supabase-js 2.112.1, `functions.invoke` envia
+ * `apikey: <secretKey>` mas deriva o bearer da sessão do usuário. Num
+ * worker headless não há sessão, e o header vai literalmente como
+ * `Authorization: undefined` — a Edge Function compara "undefined" com o
+ * segredo e responde 401 "não autorizado".
+ *
+ * Medido em 2026-09-02 com a MESMA chave: `fetch` cru devolveu 200 e
+ * `functions.invoke` devolveu 401. O comentário do código afirmava que o
+ * invoke mandava a chave sozinho e que um header manual quebraria a
+ * autorização — o oposto da verdade.
+ *
+ * Por isso o cliente do worker precisa nascer com o Authorization em
+ * `global.headers`. Se alguém tirar essa linha achando que é redundante,
+ * a emissão volta a falhar com um erro que aponta para o certificado.
+ */
+describe("cliente do worker fiscal", () => {
+  it("cria o Supabase client com Authorization explícito em global.headers", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(join(import.meta.dirname, "../src/fiscal/index.ts"), "utf-8");
+
+    expect(source).toMatch(/global:\s*\{\s*headers:\s*\{\s*Authorization:\s*`Bearer \$\{secretKey\}`/);
+  });
+});
