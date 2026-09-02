@@ -372,7 +372,7 @@ export function CaixaScreen() {
       for (const [method, value] of Object.entries(declared)) declaredCents[method] = Math.round(Number(value) * 100);
       const justificationsToSend: Record<string, string> = {};
       for (const method of METHODS) {
-        const divergenceCents = (declaredCents[method] ?? 0) - expectedHint(method, revenue, movements);
+        const divergenceCents = (declaredCents[method] ?? 0) - expectedHint(method, revenue);
         const text = (closeJustifications[method] ?? "").trim();
         if (divergenceCents !== 0 && text) justificationsToSend[method] = text;
       }
@@ -537,7 +537,8 @@ export function CaixaScreen() {
           </div>
 
           <HelpText style={{ marginBottom: "16px" }}>
-            "Declarado" é a contagem informada. "✓ Zero divergência" confirma que bateu com o esperado pelo sistema.
+            "Declarado" é o total vendido que você informou. "✓ Zero divergência" confirma que bateu com as vendas registradas
+            no sistema.
           </HelpText>
 
           <div style={{ overflowX: "auto", marginBottom: "20px" }}>
@@ -606,7 +607,7 @@ export function CaixaScreen() {
 
   if (closing) {
     const canConfirmClose = METHODS.every((method) => {
-      const divergenceCents = Math.round(Number(declared[method]) * 100) - expectedHint(method, revenue, movements);
+      const divergenceCents = Math.round(Number(declared[method]) * 100) - expectedHint(method, revenue);
       const isShortage = divergenceCents < 0;
       return !isShortage || (closeJustifications[method] ?? "").trim().length >= 3;
     });
@@ -615,11 +616,12 @@ export function CaixaScreen() {
         {renderEnvelopeModal()}
         <h1 style={{ fontFamily: "var(--font-display)" }}>Fechar turno</h1>
         <HelpText>
-          Conte o dinheiro e confira os comprovantes de cada forma de pagamento e digite o valor total que você
-          encontrou em cada um. Se houver alguma divergência com o esperado pelo sistema, será pedida uma
-          justificativa (sem mostrar o valor esperado).
+          Digite o total <strong>vendido neste turno</strong> em cada forma de pagamento, conferindo o dinheiro
+          e os comprovantes. Em DINHEIRO, informe só o que foi vendido: o fundo de caixa fica na gaveta e é
+          conferido na abertura do próximo turno. Se houver divergência com o esperado pelo sistema, será pedida
+          uma justificativa (sem mostrar o valor esperado).
         </HelpText>
-        <p>Digite o que foi contado por método:</p>
+        <p>Digite o total vendido por método:</p>
         <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -632,7 +634,7 @@ export function CaixaScreen() {
           </thead>
           <tbody>
             {METHODS.map((method) => {
-              const expectedCents = expectedHint(method, revenue, movements);
+              const expectedCents = expectedHint(method, revenue);
               const declaredCents = Math.round(Number(declared[method]) * 100);
               const divergenceCents = declaredCents - expectedCents;
               const isShortage = divergenceCents < 0;
@@ -1177,13 +1179,13 @@ export function CaixaScreen() {
  * `expected` recalculado pelo servidor na resposta de /close (a
  * mesma regra de negócio, para não haver dois lugares que podem
  * divergir).
+ *
+ * Regra (owner, 2026-09-01): no fechamento o operador declara o que
+ * VENDEU no turno por forma de pagamento. O fundo de caixa fica na
+ * gaveta e é conferido na abertura do próximo turno, então
+ * TROCO_INICIAL, SUPRIMENTO, SANGRIA e AJUSTE não entram no esperado —
+ * nem para DINHEIRO. (Ver migration 20260901100000.)
  */
-function expectedHint(method: string, revenue: RevenueByMethod[], movements: CashMovement[]): number {
-  const sales = revenue.find((r) => r.method === method)?.total_cents ?? 0;
-  if (method !== "DINHEIRO") return sales;
-  const adjustments = movements.reduce((sum, m) => {
-    if (m.kind === "SANGRIA") return sum - m.amount_cents;
-    return sum + m.amount_cents; // TROCO_INICIAL, SUPRIMENTO, AJUSTE
-  }, 0);
-  return sales + adjustments;
+function expectedHint(method: string, revenue: RevenueByMethod[]): number {
+  return revenue.find((r) => r.method === method)?.total_cents ?? 0;
 }
