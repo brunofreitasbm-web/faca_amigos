@@ -327,3 +327,30 @@ describe("montarXmlNfce", () => {
     expect(xml).not.toContain("12.345.678/0001-99");
   });
 });
+
+/**
+ * Regressão do cStat 391 ("Não informados os dados do cartão de
+ * crédito/débito nas Formas de Pagamento").
+ *
+ * O grupo <card> é obrigatório quando tPag é 03 (crédito) ou 04 (débito).
+ * Faltava, e a SEFAZ recusou em homologação em 2026-09-02 com a nota já
+ * assinada e transmitida — mais um número de NFC-e queimado.
+ */
+describe("grupo <card> nas formas de pagamento", () => {
+  const comPagamento = (metodo: DocumentoFiscalInput["pagamentos"][number]["metodo"]) =>
+    montarXmlNfce(buildInput({ pagamentos: [{ metodo, valor: 5 }] })).xml;
+
+  it("crédito e débito levam <card> com tpIntegra", () => {
+    for (const metodo of ["CREDITO", "DEBITO"] as const) {
+      const xml = comPagamento(metodo);
+      expect(xml, `${metodo} sem <card> é cStat 391`).toContain("<card>");
+      expect(xml).toContain("<tpIntegra>02</tpIntegra>");
+    }
+  });
+
+  it("dinheiro e PIX não levam <card>", () => {
+    for (const metodo of ["DINHEIRO", "PIX"] as const) {
+      expect(comPagamento(metodo)).not.toContain("<card>");
+    }
+  });
+});

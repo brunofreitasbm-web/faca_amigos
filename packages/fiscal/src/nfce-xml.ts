@@ -165,11 +165,26 @@ export function montarXmlNfce(input: DocumentoFiscalInput): MontarXmlNfceResult 
     det[0]!.prod.xProd = TEXTO_HOMOLOGACAO_PROD;
   }
 
-  const detPag = input.pagamentos.map((p) => ({
-    indPag: "0",
-    tPag: TPAG_POR_METODO[p.metodo],
-    vPag: money(p.valor),
-  }));
+  // Cartão exige o grupo <card>, senão a SEFAZ rejeita com cStat 391
+  // ("Não informados os dados do cartão de crédito/débito nas Formas de
+  // Pagamento") — medido em homologação em 2026-09-02, com a nota já
+  // assinada e transmitida.
+  //
+  // tpIntegra=02 ("pagamento não integrado com o sistema de automação da
+  // empresa"): a maquininha do balcão é autônoma, o PDV não conversa com
+  // ela por TEF. Com 02, CNPJ da credenciadora, bandeira e código de
+  // autorização são opcionais — que é o certo, porque o operador digita o
+  // valor na maquininha e o sistema nunca vê o retorno da transação.
+  //
+  // Se um dia entrar TEF integrado, isto vira 01 E passa a exigir cAut.
+  const detPag = input.pagamentos.map((p) => {
+    const tPag = TPAG_POR_METODO[p.metodo];
+    const base: Record<string, unknown> = { indPag: "0", tPag, vPag: money(p.valor) };
+    if (tPag === TPAG_POR_METODO.CREDITO || tPag === TPAG_POR_METODO.DEBITO) {
+      base.card = { tpIntegra: "02" };
+    }
+    return base;
+  });
 
   const infNFe: Record<string, unknown> = {
     "@versao": VERSAO_LEIAUTE,
