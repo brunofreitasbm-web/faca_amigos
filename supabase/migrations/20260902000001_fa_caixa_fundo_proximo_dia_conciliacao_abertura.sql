@@ -61,7 +61,8 @@ alter table fa_kiosk_shifts add column if not exists opening_divergence_cents in
 -- ---------------------------------------------------------------------
 -- 2. Abertura: herda o fundo declarado no último fechamento e concilia
 --    com o valor contado agora. Mesma assinatura de 20260806000013 —
---    CREATE OR REPLACE substitui no lugar, grants preservados.
+--    CREATE OR REPLACE substitui no lugar, grants preservados. Mantém o
+--    `set search_path` que a função já tem em produção.
 -- ---------------------------------------------------------------------
 create or replace function fa_open_shift(
   p_idempotency_key text,
@@ -136,7 +137,7 @@ begin
   perform fa_kiosk_store_idempotency(p_idempotency_key, 'fa_open_shift', v_cached);
   return v_cached;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public, pg_temp;
 
 -- ---------------------------------------------------------------------
 -- 3. Fechamento: além do declarado por forma de pagamento (inalterado),
@@ -257,7 +258,7 @@ begin
   perform fa_kiosk_store_idempotency(p_idempotency_key, 'fa_close_shift', v_cached);
   return v_cached;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public, pg_temp;
 
 -- Assinatura nova → grants precisam ser reemitidos (mesmo padrão de
 -- 20260818000000 para fa_record_cash_movement); a de 5 parâmetros fica
@@ -589,8 +590,10 @@ end;
 $$ language plpgsql volatile security definer;
 
 -- 4f. Canal de e-mail cobre o alerta novo (push já é genérico por tipo).
+--     Mesma assinatura de 20260829000006 (com photo_url) — mudar o tipo de
+--     retorno exigiria DROP e derrubaria o grant do service_role.
 create or replace function fa_owner_email_claim_due(p_now_ms bigint) returns table (
-  notification_id uuid, title text, body text, recipient_email text
+  notification_id uuid, title text, body text, recipient_email text, photo_url text
 ) as $$
   with due as (
     update fa_kiosk_owner_notifications
@@ -598,9 +601,9 @@ create or replace function fa_owner_email_claim_due(p_now_ms bigint) returns tab
     where emailed_at_ms is null
       and due_at_ms <= p_now_ms
       and report_type in ('ABERTURA', 'FECHAMENTO', 'DIVERGENCIA_FECHAMENTO', 'DIVERGENCIA_ABERTURA')
-    returning id, title, body
+    returning id, title, body, photo_url
   )
-  select d.id, d.title, d.body, e.email
+  select d.id, d.title, d.body, e.email, d.photo_url
   from due d
   cross join fa_kiosk_employees e
   where e.role = 'ADMIN' and e.email is not null and length(trim(e.email)) > 0;
