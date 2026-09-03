@@ -1042,8 +1042,14 @@ export function PainelScreen() {
           }}
           onDone={() => {
             setCheckoutOpen(false);
-            setClosingSnapshot(new Map());
             setSelected(new Set());
+            // Só solta o snapshot congelado depois que `entries` já refletir
+            // o fechamento no servidor — sem isso, se o Realtime ainda não
+            // tiver entregue o UPDATE de status, o card volta a renderizar a
+            // partir do `entries` desatualizado (ainda ATIVA) e o
+            // cronômetro/excedente parecem "continuar contando" mesmo com a
+            // sessão já paga e fechada no banco.
+            refetchActiveSessions().finally(() => setClosingSnapshot(new Map()));
           }}
         />
       )}
