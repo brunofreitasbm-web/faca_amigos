@@ -188,7 +188,17 @@ export async function processarNfseReal(deps: ClaimDeps, item: ClaimedFiscalDoc)
     return;
   }
 
-  const numero = await reservarNumeroRps(supabase, doc, unit.id);
+  // Reaproveita o número já reservado numa tentativa anterior deste MESMO
+  // documento em vez de sortear um novo — reservarNumeroRps nunca reserva o
+  // mesmo número duas vezes (fa_fiscal_reserve_number é um contador puro,
+  // sem noção de "documento"), então sortear de novo a cada retry arrisca
+  // gerar uma SEGUNDA NFS-e real para a mesma venda sempre que uma
+  // transmissão anterior tiver sido aceita pelo ADN mas a resposta se
+  // perdeu antes de chegar aqui (foi exatamente o que aconteceu com o RPS
+  // nº7 da unidade Circuito em 2026-09-02 — ver CODIGO_ERRO_DPS_JA_PROCESSADA
+  // acima, que existe como rede de segurança para quando isso já tiver
+  // ocorrido antes desta correção).
+  const numero = doc.numero ?? (await reservarNumeroRps(supabase, doc, unit.id));
   const agora = new Date();
   const timeZone = unitFiscal.timezone ?? undefined;
 
