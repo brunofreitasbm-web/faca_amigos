@@ -3,6 +3,11 @@
 Piloto: **08/09 a 05/10/2026**. Recalibração das metas em 06/10 com 30 dias de kiosk.
 Teto: **R$ 200 por operador por mês** (10% do salário de R$ 2.000). Apuração: `apuracao_bonificacao.sql`.
 
+Para imprimir e entregar direto à equipe, use `manual-operadores.md` — só as regras
+e exemplos, sem a simulação e o diagnóstico deste documento. As mesmas regras também
+aparecem ao vivo no Painel (card **🎮 Bonificação de hoje**), calculadas em
+`apps/kiosk-ui/src/bonificacao.ts`.
+
 ---
 
 ## Parte 1 — Regras (para a equipe)

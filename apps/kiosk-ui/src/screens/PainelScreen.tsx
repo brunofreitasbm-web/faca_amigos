@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon } from "@facaamigos/ui";
-import { Api } from "../api/client.js";
+import { Api, businessDateFor } from "../api/client.js";
 import type { ActiveSessionEntry, Plan, Asset } from "../api/client.js";
+import { bonificacaoHoje, dentroDoPiloto } from "../bonificacao.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { usePendingRenewals, resolveRenewal } from "../api/renewalRequests.js";
 import { useAppState } from "../state/AppState.js";
@@ -81,6 +82,7 @@ export function PainelScreen() {
   const [ticketMedioCents, setTicketMedioCents] = useState(0);
   const [ticketMinCents, setTicketMinCents] = useState(0);
   const [ticketTargetCents, setTicketTargetCents] = useState(0);
+  const [todayOrdersCount, setTodayOrdersCount] = useState(0);
   const [entradaOpen, setEntradaOpen] = useState(false);
   const [preCheckinPrefill, setPreCheckinPrefill] = useState<PreCheckinPrefill | null>(null);
   const [pendingPreCheckins, setPendingPreCheckins] = useState<PreCheckinPrefill[]>([]);
@@ -189,6 +191,7 @@ export function PainelScreen() {
           setDailyGoalCents(Number(goal.value) || 0);
           setTodayRevenueCents(revenue.totalCents);
           setTicketMedioCents(ticketMedio.avgCents);
+          setTodayOrdersCount(ticketMedio.ordersCount);
           setTicketMinCents(ticketGoal?.minTicketCents ?? 0);
           setTicketTargetCents(ticketGoal?.targetTicketCents ?? 0);
         }
@@ -1016,6 +1019,40 @@ export function PainelScreen() {
           })()}
         </div>
       )}
+
+      {unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)) && (() => {
+        const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
+        const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
+        const atual = tipo === "CIRCUITO" ? todayOrdersCount : todayRevenueCents;
+        const b = bonificacaoHoje(tipo, businessDate, atual);
+        const corNivel = b.nivel === "supermeta" ? "var(--color-amber)" : b.nivel === "meta" ? "var(--color-success)" : "var(--color-primary)";
+        const badgeVariant = b.nivel === "supermeta" ? "solid_amber" : b.nivel === "meta" ? "green" : "neutral";
+        const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta!" : b.nivel === "meta" ? "🥈 Meta batida!" : "Em andamento";
+        const atualLabel = tipo === "CIRCUITO" ? `${b.atual} locações` : money(b.atual);
+        const metaLabel = tipo === "CIRCUITO" ? `${b.meta}` : money(b.meta);
+        const superLabel = tipo === "CIRCUITO" ? `${b.super}` : money(b.super);
+        return (
+          <div
+            title="Piloto de Bonificação (08/09 a 05/10) — placar ao vivo. Só conta de verdade se o caixa abrir até 10h15 e fechar sem diferença; o valor final sai do relatório oficial, não deste card."
+            style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
+            className="capacity-container"
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "var(--text-muted)" }}>
+              <span>
+                🎮 Bonificação de hoje: {atualLabel} (meta {metaLabel} / super {superLabel})
+              </span>
+              <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+            </div>
+            <div className="capacity-bar-track">
+              <div className="capacity-bar-fill" style={{ width: `${b.percent}%`, backgroundColor: corNivel }} />
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px" }}>
+              <span>Bônus estimado do dia: <strong style={{ color: "var(--text-body)" }}>{money(b.bonusCents)}</strong></span>
+              <span>Vale se abrir até 10h15 e fechar sem diferença</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {selected.size > 0 && (
         <div style={{ position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 100 }}>
