@@ -394,6 +394,8 @@ export interface Product {
   description: string | null;
   emoji: string | null;
   price_cents: number;
+  /** Custo de aquisição, em centavos. Null = não cadastrado (não obrigatório). */
+  cost_cents: number | null;
   stock: number;
   active?: boolean;
   /** Só preenchido por `Api.productsAllUnits()` (Gerencial). */
@@ -1488,7 +1490,7 @@ export const Api = {
   products: (unitId: string, onlyActive = true) => {
     let query = supabase()
       .from("fa_kiosk_products")
-      .select("id, name, description, emoji, price_cents, stock, active")
+      .select("id, name, description, emoji, price_cents, cost_cents, stock, active")
       .eq("unit_id", unitId);
     if (onlyActive) query = query.eq("active", true);
     return unwrap<Product[]>(query);
@@ -1496,7 +1498,7 @@ export const Api = {
   /** Todos os produtos de todas as unidades — Gerencial. */
   productsAllUnits: () =>
     unwrap<Product[]>(
-      supabase().from("fa_kiosk_products").select("id, name, description, emoji, price_cents, stock, active, unit_id"),
+      supabase().from("fa_kiosk_products").select("id, name, description, emoji, price_cents, cost_cents, stock, active, unit_id"),
     ),
   // `unitId` é opcional só porque o limiar do selo VIP tem padrão global;
   // passando-o, a busca respeita o limiar configurado para a unidade.
@@ -2449,6 +2451,33 @@ export const Api = {
     }
   },
   /**
+   * Meta diária de faturamento por dia da semana (1=segunda … 7=domingo),
+   * fa_kiosk_unit_daily_goals — sucessora do `daily_goal_cents` único em
+   * fa_kiosk_app_settings (ainda lido como fallback pelo servidor, ver
+   * migration `20260904000001_fa_kiosk_unit_daily_goals`). Sempre retorna
+   * os 7 dias (0 para o que não tiver linha configurada), pra tela de
+   * edição não precisar tratar buraco no meio da semana.
+   */
+  dailyGoals: async (unitId: string): Promise<Record<number, number>> => {
+    const rows = await unwrap<{ weekday: number; goal_cents: number }[]>(
+      supabase().from("fa_kiosk_unit_daily_goals").select("weekday, goal_cents").eq("unit_id", unitId),
+    );
+    const byWeekday: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+    for (const r of rows) byWeekday[r.weekday] = r.goal_cents;
+    return byWeekday;
+  },
+  setDailyGoal: (unitId: string, weekday: number, goalCents: number) =>
+    unwrap(
+      supabase()
+        .from("fa_kiosk_unit_daily_goals")
+        .upsert({ unit_id: unitId, weekday, goal_cents: goalCents, updated_at_ms: Date.now() }, { onConflict: "unit_id,weekday" }),
+    ),
+  /** Meta de hoje (já resolvida por dia da semana + fallback), pro termômetro do Painel. */
+  todayGoal: async (unitId: string, cutoffHour: number) =>
+    unwrap<number>(
+      supabase().rpc("fa_kiosk_today_goal_cents", { p_unit_id: unitId, p_business_date: businessDateFor(Date.now(), cutoffHour) }),
+    ),
+  /**
    * Enfileira um pedido de impressão para o print bridge (processo local
    * em cada terminal, ver apps/kiosk) em vez de abrir o diálogo nativo do
    * navegador — só assim dá pra imprimir sem clique nenhum do operador,
@@ -2730,17 +2759,29 @@ export const Api = {
       overage_cents_per_minute: body.overageCentsPerMinute,
       color: body.color,
     }).eq("id", id)),
-  createProduct: (body: { unitId: string; name: string; emoji?: string; priceCents: number; stock: number }) =>
+  createProduct: (body: { unitId: string; name: string; emoji?: string; priceCents: number; costCents?: number | null; stock: number }) =>
     unwrap<{ id: string }>(
       supabase()
         .from("fa_kiosk_products")
-        .insert({ unit_id: body.unitId, name: body.name, emoji: body.emoji ?? null, price_cents: body.priceCents, stock: body.stock })
+        .insert({
+          unit_id: body.unitId,
+          name: body.name,
+          emoji: body.emoji ?? null,
+          price_cents: body.priceCents,
+          cost_cents: body.costCents ?? null,
+          stock: body.stock,
+        })
         .select("id")
         .single(),
     ),
   setProductActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_products").update({ active }).eq("id", id)),
-  updateProduct: (id: string, body: { name: string; emoji?: string; priceCents: number; stock: number }) =>
-    unwrap(supabase().from("fa_kiosk_products").update({ name: body.name, emoji: body.emoji ?? null, price_cents: body.priceCents, stock: body.stock }).eq("id", id)),
+  updateProduct: (id: string, body: { name: string; emoji?: string; priceCents: number; costCents?: number | null; stock: number }) =>
+    unwrap(
+      supabase()
+        .from("fa_kiosk_products")
+        .update({ name: body.name, emoji: body.emoji ?? null, price_cents: body.priceCents, cost_cents: body.costCents ?? null, stock: body.stock })
+        .eq("id", id),
+    ),
   createAsset: (body: {
     unitId: string;
     name: string;

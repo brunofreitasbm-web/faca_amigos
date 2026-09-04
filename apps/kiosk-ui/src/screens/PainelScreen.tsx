@@ -182,13 +182,13 @@ export function PainelScreen() {
     async function poll() {
       try {
         const [goal, revenue, ticketMedio, ticketGoal] = await Promise.all([
-          Api.unitSetting(unit!.id, "daily_goal_cents"),
+          Api.todayGoal(unit!.id, unit!.business_day_cutoff_hour),
           Api.todayRevenue(unit!.id, unit!.business_day_cutoff_hour),
           Api.todayTicketMedio(unit!.id, unit!.business_day_cutoff_hour),
           Api.ticketGoal(unit!.id),
         ]);
         if (!cancelled) {
-          setDailyGoalCents(Number(goal.value) || 0);
+          setDailyGoalCents(goal || 0);
           setTodayRevenueCents(revenue.totalCents);
           setTicketMedioCents(ticketMedio.avgCents);
           setTodayOrdersCount(ticketMedio.ordersCount);

@@ -32,6 +32,18 @@ import { money } from "../format.js";
 import { AutoUpdateCard } from "../components/AutoUpdateCard.js";
 import { getPublicAppUrl } from "../lib/appUrl.js";
 
+// isodow: 1=segunda … 7=domingo — mesma convenção do `weekday` em
+// fa_kiosk_unit_daily_goals e de `extract(isodow from ...)` no banco.
+const WEEKDAYS: Array<{ value: number; label: string }> = [
+  { value: 1, label: "Segunda" },
+  { value: 2, label: "Terça" },
+  { value: 3, label: "Quarta" },
+  { value: 4, label: "Quinta" },
+  { value: 5, label: "Sexta" },
+  { value: 6, label: "Sábado" },
+  { value: 7, label: "Domingo" },
+];
+
 type Tab =
   | "PLANOS"
   | "PACOTES"
@@ -282,9 +294,9 @@ function MetaTab({ unitId }: { unitId: string }) {
   const { employee } = useAppState();
   const isOwner = employee?.role === "ADMIN";
 
-  const [goalReais, setGoalReais] = useState("0");
-  const [savingGoal, setSavingGoal] = useState(false);
-  
+  const [goalsReais, setGoalsReais] = useState<Record<number, string>>({ 1: "0", 2: "0", 3: "0", 4: "0", 5: "0", 6: "0", 7: "0" });
+  const [savingGoalWeekday, setSavingGoalWeekday] = useState<number | null>(null);
+
   const [rules, setRules] = useState<BonusRule[]>([]);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [ruleDescription, setRuleDescription] = useState("");
@@ -294,8 +306,12 @@ function MetaTab({ unitId }: { unitId: string }) {
   const [closingTime, setClosingTime] = useState("");
   const [savingClosingTime, setSavingClosingTime] = useState(false);
 
-  function loadGoal() {
-    Api.unitSetting(unitId, "daily_goal_cents").then((r) => setGoalReais(((Number(r.value) || 0) / 100).toString()));
+  function loadGoals() {
+    Api.dailyGoals(unitId).then((byWeekday) => {
+      const next: Record<number, string> = {};
+      for (const wd of WEEKDAYS) next[wd.value] = ((byWeekday[wd.value] ?? 0) / 100).toString();
+      setGoalsReais(next);
+    });
   }
   function loadRules() {
     Api.bonusRules(unitId).then(setRules);
@@ -303,7 +319,7 @@ function MetaTab({ unitId }: { unitId: string }) {
   function loadClosingTime() {
     Api.unitSetting(unitId, "closing_time").then((r) => setClosingTime(r.value ?? ""));
   }
-  useEffect(loadGoal, [unitId]);
+  useEffect(loadGoals, [unitId]);
   useEffect(loadRules, [unitId]);
   useEffect(loadClosingTime, [unitId]);
 
@@ -313,15 +329,15 @@ function MetaTab({ unitId }: { unitId: string }) {
   // operador tocava "Salvar", nada mudava na tela, e não tinha como saber
   // qual dos dois aconteceu. toast.success/error cobre os dois lados.
 
-  async function saveGoal() {
-    setSavingGoal(true);
+  async function saveGoal(weekday: number) {
+    setSavingGoalWeekday(weekday);
     try {
-      await Api.setUnitSetting(unitId, "daily_goal_cents", String(Math.round(Number(goalReais) * 100)));
-      toast.success("Meta diária salva.");
+      await Api.setDailyGoal(unitId, weekday, Math.round(Number(goalsReais[weekday]) * 100));
+      toast.success("Meta salva.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível salvar a meta.");
     } finally {
-      setSavingGoal(false);
+      setSavingGoalWeekday(null);
     }
   }
 
@@ -387,17 +403,31 @@ function MetaTab({ unitId }: { unitId: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 title="Meta de faturamento do dia, usada na barra de progresso do Painel">Meta diária de faturamento</h2>
-        <Input
-          label="Meta do dia (R$)"
-          type="number"
-          value={goalReais}
-          onChange={(e) => setGoalReais(e.target.value)}
-          title="Valor de faturamento que a unidade deve atingir hoje"
-        />
-        <Button variant="primary" disabled={savingGoal} onClick={saveGoal} title="Salvar a meta diária de faturamento">
-          Salvar meta
-        </Button>
+        <h2 title="Meta de faturamento por dia da semana, usada na barra de progresso do Painel e no 'Meta do dia' dos relatórios de 17h/19h/20h e do fechamento">
+          Meta diária de faturamento
+        </h2>
+        {WEEKDAYS.map((wd) => (
+          <div key={wd.value} style={{ display: "flex", alignItems: "flex-end", gap: "12px" }}>
+            <div style={{ width: "160px" }}>
+              <Input
+                label={wd.label}
+                type="number"
+                value={goalsReais[wd.value] ?? "0"}
+                onChange={(e) => setGoalsReais((prev) => ({ ...prev, [wd.value]: e.target.value }))}
+                title={`Faturamento que a unidade deve atingir num(a) ${wd.label.toLowerCase()}`}
+              />
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={savingGoalWeekday === wd.value}
+              onClick={() => saveGoal(wd.value)}
+              title={`Salvar a meta de ${wd.label.toLowerCase()}`}
+            >
+              Salvar
+            </Button>
+          </div>
+        ))}
       </Card>
 
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>

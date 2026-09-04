@@ -16,6 +16,9 @@ export function ProdutosTab() {
 
   const [name, setName] = useState("");
   const [priceReais, setPriceReais] = useState("0");
+  // Vazio = custo não cadastrado (cost_cents null), não "custo zero" —
+  // a maioria dos produtos hoje não tem custo real informado ainda.
+  const [costReais, setCostReais] = useState("");
   const [stock, setStock] = useState("0");
   const [emoji, setEmoji] = useState("🛍️");
   const [unitIds, setUnitIds] = useState<string[]>(units.map((u) => u.id));
@@ -31,6 +34,7 @@ export function ProdutosTab() {
     setEditingId(p.id);
     setName(p.name);
     setPriceReais((p.price_cents / 100).toFixed(2));
+    setCostReais(p.cost_cents != null ? (p.cost_cents / 100).toFixed(2) : "");
     setStock(String(p.stock));
     setEmoji(p.emoji ?? "🛍️");
   }
@@ -39,6 +43,7 @@ export function ProdutosTab() {
     setEditingId(null);
     setName("");
     setPriceReais("0");
+    setCostReais("");
     setStock("0");
     setEmoji("🛍️");
     setUnitIds(units.map((u) => u.id));
@@ -47,7 +52,13 @@ export function ProdutosTab() {
   async function save() {
     setBusy(true);
     try {
-      const payload = { name, emoji, priceCents: Math.round(Number(priceReais) * 100), stock: Number(stock) };
+      const payload = {
+        name,
+        emoji,
+        priceCents: Math.round(Number(priceReais) * 100),
+        costCents: costReais.trim() === "" ? null : Math.round(Number(costReais) * 100),
+        stock: Number(stock),
+      };
 
       if (editingId) {
         await Api.updateProduct(editingId, payload);
@@ -92,6 +103,20 @@ export function ProdutosTab() {
         <Input label="Emoji" value={emoji} onChange={(e) => setEmoji(e.target.value)} />
         <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
         <Input label="Preço (R$)" type="number" value={priceReais} onChange={(e) => setPriceReais(e.target.value)} />
+        <Input
+          label="Custo (R$) — opcional"
+          type="number"
+          value={costReais}
+          onChange={(e) => setCostReais(e.target.value)}
+          title="Quanto custou comprar este produto. Deixe em branco se ainda não souber — não é obrigatório pra vender."
+        />
+        {costReais.trim() !== "" && (
+          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+            Margem: {money(Math.round(Number(priceReais) * 100) - Math.round(Number(costReais) * 100))}
+            {Number(priceReais) > 0 &&
+              ` (${Math.round(((Math.round(Number(priceReais) * 100) - Math.round(Number(costReais) * 100)) / Math.round(Number(priceReais) * 100)) * 100)}%)`}
+          </span>
+        )}
         <Input label="Estoque" type="number" value={stock} onChange={(e) => setStock(e.target.value)} />
         {!editingId && <UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} />}
         <Button variant="primary" disabled={busy || !name || (!editingId && unitIds.length === 0)} onClick={save}>
@@ -106,7 +131,12 @@ export function ProdutosTab() {
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <span>
-              {money(p.price_cents)} — {p.stock} un.
+              {money(p.price_cents)}
+              {p.cost_cents != null && (
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> (custo {money(p.cost_cents)})</span>
+              )}
+              {" — "}
+              {p.stock} un.
             </span>
             <Button variant="secondary" onClick={() => startEdit(p)} disabled={busy}>
               Editar
