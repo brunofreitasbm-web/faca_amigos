@@ -1047,7 +1047,7 @@ export function PainelScreen() {
               <div className="capacity-bar-fill" style={{ width: `${b.percent}%`, backgroundColor: corNivel }} />
             </div>
             <div style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px" }}>
-              <span>Bônus estimado do dia: <strong style={{ color: "var(--text-body)" }}>{money(b.bonusCents)}</strong></span>
+              <span>Bônus estimado do dia: <strong style={{ color: "var(--text-primary)" }}>{money(b.bonusCents)}</strong></span>
               <span>Vale se abrir até 10h15 e fechar sem diferença</span>
             </div>
           </div>
