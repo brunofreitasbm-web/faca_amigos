@@ -210,8 +210,10 @@ Catálogo de produtos do Circuito: Miniatura carrinho R$ 32,90 (10 em estoque), 
 
 - Circuito abre 10 h e vende zero até 14 h: testar abertura 12 h seg–qui, ou usar a manhã para abordagem no shopping.
 - Aposentar as regras de locações de julho (`fa_regras_locacoes`).
-- Cadastrar o custo dos produtos no sistema para calibrar a comissão.
-- Fase 2 de sistema: meta por dia da semana em `daily_goal_cents` (hoje é um valor único por unidade) para o relatório das 17h/19h/20h e o fechamento mostrarem a meta certa.
+- **Feito (Fase 2):** meta por dia da semana (Gerencial → Configurações → Meta, 7 campos em vez de 1) — alimenta o termômetro do Painel e o "Meta do dia" dos relatórios de 17h/19h/20h e do fechamento. Tabela `fa_kiosk_unit_daily_goals`, com fallback pro valor único antigo se a unidade ainda não tiver sido reconfigurada. Nenhum valor foi pré-preenchido — o Owner cadastra a meta de cada dia quando quiser; até lá o termômetro mostra "Não definida", igual antes.
+- **Feito (Fase 2):** custo de produto (Gerencial → Produtos → campo "Custo (R$) — opcional") pra calibrar a comissão do bônus com dado real em vez de estimativa. Campo opcional, ninguém precisa preencher pra continuar vendendo.
+- **Feito (Fase 2):** metas de ticket médio atualizadas (Playground mín R$ 85 / alvo R$ 105; Circuito mín R$ 50 / alvo R$ 58) — os valores da seção 5.4 acima já estavam decididos, só faltava aplicar.
+- **Não feito de propósito:** reprecificar PORTO SEGURO/DAY USE. Preço já é 100% editável em Gerencial → Pacotes; não precisava de nenhuma mudança de código. Fica pra quando o Owner decidir o novo número.
 
 ---
 
