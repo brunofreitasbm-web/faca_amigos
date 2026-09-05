@@ -58,6 +58,41 @@ import { MobileGerencial } from "./mobile/MobileGerencial.js";
 import { MobileLogin } from "./mobile/MobileLogin.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
 
+/**
+ * Reverte "Sempre abrir a versão completa" (MobileShell > Mais > Este
+ * aparelho). Sem este botão, quem toca ali fica preso na versão de balcão
+ * neste aparelho para sempre — useMobileShell().useMobileVersion existia
+ * mas não estava ligado a nenhum controle da UI antes deste componente.
+ */
+function UseMobileVersionButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        position: "fixed",
+        left: "50%",
+        transform: "translateX(-50%)",
+        bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+        zIndex: 60,
+        border: "none",
+        borderRadius: "9999px",
+        padding: "12px 20px",
+        minHeight: "44px",
+        background: "var(--color-dark)",
+        color: "#fff",
+        font: "inherit",
+        fontSize: "13px",
+        fontWeight: 800,
+        boxShadow: "0 8px 24px rgba(0,0,0,.28)",
+        cursor: "pointer",
+      }}
+    >
+      📱 Usar versão celular
+    </button>
+  );
+}
+
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
   { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir a pulseira e o recibo de guarda", icon: <SignInIcon /> },
   // Saída não fica na barra superior de propósito: o único caminho de
@@ -298,7 +333,12 @@ export function App() {
       if (mobile.active) {
         return <MobileGerencial units={units} onExit={() => setGerencial(false)} onLogout={handleLogout} />;
       }
-      return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
+      return (
+        <>
+          {mobile.isPhone && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
+          <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />
+        </>
+      );
     }
   }
 
@@ -394,6 +434,8 @@ export function App() {
           ‹ Voltar ao modo celular
         </button>
       )}
+
+      {!mobile.active && mobile.isPhone && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
 
       <header
         style={{
