@@ -13,12 +13,12 @@ allowBuilds:
 # uma só SPA, um só motor de domínio — não faz sentido ter React ou
 # TypeScript divergindo entre kiosk-ui, backoffice e ui).
 catalog:
-  react: ^19.0.0
-  react-dom: ^19.0.0
-  typescript: ^5.7.0
-  vitest: ^2.1.0
-  zod: ^3.24.0
-  eslint: ^9.17.0
+  react: ^19.2.8
+  react-dom: ^19.2.8
+  typescript: ^5.9.3
+  vitest: ^2.1.9
+  zod: ^3.25.76
+  eslint: ^9.39.5
 
 # Correção da auditoria de 2026-08-10 (item 9): js-yaml@3.14.1 chega
 # transitivamente via xmlbuilder2 (packages/fiscal) com 2 CVEs (DoS
