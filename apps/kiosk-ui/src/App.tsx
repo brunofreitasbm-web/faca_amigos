@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import {
   Button,
@@ -140,6 +140,28 @@ export function App() {
       ensureOwnerPushSubscription(Api).catch(() => {});
     }
   }, [employee, can]);
+
+  // Tela inicial padrão do Owner no celular: abre direto no modo Gerencial
+  // (a home "as 3 operações numa tela") em vez de cair na grade de módulos.
+  // Só na virada de login/restauração de sessão — depois disso o Owner é
+  // livre para sair do Gerencial (setGerencial(false)) sem que este efeito
+  // o traga de volta.
+  const autoGerencialAppliedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!employee) {
+      autoGerencialAppliedFor.current = null;
+      return;
+    }
+    // Espera as capabilities chegarem antes de decidir — checar can() com o
+    // conjunto ainda vazio (loading) marcaria "já decidi" com um "não" falso
+    // e o Owner nunca mais cairia no Gerencial automaticamente nesta sessão.
+    if (loadingCapabilities) return;
+    if (autoGerencialAppliedFor.current === employee.id) return;
+    autoGerencialAppliedFor.current = employee.id;
+    if (mobile.active && employee.role !== "OPERADOR" && can("config.write")) {
+      setGerencial(true);
+    }
+  }, [employee, mobile.active, loadingCapabilities, can, setGerencial]);
 
   function navigateToScreen(newScreen: Screen) {
     if (newScreen === screen) return;
