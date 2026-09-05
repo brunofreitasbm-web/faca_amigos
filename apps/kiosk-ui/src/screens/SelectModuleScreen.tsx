@@ -1,13 +1,25 @@
+import { useState } from "react";
 import { Card, Button, Badge, BrandLockup } from "@facaamigos/ui";
 import { UNIT_BRANDS, unitMatchesBrand } from "../branding/unitBrand.js";
 import { useAppState } from "../state/AppState.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { useMobileShell } from "../mobile/useMobileShell.js";
+import { MobileOwnerOverview } from "../mobile/MobileOwnerOverview.js";
 
 export function SelectModuleScreen() {
   const { units, setUnitId, setGerencial, employee } = useAppState();
   const { can } = useAuth();
-
+  const mobile = useMobileShell();
   const isOperador = employee?.role === "OPERADOR";
+  const isOwner = !isOperador && can("config.write");
+  // No celular, a Visão Geral é a tela inicial padrão do Owner — não a
+  // grade de módulos (que ainda fica a um toque de distância em "Trocar de
+  // unidade", dentro da própria Visão Geral).
+  const [showOverview, setShowOverview] = useState(() => mobile.active && isOwner);
+
+  if (mobile.active && isOwner && showOverview) {
+    return <MobileOwnerOverview units={units} onTrocarUnidade={() => setShowOverview(false)} />;
+  }
 
   const displayModules = UNIT_BRANDS.filter((mod) => {
     if (!isOperador) return true;
@@ -108,6 +120,60 @@ export function SelectModuleScreen() {
             </Card>
           );
         })}
+
+        {mobile.active && isOwner && (
+          <Card
+            key="visao-geral"
+            onClick={() => setShowOverview(true)}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: "24px",
+              borderRadius: "24px",
+              border: "2px solid var(--border-subtle)",
+              borderTop: "6px solid var(--color-primary)",
+              transition: "all 0.25s ease",
+              cursor: "pointer",
+              position: "relative",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+              <div
+                style={{
+                  fontSize: "42px",
+                  lineHeight: 1,
+                  background: "var(--surface-sunken)",
+                  padding: "12px",
+                  borderRadius: "16px",
+                }}
+              >
+                📊
+              </div>
+              <Badge variant="vip">Owner</Badge>
+            </div>
+
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
+              Visão geral
+            </h2>
+
+            <p style={{ fontSize: "14px", fontWeight: "bold", color: "var(--color-primary)", margin: "0 0 12px 0" }}>
+              As 3 unidades condensadas, só para consulta
+            </p>
+
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 24px 0", flex: 1 }}>
+              Faturamento do dia frente à meta e o placar da bonificação, lado a lado — sem entrar em nenhuma unidade.
+            </p>
+
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setShowOverview(true)}
+              style={{ width: "100%", borderRadius: "9999px", fontWeight: "bold" }}
+            >
+              Ver painel condensado ➔
+            </Button>
+          </Card>
+        )}
 
         {!isOperador && can("config.write") && (
           <Card
