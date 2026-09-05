@@ -2648,8 +2648,22 @@ export const Api = {
     );
     return { ok: true, simulated: body.channel === "SMS" };
   },
-  changeSessionPlan: (sessionId: string, planId: string) =>
-    unwrap(supabase().rpc("fa_kiosk_change_session_plan", { p_session_id: sessionId, p_plan_id: planId })),
+  /**
+   * `planId` prefixado com `PKG:` (mesmo truque de EntradaScreen/AcessoRapidoScreen)
+   * indica que o operador escolheu um Pacote em vez de um Plano — o RPC troca a
+   * sessão para o pacote (saldo novo em fa_kiosk_guardian_packages) em vez de plan_id.
+   */
+  changeSessionPlan: (sessionId: string, planId: string) => {
+    const PACKAGE_PREFIX = "PKG:";
+    const usingPackage = planId.startsWith(PACKAGE_PREFIX);
+    return unwrap(
+      supabase().rpc("fa_kiosk_change_session_plan", {
+        p_session_id: sessionId,
+        p_plan_id: usingPackage ? null : planId,
+        p_package_id: usingPackage ? planId.slice(PACKAGE_PREFIX.length) : null,
+      }),
+    );
+  },
   pauseSession: (sessionId: string, reason: string) =>
     unwrap(supabase().rpc("fa_kiosk_pause_session", { p_session_id: sessionId, p_reason: reason })),
   resumeSession: (sessionId: string) =>

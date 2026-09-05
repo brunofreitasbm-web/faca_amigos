@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
-import type { ActiveSessionEntry, Plan, Asset } from "../api/client.js";
+import type { ActiveSessionEntry, Plan, Package, Asset } from "../api/client.js";
 import { bonificacaoHoje, dentroDoPiloto } from "../bonificacao.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { usePendingRenewals, resolveRenewal } from "../api/renewalRequests.js";
@@ -73,6 +73,7 @@ export function PainelScreen() {
   const [printData, setPrintData] = useState<WristbandData | null>(null);
   const [timelineFor, setTimelineFor] = useState<ActiveSessionEntry | null>(null);
   const [planOptions, setPlanOptions] = useState<Plan[]>([]);
+  const [packageOptions, setPackageOptions] = useState<Package[]>([]);
   const [changingPlanFor, setChangingPlanFor] = useState<string | null>(null);
   const [pendingPlanId, setPendingPlanId] = useState<string>("");
   const [pausingFor, setPausingFor] = useState<string | null>(null);
@@ -105,7 +106,28 @@ export function PainelScreen() {
     if (!unit) return;
     const activity = unit.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
     Api.plans(unit.id, activity).then(setPlanOptions);
+    Api.packages(unit.id, activity).then(setPackageOptions);
   }, [unit]);
+
+  // Pacotes entram na mesma listbox de "Mudar Plano" que os Planos, sem
+  // distinção — cada um vira um Plan sintético com id prefixado, mesmo
+  // truque já usado em EntradaScreen/AcessoRapidoScreen para a Entrada.
+  // Api.changeSessionPlan reconhece o prefixo e troca a sessão para o
+  // pacote em vez do plano.
+  const PACKAGE_PREFIX = "PKG:";
+  const changePlanOptions: Plan[] = [
+    ...planOptions,
+    ...packageOptions.map((pkg) => ({
+      id: `${PACKAGE_PREFIX}${pkg.id}`,
+      activity: pkg.activity,
+      name: pkg.name,
+      valueCents: pkg.priceCents,
+      durationValue: pkg.includedMinutes,
+      durationUnit: "MINUTO" as const,
+      overageCentsPerMinute: pkg.overageCentsPerMinute,
+      color: pkg.color,
+    })),
+  ];
 
   // Pré-cadastros enviados pelo QR de Acesso Rápido (?acesso-rapido=,
   // AcessoRapidoScreen), aguardando o balcão confirmar. Poll simples —
@@ -926,7 +948,7 @@ export function PainelScreen() {
                     <option value="" disabled>
                       Escolher novo plano...
                     </option>
-                    {planOptions.map((p) => (
+                    {changePlanOptions.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} — {money(p.valueCents)}
                       </option>
