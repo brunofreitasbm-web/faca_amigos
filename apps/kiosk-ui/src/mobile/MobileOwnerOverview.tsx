@@ -15,15 +15,17 @@ interface UnitOverview {
 }
 
 /**
- * Painel condensado do Owner no celular — as 3 operações, faturamento vs
+ * Tela inicial padrão do Owner no celular — as 3 operações, faturamento vs
  * meta do dia e o placar do piloto de bonificação, tudo numa tela só.
  *
- * Rota separada da Home do Gerencial (MobileGerencialHome): aquela é o
- * ponto de partida operacional (dentro agora, caixa, envelope) com atalhos
- * de navegação; esta é só leitura, pensada para o Owner abrir, olhar os
- * três números que importam pro dia e fechar — sem nenhuma ação de escrita.
+ * Diferente da Home do Gerencial (MobileGerencialHome, que é o ponto de
+ * partida operacional dentro do modo Gerencial — dentro agora, caixa,
+ * envelope — com atalhos de navegação), esta é só leitura: o Owner abre o
+ * app, já vê os três números que importam pro dia e sai, sem nenhuma ação
+ * de escrita. "Trocar de unidade" leva de volta à grade de módulos, de
+ * onde ainda dá para entrar numa unidade específica ou no Gerencial.
  */
-export function MobileOwnerOverview({ units, onBack }: { units: Unit[]; onBack: () => void }) {
+export function MobileOwnerOverview({ units, onTrocarUnidade }: { units: Unit[]; onTrocarUnidade: () => void }) {
   const [rows, setRows] = useState<UnitOverview[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,10 +73,23 @@ export function MobileOwnerOverview({ units, onBack }: { units: Unit[]; onBack: 
     <div className="m-shell">
       <div className="m-frame">
         <div className="m-navbar">
-          <button type="button" className="m-round" aria-label="Voltar" onClick={onBack}>
-            ‹
-          </button>
           <span className="m-title-sm m-grow">Visão geral · 3 unidades</span>
+          <button
+            type="button"
+            onClick={onTrocarUnidade}
+            style={{
+              flexShrink: 0,
+              border: "1px solid var(--color-gray-200)",
+              borderRadius: 9999,
+              background: "var(--surface-page)",
+              color: "var(--text-primary)",
+              fontSize: 12.5,
+              fontWeight: 700,
+              padding: "8px 14px",
+            }}
+          >
+            Trocar de unidade
+          </button>
         </div>
 
         <div className="m-scroll">
