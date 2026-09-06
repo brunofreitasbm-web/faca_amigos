@@ -318,9 +318,6 @@ export function ColaboradoresTab() {
             <Button variant="secondary" onClick={() => setShowInviteModal(true)} style={{ borderRadius: "9999px" }}>
               🔗 Gerar link de cadastro
             </Button>
-            <Button variant="secondary" onClick={() => setShowGeneralInviteModal(true)} style={{ borderRadius: "9999px" }}>
-              🎓 Link Geral de Estagiário
-            </Button>
             <Button variant="secondary" onClick={() => setShowPjInviteModal(true)} style={{ borderRadius: "9999px" }}>
               💼 Link Auto-Cadastro PJ
             </Button>
