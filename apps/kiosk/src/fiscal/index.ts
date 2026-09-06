@@ -4,6 +4,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
+import { resolveTerminalSupabaseKey } from "../config/supabaseTerminalKey.js";
 import { electronSafeStorageCrypto } from "./electron-crypto.js";
 import { runFiscalClaimOnce } from "./claim.js";
 import { startFiscalHeartbeatLoop } from "./heartbeat.js";
@@ -40,11 +41,13 @@ function loadOrCreateTerminalId(userDataPath: string): string {
 
 export function startFiscalWorker(userDataPath: string, deviceId?: string | null): void {
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
-  const secretKey =
-    process.env.FACAAMIGOS_SUPABASE_SECRET_KEY ||
-    process.env.FACAAMIGOS_SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    "sb_publishable_ssGb6CGSjsE7PTfXpR6cBg_I20V6YBh";
+  // Mesma guarda do print bridge (main/printBridge.ts), via helper
+  // compartilhado: sem uma chave secreta real (ou com a publicável colada
+  // por engano em FACAAMIGOS_SUPABASE_SECRET_KEY, como já aconteceu em
+  // produção), o fallback cairia numa chave que a Edge Function
+  // `nfse-certificate-fetch` SEMPRE rejeita com "não autorizado" — um erro
+  // que parece problema no certificado mas na verdade é .env deste terminal.
+  const { secretKey, canFetchFiscalCredentials, kind } = resolveTerminalSupabaseKey();
 
   if (!url || !secretKey) {
     console.warn(
@@ -54,12 +57,49 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
     return;
   }
 
+  // Só a chave nova (`sb_secret_...`) autoriza em `nfse-certificate-fetch`.
+  // Subir o worker com qualquer outra coisa não emite nota nenhuma: ele
+  // reivindica o documento da fila, leva 401 ao buscar o certificado e
+  // grava BLOQUEADO "não autorizado" — e, pior, tira o documento de um
+  // terminal vizinho que estava configurado certo (a fila usa
+  // `for update skip locked`, então quem chega primeiro leva). Ficar de
+  // fora da fila é melhor que participar dela quebrado.
+  if (!canFetchFiscalCredentials) {
+    const motivo =
+      kind === "publishable" || kind === "none"
+        ? "a chave configurada é a PUBLICÁVEL (ou não há chave nenhuma)"
+        : "a service_role LEGADA (eyJ...) não é mais aceita pela Edge Function de certificado";
+    console.warn(
+      `[fiscal] emissão de NFC-e/NFS-e desligada neste terminal: ${motivo}. ` +
+        "Cole a chave secreta nova (sb_secret_..., em Supabase > Project Settings > API Keys > Secret keys) " +
+        "em FACAAMIGOS_SUPABASE_SECRET_KEY no .env deste terminal (%APPDATA%\\FacaAmigos\\.env) e reinicie. " +
+        "Ver apps/kiosk/.env.example.",
+    );
+    return;
+  }
+
   const simulado = process.env.FACAAMIGOS_FISCAL_MODE === "SIMULADO";
   const terminalId = loadOrCreateTerminalId(userDataPath);
   const log = (message: string) => console.log(message);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = createClient(url, secretKey, { realtime: { transport: WebSocket as any } });
+  // O `Authorization` explícito NÃO é redundante — é o que faz a emissão
+  // fiscal funcionar. Em @supabase/supabase-js 2.112.1, `functions.invoke`
+  // manda `apikey: <secretKey>` mas monta o bearer a partir da sessão do
+  // usuário, que num worker headless não existe; o header sai literalmente
+  // como `Authorization: undefined`. A Edge Function tira o "Bearer ",
+  // compara "undefined" com o segredo e responde 401 — que chegava ao
+  // painel como "Certificado A1 não disponível: não autorizado".
+  //
+  // Medido nesta máquina em 2026-09-02, mesma chave nos dois casos:
+  //   fetch cru + Authorization    -> 200
+  //   supabase.functions.invoke    -> 401  (authorization: "undefined")
+  //
+  // Ver o teste de regressão em test/fiscal-certificado.spec.ts.
+  const supabase = createClient(url, secretKey, {
+    global: { headers: { Authorization: `Bearer ${secretKey}` } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    realtime: { transport: WebSocket as any },
+  });
 
   let processing = false;
   async function drainQueue(): Promise<void> {

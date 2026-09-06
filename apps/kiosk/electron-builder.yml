@@ -24,9 +24,19 @@ extraResources:
   # Migrations .sql lidas em runtime (ver packages/db-local/src/migrate.ts)
   - from: ../../packages/db-local/dist/migrations
     to: migrations
-  # Arquivo de configuração .env para o quiosque
-  - from: .env
-    to: .env
+
+# NÃO volte a embutir `.env` aqui.
+#
+# Havia um `- from: .env / to: .env` nesta lista. Ele nunca funcionou no CI
+# (o .env é gitignorado, e o electron-builder ignora extraResource ausente
+# em silêncio), mas num build LOCAL o arquivo existe — e o instalador vai
+# para um bucket PÚBLICO do Supabase Storage (ver `publish` acima). O
+# resultado seria a chave secreta do projeto baixável por qualquer um.
+#
+# O workflow .github/workflows/build-kiosk.yml já falha de propósito se
+# encontrar `release/win-unpacked/resources/.env`, e scripts/release-kiosk.mjs
+# faz a mesma checagem para o build local. A chave de cada terminal mora em
+# %APPDATA%\FacaAmigos\.env — ver apps/kiosk/.env.example.
 
 win:
   target:

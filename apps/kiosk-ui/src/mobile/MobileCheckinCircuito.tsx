@@ -130,7 +130,7 @@ export function MobileCheckinCircuito({
         planId: catalogo === "planos" ? planId : null,
         packageId: catalogo === "pacotes" ? packageId : null,
         employeeId,
-        child: { id: picked.id, fullName: picked.full_name, birthDate: picked.birth_date, inclusiveEligible: false },
+        child: { id: picked.id, fullName: picked.full_name, birthDate: picked.birth_date, inclusiveEligible: Boolean(picked?.inclusive_eligible) },
         guardian: {
           fullName: picked.guardian_name || "Responsável",
           cpf: normalizeCpf(picked.cpf ?? ""),

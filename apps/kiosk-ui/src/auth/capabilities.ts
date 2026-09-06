@@ -75,7 +75,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
-export type Role = "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
+export type Role = "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN" | "PRESTADOR_PJ";
 
 /**
  * Os valores no banco continuam OPERADOR/GERENTE/ADMIN — renomeá-los
@@ -83,18 +83,20 @@ export type Role = "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
  * com risco de deixar um 'ADMIN' hardcoded para trás. O rótulo resolve o
  * mesmo problema visível com risco zero.
  *
- * ESTAGIARIO não é hierárquico como os outros três (não herda nem é
- * herdado) — só bate ponto, sem nenhum outro acesso ao sistema.
+ * ESTAGIARIO e PRESTADOR_PJ não são hierárquicos como os outros três —
+ * só registram frequência/prestação de serviço, sem nenhum outro acesso ao sistema.
  */
 export const ROLE_LABEL: Record<Role, string> = {
   ESTAGIARIO: "Estagiário",
   OPERADOR: "Operador",
   GERENTE: "Líder",
   ADMIN: "Owner",
+  PRESTADOR_PJ: "Prestador PJ",
 };
 
 export const ROLE_DESCRIPTION: Record<Role, string> = {
   ESTAGIARIO: "Só acessa o Controle de Frequência. Não opera caixa, vendas nem check-in/saída.",
+  PRESTADOR_PJ: "Só acessa o Registro de Prestação de Serviço (Check-in/Check-out). Sem vínculo empregatício CLT.",
   OPERADOR: "Caixa, vendas e Configurações.",
   GERENTE: "Tudo do Operador, mais troca de planos, sangrias, estornos e relatórios.",
   ADMIN: "Acesso total, incluindo cancelamento de sessões.",
@@ -106,4 +108,4 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
  * (Recepção, Vendedor, Líder de Turno...) desacoplado do RBAC — o único
  * nível concedido é a própria permissão.
  */
-export const ROLE_OPTIONS: ReadonlyArray<Role> = ["OPERADOR", "GERENTE", "ADMIN", "ESTAGIARIO"];
+export const ROLE_OPTIONS: ReadonlyArray<Role> = ["OPERADOR", "GERENTE", "ADMIN", "ESTAGIARIO", "PRESTADOR_PJ"];

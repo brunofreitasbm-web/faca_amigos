@@ -147,14 +147,14 @@ export interface JobApplication {
 export interface Employee {
   id: string;
   full_name: string;
-  role: "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
+  role: "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN" | "PRESTADOR_PJ";
   cpf?: string | null;
   email?: string | null;
   phone?: string | null;
   birth_date?: string | null;
   admission_date?: string | null;
   position?: string | null;
-  contract_type?: "CLT" | "ESTAGIO" | "AUTONOMO" | null;
+  contract_type?: "CLT" | "ESTAGIO" | "AUTONOMO" | "PJ" | null;
   weekly_hours_contracted?: number | null;
   active?: boolean;
   /** Unidades em que o colaborador atua — só preenchido por `Api.allEmployees()` (Gerencial). */
@@ -306,6 +306,15 @@ export interface GeneralOnboardingCompleteInput {
   phone?: string;
   birthDate?: string;
   pin: string;
+  role?: Employee["role"];
+  contractType?: Employee["contract_type"];
+  razaoSocial?: string;
+  cnpj?: string;
+  pixKey?: string;
+  bankCode?: string;
+  bankAgencia?: string;
+  bankConta?: string;
+  bankContaDv?: string;
   faceDescriptor?: number[];
   facePhotoBase64?: string;
 }
@@ -347,6 +356,7 @@ export interface EspelhoPonto {
     cpf: string | null;
     position: string | null;
     role: Employee["role"];
+    contract_type?: Employee["contract_type"];
     admission_date: string | null;
     weekly_hours_contracted: number | null;
     birth_date: string | null;
@@ -527,6 +537,7 @@ export interface ChildMatch {
   visits_in_window: number;
   /** Selo VIP: atingiu o número de visitas na janela. Decidido no banco. */
   is_vip: boolean;
+  inclusive_eligible?: boolean;
 }
 
 /**
@@ -750,6 +761,7 @@ export interface ActiveSessionEntry {
     guardian_name_snapshot?: string;
     guardian_phone_snapshot?: string;
     child_birth_date?: string;
+    child_inclusive_eligible?: boolean;
     notes?: string;
     sensory_tags?: string[];
     paused_at_ms: number | null;
@@ -1205,7 +1217,7 @@ export async function fetchActiveSessionsRaw(unitId: string): Promise<ActiveSess
     assetIds.length === 0
       ? Promise.resolve([])
       : unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_assets").select("id, name, emoji, photo_url").in("id", assetIds)),
-    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_children").select("id, birth_date").in("id", childIds)),
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_children").select("id, birth_date, inclusive_eligible").in("id", childIds)),
     // Saldo de pacote pré-pago. Sem isto o card mostraria o preço cheio e o
     // fechamento cobraria menos — o operador leria a diferença como erro do
     // sistema justamente na frente do cliente que comprou o pacote.
@@ -1310,6 +1322,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         guardian_name_snapshot: (guardian?.full_name as string) ?? undefined,
         guardian_phone_snapshot: (guardian?.phone_e164 as string) ?? undefined,
         child_birth_date: (childRow?.birth_date as string) ?? undefined,
+        child_inclusive_eligible: Boolean(childRow?.inclusive_eligible),
         // Estes dois chegavam do banco no select("*") e eram descartados
         // aqui — por isso o alerta de cuidados no card do Painel e o "OBS"
         // da etiqueta nunca apareciam, mesmo com a tela de Entrada tendo um
@@ -2365,15 +2378,51 @@ export const Api = {
     return path;
   },
 
-  bonusRules: (unitId: string) =>
-    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_rules").select("*").eq("unit_id", unitId).eq("active", true)).then(
-      (rows) => rows.map(bonusRuleFromRow),
-    ),
+  bonusRules: async (unitId: string): Promise<BonusRule[]> => {
+    try {
+      const rows = await unwrap<Record<string, unknown>[]>(
+        supabase().from("fa_kiosk_bonus_rules").select("*").eq("unit_id", unitId).eq("active", true),
+      );
+      const rules = rows.map(bonusRuleFromRow);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(`fa_bonus_rules_${unitId}`, JSON.stringify(rules));
+      }
+      return rules;
+    } catch (err) {
+      console.warn("Falha ao buscar bonusRules da API, buscando do localStorage:", err);
+      if (typeof localStorage !== "undefined") {
+        const cached = localStorage.getItem(`fa_bonus_rules_${unitId}`);
+        if (cached) {
+          try {
+            return JSON.parse(cached) as BonusRule[];
+          } catch {}
+        }
+      }
+      return [];
+    }
+  },
   /** Todas as regras de bonificação de todas as unidades (ativas e inativas) — Gerencial. */
-  bonusRulesAllUnits: () =>
-    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_rules").select("*")).then((rows) =>
-      rows.map(bonusRuleFromRow),
-    ),
+  bonusRulesAllUnits: async (): Promise<BonusRule[]> => {
+    try {
+      const rows = await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_rules").select("*"));
+      const rules = rows.map(bonusRuleFromRow);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("fa_bonus_rules_all", JSON.stringify(rules));
+      }
+      return rules;
+    } catch (err) {
+      console.warn("Falha ao buscar bonusRulesAllUnits da API, buscando do localStorage:", err);
+      if (typeof localStorage !== "undefined") {
+        const cached = localStorage.getItem("fa_bonus_rules_all");
+        if (cached) {
+          try {
+            return JSON.parse(cached) as BonusRule[];
+          } catch {}
+        }
+      }
+      return [];
+    }
+  },
 
   /**
    * Aniversariantes do mês, só desta unidade — uma criança só aparece aqui
@@ -3200,19 +3249,41 @@ export const Api = {
   },
   /** Meta de Ticket Médio (mínimo/alvo) configurada pelo Owner para a unidade — null se ainda não configurada. */
   ticketGoal: async (unitId: string): Promise<TicketGoal | null> => {
-    const rows = await unwrap<Record<string, unknown>[]>(
-      supabase().from("fa_kiosk_unit_ticket_goals").select("unit_id, min_ticket_cents, target_ticket_cents").eq("unit_id", unitId),
-    );
-    const row = rows[0];
-    if (!row) return null;
-    return { unitId: row.unit_id as string, minTicketCents: row.min_ticket_cents as number, targetTicketCents: row.target_ticket_cents as number };
+    try {
+      const rows = await unwrap<Record<string, unknown>[]>(
+        supabase().from("fa_kiosk_unit_ticket_goals").select("unit_id, min_ticket_cents, target_ticket_cents").eq("unit_id", unitId),
+      );
+      const row = rows[0];
+      if (!row) return null;
+      const res = { unitId: row.unit_id as string, minTicketCents: row.min_ticket_cents as number, targetTicketCents: row.target_ticket_cents as number };
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(`fa_ticket_goal_${unitId}`, JSON.stringify(res));
+      }
+      return res;
+    } catch (err) {
+      console.warn("Falha ao buscar ticketGoal da API, buscando do localStorage:", err);
+      if (typeof localStorage !== "undefined") {
+        const cached = localStorage.getItem(`fa_ticket_goal_${unitId}`);
+        if (cached) {
+          try {
+            return JSON.parse(cached) as TicketGoal;
+          } catch {}
+        }
+      }
+      return null;
+    }
   },
-  setTicketGoal: (unitId: string, minTicketCents: number, targetTicketCents: number) =>
-    unwrap(
+  setTicketGoal: async (unitId: string, minTicketCents: number, targetTicketCents: number) => {
+    const val = { unitId, minTicketCents, targetTicketCents };
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(`fa_ticket_goal_${unitId}`, JSON.stringify(val));
+    }
+    return unwrap(
       supabase()
         .from("fa_kiosk_unit_ticket_goals")
         .upsert({ unit_id: unitId, min_ticket_cents: minTicketCents, target_ticket_cents: targetTicketCents, updated_at_ms: Date.now() }, { onConflict: "unit_id" }),
-    ),
+    );
+  },
   reportBirthdays: async (month?: number, day?: number) => {
     let query = supabase().from("fa_kiosk_children").select("id, full_name, birth_date");
     const children = await unwrap<Record<string, unknown>[]>(query);

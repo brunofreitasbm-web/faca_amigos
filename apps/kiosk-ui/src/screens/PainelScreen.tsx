@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
-import type { ActiveSessionEntry, Plan, Package, Asset } from "../api/client.js";
+import type { ActiveSessionEntry, Plan, Package, Asset, BonusRule } from "../api/client.js";
 import { bonificacaoHoje, dentroDoPiloto } from "../bonificacao.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { usePendingRenewals, resolveRenewal } from "../api/renewalRequests.js";
@@ -84,6 +84,7 @@ export function PainelScreen() {
   const [ticketMinCents, setTicketMinCents] = useState(0);
   const [ticketTargetCents, setTicketTargetCents] = useState(0);
   const [todayOrdersCount, setTodayOrdersCount] = useState(0);
+  const [bonusRules, setBonusRules] = useState<BonusRule[]>([]);
   const [entradaOpen, setEntradaOpen] = useState(false);
   const [preCheckinPrefill, setPreCheckinPrefill] = useState<PreCheckinPrefill | null>(null);
   const [pendingPreCheckins, setPendingPreCheckins] = useState<PreCheckinPrefill[]>([]);
@@ -203,22 +204,34 @@ export function PainelScreen() {
     let cancelled = false;
     async function poll() {
       try {
-        const [goal, revenue, ticketMedio, ticketGoal] = await Promise.all([
+        const [goalRes, revenueRes, ticketMedioRes, ticketGoalRes, bonusRulesRes] = await Promise.allSettled([
           Api.todayGoal(unit!.id, unit!.business_day_cutoff_hour),
           Api.todayRevenue(unit!.id, unit!.business_day_cutoff_hour),
           Api.todayTicketMedio(unit!.id, unit!.business_day_cutoff_hour),
           Api.ticketGoal(unit!.id),
+          Api.bonusRules(unit!.id),
         ]);
         if (!cancelled) {
-          setDailyGoalCents(goal || 0);
-          setTodayRevenueCents(revenue.totalCents);
-          setTicketMedioCents(ticketMedio.avgCents);
-          setTodayOrdersCount(ticketMedio.ordersCount);
-          setTicketMinCents(ticketGoal?.minTicketCents ?? 0);
-          setTicketTargetCents(ticketGoal?.targetTicketCents ?? 0);
+          if (goalRes.status === "fulfilled") {
+            setDailyGoalCents(Number(goalRes.value) || 0);
+          }
+          if (revenueRes.status === "fulfilled") {
+            setTodayRevenueCents(revenueRes.value.totalCents);
+          }
+          if (ticketMedioRes.status === "fulfilled") {
+            setTicketMedioCents(ticketMedioRes.value.avgCents);
+            setTodayOrdersCount(ticketMedioRes.value.ordersCount);
+          }
+          if (ticketGoalRes.status === "fulfilled") {
+            setTicketMinCents(ticketGoalRes.value?.minTicketCents ?? 0);
+            setTicketTargetCents(ticketGoalRes.value?.targetTicketCents ?? 0);
+          }
+          if (bonusRulesRes.status === "fulfilled") {
+            setBonusRules(bonusRulesRes.value || []);
+          }
         }
       } catch {
-        // Meta é um extra informativo — se o backend ainda não tiver essas rotas (ex: servidor não reiniciado), o Painel segue funcionando sem o banner.
+        // Meta é um extra informativo
       }
     }
     poll();
@@ -535,6 +548,7 @@ export function PainelScreen() {
           const wristbandCode = session.access_code || session.wristband_code || session.id.slice(0, 6).toUpperCase();
           const careSummary = [...(session.sensory_tags ?? []), session.notes].filter(Boolean).join(" · ");
           const isNeurodivergent = Boolean(
+            session.child_inclusive_eligible ||
             (session.sensory_tags?.length ?? 0) > 0 ||
             session.notes?.toLowerCase().includes("neuro") ||
             session.notes?.toLowerCase().includes("autis") ||
@@ -845,7 +859,7 @@ export function PainelScreen() {
                     e.stopPropagation();
                     setPrintData({
                       wristbandCode,
-                      childName: ((session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩")
+                      childName: (session.child_inclusive_eligible || (session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩")
                         ? `${session.child_name_snapshot} 🧩`
                         : session.child_name_snapshot,
                       guardianName: session.guardian_name_snapshot || "Responsável",
@@ -1075,6 +1089,25 @@ export function PainelScreen() {
           </div>
         );
       })()}
+
+      {bonusRules.length > 0 && (
+        <div
+          title="Regras ativas do programa de bonificação da unidade"
+          style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
+          className="capacity-container"
+        >
+          <div style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-secondary)", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span>🏆 Programa de Bonificação:</span>
+          </div>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {bonusRules.map((rule) => (
+              <Badge key={rule.id} variant="vip" style={{ fontSize: "11px", padding: "4px 8px" }}>
+                🎁 {rule.description} ({money(rule.rewardValueCents)})
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
 
       {selected.size > 0 && (
         <div style={{ position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 100 }}>

@@ -176,11 +176,15 @@ export function FrequenciaTab() {
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       <span>{r.full_name}</span>
-                      {r.role === "ESTAGIARIO" && (
+                      {r.role === "PRESTADOR_PJ" ? (
+                        <span style={{ fontSize: "11px", fontWeight: "bold", background: "rgba(16, 185, 129, 0.15)", color: "#047857", padding: "1px 6px", borderRadius: "9999px" }}>
+                          💼 Prestador PJ
+                        </span>
+                      ) : r.role === "ESTAGIARIO" ? (
                         <span style={{ fontSize: "11px", fontWeight: "bold", background: "rgba(180, 83, 9, 0.15)", color: "#b45309", padding: "1px 6px", borderRadius: "9999px" }}>
                           🎓 Estagiário
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </td>
                   <td>{r.role ? ROLE_LABEL[r.role] : "—"}</td>

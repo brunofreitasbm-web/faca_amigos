@@ -334,6 +334,9 @@ export function EntradaScreen({
     setPhone(match.phone_e164 ? formatPhoneBr(match.phone_e164) : "");
     setGuardianName(match.guardian_name ?? "");
     setCpf(match.cpf ? formatCpf(match.cpf) : "");
+    if (match.inclusive_eligible) {
+      setIsNeurodivergent(true);
+    }
     setMatches([]);
     setFavoriteAssetId(null);
     setOffer(null);
@@ -584,7 +587,7 @@ export function EntradaScreen({
         useHourBank: usingHourBank,
         packageId: usingPackage ? selectedPackageId : undefined,
         employeeId: employee.id,
-        child: { id: matchedChild?.id, fullName: childName.trim(), birthDate, inclusiveEligible: false },
+        child: { id: matchedChild?.id, fullName: childName.trim(), birthDate, inclusiveEligible: isNeurodivergent },
         guardian: {
           id: lastGuardianId ?? undefined,
           fullName: guardianName.trim(),

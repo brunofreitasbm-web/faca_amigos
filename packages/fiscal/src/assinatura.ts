@@ -9,16 +9,29 @@ import { SignedXml } from "xml-crypto";
  * Fase 2) — este pacote nunca toca em disco nem no arquivo `.pfx` original.
  *
  * Parâmetros exigidos pelo layout NF-e/NFC-e:
- *   - Canonicalização exclusiva (`exc-c14n`)
+ *   - Canonicalização INCLUSIVA (`REC-xml-c14n-20010315`)
  *   - Algoritmo de assinatura `rsa-sha1`, digest `sha1`
- *   - Transform `enveloped-signature` + `exc-c14n`
+ *   - Transform `enveloped-signature` + `REC-xml-c14n-20010315`
  *   - `Reference URI="#NFe<chaveDeAcesso>"`, apontando para o `Id` do `infNFe`
  *   - `KeyInfo` com `X509Data` (o certificado do emitente, para a SEFAZ
  *     conseguir validar a cadeia)
  */
 
 const ALGORITMO_ASSINATURA = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
-const ALGORITMO_CANONICALIZACAO = "http://www.w3.org/2001/10/xml-exc-c14n#";
+
+/**
+ * Canonicalização INCLUSIVA. Não troque por `exc-c14n`.
+ *
+ * O XSD da NF-e restringe o atributo `Algorithm` a uma lista fechada, e
+ * `http://www.w3.org/2001/10/xml-exc-c14n#` não está nela. Estava aqui, e a
+ * SEFAZ rejeitou em homologação em 2026-09-02 com
+ * `cStat 225 — Falha no Schema XML da NFe (Atributo: Algorithm)`, com a
+ * nota já montada, numerada e transmitida.
+ *
+ * Vale para NFC-e e para a DPS nacional: os dois layouts pedem o MESMO
+ * valor, ao contrário do que o comentário de `assinarXmlDps` afirmava.
+ */
+const ALGORITMO_CANONICALIZACAO = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
 const ALGORITMO_DIGEST = "http://www.w3.org/2000/09/xmldsig#sha1";
 const TRANSFORM_ENVELOPED = "http://www.w3.org/2000/09/xmldsig#enveloped-signature";
 
@@ -66,7 +79,12 @@ export function assinarXmlNfce(input: AssinarXmlNfceInput): string {
   return sig.getSignedXml();
 }
 
-const ALGORITMO_CANONICALIZACAO_DPS = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
+/**
+ * Mantido como alias por clareza de leitura no código da DPS, mas é
+ * exatamente o mesmo valor da NFC-e — ver a nota em
+ * `ALGORITMO_CANONICALIZACAO`.
+ */
+const ALGORITMO_CANONICALIZACAO_DPS = ALGORITMO_CANONICALIZACAO;
 
 export interface AssinarXmlDpsInput {
   /** XML da DPS ainda sem assinatura, contendo `<infDPS Id="DPS...">`. */
@@ -81,12 +99,17 @@ export interface AssinarXmlDpsInput {
 
 /**
  * Assinatura XMLDSig da DPS (Modelo Nacional de NFS-e) — mesma dupla
- * RSA-SHA1/SHA1 da NFC-e, mas com canonicalização C14N "pura" (não
- * exclusiva), conforme o Manual de Contribuintes da Prefeitura de Belém
- * (seção "Padrão de assinatura", 2026-08-19): a NFC-e usa `exc-c14n`, a
- * DPS nacional usa `REC-xml-c14n-20010315` — as duas exigências não são
- * intercambiáveis, daí a função separada em vez de reaproveitar
- * `assinarXmlNfce` com um parâmetro a mais.
+ * RSA-SHA1/SHA1 e a MESMA canonicalização C14N inclusiva da NFC-e,
+ * conforme o Manual de Contribuintes da Prefeitura de Belém (seção "Padrão
+ * de assinatura", 2026-08-19).
+ *
+ * O comentário anterior dizia que "a NFC-e usa exc-c14n, a DPS usa
+ * REC-xml-c14n-20010315 — as duas exigências não são intercambiáveis".
+ * A segunda metade estava certa e a primeira não: a NFC-e também exige
+ * `REC-xml-c14n-20010315`, e usar `exc-c14n` lá rendeu cStat 225. As
+ * funções seguem separadas porque diferem no que importa de verdade — o
+ * xpath da Reference (`infNFe` x `infDPS`) e onde a Signature é
+ * posicionada (`append` no <NFe> x `after` no infDPS).
  */
 export function assinarXmlDps(input: AssinarXmlDpsInput): string {
   const sig = new SignedXml({

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, Input, HelpText, Modal, Tag } from "@facaamigos/ui";
 import { formatCpf, isValidCpf } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
-import type { CashMovement, CloseShiftResult, RevenueByMethod, Shift, ShiftSale, FiscalDoc } from "../api/client.js";
+import type { CashMovement, CloseShiftResult, RevenueByMethod, Shift, ShiftSale, FiscalDoc, BonusRule } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useConfirm } from "../state/ConfirmContext.js";
 import { IfCan } from "../auth/RequireCapability.js";
@@ -49,6 +49,13 @@ export function CaixaScreen() {
   // aqui só acompanhamos o status e liberamos o "Tentar Novamente".
   const [nfceDocsMap, setNfceDocsMap] = useState<Record<string, FiscalDoc | null>>({});
   const [nfceRetryingMap, setNfceRetryingMap] = useState<Record<string, boolean>>({});
+  const [bonusRules, setBonusRules] = useState<BonusRule[]>([]);
+
+  useEffect(() => {
+    if (unit?.id) {
+      Api.bonusRules(unit.id).then(setBonusRules).catch(() => {});
+    }
+  }, [unit?.id]);
 
   async function loadNfceDocsForSales(salesList: ShiftSale[]) {
     const pdvSales = salesList.filter((s) => s.kind === "PDV");
@@ -1359,6 +1366,21 @@ export function CaixaScreen() {
         <HelpText style={{ marginBottom: "16px" }}>
           Registro diário de locações e velocidade de atendimento (vendas em 30m, 1h e 2h) para cálculo automático de metas Ouro/Diamante.
         </HelpText>
+
+        {bonusRules.length > 0 && (
+          <div style={{ marginBottom: "16px", padding: "12px", borderRadius: "12px", background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)" }}>
+            <div style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-secondary)", marginBottom: "8px" }}>
+              ✨ Regras de Bonificação Vigentes para esta Unidade:
+            </div>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {bonusRules.map((rule) => (
+                <Tag key={rule.id} style={{ fontSize: "12px", padding: "4px 10px", background: "rgba(147, 51, 234, 0.1)", border: "1px solid rgba(147, 51, 234, 0.3)", color: "var(--text-primary)" }}>
+                  🎁 <strong>{rule.description}</strong> — Bônus: {money(rule.rewardValueCents)}
+                </Tag>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" }}>
           <div>

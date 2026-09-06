@@ -55,12 +55,24 @@ export class SvrsNfceTransport implements NfceTransport {
     bodyXml: string,
   ): Promise<string> {
     const host = ambiente === "PRODUCAO" ? SVRS_HOSTS.PRODUCAO : SVRS_HOSTS.HOMOLOGACAO;
-    const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
-    ${bodyXml}
-  </soap12:Body>
-</soap12:Envelope>`;
+
+    // UMA LINHA SÓ, sem espaço nem quebra entre tags — e não é preciosismo
+    // de formatação. A SEFAZ valida isso e devolve cStat 588: "Não é
+    // permitida a presença de caracteres de edição no início/fim da
+    // mensagem ou entre as tags da mensagem". O envelope indentado que
+    // estava aqui foi rejeitado em homologação em 2026-09-02 (Elemento:
+    // enviNFe), com a nota já assinada e numerada.
+    //
+    // `trim()` no corpo pelo mesmo motivo: o XML assinado não pode chegar
+    // com \n ou espaço nas pontas. Alterar a assinatura é impossível a
+    // esta altura, então o cuidado é não introduzir sujeira ao redor.
+    const soapEnvelope =
+      `<?xml version="1.0" encoding="utf-8"?>` +
+      `<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">` +
+      `<soap12:Body>` +
+      bodyXml.trim() +
+      `</soap12:Body>` +
+      `</soap12:Envelope>`;
 
     return new Promise((resolve, reject) => {
       const req = request(
@@ -103,13 +115,12 @@ export class SvrsNfceTransport implements NfceTransport {
 
   async consultarStatusServico(ambiente: FiscalAmbiente): Promise<StatusServicoResultado> {
     const tpAmb = ambiente === "PRODUCAO" ? "1" : "2";
-    const bodyXml = `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NfeStatusServico4">
-      <consStatServ xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
-        <tpAmb>${tpAmb}</tpAmb>
-        <cUF>15</cUF>
-        <xServ>STATUS</xServ>
-      </consStatServ>
-    </nfeDadosMsg>`;
+    // Sem quebra nem espaço entre tags — ver a nota sobre cStat 588 em postSoap.
+    const bodyXml =
+      `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NfeStatusServico4">` +
+      `<consStatServ xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">` +
+      `<tpAmb>${tpAmb}</tpAmb><cUF>15</cUF><xServ>STATUS</xServ>` +
+      `</consStatServ></nfeDadosMsg>`;
 
     try {
       const xmlRes = await this.postSoap(
@@ -142,13 +153,15 @@ export class SvrsNfceTransport implements NfceTransport {
 
   async autorizar(xmlAssinado: string, ambiente: FiscalAmbiente): Promise<AutorizacaoResultado> {
     const idLote = String(Date.now()).slice(-9);
-    const bodyXml = `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">
-      <enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
-        <idLote>${idLote}</idLote>
-        <indSinc>1</indSinc>
-        ${xmlAssinado.replace(/<\?xml.*?\?>/g, "")}
-      </enviNFe>
-    </nfeDadosMsg>`;
+    // Este é o elemento que a SEFAZ nomeou ao rejeitar com cStat 588
+    // ("caracteres de edição ... Elemento: enviNFe"): a indentação em volta
+    // do XML assinado bastava para derrubar a nota. Ver a nota em postSoap.
+    const bodyXml =
+      `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">` +
+      `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">` +
+      `<idLote>${idLote}</idLote><indSinc>1</indSinc>` +
+      xmlAssinado.replace(/<\?xml.*?\?>/g, "").trim() +
+      `</enviNFe></nfeDadosMsg>`;
 
     try {
       const xmlRes = await this.postSoap(
@@ -209,13 +222,12 @@ export class SvrsNfceTransport implements NfceTransport {
 
   async consultarPorChave(chaveAcesso: string, ambiente: FiscalAmbiente): Promise<AutorizacaoResultado> {
     const tpAmb = ambiente === "PRODUCAO" ? "1" : "2";
-    const bodyXml = `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NfeConsulta4">
-      <consSitNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
-        <tpAmb>${tpAmb}</tpAmb>
-        <xServ>CONSULTAR</xServ>
-        <chNFe>${chaveAcesso}</chNFe>
-      </consSitNFe>
-    </nfeDadosMsg>`;
+    // Sem quebra nem espaço entre tags — ver a nota sobre cStat 588 em postSoap.
+    const bodyXml =
+      `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NfeConsulta4">` +
+      `<consSitNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">` +
+      `<tpAmb>${tpAmb}</tpAmb><xServ>CONSULTAR</xServ><chNFe>${chaveAcesso}</chNFe>` +
+      `</consSitNFe></nfeDadosMsg>`;
 
     try {
       const xmlRes = await this.postSoap(

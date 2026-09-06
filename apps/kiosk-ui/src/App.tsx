@@ -28,6 +28,7 @@ import { LoginScreen } from "./screens/LoginScreen.js";
 import { SelectModuleScreen } from "./screens/SelectModuleScreen.js";
 import { OnboardingInviteScreen } from "./screens/OnboardingInviteScreen.js";
 import { GeneralOnboardingScreen } from "./screens/GeneralOnboardingScreen.js";
+import { GeneralPjOnboardingScreen } from "./screens/GeneralPjOnboardingScreen.js";
 import { AcompanharScreen } from "./screens/AcompanharScreen.js";
 import { AcessoRapidoScreen } from "./screens/AcessoRapidoScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
@@ -308,6 +309,13 @@ export function App() {
   if (cadastroEstagiarioParam) {
     const [unitId, token] = cadastroEstagiarioParam.split(".");
     if (unitId && token) return <GeneralOnboardingScreen unitId={unitId} token={token} />;
+  }
+
+  // Link Geral de auto-cadastro de prestador PJ (?cadastro-pj=<unitId>.<token>):
+  const cadastroPjParam = new URLSearchParams(window.location.search).get("cadastro-pj");
+  if (cadastroPjParam) {
+    const [unitId, token] = cadastroPjParam.split(".");
+    if (unitId && token) return <GeneralPjOnboardingScreen unitId={unitId} token={token} />;
   }
 
   // Painel do responsável (?acompanhar=<access_code>): quem abre é o pai/mãe

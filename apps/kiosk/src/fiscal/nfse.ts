@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { anoMesLocal, assinarXmlDps, montarXmlDps, type DpsInput } from "@facaamigos/fiscal";
-import { transmitirDps } from "@facaamigos/fiscal/dps-nacional-transport";
+import {
+  CODIGO_ERRO_DPS_JA_PROCESSADA,
+  consultarChaveAcessoPorDps,
+  consultarNfsePorChave,
+  transmitirDps,
+} from "@facaamigos/fiscal/dps-nacional-transport";
 import { buscarCredenciaisFiscais } from "./certificado.js";
 import { extrairChaveECertificadoPem } from "./vault.js";
 import type { ClaimDeps, ClaimedFiscalDoc } from "./claim.js";
@@ -183,7 +188,17 @@ export async function processarNfseReal(deps: ClaimDeps, item: ClaimedFiscalDoc)
     return;
   }
 
-  const numero = await reservarNumeroRps(supabase, doc, unit.id);
+  // Reaproveita o número já reservado numa tentativa anterior deste MESMO
+  // documento em vez de sortear um novo — reservarNumeroRps nunca reserva o
+  // mesmo número duas vezes (fa_fiscal_reserve_number é um contador puro,
+  // sem noção de "documento"), então sortear de novo a cada retry arrisca
+  // gerar uma SEGUNDA NFS-e real para a mesma venda sempre que uma
+  // transmissão anterior tiver sido aceita pelo ADN mas a resposta se
+  // perdeu antes de chegar aqui (foi exatamente o que aconteceu com o RPS
+  // nº7 da unidade Circuito em 2026-09-02 — ver CODIGO_ERRO_DPS_JA_PROCESSADA
+  // acima, que existe como rede de segurança para quando isso já tiver
+  // ocorrido antes desta correção).
+  const numero = doc.numero ?? (await reservarNumeroRps(supabase, doc, unit.id));
   const agora = new Date();
   const timeZone = unitFiscal.timezone ?? undefined;
 
@@ -216,8 +231,28 @@ export async function processarNfseReal(deps: ClaimDeps, item: ClaimedFiscalDoc)
   const { xml, idDps } = montarXmlDps(dpsInput);
   const xmlAssinado = assinarXmlDps({ xml, idDps, certPem, privateKeyPem });
 
-  const resultado = await transmitirDps({ xmlAssinado, ambiente: doc.environment, certPem, privateKeyPem });
+  let resultado = await transmitirDps({ xmlAssinado, ambiente: doc.environment, certPem, privateKeyPem });
   const nowMs = Date.now();
+
+  // E0014 = a série/número/município/CNPJ desta DPS já geraram uma NFS-e
+  // numa transmissão anterior (ex.: a resposta se perdeu por timeout/queda
+  // de rede depois que o ADN já tinha processado). `numero` é reservado de
+  // forma idempotente por doc.id (reservarNumeroRps), então reenviar com
+  // outro número criaria uma segunda NFS-e para a mesma venda — o correto é
+  // buscar a que já existe, não gerar outra.
+  if (!resultado.autorizado && resultado.codigosErro.includes(CODIGO_ERRO_DPS_JA_PROCESSADA)) {
+    onLog?.(`[fiscal] NFS-e ${doc.id}: DPS já processada (E0014) — recuperando a NFS-e já emitida em vez de reenviar.`);
+    const { chaveAcesso } = await consultarChaveAcessoPorDps({ idDps, ambiente: doc.environment, certPem, privateKeyPem });
+    if (chaveAcesso) {
+      const { nfseXml } = await consultarNfsePorChave({ chaveAcesso, ambiente: doc.environment, certPem, privateKeyPem });
+      if (nfseXml) {
+        resultado = { autorizado: true, httpStatus: 200, tipoAmbiente: null, chaveAcesso, nfseXml, mensagemErro: null, codigosErro: [], alertas: [] };
+      }
+    }
+    if (!resultado.autorizado) {
+      onLog?.(`[fiscal] NFS-e ${doc.id}: não foi possível recuperar a NFS-e já emitida (E0014) — chave/XML indisponíveis na consulta ao ADN.`);
+    }
+  }
 
   if (!resultado.autorizado) {
     onLog?.(`[fiscal] NFS-e ${doc.id} rejeitada pelo ADN (HTTP ${resultado.httpStatus}): ${resultado.mensagemErro}`);

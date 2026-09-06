@@ -43,8 +43,115 @@ export interface TransmitirDpsResultado {
   nfseXml: string | null;
   /** Mensagem de erro/motivo de rejeição, quando não autorizado — corpo bruto se não for JSON reconhecível. */
   mensagemErro: string | null;
+  /** Códigos de erro estruturados (`erros[].Codigo`), quando não autorizado — ex. checar `CODIGO_ERRO_DPS_JA_PROCESSADA`. */
+  codigosErro: string[];
   alertas: unknown[];
 }
+
+/**
+ * GET genérico à API ADN, com o mesmo fallback de path (`/API/SefinNacional`
+ * x `/SefinNacional`) da transmissão — ver comentário no topo do arquivo.
+ */
+async function getAdn(
+  ambiente: "HOMOLOGACAO" | "PRODUCAO",
+  pathSuffix: string,
+  certPem: string,
+  privateKeyPem: string,
+  timeoutMs: number,
+): Promise<{ status: number; raw: string }> {
+  const host = ambiente === "PRODUCAO" ? HOST_PRODUCAO : HOST_HOMOLOGACAO;
+  let lastStatus = 0;
+  let lastRaw = "";
+
+  for (const base of CANDIDATE_PATHS.map((p) => p.replace(/\/nfse$/, ""))) {
+    const { status, raw } = await new Promise<{ status: number; raw: string }>((resolve, reject) => {
+      const req = request(
+        {
+          host,
+          path: `${base}${pathSuffix}`,
+          method: "GET",
+          cert: certPem,
+          key: privateKeyPem,
+          ca: montarCaBundle(),
+          servername: host,
+          timeout: timeoutMs,
+          headers: { Accept: "application/json" },
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, raw: Buffer.concat(chunks).toString("utf-8") }));
+        },
+      );
+      req.on("timeout", () => req.destroy(new Error(`Tempo esgotado ao consultar ${pathSuffix} no ADN.`)));
+      req.on("error", reject);
+      req.end();
+    });
+    lastStatus = status;
+    lastRaw = raw;
+    if (status !== 404) break;
+  }
+
+  return { status: lastStatus, raw: lastRaw };
+}
+
+export interface ConsultarChaveDpsInput {
+  idDps: string;
+  ambiente: "HOMOLOGACAO" | "PRODUCAO";
+  certPem: string;
+  privateKeyPem: string;
+  timeoutMs?: number;
+}
+
+/**
+ * Recupera a chave de acesso de uma NFS-e já gerada a partir de uma DPS
+ * enviada anteriormente — necessário quando uma transmissão retorna
+ * `E0014` (série/número/município/CNPJ já usados numa DPS anterior): a
+ * NFS-e já existe de verdade no ADN, reenviar geraria um erro em loop, e o
+ * documento correto é buscar o que já foi emitido, não tentar de novo.
+ * `GET /SefinNacional/dps/{idDps}` — confirmado no manual público do
+ * Sistema Nacional NFS-e (gov.br/nfse, "Guia para utilização das APIs").
+ */
+export async function consultarChaveAcessoPorDps(input: ConsultarChaveDpsInput): Promise<{ chaveAcesso: string | null; httpStatus: number; raw: string }> {
+  const { status, raw } = await getAdn(input.ambiente, `/dps/${input.idDps}`, input.certPem, input.privateKeyPem, input.timeoutMs ?? 30_000);
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    parsed = null;
+  }
+  const chave = parsed?.chaveAcesso ?? parsed?.chave ?? null;
+  return { chaveAcesso: typeof chave === "string" ? chave : null, httpStatus: status, raw };
+}
+
+export interface ConsultarNfseInput {
+  chaveAcesso: string;
+  ambiente: "HOMOLOGACAO" | "PRODUCAO";
+  certPem: string;
+  privateKeyPem: string;
+  timeoutMs?: number;
+}
+
+/**
+ * Recupera o XML completo (autorizado) de uma NFS-e já emitida, a partir
+ * da chave de acesso — segunda metade da recuperação pós-E0014, ver
+ * `consultarChaveAcessoPorDps`. `GET /SefinNacional/nfse/{chave}`.
+ */
+export async function consultarNfsePorChave(input: ConsultarNfseInput): Promise<{ nfseXml: string | null; httpStatus: number; raw: string }> {
+  const { status, raw } = await getAdn(input.ambiente, `/nfse/${input.chaveAcesso}`, input.certPem, input.privateKeyPem, input.timeoutMs ?? 30_000);
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    parsed = null;
+  }
+  const gzipB64 = parsed?.nfseXmlGZipB64;
+  const nfseXml = typeof gzipB64 === "string" ? gunzipSync(Buffer.from(gzipB64, "base64")).toString("utf-8") : null;
+  return { nfseXml, httpStatus: status, raw };
+}
+
+/** Código de rejeição do ADN quando a NFS-e já foi gerada por uma DPS anterior — ver `consultarChaveAcessoPorDps`. */
+export const CODIGO_ERRO_DPS_JA_PROCESSADA = "E0014";
 
 /**
  * POST síncrono à API ADN — a própria API já valida e gera a NFS-e numa
@@ -119,6 +226,7 @@ export async function transmitirDps(input: TransmitirDpsInput): Promise<Transmit
       chaveAcesso: typeof parsed.chaveAcesso === "string" ? parsed.chaveAcesso : null,
       nfseXml,
       mensagemErro: null,
+      codigosErro: [],
       alertas: Array.isArray(parsed.alertas) ? parsed.alertas : [],
     };
   }
@@ -128,6 +236,14 @@ export async function transmitirDps(input: TransmitirDpsInput): Promise<Transmit
       ? String((parsed as Record<string, unknown>).mensagem ?? (parsed as Record<string, unknown>).message ?? (parsed as Record<string, unknown>).error)
       : raw || `HTTP ${status} sem corpo de resposta`;
 
+  // `erros` é o formato de rejeição do ADN (ver E0014/E1235/E0037 medidos em
+  // produção/homologação) — cada item tem `Codigo`/`Descricao`/`Complemento`.
+  const codigosErro = Array.isArray(parsed?.erros)
+    ? (parsed!.erros as Array<Record<string, unknown>>)
+        .map((e) => e.Codigo)
+        .filter((c): c is string => typeof c === "string")
+    : [];
+
   return {
     autorizado: false,
     httpStatus: status,
@@ -135,6 +251,7 @@ export async function transmitirDps(input: TransmitirDpsInput): Promise<Transmit
     chaveAcesso: null,
     nfseXml: null,
     mensagemErro,
+    codigosErro,
     alertas: Array.isArray(parsed?.alertas) ? (parsed!.alertas as unknown[]) : [],
   };
 }
