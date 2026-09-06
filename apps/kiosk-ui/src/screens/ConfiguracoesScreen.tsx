@@ -1478,6 +1478,7 @@ const CONTRACT_TYPE_LABEL: Record<NonNullable<Employee["contract_type"]>, string
   CLT: "CLT",
   ESTAGIO: "Estágio",
   AUTONOMO: "Autônomo",
+  PJ: "PJ (Prestador de Serviço)",
 };
 
 /**

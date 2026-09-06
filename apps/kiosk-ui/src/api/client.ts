@@ -147,14 +147,14 @@ export interface JobApplication {
 export interface Employee {
   id: string;
   full_name: string;
-  role: "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN";
+  role: "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN" | "PRESTADOR_PJ";
   cpf?: string | null;
   email?: string | null;
   phone?: string | null;
   birth_date?: string | null;
   admission_date?: string | null;
   position?: string | null;
-  contract_type?: "CLT" | "ESTAGIO" | "AUTONOMO" | null;
+  contract_type?: "CLT" | "ESTAGIO" | "AUTONOMO" | "PJ" | null;
   weekly_hours_contracted?: number | null;
   active?: boolean;
   /** Unidades em que o colaborador atua — só preenchido por `Api.allEmployees()` (Gerencial). */
@@ -306,6 +306,15 @@ export interface GeneralOnboardingCompleteInput {
   phone?: string;
   birthDate?: string;
   pin: string;
+  role?: Employee["role"];
+  contractType?: Employee["contract_type"];
+  razaoSocial?: string;
+  cnpj?: string;
+  pixKey?: string;
+  bankCode?: string;
+  bankAgencia?: string;
+  bankConta?: string;
+  bankContaDv?: string;
   faceDescriptor?: number[];
   facePhotoBase64?: string;
 }
@@ -347,6 +356,7 @@ export interface EspelhoPonto {
     cpf: string | null;
     position: string | null;
     role: Employee["role"];
+    contract_type?: Employee["contract_type"];
     admission_date: string | null;
     weekly_hours_contracted: number | null;
     birth_date: string | null;

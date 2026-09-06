@@ -18,6 +18,13 @@ const KINDS = [
   { value: "SAIDA", label: "Saída", help: "Registrar término da jornada de trabalho" },
 ] as const;
 
+const PJ_KINDS = [
+  { value: "ENTRADA", label: "Início da Prestação", help: "Registrar chegada / início das atividades prestadas" },
+  { value: "INTERVALO_INICIO", label: "Pausa", help: "Registrar início de intervalo / pausa na prestação" },
+  { value: "INTERVALO_FIM", label: "Retorno da Pausa", help: "Registrar retorno das atividades prestadas" },
+  { value: "SAIDA", label: "Término da Prestação", help: "Registrar término das atividades prestadas no dia" },
+] as const;
+
 function IconEntrada({ size = 28, color = "currentColor" }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -82,8 +89,13 @@ function getNextLogicalKind(todayPunches: PontoRecord[]): (typeof KINDS)[number]
  */
 export function PontoScreen() {
   const { unit, employee, hasFaceEnrolled } = useAppState();
+  const isPj = employee?.role === "PRESTADOR_PJ" || employee?.contract_type === "PJ";
   const isEstagiario = employee?.role === "ESTAGIARIO";
-  const screenTitle = isEstagiario ? "Controle de Frequência" : "Bater ponto";
+  const screenTitle = isPj
+    ? "Registro de Prestação de Serviço"
+    : isEstagiario
+    ? "Controle de Frequência"
+    : "Bater ponto";
   const toast = useToast();
 
   const [mode, setMode] = useState<"FACIAL_RAPIDO" | "PIN_MANUAL">("FACIAL_RAPIDO");

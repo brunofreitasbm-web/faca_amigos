@@ -98,10 +98,7 @@ export function ColaboradoresTab() {
     toast.success("Link copiado.");
   }
 
-  // Link Geral de auto-cadastro de estagiário: token fixo por unidade —
-  // sempre ESTAGIARIO, liberado na hora que a pessoa preenche (sem fila de
-  // aprovação). Diferente do convite individual, é idempotente: reabrir o
-  // modal para a mesma unidade devolve o MESMO link, nunca gera outro.
+  // Link Geral de auto-cadastro de estagiário (?cadastro-estagiario=<unitId>.<token>)
   const [showGeneralInviteModal, setShowGeneralInviteModal] = useState(false);
   const [generalInviteUnitId, setGeneralInviteUnitId] = useState(units[0]?.id ?? "");
   const [generalInviteBusy, setGeneralInviteBusy] = useState(false);
@@ -135,6 +132,44 @@ export function ColaboradoresTab() {
     if (!generalInviteLink) return;
     await navigator.clipboard.writeText(generalInviteLink);
     toast.success("Link copiado.");
+  }
+
+  // Link Geral de auto-cadastro de Prestador PJ (?cadastro-pj=<unitId>.<token>)
+  const [showPjInviteModal, setShowPjInviteModal] = useState(false);
+  const [pjInviteUnitId, setPjInviteUnitId] = useState(units[0]?.id ?? "");
+  const [pjInviteBusy, setPjInviteBusy] = useState(false);
+  const [pjInviteError, setPjInviteError] = useState<string | null>(null);
+  const [pjInviteLink, setPjInviteLink] = useState<string | null>(null);
+
+  const [categoryFilter, setCategoryFilter] = useState<"ALL" | "CLT" | "PJ">("ALL");
+
+  function closePjInviteModal() {
+    setShowPjInviteModal(false);
+    setPjInviteError(null);
+    setPjInviteLink(null);
+  }
+
+  async function fetchPjInvite() {
+    if (!pjInviteUnitId) return;
+    setPjInviteBusy(true);
+    setPjInviteError(null);
+    try {
+      const { unitId, token } = await Api.generalInviteLink(pjInviteUnitId);
+      const publicAppOrigin = getPublicAppUrl();
+      setPjInviteLink(
+        `${publicAppOrigin.replace(/\/$/, "")}${window.location.pathname}?cadastro-pj=${unitId}.${token}`,
+      );
+    } catch (err) {
+      setPjInviteError(err instanceof Error ? err.message : "Não foi possível gerar o link PJ");
+    } finally {
+      setPjInviteBusy(false);
+    }
+  }
+
+  async function copyPjInviteLink() {
+    if (!pjInviteLink) return;
+    await navigator.clipboard.writeText(pjInviteLink);
+    toast.success("Link PJ copiado.");
   }
 
   function load() {
@@ -286,10 +321,42 @@ export function ColaboradoresTab() {
             <Button variant="secondary" onClick={() => setShowGeneralInviteModal(true)} style={{ borderRadius: "9999px" }}>
               🎓 Link Geral de Estagiário
             </Button>
+            <Button variant="secondary" onClick={() => setShowPjInviteModal(true)} style={{ borderRadius: "9999px" }}>
+              💼 Link Auto-Cadastro PJ
+            </Button>
             <Button variant="primary" onClick={() => setShowForm(true)} style={{ borderRadius: "9999px" }}>
               ⚡ + Novo colaborador rápido
             </Button>
           </div>
+        </div>
+      )}
+
+      {!showForm && (
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+          <Button
+            variant={categoryFilter === "ALL" ? "primary" : "ghost"}
+            size="sm"
+            onClick={() => setCategoryFilter("ALL")}
+            style={{ borderRadius: "9999px" }}
+          >
+            Todos ({employees.length})
+          </Button>
+          <Button
+            variant={categoryFilter === "CLT" ? "primary" : "ghost"}
+            size="sm"
+            onClick={() => setCategoryFilter("CLT")}
+            style={{ borderRadius: "9999px" }}
+          >
+            Equipe CLT / Estágio ({employees.filter((e) => e.role !== "PRESTADOR_PJ" && e.contract_type !== "PJ").length})
+          </Button>
+          <Button
+            variant={categoryFilter === "PJ" ? "primary" : "ghost"}
+            size="sm"
+            onClick={() => setCategoryFilter("PJ")}
+            style={{ borderRadius: "9999px" }}
+          >
+            Prestadores PJ ({employees.filter((e) => e.role === "PRESTADOR_PJ" || e.contract_type === "PJ").length})
+          </Button>
         </div>
       )}
 
@@ -524,16 +591,70 @@ export function ColaboradoresTab() {
         </Modal>
       )}
 
+      {showPjInviteModal && (
+        <Modal onClose={closePjInviteModal} title="💼 Link de Auto-Cadastro de Prestador PJ">
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {!pjInviteLink ? (
+              <>
+                <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
+                  Link fixo por unidade para envio a profissionais parceiros PJ. O formulário solicita Razão Social, CNPJ,
+                  dados de pagamento (PIX), aceitação do termo autônomo sem vínculo empregatício e biometria opcional.
+                </p>
+                <Select label="Unidade *" value={pjInviteUnitId} onChange={(e) => setPjInviteUnitId(e.target.value)}>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </Select>
+                {pjInviteError && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{pjInviteError}</p>}
+                <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                  <Button variant="primary" disabled={pjInviteBusy || !pjInviteUnitId} onClick={fetchPjInvite} style={{ borderRadius: "9999px", flex: 1 }}>
+                    {pjInviteBusy ? "Gerando…" : "Gerar link PJ"}
+                  </Button>
+                  <Button variant="ghost" onClick={closePjInviteModal}>
+                    Cancelar
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
+                  Link público de auto-cadastro para Prestador PJ nesta unidade. Pode enviar via WhatsApp ou e-mail.
+                </p>
+                <Input label="Link de auto-cadastro PJ" value={pjInviteLink} readOnly onFocus={(e) => e.target.select()} />
+                <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                  <Button variant="primary" onClick={copyPjInviteLink} style={{ borderRadius: "9999px", flex: 1 }}>
+                    📋 Copiar link PJ
+                  </Button>
+                  <Button variant="ghost" onClick={closePjInviteModal}>
+                    Fechar
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {employees.map((e) => {
-          const roleBadgeStyle =
-            e.role === "ADMIN"
-              ? { bg: "rgba(124, 58, 237, 0.12)", color: "#6d28d9", label: "👑 Admin" }
-              : e.role === "GERENTE"
-              ? { bg: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", label: "⭐ Gerente" }
-              : e.role === "ESTAGIARIO"
-              ? { bg: "rgba(180, 83, 9, 0.12)", color: "#b45309", label: "🎓 Estagiário" }
-              : { bg: "rgba(13, 148, 136, 0.12)", color: "#0f766e", label: "👤 Operador" };
+        {employees
+          .filter((e) => {
+            if (categoryFilter === "CLT") return e.role !== "PRESTADOR_PJ" && e.contract_type !== "PJ";
+            if (categoryFilter === "PJ") return e.role === "PRESTADOR_PJ" || e.contract_type === "PJ";
+            return true;
+          })
+          .map((e) => {
+            const roleBadgeStyle =
+              e.role === "PRESTADOR_PJ" || e.contract_type === "PJ"
+                ? { bg: "rgba(16, 185, 129, 0.12)", color: "#047857", label: "💼 Prestador PJ" }
+                : e.role === "ADMIN"
+                ? { bg: "rgba(124, 58, 237, 0.12)", color: "#6d28d9", label: "👑 Admin" }
+                : e.role === "GERENTE"
+                ? { bg: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", label: "⭐ Gerente" }
+                : e.role === "ESTAGIARIO"
+                ? { bg: "rgba(180, 83, 9, 0.12)", color: "#b45309", label: "🎓 Estagiário" }
+                : { bg: "rgba(13, 148, 136, 0.12)", color: "#0f766e", label: "👤 Operador" };
           const employeeUnitNames = (e.unitIds ?? []).map((id) => units.find((u) => u.id === id)?.name).filter(Boolean);
 
           return (

@@ -283,75 +283,89 @@ export function EspelhoPontoModal({ employee, onClose }: EspelhoPontoModalProps)
         >
           <Timbre />
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
-            <h1 style={{ margin: 0 }}>Espelho de Ponto Mensal — {MONTH_LABEL[data.month - 1]}/{data.year}</h1>
-            <span style={{ fontSize: "11px", color: "#555" }}>
-              Emitido em {new Date().toLocaleDateString("pt-BR")} às {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          </div>
-
-          {data.units.length > 0 && (
-            <div style={{ fontSize: "12px", marginBottom: "10px", paddingBottom: "10px", borderBottom: "1px solid #999" }}>
-              {data.units.map((u) => (
-                <div key={u.name} style={{ marginBottom: "2px" }}>
-                  <strong>{u.nomeFantasia ?? u.name}</strong>
-                  {u.razaoSocial ? ` — ${u.razaoSocial}` : ""}
-                  {u.cnpj ? ` · CNPJ ${u.cnpj}` : ""}
-                  {u.address ? ` · ${u.address}` : ""}
-                  {u.phone ? ` · ${u.phone}` : ""}
+          {(() => {
+            const isPj = data.employee.role === "PRESTADOR_PJ" || data.employee.contract_type === "PJ";
+            const docTitle = isPj
+              ? `Relatório de Medição de Serviços / Horas Prestadas — ${MONTH_LABEL[data.month - 1]}/${data.year}`
+              : `Espelho de Ponto Mensal — ${MONTH_LABEL[data.month - 1]}/${data.year}`;
+            return (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                  <h1 style={{ margin: 0 }}>{docTitle}</h1>
+                  <span style={{ fontSize: "11px", color: "#555" }}>
+                    Emitido em {new Date().toLocaleDateString("pt-BR")} às {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
 
-          <div className="header-grid">
-            <div><strong>Colaborador:</strong> {data.employee.full_name}</div>
-            <div><strong>CPF:</strong> {formatCpf(data.employee.cpf)}</div>
-            <div><strong>RG:</strong> {data.employee.rg_numero ?? "—"}{data.employee.rg_orgao_emissor ? ` (${data.employee.rg_orgao_emissor})` : ""}</div>
-            <div><strong>CTPS:</strong> {formatCtps(data.employee.ctps_numero, data.employee.ctps_serie, data.employee.ctps_uf)}</div>
-            <div><strong>Data de nascimento:</strong> {formatDate(data.employee.birth_date)}</div>
-            <div><strong>Data de admissão:</strong> {formatDate(data.employee.admission_date)}</div>
-            <div><strong>Permissão:</strong> {ROLE_LABEL[data.employee.role]}</div>
-            <div><strong>Jornada semanal contratada:</strong> {data.employee.weekly_hours_contracted ?? "—"}h</div>
-          </div>
+                {data.units.length > 0 && (
+                  <div style={{ fontSize: "12px", marginBottom: "10px", paddingBottom: "10px", borderBottom: "1px solid #999" }}>
+                    {data.units.map((u) => (
+                      <div key={u.name} style={{ marginBottom: "2px" }}>
+                        <strong>{u.nomeFantasia ?? u.name}</strong>
+                        {u.razaoSocial ? ` — ${u.razaoSocial}` : ""}
+                        {u.cnpj ? ` · CNPJ ${u.cnpj}` : ""}
+                        {u.address ? ` · ${u.address}` : ""}
+                        {u.phone ? ` · ${u.phone}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-          <table>
-            <thead>
-              <tr>
-                <th>Dia</th>
-                {KIND_COLUMNS.map((c) => (
-                  <th key={c.kind}>{c.label}</th>
-                ))}
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.day}>
-                  <td>{String(row.day).padStart(2, "0")}</td>
-                  {KIND_COLUMNS.map((c) => (
-                    <td key={c.kind}>{row.byKind[c.kind].join(", ") || "—"}</td>
-                  ))}
-                  <td>
-                    {KIND_COLUMNS.every((c) => row.byKind[c.kind].length === 0) ? "—" : formatMinutes(row.workedMinutes)}
-                    {row.incomplete && <span title="Marcação incompleta neste dia"> ⚠️</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                <div className="header-grid">
+                  <div><strong>{isPj ? "Prestador de Serviço:" : "Colaborador:"}</strong> {data.employee.full_name}</div>
+                  <div><strong>{isPj ? "CNPJ / CPF:" : "CPF:"}</strong> {formatCpf(data.employee.cpf)}</div>
+                  {!isPj && <div><strong>RG:</strong> {data.employee.rg_numero ?? "—"}{data.employee.rg_orgao_emissor ? ` (${data.employee.rg_orgao_emissor})` : ""}</div>}
+                  {!isPj && <div><strong>CTPS:</strong> {formatCtps(data.employee.ctps_numero, data.employee.ctps_serie, data.employee.ctps_uf)}</div>}
+                  <div><strong>Data de nascimento:</strong> {formatDate(data.employee.birth_date)}</div>
+                  <div><strong>{isPj ? "Início do Contrato:" : "Data de admissão:"}</strong> {formatDate(data.employee.admission_date)}</div>
+                  <div><strong>Categoria:</strong> {ROLE_LABEL[data.employee.role]}</div>
+                  <div><strong>{isPj ? "Horas estimadas no contrato:" : "Jornada semanal contratada:"}</strong> {data.employee.weekly_hours_contracted ?? "—"}h</div>
+                </div>
 
-          <p style={{ fontSize: "12px", color: "#555", marginTop: "8px" }}>
-            Total do mês: <strong>{formatMinutes(rows.reduce((sum, r) => sum + r.workedMinutes, 0))}</strong>
-            {rows.some((r) => r.incomplete) && (
-              <> — ⚠️ {rows.filter((r) => r.incomplete).length} dia(s) com marcação incompleta (total aproximado)</>
-            )}
-          </p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Dia</th>
+                      {KIND_COLUMNS.map((c) => (
+                        <th key={c.kind}>{isPj ? (c.kind === "ENTRADA" ? "Início" : c.kind === "SAIDA" ? "Término" : c.label) : c.label}</th>
+                      ))}
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={row.day}>
+                        <td>{String(row.day).padStart(2, "0")}</td>
+                        {KIND_COLUMNS.map((c) => (
+                          <td key={c.kind}>{row.byKind[c.kind].join(", ") || "—"}</td>
+                        ))}
+                        <td>
+                          {KIND_COLUMNS.every((c) => row.byKind[c.kind].length === 0) ? "—" : formatMinutes(row.workedMinutes)}
+                          {row.incomplete && <span title="Marcação incompleta neste dia"> ⚠️</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-          <div className="signature">
-            Declaro que as marcações acima correspondem à minha jornada de trabalho no período.
-            <div className="signature-line">Assinatura de {data.employee.full_name}</div>
-          </div>
+                <p style={{ fontSize: "12px", color: "#555", marginTop: "8px" }}>
+                  Total de horas prestadas no mês: <strong>{formatMinutes(rows.reduce((sum, r) => sum + r.workedMinutes, 0))}</strong>
+                  {rows.some((r) => r.incomplete) && (
+                    <> — ⚠️ {rows.filter((r) => r.incomplete).length} dia(s) com registro incompleto (total aproximado)</>
+                  )}
+                </p>
+
+                <div className="signature">
+                  {isPj
+                    ? "Declaro que os registros acima correspondem às horas e presenças dedicadas à prestação autônoma de serviços no período, sem vínculo empregatício."
+                    : "Declaro que as marcações acima correspondem à minha jornada de trabalho no período."}
+                  <div className="signature-line">
+                    {isPj ? `Assinatura do Prestador de Serviços — ${data.employee.full_name}` : `Assinatura de ${data.employee.full_name}`}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
     </Modal>

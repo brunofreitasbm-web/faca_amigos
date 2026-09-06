@@ -25,6 +25,15 @@ interface CompleteBody {
   phone?: string;
   birthDate?: string;
   pin: string;
+  role?: "ESTAGIARIO" | "OPERADOR" | "GERENTE" | "ADMIN" | "PRESTADOR_PJ";
+  contractType?: "CLT" | "ESTAGIO" | "AUTONOMO" | "PJ";
+  razaoSocial?: string;
+  cnpj?: string;
+  pixKey?: string;
+  bankCode?: string;
+  bankAgencia?: string;
+  bankConta?: string;
+  bankContaDv?: string;
   faceDescriptor?: number[];
   facePhotoBase64?: string;
 }
@@ -65,6 +74,11 @@ Deno.serve(async (req) => {
   const result = await validateGeneralInvite(adminClient, body.unitId, body.token);
   if (!result.ok) return jsonResponse(req, { error: result.error }, 401);
 
+  const isPj = body.role === "PRESTADOR_PJ" || body.contractType === "PJ";
+  const assignedRole = isPj ? "PRESTADOR_PJ" : (body.role ?? "ESTAGIARIO");
+  const assignedContract = isPj ? "PJ" : (body.contractType ?? "ESTAGIO");
+  const assignedPosition = isPj ? "Prestador PJ" : "Estagiário";
+
   const syntheticEmail = `employee-${crypto.randomUUID()}@kiosk.internal`;
   const { data: createdUser, error: createUserError } = await adminClient.auth.admin.createUser({
     email: syntheticEmail,
@@ -80,9 +94,9 @@ Deno.serve(async (req) => {
     .insert({
       auth_user_id: createdUser.user.id,
       full_name: body.fullName.trim(),
-      role: "ESTAGIARIO",
-      position: "Estagiário",
-      contract_type: "ESTAGIO",
+      role: assignedRole,
+      position: assignedPosition,
+      contract_type: assignedContract,
       admission_date: new Date().toISOString().slice(0, 10),
       cpf: nullIfEmpty(body.cpf)?.replace(/\D/g, "") || null,
       cpf_last4: nullIfEmpty(body.cpf)?.replace(/\D/g, "").slice(-4) || null,
