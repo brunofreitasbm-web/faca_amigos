@@ -78,7 +78,6 @@ export function PainelScreen() {
   const [pendingPlanId, setPendingPlanId] = useState<string>("");
   const [pausingFor, setPausingFor] = useState<string | null>(null);
   const [pendingPauseReason, setPendingPauseReason] = useState<string>("");
-  const [dailyGoalCents, setDailyGoalCents] = useState(0);
   const [todayRevenueCents, setTodayRevenueCents] = useState(0);
   const [ticketMedioCents, setTicketMedioCents] = useState(0);
   const [ticketMinCents, setTicketMinCents] = useState(0);
@@ -204,17 +203,13 @@ export function PainelScreen() {
     let cancelled = false;
     async function poll() {
       try {
-        const [goalRes, revenueRes, ticketMedioRes, ticketGoalRes, bonusRulesRes] = await Promise.allSettled([
-          Api.todayGoal(unit!.id, unit!.business_day_cutoff_hour),
+        const [revenueRes, ticketMedioRes, ticketGoalRes, bonusRulesRes] = await Promise.allSettled([
           Api.todayRevenue(unit!.id, unit!.business_day_cutoff_hour),
           Api.todayTicketMedio(unit!.id, unit!.business_day_cutoff_hour),
           Api.ticketGoal(unit!.id),
           Api.bonusRules(unit!.id),
         ]);
         if (!cancelled) {
-          if (goalRes.status === "fulfilled") {
-            setDailyGoalCents(Number(goalRes.value) || 0);
-          }
           if (revenueRes.status === "fulfilled") {
             setTodayRevenueCents(revenueRes.value.totalCents);
           }
@@ -1004,28 +999,6 @@ export function PainelScreen() {
         )}
         </div>
       </div>
-
-      {dailyGoalCents > 0 && (
-        <div
-          title="Progresso do faturamento de hoje em relação à meta diária configurada em Configurações → Meta"
-          style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
-          className="capacity-container"
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "var(--text-muted)" }}>
-            <span>Meta do dia: {money(todayRevenueCents)} / {money(dailyGoalCents)}</span>
-            <span>{Math.min(100, Math.round((todayRevenueCents / dailyGoalCents) * 100))}%</span>
-          </div>
-          <div className="capacity-bar-track">
-            <div
-              className="capacity-bar-fill"
-              style={{
-                width: `${Math.min(100, Math.round((todayRevenueCents / dailyGoalCents) * 100))}%`,
-                backgroundColor: todayRevenueCents >= dailyGoalCents ? "var(--color-success)" : "var(--color-primary)",
-              }}
-            />
-          </div>
-        </div>
-      )}
 
       {ticketTargetCents > 0 && (
         <div
