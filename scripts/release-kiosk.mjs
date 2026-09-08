@@ -60,19 +60,27 @@ if (!supabaseUrl || !serviceRoleKey) {
   );
 }
 
-async function storageFetch(path, options) {
-  const res = await fetch(`${supabaseUrl}/storage/v1${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
-      apikey: serviceRoleKey,
-      ...options.headers,
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`Storage ${options.method ?? "GET"} ${path} -> ${res.status}: ${await res.text()}`);
+async function storageFetch(path, options, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${supabaseUrl}/storage/v1${path}`, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+          ...options.headers,
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Storage ${options.method ?? "GET"} ${path} -> ${res.status}: ${await res.text()}`);
+      }
+      return res;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      console.warn(`[storageFetch] Tentativa ${attempt}/${retries} falhou (${err instanceof Error ? err.message : String(err)}). Tentando novamente em 3s...`);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
   }
-  return res;
 }
 
 // 1. Build do instalador (workspace + kiosk-ui + ícones + electron-builder)
