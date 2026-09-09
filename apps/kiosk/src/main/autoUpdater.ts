@@ -28,28 +28,72 @@ let currentUpdateState: UpdateState = {
 };
 
 let initialized = false;
+let versaoPendente: string | undefined;
 
 const PERIODIC_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+const VERIFICACAO_JANELA_INTERVAL_MS = 5 * 60 * 1000;
 
 // O terminal NÃO fica ligado 24/7 — a loja liga o PC por volta das 10h e
-// desliga por volta das 22h (energia cortada, não um "Desligar" do Windows
-// com tempo de sobra). Uma janela de instalação fixa de madrugada (versão
-// antiga desta lógica, 03:30) nunca chega a rodar: o processo já está morto
-// a essa hora todo santo dia, e a atualização baixada ficava pendente para
-// sempre — o terminal "congelava" na versão antiga (foi o que prendeu a loja
-// na 0.1.5, e de novo aqui: nenhum terminal saiu da 0.1.21 sozinho).
+// desliga por volta das 22h. E "desliga" aqui é energia cortada, não um
+// "Desligar" do Windows com tempo de sobra: o processo simplesmente morre.
 //
-// A única janela ociosa real é a abertura do dia: os primeiros minutos após
-// o boot, antes de qualquer check-in. Por isso, se a atualização já estava
-// baixada de um dia anterior (ou termina de baixar) dentro desse período
-// logo após o app subir, instala na hora — quitAndInstall(true, true) fecha,
-// instala em silêncio e o próprio instalador reabre o app, então a loja só
-// vê o terminal demorar um pouco mais para aparecer na tela de login.
-// Fora dessa janela (baixou no meio do expediente), não força: fica
-// pendente para o fechamento do terminal (window-all-closed, main.ts) ou,
-// na pior hipótese, para a abertura do dia seguinte.
-const STARTUP_INSTALL_GRACE_MS = 5 * 60 * 1000;
+// Consequência: `window-all-closed` (main.ts), que é onde mora o outro
+// caminho de instalação, praticamente NUNCA roda em produção. Ninguém fecha
+// o quiosque; a tomada é que fecha.
+//
+// Sobrava então uma única janela real de instalação: os primeiros minutos
+// após o boot. E ela era curta demais — 5 minutos para baixar um instalador
+// de ~105 MB exige ~2,8 Mbps sustentados desde o instante do boot. Na
+// prática o download terminava fora da janela, o app logava "não instala
+// agora, fica pendente para o fechamento" e o fechamento nunca vinha. No dia
+// seguinte o ciclo se repetia idêntico. Foi assim que a loja ficou presa na
+// 0.1.5, depois na 0.1.21, e de novo na 0.1.35 com a 0.1.36 já publicada e
+// íntegra no feed.
+//
+// Agora existem TRÊS janelas, e nenhuma depende de o download ser rápido:
+//
+//   1. Abertura do dia — o app subiu há pouco e ninguém está atendendo
+//      ainda. Prazo generoso (30 min), não 5.
+//   2. Pré-fechamento — a partir de PRE_FECHAMENTO_HORA a loja está
+//      encerrando; instalar aqui aproveita a única janela ociosa garantida
+//      do dia, ANTES de a energia cair. É o caminho que substitui o
+//      `window-all-closed` que nunca acontece.
+//   3. Fora do expediente — terminal ligado antes de abrir ou depois de
+//      fechar (teste, manutenção, boot fora de hora): não há atendimento
+//      em risco, instala.
+//
+// Em qualquer uma delas o quitAndInstall(true, true) fecha, instala em
+// silêncio e o próprio instalador reabre o app. Dentro do expediente e fora
+// dessas janelas, continua sem forçar: um atendimento em curso não é
+// interrompido — a instalação fica pendente e o verificador periódico a
+// aplica assim que a primeira janela abrir, no mesmo dia.
+const STARTUP_INSTALL_GRACE_MS = 30 * 60 * 1000;
 const appStartMs = Date.now();
+
+// Horário da operação (Belém, sem horário de verão). Sobrescrevíveis por
+// ambiente para as unidades que fogem do padrão do shopping.
+const numeroDoAmbiente = (nome: string, padrao: number): number => {
+  const bruto = process.env[nome];
+  if (!bruto) return padrao;
+  const valor = Number.parseInt(bruto, 10);
+  return Number.isInteger(valor) && valor >= 0 && valor <= 23 ? valor : padrao;
+};
+const ABERTURA_HORA = numeroDoAmbiente("FACAAMIGOS_ABERTURA_HORA", 10);
+const FECHAMENTO_HORA = numeroDoAmbiente("FACAAMIGOS_FECHAMENTO_HORA", 22);
+// 21h: dá ~1h de folga antes do corte de energia das 22h. O instalador NSIS
+// leva segundos, mas o app precisa subir de novo depois — e é melhor que
+// isso aconteça com a loja ainda de pé do que na corrida do fechamento.
+const PRE_FECHAMENTO_HORA = numeroDoAmbiente("FACAAMIGOS_PRE_FECHAMENTO_HORA", FECHAMENTO_HORA - 1);
+
+type MotivoInstalacao = "abertura" | "pre-fechamento" | "fora-do-expediente";
+
+export function motivoParaInstalarAgora(agora = new Date(), iniciadoEm = appStartMs): MotivoInstalacao | null {
+  const hora = agora.getHours();
+  if (agora.getTime() - iniciadoEm < STARTUP_INSTALL_GRACE_MS) return "abertura";
+  if (hora < ABERTURA_HORA || hora >= FECHAMENTO_HORA) return "fora-do-expediente";
+  if (hora >= PRE_FECHAMENTO_HORA) return "pre-fechamento";
+  return null;
+}
 
 function notifyWindows(state: UpdateState): void {
   currentUpdateState = state;
@@ -133,6 +177,18 @@ export function checkForUpdatesAndWait(timeoutMs = 5 * 60 * 1000): Promise<void>
   });
 }
 
+function aplicarSeHouverJanela(contexto: string): void {
+  const motivo = motivoParaInstalarAgora();
+  if (motivo) {
+    log?.info?.(`[auto-updater] ${contexto} — janela "${motivo}" aberta, instalando agora.`);
+    applyUpdate();
+    return;
+  }
+  log?.info?.(
+    `[auto-updater] ${contexto} — expediente em curso, não interrompe atendimento. Nova tentativa em ${VERIFICACAO_JANELA_INTERVAL_MS / 60000} min (instala no máximo às ${PRE_FECHAMENTO_HORA}h).`,
+  );
+}
+
 export function initAutoUpdater(): void {
   if (typeof ipcMain?.handle === "function") {
     ipcMain.handle("get-app-version", () => (app?.getVersion ? app.getVersion() : "0.1.13-dev"));
@@ -173,9 +229,14 @@ export function initAutoUpdater(): void {
   autoUpdater.logger = log;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  // O feed é servido pelo CDN da Vercel, que não responde multipart/byteranges
-  // — toda tentativa de download diferencial falhava com erro de Content-Type
-  // e caía no download completo. Desliga direto e economiza o round-trip.
+  // Comentário antigo dizia "o CDN da Vercel não responde byteranges". O feed
+  // não está mais na Vercel (é o Supabase Storage, ver electron-builder.yml) e
+  // ele RESPONDE 206 a range request. O motivo hoje é outro:
+  // scripts/release-kiosk.mjs apaga as versões antigas do bucket a cada
+  // publicação, então o .blockmap da versão instalada no terminal não existe
+  // mais quando a nova sai — o download diferencial não teria contra o que
+  // diferenciar e cairia no download completo depois de um round-trip perdido.
+  // Reativar isto exige antes parar de apagar o blockmap anterior.
   autoUpdater.disableDifferentialDownload = true;
   autoUpdater.disableWebInstaller = true;
 
@@ -228,18 +289,26 @@ export function initAutoUpdater(): void {
       progress: 100,
     });
 
-    if (Date.now() - appStartMs < STARTUP_INSTALL_GRACE_MS) {
-      log.info(`[auto-updater] Baixada logo na abertura do terminal — aplicando a versão ${info.version} agora, antes do expediente.`);
-      applyUpdate();
-    } else {
-      log.info(
-        `[auto-updater] Versão ${info.version} baixada durante o expediente — não instala agora para não interromper um atendimento. Fica pendente para o fechamento do terminal ou a próxima abertura.`,
-      );
-    }
+    versaoPendente = info.version;
+    aplicarSeHouverJanela(`versão ${info.version} recém-baixada`);
   });
 
   checkForUpdates();
 
   setInterval(checkForUpdates, PERIODIC_CHECK_INTERVAL_MS);
+
+  // Verificador independente do ciclo de download. Sem ele, uma atualização
+  // que termina de baixar às 11h só teria uma nova chance de ser instalada
+  // se o `update-downloaded` fosse reemitido — o que depende de o
+  // electron-updater revalidar o arquivo de ~105 MB em cache a cada
+  // checagem, e qualquer falha nessa revalidação cai no handler de `error`,
+  // não no de instalação. Este timer olha só o estado local: havendo
+  // atualização baixada e uma janela aberta, instala. É ele que garante que
+  // a versão baixada de manhã entre no ar às 21h do MESMO dia, em vez de
+  // esperar um `window-all-closed` que a queda de energia nunca dispara.
+  setInterval(() => {
+    if (currentUpdateState.status !== "downloaded") return;
+    aplicarSeHouverJanela(`versão ${versaoPendente ?? currentUpdateState.version} pendente desde o download`);
+  }, VERIFICACAO_JANELA_INTERVAL_MS);
 }
 
