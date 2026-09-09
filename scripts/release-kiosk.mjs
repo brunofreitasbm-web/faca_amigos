@@ -132,15 +132,28 @@ if (staleFiles.length > 0) {
 }
 
 // 4. Sobe os artefatos novos (x-upsert sobrescreve se já existir)
+//
+// `comoSeChama` existe por causa do ATUAL_EXE. O passo 3 acima apaga do
+// bucket todo arquivo terminado em .exe, então qualquer link que carregue o
+// número da versão dentro (…-0.1.37.exe) vira 404 na publicação seguinte —
+// e é justamente esse link que se manda para o operador de loja baixar o
+// instalador à mão quando um terminal precisa ser recolocado na versão
+// certa. A cópia de nome fixo resolve: mesmo binário, endereço estável, que
+// pode ser distribuído uma vez e continuar valendo. O electron-updater
+// ignora esse arquivo (ele só lê o que o latest.yml aponta); custa ~105 MB
+// a mais no bucket, que é o preço de um link que não quebra.
+const ATUAL_EXE = "FacaAmigos-Setup-atual.exe";
 const uploads = [
   { file: `FacaAmigos-Setup-${version}.exe`, contentType: "application/x-msdownload" },
+  { file: `FacaAmigos-Setup-${version}.exe`, comoSeChama: ATUAL_EXE, contentType: "application/x-msdownload" },
   { file: `FacaAmigos-Setup-${version}.exe.blockmap`, contentType: "application/octet-stream" },
   { file: "latest.yml", contentType: "text/yaml" },
 ];
-for (const { file, contentType } of uploads) {
-  console.log(`Enviando ${file}...`);
+for (const { file, comoSeChama, contentType } of uploads) {
+  const destino = comoSeChama ?? file;
+  console.log(`Enviando ${destino}${comoSeChama ? ` (cópia de ${file})` : ""}...`);
   const body = readFileSync(join(releaseDir, file));
-  await storageFetch(`/object/${BUCKET}/${PREFIX}/${file}`, {
+  await storageFetch(`/object/${BUCKET}/${PREFIX}/${destino}`, {
     method: "POST",
     headers: { "Content-Type": contentType, "x-upsert": "true" },
     body,
@@ -149,3 +162,4 @@ for (const { file, contentType } of uploads) {
 
 const feedUrl = `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${PREFIX}`;
 console.log(`\n✅ Kiosk v${version} publicado em ${feedUrl}/`);
+console.log(`   Link fixo para instalação manual: ${feedUrl}/${ATUAL_EXE}`);
