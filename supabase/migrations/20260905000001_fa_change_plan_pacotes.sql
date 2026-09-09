@@ -75,3 +75,9 @@ begin
   end if;
 end;
 $$ language plpgsql security definer set search_path = public, pg_temp;
+
+-- O DROP acima apaga o objeto antigo (com seus grants). CREATE OR REPLACE
+-- não recria GRANTs em cima de um objeto novo, então sem isto o Painel
+-- (papel authenticated) perde a permissão de chamar a função.
+revoke all on function fa_kiosk_change_session_plan(uuid, uuid, uuid) from public;
+grant execute on function fa_kiosk_change_session_plan(uuid, uuid, uuid) to authenticated, service_role;
