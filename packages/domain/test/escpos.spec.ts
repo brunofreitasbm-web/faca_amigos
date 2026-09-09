@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { generateEscPosReceipt, encodeCp860 } from "../src/printers/escpos.js";
+import { generateEscPosReceipt, encodeCp860, nvLogoPrintCommandHex, nvLogoStoreCommandHex } from "../src/printers/escpos.js";
+import { LOGO_HEIGHT_DOTS, LOGO_WIDTH_BYTES } from "../src/printers/logoBitmap.js";
 
 describe("generateEscPosReceipt", () => {
   it("codifica caracteres em Português para a tabela CP860 (single-byte) sem corromper acentos", () => {
@@ -58,6 +59,45 @@ describe("generateEscPosReceipt", () => {
 
     // Cupom sem accessCode não é recibo de guarda — sem trackingUrl, sem comando de QR.
     expect(receipt.commandsHex).not.toContain("1d286b");
+  });
+
+  it("imprime o timbre (FS p, via NV Graphics) logo após o cabeçalho em todo cupom não fiscal", () => {
+    const receipt = generateEscPosReceipt({
+      title: "Recibo de Caixa",
+      unitName: "Playground Parque Shopping",
+      items: [{ description: "Água mineral", quantity: 1, amountCents: 1000 }],
+      totalCents: 1000,
+      payments: [{ method: "PIX", amountCents: 1000 }],
+    });
+
+    // FS p (1c70) + slot 01 + modo 00 = comando de impressão do timbre já
+    // gravado na NV — vem logo após o cabeçalho de inicialização.
+    const logoCmd = nvLogoPrintCommandHex();
+    expect(logoCmd).toBe("1c700100");
+    expect(receipt.commandsHex.indexOf(logoCmd)).toBe("1b401b74031b6101".length);
+  });
+
+  it("NÃO imprime o timbre no DANFE NFC-e — documento fiscal tem layout regulado", () => {
+    const receipt = generateEscPosReceipt({
+      title: "DANFE NFC-e",
+      unitName: "Playground Parque Shopping",
+      items: [{ description: "Plano 30 minutos", quantity: 1, amountCents: 4000 }],
+      totalCents: 4000,
+      payments: [{ method: "PIX", amountCents: 4000 }],
+      fiscalQrUrl: "https://appnfc.sefa.pa.gov.br/portal/view/consultas/nfce/consultanfce.seam?p=123",
+    });
+
+    expect(receipt.commandsHex).not.toContain(nvLogoPrintCommandHex());
+  });
+
+  it("gera o comando de gravação do timbre na NV (FS q) com as dimensões do bitmap gerado", () => {
+    const storeCmd = nvLogoStoreCommandHex();
+    // 1c71 (FS q) + 01 (1 imagem) + xL xH (largura em bytes) + yL yH (altura em dots)
+    const widthHex = (LOGO_WIDTH_BYTES & 0xff).toString(16).padStart(2, "0") + ((LOGO_WIDTH_BYTES >> 8) & 0xff).toString(16).padStart(2, "0");
+    const heightHex = (LOGO_HEIGHT_DOTS & 0xff).toString(16).padStart(2, "0") + ((LOGO_HEIGHT_DOTS >> 8) & 0xff).toString(16).padStart(2, "0");
+    expect(storeCmd.startsWith(`1c7101${widthHex}${heightHex}`)).toBe(true);
+    // Header (7 bytes = 14 hex chars) + bitmap completo (largura x altura bytes)
+    expect(storeCmd.length).toBe(14 + LOGO_WIDTH_BYTES * LOGO_HEIGHT_DOTS * 2);
   });
 
   it("imprime o QR de acompanhamento (GS ( k) no recibo de guarda quando trackingUrl é informado", () => {
