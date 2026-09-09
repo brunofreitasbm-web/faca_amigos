@@ -2314,6 +2314,8 @@ function UnidadeTab({ unitId }: { unitId: string }) {
       <Button variant="primary" disabled={saving || !name} onClick={save}>
         Salvar unidade
       </Button>
+
+      <AutoUpdateCard />
     </div>
   );
 }

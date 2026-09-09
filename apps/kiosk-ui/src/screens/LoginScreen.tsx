@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Button, HelpText } from "@facaamigos/ui";
+import { Card, Button, HelpText, BrandMark } from "@facaamigos/ui";
 import { useAppState } from "../state/AppState.js";
 import { Api } from "../api/client.js";
 import { PinPad } from "../components/PinPad.js";
@@ -91,7 +91,8 @@ export function LoginScreen() {
 
   return (
     <div style={{ maxWidth: "480px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
-      <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center" }}>Quem está operando?</h1>
+      <BrandMark size={96} style={{ alignSelf: "center" }} />
+      <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center", margin: 0 }}>Quem está operando?</h1>
       <HelpText>Toque no seu nome para confirmar com o PIN deste terminal. Se ainda não apareceu na lista, toque em "outro colaborador".</HelpText>
       {terminalEmployees.map((emp) => (
         <Card key={emp.id} style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

@@ -2130,11 +2130,10 @@
         submitBtn.disabled = true;
         submitBtn.textContent = 'Enviando...';
 
+        var supabaseKey = (typeof window !== 'undefined' && window.VITE_SUPABASE_PUBLISHABLE_KEY) ? window.VITE_SUPABASE_PUBLISHABLE_KEY : '';
         fetch('https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/job-application-webhook', {
           method: 'POST',
-          headers: {
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2anZwZHpzZmpkcHlhYmJ6enVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1MDYwNjksImV4cCI6MjEwMDA4MjA2OX0.QdYzftTxdmYY8r_7sVe0mjjOqJ4nnOR3iyiWN18cgsQ'
-          },
+          headers: supabaseKey ? { 'Authorization': 'Bearer ' + supabaseKey } : {},
           body: formData
         })
           .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })

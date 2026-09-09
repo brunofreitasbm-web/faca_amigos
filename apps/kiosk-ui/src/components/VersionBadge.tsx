@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 // empacotado no Electron quanto no deploy PWA da Vercel, já que os dois
 // consomem o mesmo bundle JS gerado por este build.
 export function VersionBadge() {
+  const [desktopVersion, setDesktopVersion] = useState<string | null>(null);
   const [updateState, setUpdateState] = useState<{
     status: string;
     version?: string;
@@ -13,6 +14,12 @@ export function VersionBadge() {
   }>({ status: "idle" });
 
   useEffect(() => {
+    if (window.facaamigos?.getAppVersion) {
+      window.facaamigos.getAppVersion().then((v) => {
+        if (v) setDesktopVersion(v);
+      });
+    }
+
     // Escutar eventos do Electron se disponíveis
     if (window.facaamigos?.getUpdateStatus) {
       window.facaamigos.getUpdateStatus().then((s) => {
@@ -86,7 +93,7 @@ export function VersionBadge() {
       ) : isDownloading ? (
         <>⏳ Baixando versão {updateState.version ?? ""} ({updateState.progress ?? 0}%)...</>
       ) : (
-        <>v{__APP_VERSION__} · {__BUILD_SHA__}</>
+        <>v{desktopVersion ?? __APP_VERSION__} · {__BUILD_SHA__}</>
       )}
     </div>
   );

@@ -44,7 +44,7 @@ const PONTO_D =
  * Terapia Comportamental" embutida nas curvas, que estaria errada tanto
  * no Circuito quanto no Playground (ver operação dinâmica em unitBrand.ts).
  */
-function BrandMark({ size, accent }: { size: number; accent: string }) {
+export function BrandMark({ size = 46, accent = "var(--color-pink)", style }: { size?: number; accent?: string; style?: CSSProperties }) {
   return (
     <svg
       width={size}
@@ -52,7 +52,7 @@ function BrandMark({ size, accent }: { size: number; accent: string }) {
       viewBox="1293.62 1215.30 2385.55 1406.61"
       fill="none"
       aria-hidden="true"
-      style={{ flexShrink: 0, display: "block" }}
+      style={{ flexShrink: 0, display: "block", ...style }}
     >
       <path fill="#FDC51D" d={ARCO_AMARELO_D} />
       <path fill="#07C5C8" d={ARCO_TURQUESA_D} />
