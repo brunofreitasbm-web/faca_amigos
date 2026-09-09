@@ -74,7 +74,9 @@ export function InstallPwaBanner() {
     } else {
       document.documentElement.style.removeProperty("--install-banner-height");
     }
-    return () => document.documentElement.style.removeProperty("--install-banner-height");
+    return () => {
+      document.documentElement.style.removeProperty("--install-banner-height");
+    };
   }, [visible]);
 
   if (!visible) return null;
