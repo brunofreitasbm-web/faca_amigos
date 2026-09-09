@@ -44,7 +44,15 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             <Button variant="ghost" onClick={() => resolvePending(false)}>
               {pending.cancelLabel ?? "Cancelar"}
             </Button>
-            <Button variant="primary" onClick={() => resolvePending(true)}>
+            <Button
+              variant="primary"
+              onClick={() => resolvePending(true)}
+              style={
+                pending.variant === "danger"
+                  ? { background: "var(--color-error-text)", boxShadow: "none" }
+                  : undefined
+              }
+            >
               {pending.confirmLabel ?? "Confirmar"}
             </Button>
           </div>

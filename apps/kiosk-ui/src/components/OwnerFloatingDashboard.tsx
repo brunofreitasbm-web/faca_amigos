@@ -86,7 +86,7 @@ export function OwnerFloatingDashboard() {
         title="Abrir resumo do dia"
         style={{
           position: "fixed",
-          bottom: "24px",
+          bottom: "calc(24px + var(--install-banner-height, 0px))",
           right: "24px",
           zIndex: 999,
           padding: "10px 16px",
@@ -114,7 +114,7 @@ export function OwnerFloatingDashboard() {
     <div
       style={{
         position: "fixed",
-        bottom: "24px",
+        bottom: "calc(24px + var(--install-banner-height, 0px))",
         right: "24px",
         zIndex: 999,
         width: "300px",

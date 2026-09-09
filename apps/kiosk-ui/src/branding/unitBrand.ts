@@ -1,3 +1,6 @@
+import { createElement, type ReactNode } from "react";
+import { CastleTurretIcon, CarProfileIcon, TreeIcon, MapPinIcon } from "@facaamigos/ui";
+
 /**
  * Identidade visual de cada operação — fonte única de verdade.
  *
@@ -12,7 +15,7 @@
  */
 export interface UnitBrand {
   key: string;
-  icon: string;
+  icon: ReactNode;
   /** Texto da faixa do timbre, sob o wordmark. */
   operation: string;
   title: string;
@@ -26,7 +29,7 @@ export interface UnitBrand {
 export const UNIT_BRANDS: UnitBrand[] = [
   {
     key: "playground",
-    icon: "🏰",
+    icon: createElement(CastleTurretIcon),
     operation: "Playground · Parque Shopping",
     title: "Playground (Parque Shopping)",
     subtitle: "Operação Loja — Brinquedoteca Física & Regulação Sensorial",
@@ -36,7 +39,7 @@ export const UNIT_BRANDS: UnitBrand[] = [
   },
   {
     key: "circuito",
-    icon: "🏎️",
+    icon: createElement(CarProfileIcon),
     operation: "Circuito · Parque Shopping",
     title: "Circuito (Parque Shopping)",
     subtitle: "Operação Quiosque — Pista & Carrinhos Elétricos",
@@ -46,7 +49,7 @@ export const UNIT_BRANDS: UnitBrand[] = [
   },
   {
     key: "grao-para",
-    icon: "🌳",
+    icon: createElement(TreeIcon),
     operation: "Playground · Bosque Grão-Pará",
     title: "Playground (Bosque Grão-Pará)",
     subtitle: "Operação Loja — Brinquedoteca Física & Regulação Sensorial",
@@ -58,7 +61,7 @@ export const UNIT_BRANDS: UnitBrand[] = [
 
 const FALLBACK: Omit<UnitBrand, "operation" | "title"> = {
   key: "outra",
-  icon: "📍",
+  icon: createElement(MapPinIcon),
   subtitle: "Operação",
   location: "",
   accent: "var(--color-primary)",

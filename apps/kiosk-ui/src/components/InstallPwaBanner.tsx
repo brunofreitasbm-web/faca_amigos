@@ -68,6 +68,15 @@ export function InstallPwaBanner() {
     };
   }, []);
 
+  useEffect(() => {
+    if (visible) {
+      document.documentElement.style.setProperty("--install-banner-height", "72px");
+    } else {
+      document.documentElement.style.removeProperty("--install-banner-height");
+    }
+    return () => document.documentElement.style.removeProperty("--install-banner-height");
+  }, [visible]);
+
   if (!visible) return null;
 
   const dismiss = () => {
@@ -88,6 +97,12 @@ export function InstallPwaBanner() {
       role="dialog"
       aria-label="Instalar aplicativo"
       style={{
+        // Continua no rodapé: PainelScreen, App.tsx e OwnerFloatingDashboard
+        // já reservam espaço para esta barra via --install-banner-height
+        // (empurram botões flutuantes e o padding-bottom do conteúdo).
+        // Mover para o topo quebraria essa reserva sem ganhar nada — o
+        // problema real era o tema escuro destoando da paleta, não a
+        // posição.
         position: "fixed",
         left: 12,
         right: 12,
@@ -98,18 +113,19 @@ export function InstallPwaBanner() {
         gap: 12,
         padding: "12px 14px",
         borderRadius: 16,
-        background: "var(--color-bg-app, #141414)",
-        color: "#fff",
-        boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
+        background: "var(--surface-card, #fff)",
+        color: "var(--text-strong, #1F2937)",
+        border: "1px solid var(--border-subtle)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
       }}
     >
       <img src="/icons/pwa-192.png" alt="" style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 800, fontSize: 15 }}>Instale o FaçaAmigos</div>
         {canPrompt ? (
-          <div style={{ fontSize: 13, opacity: 0.85 }}>Abra em tela cheia, com ícone na tela inicial.</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Abra em tela cheia, com ícone na tela inicial.</div>
         ) : (
-          <div style={{ fontSize: 13, opacity: 0.85 }}>
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
             Toque em <strong>Compartilhar</strong>{" "}
             <span aria-hidden="true" style={{ display: "inline-block", transform: "translateY(1px)" }}>
               ⎋
@@ -127,8 +143,8 @@ export function InstallPwaBanner() {
             padding: "10px 14px",
             fontWeight: 800,
             fontSize: 14,
-            background: "var(--color-pink, #F0196B)",
-            color: "#fff",
+            background: "var(--color-teal, #1D9B84)",
+            color: "var(--text-on-primary, #fff)",
             cursor: "pointer",
             flexShrink: 0,
           }}
@@ -142,8 +158,7 @@ export function InstallPwaBanner() {
         style={{
           border: "none",
           background: "transparent",
-          color: "#fff",
-          opacity: 0.6,
+          color: "var(--text-muted)",
           fontSize: 18,
           cursor: "pointer",
           flexShrink: 0,

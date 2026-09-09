@@ -10,6 +10,8 @@ export interface PunchPhotoCaptureProps {
   /** Status do reconhecimento rápido (opcional): scanning, detected, success, fail */
   scanState?: "idle" | "scanning" | "detected" | "success" | "fail";
   detectedName?: string | null;
+  /** Quando informado, mostra um botão de recuperação ao lado do erro de câmera para pular para o fluxo PIN/Seleção. */
+  onUseFallback?: () => void;
 }
 
 /**
@@ -23,7 +25,56 @@ export function PunchPhotoCapture({
   geofenceRadiusM,
   scanState = "idle",
   detectedName,
+  onUseFallback,
 }: PunchPhotoCaptureProps) {
+  if (faceCapture.error) {
+    return (
+      <div
+        role="alert"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
+          gap: "10px",
+          padding: "24px 20px",
+          borderRadius: "var(--radius-lg, 16px)",
+          background: "var(--color-error-bg, #fef2f2)",
+          border: "1px solid var(--color-error, #ef4444)",
+        }}
+      >
+        <span style={{ fontSize: "32px" }} aria-hidden="true">
+          ⚠️
+        </span>
+        <strong style={{ fontSize: "16px", color: "var(--color-error-text, #991b1b)" }}>
+          {faceCapture.error}
+        </strong>
+        <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+          Verifique o ícone de câmera na barra de endereço do navegador e permita o acesso, ou continue pelo PIN.
+        </span>
+        {onUseFallback && (
+          <button
+            type="button"
+            onClick={onUseFallback}
+            style={{
+              marginTop: "6px",
+              border: "none",
+              borderRadius: "9999px",
+              padding: "10px 20px",
+              fontSize: "14px",
+              fontWeight: 700,
+              cursor: "pointer",
+              background: "var(--color-primary-hover, #F0196B)",
+              color: "#fff",
+            }}
+          >
+            🔑 Usar Seleção / PIN
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const borderColor =
     scanState === "success"
       ? "var(--color-teal, #10b981)"
@@ -92,8 +143,8 @@ export function PunchPhotoCapture({
           </div>
         )}
 
-        {/* Badge de status no topo da câmera */}
-        {scanState !== "idle" && (
+        {/* Badge de status no topo da câmera — só depois do stream de vídeo estar ativo, senão a instrução de "posicione o rosto" aparece sobre um retângulo preto sem imagem nenhuma. */}
+        {scanState !== "idle" && faceCapture.ready && (
           <div
             style={{
               position: "absolute",

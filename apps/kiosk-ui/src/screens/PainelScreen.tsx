@@ -96,6 +96,20 @@ export function PainelScreen() {
   const [manualExitFor, setManualExitFor] = useState<ActiveSessionEntry | null>(null);
   const [vipChildIds, setVipChildIds] = useState<Set<string>>(new Set());
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [tipDismissed, setTipDismissed] = useState(() => localStorage.getItem("facaamigos_panel_tip_dismissed") === "true");
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+      if (e.key === "e" || e.key === "E" || e.key === "F2") {
+        e.preventDefault();
+        setPreCheckinPrefill(null);
+        setEntradaOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!unit) return;
@@ -408,10 +422,25 @@ export function PainelScreen() {
               ? "Acompanhamento em tempo real dos carrinhos no circuito"
               : "Acompanhamento em tempo real das crianças no playground"}
           </p>
-          <HelpText style={{ marginTop: "4px" }}>
-            Toque num cartão para selecioná-lo (fica com borda rosa) e depois em "Fechar sessões" para cobrar. O
-            rótulo colorido (verde/amarelo/vermelho) mostra o tempo restante do plano — vermelho já ultrapassou.
-          </HelpText>
+          {!tipDismissed && entries.length > 0 && (
+            <div style={{ position: "relative" }} role="status">
+              <HelpText style={{ marginTop: "4px", paddingRight: "30px" }}>
+                Toque num cartão para selecioná-lo (fica com borda rosa) e depois em "Fechar sessões" para cobrar. O
+                rótulo colorido (verde/amarelo/vermelho) mostra o tempo restante do plano — vermelho já ultrapassou.
+              </HelpText>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem("facaamigos_panel_tip_dismissed", "true");
+                  setTipDismissed(true);
+                }}
+                title="Não mostrar mais esta dica"
+                style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "16px" }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Gauge de Ocupação do Parque */}
@@ -420,7 +449,7 @@ export function PainelScreen() {
             <span>Ocupação: {currentOccupancy} / {maxCapacity} {unit.kind === "QUIOSQUE" ? "carrinhos" : "crianças"}</span>
             <span style={{ color: capacityTextColor }}>{occupancyPercent}% ({capacityLabel})</span>
           </div>
-          <div className="capacity-bar-track">
+          <div className="capacity-bar-track" role="progressbar" aria-valuenow={occupancyPercent} aria-valuemin={0} aria-valuemax={100}>
             <div className="capacity-bar-fill" style={{ width: `${occupancyPercent}%`, backgroundColor: capacityColor }} />
           </div>
         </div>
@@ -987,7 +1016,16 @@ export function PainelScreen() {
           <AsyncState kind="loading" title="Carregando sessões ativas…" style={{ gridColumn: "1 / -1" }} />
         )}
         {entries.length === 0 && sessionsStatus === "ready" && (
-          <AsyncState kind="empty" title="Nenhuma criança em atividade no momento." style={{ gridColumn: "1 / -1" }} />
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px", gap: "16px", textAlign: "center", color: "var(--text-muted)", background: "var(--surface-card)", borderRadius: "16px", border: "1px dashed var(--border-subtle)" }}>
+            <div style={{ fontSize: "40px" }}>📭</div>
+            <div style={{ fontSize: "16px", fontWeight: 500 }}>Nenhuma criança em atividade no momento.</div>
+            <Button variant="primary" onClick={() => {
+              setPreCheckinPrefill(null);
+              setEntradaOpen(true);
+            }}>
+              Registrar Nova Entrada (E)
+            </Button>
+          </div>
         )}
         {entries.length === 0 && sessionsStatus === "error" && (
           <AsyncState
@@ -1016,11 +1054,11 @@ export function PainelScreen() {
             const percent = Math.min(100, Math.round((ticketMedioCents / ticketTargetCents) * 100));
             return (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "var(--text-muted)" }}>
-                  <span>🌡️ Ticket Médio hoje: {money(ticketMedioCents)} (mín {money(ticketMinCents)} / alvo {money(ticketTargetCents)})</span>
-                  <span style={{ color: zoneColor, fontWeight: "bold" }}>{percent}%</span>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "#595959" }}>
+                  <span>🌡️ Ticket Médio hoje: <strong style={{ color: "var(--text-primary)" }}>{money(ticketMedioCents)}</strong> (mín {money(ticketMinCents)} / alvo {money(ticketTargetCents)})</span>
+                  <span style={{ backgroundColor: "#F1F3F5", color: "#212529", fontWeight: "bold", padding: "2px 6px", borderRadius: "4px" }}>{percent}%</span>
                 </div>
-                <div className="capacity-bar-track">
+                <div className="capacity-bar-track" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
                   <div className="capacity-bar-fill" style={{ width: `${percent}%`, backgroundColor: zoneColor }} />
                 </div>
               </>
@@ -1046,13 +1084,13 @@ export function PainelScreen() {
             style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
             className="capacity-container"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "var(--text-muted)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "#595959" }}>
               <span>
-                🎮 Bonificação de hoje: {atualLabel} (meta {metaLabel} / super {superLabel})
+                🎮 Bonificação de hoje: <strong style={{ color: "var(--text-primary)" }}>{atualLabel}</strong> (meta {metaLabel} / super {superLabel})
               </span>
-              <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+              <span style={{ backgroundColor: "#F1F3F5", color: "#212529", fontWeight: "bold", padding: "2px 8px", borderRadius: "12px", fontSize: "11px" }}>{badgeLabel}</span>
             </div>
-            <div className="capacity-bar-track">
+            <div className="capacity-bar-track" role="progressbar" aria-valuenow={b.percent} aria-valuemin={0} aria-valuemax={100}>
               <div className="capacity-bar-fill" style={{ width: `${b.percent}%`, backgroundColor: corNivel }} />
             </div>
             <div style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px" }}>
@@ -1083,7 +1121,7 @@ export function PainelScreen() {
       )}
 
       {selected.size > 0 && (
-        <div style={{ position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 100 }}>
+        <div style={{ position: "fixed", bottom: "calc(24px + var(--install-banner-height, 0px))", left: "50%", transform: "translateX(-50%)", zIndex: 100 }}>
           <Button
             variant="primary"
             size="lg"
@@ -1148,7 +1186,7 @@ export function PainelScreen() {
 
 
       {/* Botões flutuantes: Painel é a tela principal — Entrada e PDV abrem por cima, sem sair dele */}
-      <div style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 90, display: "flex", flexDirection: "column", gap: "14px", alignItems: "flex-end" }}>
+      <div style={{ position: "fixed", bottom: "calc(24px + var(--install-banner-height, 0px))", right: "24px", zIndex: 90, display: "flex", flexDirection: "column", gap: "14px", alignItems: "flex-end" }}>
         <Button
           variant="teal"
           size="lg"

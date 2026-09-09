@@ -3,6 +3,7 @@ import type { ReactElement, ReactNode } from "react";
 import {
   Button,
   BrandLockup,
+  BrandLoader,
   SignInIcon,
   GridIcon,
   ShoppingCartIcon,
@@ -234,6 +235,22 @@ export function App() {
     });
   }, [showConnectModal, navOpen, visibleScreens, screen]);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+      if (e.altKey && e.key >= "1" && e.key <= "9") {
+        const index = parseInt(e.key, 10) - 1;
+        const s = visibleScreens[index];
+        if (s) {
+          e.preventDefault();
+          navigateToScreen(s.value);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [visibleScreens, screen]);
+
   const handleSave = useCallback(() => {
     const submitButton = document.querySelector<HTMLButtonElement>(
       "main form button[type='submit'], main button[data-save-button], main .kiosk-save-btn"
@@ -340,7 +357,7 @@ export function App() {
   // tela de login por um instante para quem já está logado faz o operador
   // digitar o PIN à toa a cada refresh.
   if (restoring) {
-    return <div style={{ padding: "80px", textAlign: "center", color: "var(--text-muted)" }}>Carregando…</div>;
+    return <BrandLoader />;
   }
 
   // Login por PIN não tem valor de negócio pra divergir entre versões —
@@ -522,12 +539,13 @@ export function App() {
               O contorno em cada botão (mesmo os "ghost") é de propósito:
               sem ele, rótulo + ícone rosa sobre fundo branco se confundem
               com texto comum — o contorno é o que avisa "isto é clicável". */}
-          {visibleScreens.map((s) => (
+          {visibleScreens.map((s, index) => (
             <Button
               key={s.value}
               variant={screen === s.value ? "teal" : "ghost"}
               size="sm"
               title={s.help}
+              aria-current={screen === s.value ? "page" : undefined}
               onClick={() => {
                 navigateToScreen(s.value);
                 setNavOpen(false);
@@ -535,6 +553,11 @@ export function App() {
               style={{ border: screen === s.value ? "1px solid transparent" : "1px solid var(--border-subtle)" }}
             >
               {s.icon} {s.label}
+              {!mobile.isPhone && (
+                <kbd style={{ marginLeft: "6px", fontSize: "10px", padding: "2px 4px", borderRadius: "4px", background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}>
+                  Alt+{index + 1}
+                </kbd>
+              )}
             </Button>
           ))}
         </nav>
@@ -609,7 +632,7 @@ export function App() {
           deixar a página inteira rolar do que espremer o conteúdo. */}
       {/* Arrastar o dedo para os lados troca de módulo — gesto extra além
           da barra/menu, pensado para o celular (ver useSwipeNavigation). */}
-      <main className="kiosk-main" style={{ flex: 1, minHeight: 0 }} {...swipeHandlers}>
+      <main className="kiosk-main" style={{ flex: 1, minHeight: 0, paddingBottom: "var(--install-banner-height, 0px)" }} {...swipeHandlers}>
         {ScreenComponent && (
           <RequireCapability capability={SCREEN_CAPABILITY[screen]}>
             <ScreenComponent />

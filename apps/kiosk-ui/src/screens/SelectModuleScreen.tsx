@@ -88,6 +88,7 @@ export function SelectModuleScreen() {
                     background: "var(--surface-sunken)",
                     padding: "12px",
                     borderRadius: "16px",
+                    color: meta.accent,
                   }}
                 >
                   {meta.icon}

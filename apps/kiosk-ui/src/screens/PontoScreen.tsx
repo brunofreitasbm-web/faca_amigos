@@ -82,6 +82,15 @@ function getNextLogicalKind(todayPunches: PontoRecord[]): (typeof KINDS)[number]
   return "ENTRADA";
 }
 
+// TODO(human): No modo Facial Rápido a identidade só é conhecida DEPOIS do
+// reconhecimento (não dá pra usar o histórico do dia como em getNextLogicalKind
+// acima), então hoje o colaborador sempre parte de nenhuma seleção. Implemente
+// uma sugestão de default por horário do relógio local do terminal, para
+// reduzir toques sem esconder a decisão do colaborador.
+function suggestKindByTimeOfDay(nowMs: number): (typeof KINDS)[number]["value"] {
+  return "ENTRADA";
+}
+
 /**
  * Bater ponto / Controle de Frequência para Estagiários e Colaboradores.
  * Suporta Modo Reconhecimento Facial Rápido (Touchless) e Fallback por PIN.
@@ -154,6 +163,7 @@ export function PontoScreen() {
     if (mode === "FACIAL_RAPIDO") {
       faceCapture.start();
       setScanState("scanning");
+      setSelectedKind(suggestKindByTimeOfDay(Date.now()));
     } else if (!authedAs) {
       faceCapture.stop();
       setScanState("idle");
@@ -186,7 +196,7 @@ export function PontoScreen() {
 
   // Escaneamento facial instantâneo/rápido
   async function handleAutoScan() {
-    if (isScanningRef.current || busy || scanState === "success" || !faceCapture.ready) return;
+    if (isScanningRef.current || busy || scanState === "success" || !faceCapture.ready || !selectedKind) return;
     isScanningRef.current = true;
     try {
       const captured = await faceCapture.capture();
@@ -350,6 +360,12 @@ export function PontoScreen() {
 
   const nextKind = getNextLogicalKind(today);
 
+  function useFallbackParaPin() {
+    faceCapture.stop();
+    setScanState("idle");
+    setMode("PIN_MANUAL");
+  }
+
   function trocarColaborador() {
     faceCapture.stop();
     setSelected(null);
@@ -390,17 +406,9 @@ export function PontoScreen() {
 
       {mode === "FACIAL_RAPIDO" && !authedAs && (
         <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px", borderRadius: "18px" }}>
-          <PunchPhotoCapture
-            faceCapture={faceCapture}
-            geolocation={geolocation}
-            geofenceRadiusM={geofenceRadiusM}
-            scanState={scanState}
-            detectedName={detectedName}
-          />
-
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>👉</span> Selecione o momento da jornada de trabalho:
+            <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-strong, #1F2937)", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>1️⃣</span> Selecione o momento da jornada de trabalho:
             </span>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", width: "100%" }}>
               {KINDS.map((k) => {
@@ -454,7 +462,7 @@ export function PontoScreen() {
                       background: bg,
                       border: `2px ${borderStyle} ${borderColor}`,
                       boxShadow: isSelected
-                        ? `0 6px 0 ${borderColor}, 0 8px 18px rgba(0,0,0,0.18)`
+                        ? `0 0 0 3px var(--color-primary-hover, #F0196B), 0 6px 0 ${borderColor}, 0 8px 18px rgba(0,0,0,0.18)`
                         : `0 4px 0 ${borderColor}`,
                       color: textColor,
                       cursor: busy ? "not-allowed" : "pointer",
@@ -464,6 +472,7 @@ export function PontoScreen() {
                       outline: "none",
                       fontFamily: "var(--font-sans, system-ui, sans-serif)",
                     }}
+                    aria-pressed={isSelected}
                   >
                     {isSelected && (
                       <span
@@ -495,16 +504,31 @@ export function PontoScreen() {
             </div>
           </div>
 
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-strong, #1F2937)", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>2️⃣</span> Aponte o rosto para a câmera:
+            </span>
+            <PunchPhotoCapture
+              faceCapture={faceCapture}
+              geolocation={geolocation}
+              geofenceRadiusM={geofenceRadiusM}
+              scanState={scanState}
+              detectedName={detectedName}
+              onUseFallback={useFallbackParaPin}
+            />
+          </div>
+
           {faceCapture.ready && scanState === "scanning" && (
             <Button
               variant="primary"
               size="lg"
               loading={busy}
-              disabled={busy}
+              disabled={busy || !selectedKind}
               onClick={handleAutoScan}
+              title={!selectedKind ? "Selecione o momento da jornada acima antes de bater o ponto" : undefined}
               style={{ borderRadius: "9999px", background: "linear-gradient(135deg, #10b981, #059669)", fontWeight: "bold" }}
             >
-              📸 Reconhecer Rosto e Bater Ponto
+              {selectedKind ? "📸 Reconhecer Rosto e Bater Ponto" : "👆 Selecione o momento da jornada acima"}
             </Button>
           )}
 

@@ -51,6 +51,20 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "CONTRATO", label: "Contrato (Planos 2h+)" },
 ];
 
+// Agrupamento semântico só para reduzir a busca visual entre 21 itens
+// numa coluna só (Lei de Hick) — cada grupo vira seu próprio tablist,
+// então a seta do teclado circula dentro do grupo, não pelos 21 juntos.
+const TAB_GROUPS: { label: string; values: GerencialTab[] }[] = [
+  { label: "Comercial", values: ["PLANOS", "PACOTES", "PRODUTOS", "CUPONS", "FIDELIDADE", "METAS"] },
+  { label: "Pessoas", values: ["COLABORADORES", "FREQUENCIA", "OCORRENCIAS", "PERMISSOES", "CLIENTES", "TALENTOS", "FOLHA"] },
+  {
+    label: "Financeiro & Operações",
+    values: ["RELATORIOS", "ABERTURA_FECHAMENTO", "FOTOS_ENVELOPE", "SALDO_ENVELOPES", "HISTORICO", "AUDITORIA", "CONTRATO"],
+  },
+];
+const GROUPED_TAB_VALUES = new Set(TAB_GROUPS.flatMap((g) => g.values));
+const UNGROUPED_TABS = TABS.filter((t) => !GROUPED_TAB_VALUES.has(t.value));
+
 const TAB_HELP: Record<GerencialTab, string> = {
   COPILOT_IA: "ZoeIA: assistente comercial humana para sugestões automáticas de vendas, aumento de ticket médio e consultoria gerencial em tempo real.",
   PLANOS: "Cadastre um plano e escolha em quais unidades ele vale — cada unidade marcada vira sua própria linha, editável depois de forma independente.",
@@ -123,7 +137,29 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
 
             <div className="gerencial-body">
               <div className="gerencial-tabs-col">
-                <Tabs value={tab} onChange={setTab} tabs={TABS} />
+                {UNGROUPED_TABS.length > 0 && <Tabs value={tab} onChange={setTab} tabs={UNGROUPED_TABS} />}
+                {TAB_GROUPS.map((group) => (
+                  <div key={group.label} style={{ marginTop: "16px" }}>
+                    <h4
+                      style={{
+                        margin: "0 0 4px",
+                        padding: "0 4px",
+                        fontSize: "11px",
+                        fontWeight: "var(--weight-bold)" as unknown as number,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      {group.label}
+                    </h4>
+                    <Tabs
+                      value={tab}
+                      onChange={setTab}
+                      tabs={TABS.filter((t) => group.values.includes(t.value))}
+                    />
+                  </div>
+                ))}
               </div>
 
               <div className="gerencial-content-col">
