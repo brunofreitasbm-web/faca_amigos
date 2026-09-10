@@ -101,3 +101,75 @@ CHECKLIST PÓS-PUBLICAÇÃO (quem publica ou o Bruno faz depois)
     confirmar que os vídeos carregam bem em 4G.
 
 Dúvidas técnicas: falar com Bruno (brunofreitasbm@gmail.com).
+
+
+====================================================================
+ATUALIZAÇÃO — 09/09/2026 (revisão pré-publicação)
+====================================================================
+Esta seção substitui o que estiver em conflito acima.
+
+ARQUIVOS QUE VÃO PARA O AR (5 HTML + pastas img/ e video/)
+- index.html                  → Playground (página principal)
+- circuito.html               → FaçaAmigos Circuito
+- hub.html                    → hub Clínica + Playground + Circuito
+- politica-privacidade.html   → política de privacidade (LGPD)
+- google877c2b37d3c979fb.html → verificação do Google (não mexer)
+- robots.txt e sitemap.xml
+
+NÃO PUBLICAR: hub_artifact_full.html e hub_completo.html.
+São rascunhos de 1,3 MB cada (o mesmo hub com as imagens embutidas em
+base64) e ficaram com o número de WhatsApp antigo. Quem for subir os
+arquivos deve simplesmente ignorar esses dois.
+
+RASTREAMENTO — AGORA IDÊNTICO NAS 4 PÁGINAS
+Antes estava inconsistente: index e circuito carregavam DOIS Clarity
+diferentes, a política de privacidade usava outro container do GTM e o
+hub não tinha rastreamento nenhum. Foi unificado em:
+- Google Tag Manager  GTM-PN5D2BTS
+- Google Analytics 4  G-Q7LHH3C9P8
+- Microsoft Clarity   xz0butjjbh
+- Contentsquare       c3b9c7ee91c87
+(os IDs GTM-K3NVZCCL e Clarity y3je6ymu3d foram removidos)
+
+CONTEÚDO ALINHADO AO BANCO DE DADOS (Supabase)
+- WhatsApp corrigido em todas as páginas: (91) 99234-7673. Os links
+  estavam com um dígito a menos (9234-7673), ou seja, todo botão de
+  CTA do site estava quebrado.
+- Preços do Playground mantidos como estavam (R$ 60 / 108 / 192 /
+  270 / 840 e minuto adicional R$ 1,80; meia inclusiva R$ 50 / 90 /
+  160 / 225 / 700 e minuto adicional R$ 1,50). Conferido nos pedidos
+  reais: o sistema cadastra a tabela cheia (R$ 100 os 30 min) e aplica
+  40% para o público geral e 50% na meia inclusiva sobre o TOTAL do
+  pedido, excedente incluído. Ex.: 30 min (R$ 100) + 5 min de
+  excedente (R$ 15) = R$ 115, menos 40% = R$ 69 pagos. A tabela cheia
+  é só âncora de marketing e por isso NÃO aparece no site.
+- Circuito: R$ 48 o passeio e minuto adicional R$ 3,00. Aqui o valor
+  é cheio mesmo — nenhum dos 158 passeios registrados usou cupom.
+- Day Use descrito como "10 horas no mesmo dia" (é o que o pacote
+  cadastrado entrega, não tempo livre).
+- Programa de fidelidade (a cada 10 visitas a próxima é cortesia)
+  passou a aparecer no site e na política de privacidade — está ativo
+  no sistema para Playground e Circuito.
+- Prova social passou a usar número real: mais de 1.100 famílias e
+  7.500 visitas registradas.
+
+CONTEÚDO FICTÍCIO REMOVIDO
+- Os 3 depoimentos do hub ("mãe de aluno da Clínica", "pai de criança
+  atípica", "mãe de dois filhos") eram inventados e foram excluídos.
+- "Centenas de famílias atendidas" (estimativa) virou o número real.
+- As 3 avaliações do index (Vanessa Santos, Eledes Failache e Ana
+  Monteiro) foram MANTIDAS: são avaliações reais do Google.
+
+AINDA PRECISA DA SUA CONFIRMAÇÃO (não dá para checar no banco)
+[ ] "+8 anos de atuação" no hub.html — o banco só tem dados desde
+    01/01/2026. Se o número vier da Clínica, tudo bem; se não, tirar.
+[ ] "Manhã Inclusiva (10h–12h)" no FAQ do index.html — não existe
+    nada no sistema marcando esse horário.
+[ ] "Passaporte mensal em 3x sem juros" — não há registro de
+    parcelamento no sistema (o pacote PORTO SEGURO existe: 10 h por
+    30 dias, R$ 1.400 cheios = R$ 840 com os 40%).
+[ ] "Extensão de sessão terapêutica sem custo adicional" (parcerias)
+    — não há registro dessas sessões no sistema.
+[ ] Endereço: o site diz "Térreo, próximo às Lojas Americanas" e o
+    cadastro fiscal diz "1º Piso, loja PSB01003". Mantido o do site
+    por decisão do Bruno, mas vale conferir.

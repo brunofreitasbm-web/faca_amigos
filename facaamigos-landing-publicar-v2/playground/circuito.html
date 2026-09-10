@@ -12,15 +12,6 @@
           'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
     })(window, document, 'script', 'dataLayer', 'GTM-PN5D2BTS');</script>
   <!-- End Google Tag Manager -->
-  <!-- Microsoft Clarity -->
-  <script type="text/javascript">
-    (function (c, l, a, r, i, t, y) {
-      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
-      t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i + "?ref=bwt";
-      y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
-    })(window, document, "clarity", "script", "y3je6ymu3d");
-  </script>
-  <!-- End Microsoft Clarity -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FaçaAmigos Circuito — Carrinhos Elétricos no Parque Shopping Belém</title>
@@ -55,7 +46,7 @@
   "name": "FaçaAmigos Circuito",
   "image": "https://playground.institutofacaamigos.com.br/img/circuito-carrinhos.jpg",
   "url": "https://playground.institutofacaamigos.com.br/circuito.html",
-  "telephone": "+55 91 9234-7673",
+  "telephone": "+55 91 99234-7673",
   "priceRange": "$$",
   "address": {
     "@type": "PostalAddress",
@@ -871,6 +862,112 @@
       color: rgba(255, 255, 255, 0.45);
     }
 
+    /* Modal: Trabalhe Conosco */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(26, 63, 53, 0.6);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--white, #ffffff);
+      border-radius: var(--r-card, 24px);
+      padding: 36px;
+      max-width: 460px;
+      width: 100%;
+      position: relative;
+      box-shadow: var(--shadow-lg, 0 12px 32px rgba(0,0,0,0.15));
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal h3 {
+      font-size: 1.35rem;
+      margin-bottom: 6px;
+      padding-right: 36px;
+      color: var(--dark, #1a3f35);
+      font-family: 'Fredoka One', cursive, sans-serif;
+    }
+
+    .modal>p {
+      color: var(--ink-soft, #556b63);
+      font-weight: 600;
+      font-size: 0.94rem;
+      margin-bottom: 20px;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 50%;
+      background: var(--cream, #f7f5f0);
+      color: var(--dark, #1a3f35);
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background var(--t-fast, 0.2s ease);
+    }
+
+    .modal-close:hover {
+      background: var(--yellow, #ffd15c);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 14px 18px;
+      border: 2.5px solid rgba(26, 63, 53, 0.12);
+      border-radius: 14px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 700;
+      font-size: 0.98rem;
+      color: var(--dark, #1a3f35);
+      background: #ffffff;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--teal, #2dcfb5);
+      box-shadow: 0 0 0 4px rgba(46, 207, 181, 0.18);
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--dark, #1a3f35);
+      margin-bottom: 6px;
+    }
+
+    .form-error {
+      display: none;
+      background: #ffeeee;
+      color: #cc0000;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
     /* Float WA */
     .wa-float {
       position: fixed;
@@ -990,7 +1087,7 @@
             class="amigos">Amigos</span><span class="sub">Circuito</span></span></a>
       <div class="nav-actions">
         <a href="index.html" class="btn btn-ghost btn-sm">Conhecer o Playground</a>
-        <a href="https://wa.me/559192347673?text=Oi!%20Vim%20pelo%20site%20e%20quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito!"
+        <a href="https://wa.me/5591992347673?text=Oi!%20Vim%20pelo%20site%20e%20quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito!"
           target="_blank" rel="noopener" class="btn btn-wa btn-sm">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path
@@ -1011,7 +1108,7 @@
         <p class="sub">Carrinhos elétricos por R$ 48 o passeio, direto no piso do Parque Shopping Belém. Sem
           agendamento — a mesma equipe e o mesmo cuidado do FaçaAmigos, agora rodando pelo shopping.</p>
         <div class="hero-actions">
-          <a href="https://wa.me/559192347673?text=Oi!%20Quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito%20para%20o%20meu%20filho!"
+          <a href="https://wa.me/5591992347673?text=Oi!%20Quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito%20para%20o%20meu%20filho!"
             target="_blank" rel="noopener" class="btn btn-wa">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -1058,7 +1155,7 @@
           aria-label="Vídeo do FaçaAmigos Circuito rodando no Parque Shopping Belém"></video>
       </div>
       <div style="margin-top: 30px;">
-        <a href="https://wa.me/559192347673?text=Oi!%20Vi%20o%20v%C3%ADdeo%20do%20Circuito%20e%20quero%20ir%20tamb%C3%A9m!"
+        <a href="https://wa.me/5591992347673?text=Oi!%20Vi%20o%20v%C3%ADdeo%20do%20Circuito%20e%20quero%20ir%20tamb%C3%A9m!"
           target="_blank" rel="noopener" class="btn btn-wa">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path
@@ -1082,7 +1179,7 @@
             <path fill-rule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
               clip-rule="evenodd" />
-          </svg> Preço único, sem letra miúda</span>
+          </svg> Preço único: R$ 48 o passeio</span>
         <span class="badge"><svg fill="currentColor" viewBox="0 0 20 20">
             <path
               d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -1163,23 +1260,24 @@
     <div class="wrap fx">
       <div class="center">
         <h2 class="sec-title">Quanto custa rodar?</h2>
-        <p class="sec-sub">Preço único, direto no quiosque — sem pacote, sem letra miúda.</p>
+        <p class="sec-sub">Preço único por passeio, direto no quiosque. Passou do tempo, o minuto adicional é R$ 3,00.</p>
       </div>
       <div class="price-cards">
         <div class="price-card">
           <div class="label">Pelúcias e Jeep</div>
           <div class="value">R$ 48</div>
-          <div class="per">20 minutos</div>
+          <div class="per">20 minutos · minuto adicional R$ 3,00</div>
         </div>
         <div class="price-card">
           <div class="label">Carros e moto</div>
           <div class="value">R$ 48</div>
-          <div class="per">30 minutos</div>
+          <div class="per">30 minutos · minuto adicional R$ 3,00</div>
         </div>
       </div>
-      <p class="price-foot">Pagamento no quiosque do Circuito, no piso do Parque Shopping Belém.</p>
+      <p class="price-foot">Fidelidade: a cada 10 passeios, o próximo é por nossa conta · Pagamento no quiosque do
+        Circuito, no piso do Parque Shopping Belém.</p>
       <div class="center">
-        <a href="https://wa.me/559192347673?text=Oi!%20Quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito!"
+        <a href="https://wa.me/5591992347673?text=Oi!%20Quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito!"
           target="_blank" rel="noopener" class="btn btn-wa">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path
@@ -1210,8 +1308,9 @@
         </details>
         <details>
           <summary>Quanto custa?</summary>
-          <div class="ans">R$ 48 o passeio: 20 minutos nas pelúcias e no jeep, ou 30 minutos nos carros e na moto.
-            Pagamento direto no quiosque do Circuito.</div>
+          <div class="ans">R$ 48 o passeio: 20 minutos nas pelúcias e no jeep, ou 30 minutos nos carros e na moto. Se
+            passar do tempo, o minuto adicional é R$ 3,00. A cada 10 passeios, o próximo é por nossa conta. Pagamento
+            direto no quiosque do Circuito.</div>
         </details>
         <details>
           <summary>O Circuito fica dentro do FaçaAmigos Playground?</summary>
@@ -1228,7 +1327,7 @@
     <p>Parque Shopping Belém, todos os dias das 10h às 22h. Sem agendamento — é só chegar.</p>
     <div class="row">
       <a class="btn btn-wa"
-        href="https://wa.me/559192347673?text=Oi!%20Quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito!"
+        href="https://wa.me/5591992347673?text=Oi!%20Quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito!"
         target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path
@@ -1249,14 +1348,14 @@
     <p>Todos os dias, das 10h às 22h · <a href="https://www.instagram.com/facaamigos.belem/" target="_blank"
         rel="noopener">@facaamigos.belem</a></p>
     <p style="margin-top: 18px;"><a href="index.html">Conhecer o FaçaAmigos Playground</a> · <a
-        href="https://wa.me/559192347673?text=Oi!%20Vim%20pelo%20site%20e%20gostaria%20de%20tirar%20uma%20d%C3%BAvida%20sobre%20o%20Circuito."
-        target="_blank" rel="noopener">Fale conosco</a> · <a href="politica-privacidade.html">Política de
+        href="https://wa.me/5591992347673?text=Oi!%20Vim%20pelo%20site%20e%20gostaria%20de%20tirar%20uma%20d%C3%BAvida%20sobre%20o%20Circuito."
+        target="_blank" rel="noopener">Fale conosco</a> · <a href="#" onclick="openJobModal(); return false;">Venha fazer parte do nosso time</a> · <a href="politica-privacidade.html">Política de
         privacidade</a></p>
     <p class="legal">FaçaAmigos Playground Inclusivo · CNPJ 66.318.630/0001-17 · Belém/PA</p>
   </footer>
 
   <a class="wa-float"
-    href="https://wa.me/559192347673?text=Oi!%20Vim%20pelo%20site%20e%20quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito!"
+    href="https://wa.me/5591992347673?text=Oi!%20Vim%20pelo%20site%20e%20quero%20saber%20mais%20sobre%20o%20Fa%C3%A7aAmigos%20Circuito!"
     target="_blank" rel="noopener" aria-label="Fale conosco no WhatsApp">
     <svg viewBox="0 0 24 24" fill="currentColor">
       <path
@@ -1278,6 +1377,134 @@
         });
       }, { threshold: 0.12 });
       els.forEach(function (el) { io.observe(el); });
+    })();
+  </script>
+  <!-- Modal: Venha Fazer Parte do Nosso Time -->
+  <div class="modal-overlay" id="jobModalOverlay" onclick="if(event.target===this) closeJobModal()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jobModalTitle">
+      <button type="button" class="modal-close" onclick="closeJobModal()" aria-label="Fechar">✕</button>
+      <h3 id="jobModalTitle">Venha fazer parte do nosso time</h3>
+      <p>Preencha seus dados e envie seu currículo em PDF. Nosso time de RH vai analisar sua candidatura.</p>
+      <form id="job-form">
+        <div class="form-group"><input type="text" id="job-nome" class="form-control" placeholder="Nome completo"
+            required></div>
+        <div class="form-group"><input type="email" id="job-email" class="form-control" placeholder="E-mail" required>
+        </div>
+        <div class="form-group"><input type="tel" id="job-telefone" class="form-control" placeholder="WhatsApp"
+            required></div>
+        <div class="form-group">
+          <input type="text" id="job-curso" class="form-control" list="job-curso-sugestoes"
+            placeholder="Curso (ex: Psicologia, Terapia Ocupacional...)">
+          <datalist id="job-curso-sugestoes">
+            <option value="Psicologia">
+            <option value="Terapia Ocupacional">
+            <option value="Educação Física">
+            <option value="Pedagogia">
+            <option value="Fonoaudiologia">
+            <option value="Fisioterapia">
+            <option value="Enfermagem">
+            <option value="Administração">
+            <option value="Recursos Humanos">
+            <option value="Marketing">
+          </datalist>
+        </div>
+        <div class="form-group">
+          <select id="job-area" class="form-control" required>
+            <option value="" disabled selected>Área pretendida</option>
+            <option value="RECEPCAO">Recepção</option>
+            <option value="VENDEDOR">Vendedor(a)</option>
+            <option value="CAIXA">Caixa</option>
+            <option value="MONITOR">Monitor(a) de Brincadeira</option>
+            <option value="LIDERANCA">Liderança / Supervisão</option>
+            <option value="OUTRA">Outra</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="job-tipo" class="form-control" required>
+            <option value="" disabled selected>Tipo de oportunidade</option>
+            <option value="ESTAGIO">Estágio</option>
+            <option value="REMUNERADO">Vaga remunerada (CLT)</option>
+            <option value="BOLSA">Bolsa</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="job-curriculo" class="form-label">Currículo (PDF, até 5MB)</label>
+          <input type="file" id="job-curriculo" class="form-control" accept="application/pdf" required>
+        </div>
+        <p style="font-size: 0.78rem; font-weight: 700; color: var(--ink-soft, #556b63); margin-bottom: 14px;">Ao enviar, você
+          concorda com o uso dos seus dados para o processo seletivo, conforme a <a href="politica-privacidade.html"
+            target="_blank" style="color: var(--teal-dark, #1f917f);">Política de Privacidade</a>.</p>
+        <div id="job-form-error" class="form-error"></div>
+        <button type="submit" id="job-form-submit" class="btn btn-pink" style="width: 100%;">Enviar candidatura</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Modal: Venha Fazer Parte do Nosso Time
+    function openJobModal() { document.getElementById('jobModalOverlay').classList.add('active'); }
+    function closeJobModal() { document.getElementById('jobModalOverlay').classList.remove('active'); }
+
+    (function () {
+      var jobForm = document.getElementById('job-form');
+      if (!jobForm) return;
+      jobForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var errorBox = document.getElementById('job-form-error');
+        var submitBtn = document.getElementById('job-form-submit');
+        var resumeInput = document.getElementById('job-curriculo');
+        errorBox.style.display = 'none';
+
+        var resumeFile = resumeInput.files[0];
+        if (!resumeFile || resumeFile.type !== 'application/pdf') {
+          errorBox.textContent = 'Selecione um currículo em PDF.';
+          errorBox.style.display = 'block';
+          return;
+        }
+        if (resumeFile.size > 5 * 1024 * 1024) {
+          errorBox.textContent = 'O currículo deve ter até 5MB.';
+          errorBox.style.display = 'block';
+          return;
+        }
+
+        var formData = new FormData();
+        formData.append('full_name', document.getElementById('job-nome').value);
+        formData.append('email', document.getElementById('job-email').value);
+        formData.append('phone', document.getElementById('job-telefone').value);
+        formData.append('course', document.getElementById('job-curso').value);
+        formData.append('desired_area', document.getElementById('job-area').value);
+        formData.append('opportunity_type', document.getElementById('job-tipo').value);
+        formData.append('resume', resumeFile);
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Enviando...';
+
+        var supabaseKey = (typeof window !== 'undefined' && window.VITE_SUPABASE_PUBLISHABLE_KEY) ? window.VITE_SUPABASE_PUBLISHABLE_KEY : '';
+        fetch('https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/job-application-webhook', {
+          method: 'POST',
+          headers: supabaseKey ? { 'Authorization': 'Bearer ' + supabaseKey } : {},
+          body: formData
+        })
+          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (r) {
+            if (!r.ok) throw new Error(r.data.error || 'Falha ao enviar candidatura');
+            jobForm.innerHTML = '<div style="text-align:center; padding: 10px 0;">' +
+              '<h4 style="color:var(--dark, #1a3f35); margin-bottom:12px; font-family:\'Fredoka One\',sans-serif; font-size:1.3rem;">Candidatura enviada!</h4>' +
+              '<p style="color:var(--ink-soft, #556b63); font-weight:600; font-size:0.95rem;">Obrigado pelo interesse em fazer parte do FaçaAmigos. Nosso time de RH vai analisar seu currículo e entrar em contato.</p></div>';
+          })
+          .catch(function (err) {
+            var errorMsg = err.message || '';
+            if (errorMsg.toLowerCase().includes('failed to fetch')) {
+              errorMsg = 'Não foi possível enviar seu currículo no momento. Verifique sua conexão e tente novamente.';
+            } else {
+              errorMsg = errorMsg || 'Não foi possível enviar sua candidatura. Tente novamente.';
+            }
+            errorBox.textContent = errorMsg;
+            errorBox.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Enviar candidatura';
+          });
+      });
     })();
   </script>
 </body>
