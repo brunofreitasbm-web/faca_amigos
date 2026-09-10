@@ -664,6 +664,35 @@ export function PainelScreen() {
           No celular (.painel-scroll no app.css) isso é desligado: a
           prioridade lá é ver o quadro inteiro, então quem rola é a página. */}
       <div className="painel-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: "4px" }}>
+        {entries.length === 0 && sessionsStatus === "loading" && (
+          <AsyncState kind="loading" title="Carregando sessões ativas…" style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", boxSizing: "border-box" }} />
+        )}
+        {/* Antes ficava dentro do .painel-grid como só mais um item — a grade
+            não estica um item sozinho pra ocupar a linha inteira, então o
+            "quadro" (a área de maior destaque da tela) sobrava vazio em
+            volta de uma caixinha pequena centrada no topo. Agora ocupa a
+            altura toda do .painel-scroll de propósito. */}
+        {entries.length === 0 && sessionsStatus === "ready" && (
+          <div style={{ height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px", gap: "16px", textAlign: "center", color: "var(--text-muted)", background: "var(--surface-card)", borderRadius: "16px", border: "1px dashed var(--border-subtle)" }}>
+            <div style={{ fontSize: "40px" }}>📭</div>
+            <div style={{ fontSize: "16px", fontWeight: 500 }}>Nenhuma criança em atividade no momento.</div>
+            <Button variant="primary" onClick={() => {
+              setPreCheckinPrefill(null);
+              setEntradaOpen(true);
+            }}>
+              Registrar Nova Entrada (E)
+            </Button>
+          </div>
+        )}
+        {entries.length === 0 && sessionsStatus === "error" && (
+          <AsyncState
+            kind="error"
+            title="Não foi possível carregar as sessões ativas."
+            detail={sessionsError ?? undefined}
+            style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", boxSizing: "border-box" }}
+          />
+        )}
+        {entries.length > 0 && (
         <div className="painel-grid">
         {entries.map((entry) => {
           const { session, quote, plan, asset } = closingSnapshot.get(entry.session.id) ?? entry;
@@ -1136,30 +1165,8 @@ export function PainelScreen() {
             </Card>
           );
         })}
-        {entries.length === 0 && sessionsStatus === "loading" && (
-          <AsyncState kind="loading" title="Carregando sessões ativas…" style={{ gridColumn: "1 / -1" }} />
-        )}
-        {entries.length === 0 && sessionsStatus === "ready" && (
-          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px", gap: "16px", textAlign: "center", color: "var(--text-muted)", background: "var(--surface-card)", borderRadius: "16px", border: "1px dashed var(--border-subtle)" }}>
-            <div style={{ fontSize: "40px" }}>📭</div>
-            <div style={{ fontSize: "16px", fontWeight: 500 }}>Nenhuma criança em atividade no momento.</div>
-            <Button variant="primary" onClick={() => {
-              setPreCheckinPrefill(null);
-              setEntradaOpen(true);
-            }}>
-              Registrar Nova Entrada (E)
-            </Button>
-          </div>
-        )}
-        {entries.length === 0 && sessionsStatus === "error" && (
-          <AsyncState
-            kind="error"
-            title="Não foi possível carregar as sessões ativas."
-            detail={sessionsError ?? undefined}
-            style={{ gridColumn: "1 / -1" }}
-          />
-        )}
         </div>
+        )}
       </div>
 
       {ticketTargetCents > 0 && (

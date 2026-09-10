@@ -9,8 +9,7 @@ export type Screen =
   | "ANIVERSARIOS"
   | "PONTO"
   | "RELATORIO"
-  | "CONFIGURACOES"
-  | "TALENTOS";
+  | "CONFIGURACOES";
 
 /**
  * Capacidade exigida por cada tela do menu.
@@ -30,6 +29,5 @@ export const SCREEN_CAPABILITY: Record<Screen, Capability> = {
   PONTO: "ponto.self",
   RELATORIO: "relatorio.read",
   CONFIGURACOES: "config.read",
-  TALENTOS: "talentos.read",
 };
 
