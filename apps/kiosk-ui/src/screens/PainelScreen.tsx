@@ -18,6 +18,8 @@ import { getFriendlyWristbandCode } from "@facaamigos/domain";
 import { formatAge, formatElapsed, money } from "../format.js";
 import { EntradaScreen } from "./EntradaScreen.js";
 import type { PreCheckinPrefill } from "./EntradaScreen.js";
+import type { PrepaidCreditQueueItem } from "../api/client.js";
+import { formatPlanoHoras } from "../contract/contractTemplate.js";
 import { SaidaScreen } from "./SaidaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
 import { WristbandQRCode } from "../components/WristbandQRCode.js";
@@ -88,6 +90,8 @@ export function PainelScreen() {
   const [preCheckinPrefill, setPreCheckinPrefill] = useState<PreCheckinPrefill | null>(null);
   const [pendingPreCheckins, setPendingPreCheckins] = useState<PreCheckinPrefill[]>([]);
   const [preCheckinBusy, setPreCheckinBusy] = useState<Set<string>>(new Set());
+  const [prepaidCreditQueue, setPrepaidCreditQueue] = useState<PrepaidCreditQueueItem[]>([]);
+  const [prepaidPrefill, setPrepaidPrefill] = useState<PrepaidCreditQueueItem | null>(null);
   const [saidaOpen, setSaidaOpen] = useState(false);
   const [pdvOpen, setPdvOpen] = useState(false);
   const [qrModalSession, setQrModalSession] = useState<{ code: string; childName: string; guardianName?: string } | null>(null);
@@ -163,6 +167,30 @@ export function PainelScreen() {
 
   function openPreCheckin(item: PreCheckinPrefill) {
     setPreCheckinPrefill(item);
+    setEntradaOpen(true);
+  }
+
+  // Saldos pré-pagos aguardando início (venda feita sem "Iniciar contagem
+  // agora"). Mesmo poll simples do pré-cadastro acima — não é dado que
+  // precisa de Realtime, só reaparecer em alguns segundos já basta, e
+  // crédito não vive em fa_kiosk_sessions, então o canal Realtime do
+  // Painel (useActiveSessions) nunca o veria de qualquer forma.
+  function refetchPrepaidCreditQueue() {
+    if (!unit) return;
+    Api.prepaidCreditQueue(unit.id)
+      .then(setPrepaidCreditQueue)
+      .catch(() => {});
+  }
+  useEffect(() => {
+    if (!unit) return;
+    refetchPrepaidCreditQueue();
+    const interval = setInterval(refetchPrepaidCreditQueue, 10000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unit?.id]);
+
+  function openPrepaidCredit(item: PrepaidCreditQueueItem) {
+    setPrepaidPrefill(item);
     setEntradaOpen(true);
   }
 
@@ -547,6 +575,72 @@ export function PainelScreen() {
                   aria-label="Descartar pré-cadastro"
                 >
                   <XIcon />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Saldos pré-pagos: o pai pagou e foi embora numa visita anterior
+          ("Iniciar contagem agora" desmarcado na Entrada) e a criança
+          voltou agora. Mesmo layout do bloco de pré-cadastro acima, mas
+          roxo — cor do saldo pré-pago em toda a UI (client.ts, card da
+          Entrada) — para não confundir as duas filas. "▶ Iniciar" abre a
+          Entrada pré-preenchida (openPrepaidCredit); não cria a sessão
+          direto daqui, de propósito. */}
+      {prepaidCreditQueue.length > 0 && (
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            padding: "10px 12px",
+            borderRadius: "14px",
+            border: "1px dashed #7C4DFF",
+            background: "rgba(124, 77, 255, 0.06)",
+          }}
+        >
+          <strong style={{ fontSize: "13px", color: "#5B32C4" }}>
+            💳 {prepaidCreditQueue.length} saldo{prepaidCreditQueue.length > 1 ? "s" : ""} pré-pago
+            {prepaidCreditQueue.length > 1 ? "s" : ""} aguardando início
+          </strong>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            {prepaidCreditQueue.map((item) => (
+              <div
+                key={item.credit_id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 10px",
+                  borderRadius: "12px",
+                  border: "1px solid var(--border-subtle)",
+                  background: "var(--surface-card)",
+                }}
+              >
+                <div>
+                  <strong style={{ fontSize: "13px", display: "block" }}>
+                    {item.child_name}
+                    {item.child_inclusive_eligible && !item.child_name.includes("🧩") ? " 🧩" : ""}
+                  </strong>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                    {item.guardian_name} · {formatPlanoHoras(item.remaining_minutes)} · {item.source_name_snapshot}
+                  </span>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={item.has_active_session}
+                  onClick={() => openPrepaidCredit(item)}
+                  title={
+                    item.has_active_session
+                      ? "Esta criança já está no parque por outra entrada"
+                      : "Abrir Entrada já preenchida para iniciar a contagem deste saldo"
+                  }
+                >
+                  {item.has_active_session ? "Já está no parque" : "▶ Iniciar"}
                 </Button>
               </div>
             ))}
@@ -1217,6 +1311,7 @@ export function PainelScreen() {
           onClose={() => {
             setEntradaOpen(false);
             setPreCheckinPrefill(null);
+            setPrepaidPrefill(null);
           }}
           ariaLabel="Entrada"
           maxWidth="820px"
@@ -1224,12 +1319,14 @@ export function PainelScreen() {
           zIndex={150}
         >
           <EntradaScreen
-            onSuccess={() => { refetchActiveSessions(); }}
+            onSuccess={() => { refetchActiveSessions(); refetchPrepaidCreditQueue(); }}
             prefill={preCheckinPrefill}
             onPrefillConsumed={() => {
               setPreCheckinPrefill(null);
               refetchPendingPreCheckins();
             }}
+            prepaidPrefill={prepaidPrefill}
+            onPrepaidPrefillConsumed={() => setPrepaidPrefill(null)}
           />
         </Modal>
       )}

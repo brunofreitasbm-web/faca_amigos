@@ -665,6 +665,8 @@ export interface ChildCreditBalance {
   child_id: string;
   remaining_minutes: number;
   credits_count: number;
+  /** Id do crédito mais antigo (FIFO) — o que o fa_checkin referencia para fixar tarifa/piso da sessão. */
+  credit_id: string;
 }
 
 /** Uma criança com saldo pré-pago aguardando início — fila do Painel (`fa_kiosk_child_credit_queue`). */
@@ -672,9 +674,13 @@ export interface PrepaidCreditQueueItem {
   credit_id: string;
   child_id: string;
   child_name: string;
+  /** Traz nascimento/CPF/elegibilidade só para o Painel reconstruir um ChildMatch e reusar pickMatch() na Entrada. */
+  child_birth_date: string;
+  child_inclusive_eligible: boolean;
   guardian_id: string;
   guardian_name: string;
   guardian_phone: string | null;
+  guardian_cpf: string | null;
   remaining_minutes: number;
   source_name_snapshot: string;
   activity: "PLAYGROUND" | "CARRINHO";
@@ -800,6 +806,11 @@ export interface ActiveSessionEntry {
     package_id?: string | null;
     /** Minutos alocados no check-in — a "duração do plano" da sessão de pacote. */
     package_allocated_minutes?: number;
+    /** Entrada consumindo saldo pré-pago (comprado numa visita anterior, sem plano vendido agora). */
+    uses_child_credit?: boolean;
+    child_credit_id?: string | null;
+    /** Minutos alocados no check-in — a "duração do plano" da sessão de saldo pré-pago. */
+    child_credit_allocated_minutes?: number;
   };
   quote: {
     lines: QuoteLine[];
@@ -1280,12 +1291,16 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
   return raw.sessions.map((row) => {
     const usesHourBank = Boolean(row.uses_hour_bank);
     const usesPackage = Boolean(row.uses_package);
+    const usesChildCredit = Boolean(row.uses_child_credit);
     // Sessão de banco de horas: não existe plano vendido. O pseudo-plano
     // reusa o mesmo motor de preço — valor 0, duração = saldo alocado no
     // check-in e excedente pela tarifa congelada do crédito de origem.
     // Sessão de Pacote: também não existe plano vendido, mas o pacote É
     // cobrado no fechamento (preço cheio, congelado no check-in) — só a
     // duração/excedente seguem o mesmo padrão do banco de horas.
+    // Sessão de saldo pré-pago: dinheiro já trocou de mãos na venda
+    // (fa_kiosk_sell_prepaid_credit) — valor 0 aqui, igual ao banco de
+    // horas, até o saldo acabar e começar o excedente.
     const plan: Plan = usesHourBank
       ? {
           id: "HOUR_BANK",
@@ -1308,7 +1323,18 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
             overageCentsPerMinute: (row.package_overage_cents_per_minute as number | null) ?? 0,
             color: "#FF7A00",
           }
-        : raw.planById.get(row.plan_id as string)!;
+        : usesChildCredit
+          ? {
+              id: `CREDIT:${row.child_credit_id as string}`,
+              activity: row.activity as Plan["activity"],
+              name: (row.child_credit_name_snapshot as string | null) ?? "Saldo pré-pago",
+              valueCents: 0,
+              durationValue: (row.child_credit_allocated_minutes as number | null) ?? 0,
+              durationUnit: "MINUTO",
+              overageCentsPerMinute: (row.child_credit_overage_cents_per_minute as number | null) ?? 0,
+              color: "#7C4DFF",
+            }
+          : raw.planById.get(row.plan_id as string)!;
     const guardian = raw.guardianById.get(row.guardian_id as string);
     const assetRow = row.asset_id ? raw.assetById.get(row.asset_id as string) : undefined;
     const childRow = raw.childById.get(row.child_id as string);
@@ -1360,6 +1386,9 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         uses_package: usesPackage,
         package_id: (row.package_id as string | null) ?? undefined,
         package_allocated_minutes: (row.package_allocated_minutes as number | null) ?? undefined,
+        uses_child_credit: usesChildCredit,
+        child_credit_id: (row.child_credit_id as string | null) ?? undefined,
+        child_credit_allocated_minutes: (row.child_credit_allocated_minutes as number | null) ?? undefined,
       },
       quote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
@@ -1753,6 +1782,8 @@ export const Api = {
     useHourBank?: boolean;
     /** Entrada por um Pacote: compra/renova o saldo do responsável e usa nesta mesma visita. */
     packageId?: string | null;
+    /** Entrada consumindo saldo pré-pago comprado numa visita anterior (fa_kiosk_sell_prepaid_credit). */
+    childCreditId?: string | null;
     employeeId: string;
     child: { id?: string; fullName: string; birthDate: string; inclusiveEligible: boolean; inclusiveProofType?: string };
     guardian: { id?: string; fullName: string; cpf: string; phoneE164: string };
@@ -1781,6 +1812,8 @@ export const Api = {
         hourBankAllocatedMinutes: number | null;
         /** Minutos do pacote alocados nesta entrada (só quando packageId). */
         packageAllocatedMinutes: number | null;
+        /** Minutos do saldo pré-pago alocados nesta entrada (só quando childCreditId). */
+        childCreditAllocatedMinutes: number | null;
       }>(
         "fa_checkin",
         {
@@ -1789,6 +1822,7 @@ export const Api = {
           p_plan_id: body.planId,
           p_use_hour_bank: body.useHourBank ?? false,
           p_package_id: body.packageId ?? null,
+          p_child_credit_id: body.childCreditId ?? null,
           p_asset_id: body.assetId ?? null,
           p_guardian: { id: body.guardian.id, fullName: body.guardian.fullName, cpf: body.guardian.cpf, phoneE164: body.guardian.phoneE164 },
           p_child: {
@@ -3237,6 +3271,21 @@ export const Api = {
   // significa "todas as unidades" — usado pelo Gerencial, que enxerga as 3
   // de uma vez (mesmo padrão de apps/backoffice/.../relatorios/page.tsx,
   // que resolvia esse mesmo dilema antes de ser desativado).
+  /**
+   * Passivo de saldos pré-pagos em aberto — não tem período (from/to):
+   * é o retrato de HOJE do que já foi recebido e ainda não foi usado,
+   * e não vence sozinho (decisão do dono: saldo sem validade).
+   */
+  prepaidCreditLiability: async (unitId: string) => {
+    const rows = await unwrap<{ credits_count: number; remaining_minutes: number; estimated_value_cents: number }[]>(
+      supabase().rpc("fa_kiosk_prepaid_credit_liability", { p_unit_id: unitId }),
+    );
+    // A função é uma agregação sem GROUP BY — sempre devolve exatamente
+    // uma linha (com zeros, se não houver saldo em aberto), mas o
+    // fallback cobre qualquer resposta vazia inesperada.
+    return rows[0] ?? { credits_count: 0, remaining_minutes: 0, estimated_value_cents: 0 };
+  },
+
   reportSales: async (unitId: string | null, from: string, to: string) => {
     let ordersQuery = supabase()
       .from("fa_kiosk_orders")

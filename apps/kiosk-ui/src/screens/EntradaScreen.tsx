@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { Asset, ChildMatch, Coupon, Package, Plan, Product, UpsellOffer } from "../api/client.js";
+import type { Asset, ChildMatch, Coupon, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
 import { PrepaidPaymentModal } from "../components/PrepaidPaymentModal.js";
@@ -119,12 +119,18 @@ export function EntradaScreen({
   onSuccess,
   prefill,
   onPrefillConsumed,
+  prepaidPrefill,
+  onPrepaidPrefillConsumed,
 }: {
   onSuccess?: () => void;
   /** Pré-cadastro feito pelo responsável no QR de Acesso Rápido (ver PainelScreen) — preenche o formulário para o operador só conferir e confirmar. */
   prefill?: PreCheckinPrefill | null;
   /** Avisa quem abriu a tela (PainelScreen) que o prefill já foi consumido, para fechar o card da lista de pendentes. */
   onPrefillConsumed?: () => void;
+  /** Criança escolhida na fila "Saldos aguardando início" do Painel (ver PainelScreen) — reusa pickMatch() e já seleciona o saldo pré-pago. */
+  prepaidPrefill?: PrepaidCreditQueueItem | null;
+  /** Avisa quem abriu a tela que o prefill já foi consumido, para fechar o card da fila. */
+  onPrepaidPrefillConsumed?: () => void;
 } = {}) {
   const { unit, employee } = useAppState();
   const toast = useToast();
@@ -201,6 +207,12 @@ export function EntradaScreen({
   // Saldo do banco de horas da criança identificada (planos >2h de visitas
   // anteriores, em qualquer unidade). null = sem saldo ou não consultado.
   const [hourBank, setHourBank] = useState<{ remainingMinutes: number; nextExpiryMs: number } | null>(null);
+
+  // Saldo pré-pago da criança identificada (comprado numa visita anterior
+  // com "Iniciar contagem agora" desmarcado). null = sem saldo ou não
+  // consultado. creditId aponta para o crédito mais antigo (FIFO) — é o
+  // que fa_checkin referencia para fixar tarifa/piso da sessão.
+  const [childCredit, setChildCredit] = useState<{ remainingMinutes: number; creditId: string } | null>(null);
 
   // Oferta de upgrade da criança identificada. `null` cobre os dois casos
   // em que não há card: ainda não consultado e não elegível — a tela trata
@@ -356,6 +368,7 @@ export function EntradaScreen({
     setFavoriteAssetId(null);
     setOffer(null);
     setHourBank(null);
+    setChildCredit(null);
 
     // Saldo do banco de horas (planos >2h de visitas anteriores, em
     // qualquer unidade): consultado aqui para a opção "Usar banco de
@@ -366,6 +379,16 @@ export function EntradaScreen({
         setHourBank(b && b.remaining_minutes > 0 ? { remainingMinutes: b.remaining_minutes, nextExpiryMs: b.next_expiry_ms } : null);
       })
       .catch(() => setHourBank(null));
+
+    // Saldo pré-pago (comprado numa visita anterior, sem iniciar a
+    // sessão): mesma lógica do banco de horas — aparece como card antes
+    // de vender plano novo.
+    Api.childCreditBalances([match.id])
+      .then((map) => {
+        const b = map.get(match.id);
+        setChildCredit(b && b.remaining_minutes > 0 ? { remainingMinutes: b.remaining_minutes, creditId: b.credit_id } : null);
+      })
+      .catch(() => setChildCredit(null));
 
     // Oferta de upgrade. Consultada aqui, e não no `submit`, porque o
     // script precisa chegar ao operador ANTES de a conversa virar "qual
@@ -444,6 +467,7 @@ export function EntradaScreen({
     setShowNewForm(false);
     setOffer(null);
     setHourBank(null);
+    setChildCredit(null);
     setChildName("");
     setBirthDate("");
     setIsNeurodivergent(false);
@@ -478,6 +502,34 @@ export function EntradaScreen({
   // dos planos sem virar um plano de verdade.
   const HOUR_BANK = "HOUR_BANK";
   const usingHourBank = planId === HOUR_BANK;
+  // Sentinela do saldo pré-pago — mesmo truque, para consumir o crédito
+  // comprado numa visita anterior sem virar um plano de verdade.
+  const CHILD_CREDIT = "CHILD_CREDIT";
+  const usingChildCredit = planId === CHILD_CREDIT;
+
+  // "▶ Iniciar" da fila do Painel: reusa o MESMO pickMatch() da busca
+  // manual — um único caminho de criação de sessão em vez de duplicar a
+  // lógica de fa_checkin numa segunda função (ver comentário da
+  // migration fa_prepaid_queue_enrichment). Só falta selecionar o saldo
+  // pré-pago, que pickMatch por si só não faz.
+  useEffect(() => {
+    if (!prepaidPrefill) return;
+    pickMatch({
+      id: prepaidPrefill.child_id,
+      full_name: prepaidPrefill.child_name,
+      birth_date: prepaidPrefill.child_birth_date,
+      phone_e164: prepaidPrefill.guardian_phone,
+      guardian_name: prepaidPrefill.guardian_name,
+      cpf: prepaidPrefill.guardian_cpf,
+      inclusive_eligible: prepaidPrefill.child_inclusive_eligible,
+      is_vip: false,
+      visits_in_window: 0,
+    });
+    setPlanId(CHILD_CREDIT);
+    onPrepaidPrefillConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prepaidPrefill?.credit_id]);
+
   // Pacotes aparecem no mesmo grid dos planos, sem distinção: cada um vira
   // um Plan sintético (id prefixado) — o resto da tela (preço, "cabe até o
   // fechamento", contrato >2h, cross-sell) já sabe lidar com um Plan
@@ -592,17 +644,15 @@ export function EntradaScreen({
     if (activity === "CARRINHO" && !assetId) return "Escolha o carrinho";
 
     if (!startNow) {
-      // TODO(human): guardas de política da venda pré-paga. O servidor
-      // (fa_kiosk_sell_prepaid_credit) já recusa turno fechado com
-      // SEM_TURNO_ABERTO — isto aqui é só a mensagem amigável ANTES de
-      // o operador preencher tudo. Três perguntas em aberto, cada uma
-      // um `if (...) return "mensagem";`:
-      //   1. Venda pré-paga exige caixa aberto? (o dinheiro tem que
-      //      cair num turno — provavelmente sim)
-      //   2. Pode pré-pagar saldo de CARRINHO, se o carrinho em si não
-      //      pode ser reservado com antecedência?
-      //   3. Cupom de desconto vale para saldo vendido hoje e
-      //      consumido só daqui a semanas/meses?
+      // Decisão do dono (2026-09-10): caixa aberto é obrigatório (o
+      // dinheiro tem que cair num turno — o servidor também recusa isto
+      // com SEM_TURNO_ABERTO, esta é só a mensagem amigável antes de
+      // preencher tudo); saldo pré-pago só vale para Playground, nunca
+      // CARRINHO (o carrinho não pode ser reservado para o futuro);
+      // cupom de desconto vale normalmente, mesmo para saldo consumido
+      // só daqui a semanas — por isso não há guarda de cupom aqui.
+      if (hasOpenShift === false) return "Abra o caixa para vender saldo pré-pago";
+      if (activity === "CARRINHO") return "Saldo pré-pago só vale para planos e pacotes do Playground";
     }
 
     return null;
@@ -621,9 +671,10 @@ export function EntradaScreen({
         unitId: unit.id,
         activity,
         assetId: assetId ?? undefined,
-        planId: usingHourBank || usingPackage ? null : planId!,
+        planId: usingHourBank || usingPackage || usingChildCredit ? null : planId!,
         useHourBank: usingHourBank,
         packageId: usingPackage ? selectedPackageId : undefined,
+        childCreditId: usingChildCredit ? childCredit?.creditId : undefined,
         employeeId: employee.id,
         child: { id: matchedChild?.id, fullName: childName.trim(), birthDate, inclusiveEligible: isNeurodivergent },
         guardian: {
@@ -632,7 +683,7 @@ export function EntradaScreen({
           cpf: normalizeCpf(cpf),
           phoneE164: normalizePhoneE164(phone),
         },
-        couponCode: usingHourBank ? undefined : couponCode || undefined,
+        couponCode: usingHourBank || usingChildCredit ? undefined : couponCode || undefined,
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
         preCheckinId: preCheckinId ?? undefined,
@@ -1101,6 +1152,32 @@ export function EntradaScreen({
               </div>
             </Card>
           )}
+          {/* Saldo pré-pago: dinheiro já recebido numa visita anterior em
+              que "Iniciar contagem agora" ficou desmarcado. Mesmo padrão
+              visual do banco de horas, cor roxa para não confundir com ele
+              (o roxo já é a cor da sessão pré-paga no Painel/client.ts). */}
+          {matchedChild && childCredit && activity === "PLAYGROUND" && (
+            <Card
+              onClick={() => setPlanId(CHILD_CREDIT)}
+              title="Usar o saldo pago numa visita anterior, em que a criança não iniciou a contagem na hora"
+              style={{
+                cursor: "pointer",
+                padding: "14px 18px",
+                minWidth: "180px",
+                borderRadius: "16px",
+                border: usingChildCredit ? "2px solid #7C4DFF" : "2px dashed #7C4DFF",
+                background: usingChildCredit ? "rgba(124, 77, 255, 0.10)" : "var(--surface-card)",
+              }}
+            >
+              <strong style={{ fontSize: "16px", display: "block", color: "#5B32C4" }}>
+                💳 Usar saldo pré-pago
+              </strong>
+              <div style={{ fontSize: "18px", color: "#5B32C4", fontWeight: "bold", marginTop: "2px" }}>
+                {formatPlanoHoras(childCredit.remainingMinutes)} disponíveis
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>sem vencimento · sem custo de entrada</div>
+            </Card>
+          )}
           {/* Pacotes entram no mesmo grid dos planos, sem seção ou marca
               visual separada — cada um já chegou aqui como um Plan
               sintético (packagePlans). */}
@@ -1186,9 +1263,10 @@ export function EntradaScreen({
 
         {/* Pré-pago: o pai paga e vai embora, o tempo fica como saldo da
             criança. Marcado ("Iniciar contagem agora") é o padrão — só
-            aparece quando já há um plano escolhido e não é o banco de
-            horas (não dá pra pré-pagar um saldo que a criança já tem). */}
-        {selectedPlan && !usingHourBank && (
+            aparece quando já há um plano escolhido, não é o banco de
+            horas (não dá pra pré-pagar um saldo que a criança já tem) e
+            é Playground (CARRINHO não pode ser reservado para o futuro). */}
+        {selectedPlan && !usingHourBank && !usingChildCredit && activity === "PLAYGROUND" && (
           <IfCan capability="venda.prepago">
             <div
               style={{

@@ -176,6 +176,7 @@ export function RelatorioScreen() {
 export function VendasTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
   const [byDay, setByDay] = useState<DailySales[]>([]);
   const [byMethod, setByMethod] = useState<RevenueByMethod[]>([]);
+  const [prepaidLiability, setPrepaidLiability] = useState<{ credits_count: number; remaining_minutes: number; estimated_value_cents: number } | null>(null);
 
   useEffect(() => {
     Api.reportSales(unitId, from, to).then((r) => {
@@ -184,10 +185,36 @@ export function VendasTab({ unitId, from, to }: { unitId: string | null; from: s
     });
   }, [unitId, from, to]);
 
+  // Passivo de saldos pré-pagos: não é filtrado por período (from/to) —
+  // é o retrato de HOJE do que já foi recebido e ainda não foi usado.
+  useEffect(() => {
+    if (!unitId) return;
+    Api.prepaidCreditLiability(unitId).then(setPrepaidLiability).catch(() => setPrepaidLiability(null));
+  }, [unitId]);
+
   const total = byMethod.reduce((sum, r) => sum + r.total_cents, 0);
 
   return (
     <div>
+      {prepaidLiability && prepaidLiability.credits_count > 0 && (
+        <Card
+          style={{
+            padding: "14px 16px",
+            margin: "16px 0",
+            border: "1px solid #7C4DFF",
+            background: "rgba(124, 77, 255, 0.06)",
+          }}
+          title="Dinheiro já recebido por saldos pré-pagos (venda sem 'Iniciar contagem agora') que ainda não foi consumido. Não vence — fica em aberto até a criança usar."
+        >
+          <strong style={{ fontFamily: "var(--font-display)", fontSize: "15px", color: "#5B32C4" }}>
+            💳 Saldos pré-pagos em aberto: {money(prepaidLiability.estimated_value_cents)}
+          </strong>
+          <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
+            {prepaidLiability.credits_count} crédito{prepaidLiability.credits_count > 1 ? "s" : ""} ·{" "}
+            {prepaidLiability.remaining_minutes} min ainda não usados · serviço recebido em dinheiro, ainda não prestado
+          </div>
+        </Card>
+      )}
       <Card style={{ padding: "16px", margin: "16px 0" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px" }}>Total do período: {money(total)}</h2>
         {byMethod.map((r) => (
