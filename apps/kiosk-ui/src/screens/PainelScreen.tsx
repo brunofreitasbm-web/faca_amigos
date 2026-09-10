@@ -1000,10 +1000,15 @@ export function PainelScreen() {
                 </Tooltip>
               </div>
 
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {/* "sm" em vez de "md" aqui: estes três continuam por extenso
+                  (são os urgentes/frequentes, ver comentário abaixo sobre
+                  Saída manual), mas "md" tinha 44px de altura pensados pra
+                  botão isolado — em pilha de até 3 linhas no card estreito
+                  do celular isso é 24px de rolagem a mais só de padding. */}
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                 <Button
                   variant="primary"
-                  size="md"
+                  size="sm"
                   loading={actionBusy.has(session.id)}
                   disabled={actionBusy.has(session.id)}
                   title="Chamado de retorno urgente — o responsável precisa vir buscar/atender a criança agora (banheiro, quer ir embora)"
@@ -1019,7 +1024,7 @@ export function PainelScreen() {
                     e o operador está sob pressão com a família na frente. */}
                 <Button
                   variant="ghost"
-                  size="md"
+                  size="sm"
                   disabled={isPaused || actionBusy.has(session.id)}
                   title={
                     isPaused
@@ -1036,7 +1041,7 @@ export function PainelScreen() {
                 {isPaused ? (
                   <Button
                     variant="teal"
-                    size="md"
+                    size="sm"
                     loading={actionBusy.has(session.id)}
                     disabled={actionBusy.has(session.id)}
                     title="Retomar a contagem do tempo desta sessão"
@@ -1050,7 +1055,7 @@ export function PainelScreen() {
                 ) : (
                   <Button
                     variant="ghost"
-                    size="md"
+                    size="sm"
                     disabled={actionBusy.has(session.id)}
                     title="Pausar a contagem do tempo — banheiro, saiu do espaço, etc."
                     onClick={(e) => {
