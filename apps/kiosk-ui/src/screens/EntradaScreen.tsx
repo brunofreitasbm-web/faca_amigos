@@ -26,7 +26,7 @@ import {
   planDurationMinutes,
   formatAccessCode,
 } from "@facaamigos/domain";
-import { money, formatElapsed } from "../format.js";
+import { money, formatElapsed, formatAge } from "../format.js";
 
 // Lista padrão e assertiva — o operador marca em vez de descrever do zero
 // na hora do balcão, com a família esperando. Os cinco primeiros itens são
@@ -229,6 +229,8 @@ export function EntradaScreen({
   const [crossSellModalOpen, setCrossSellModalOpen] = useState(false);
 
   const [lastGuardianId, setLastGuardianId] = useState<string | null>(null);
+  const [siblingMatches, setSiblingMatches] = useState<ChildMatch[]>([]);
+  const [siblingCheckinCount, setSiblingCheckinCount] = useState(0);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   const [geminiOffers, setGeminiOffers] = useState<CheckinOffer[]>([]);
@@ -370,6 +372,13 @@ export function EntradaScreen({
     setHourBank(null);
     setChildCredit(null);
 
+    const activeTerm = (match.cpf ? normalizeCpf(match.cpf) : "") || (match.phone_e164 ? phoneDigitsBr(match.phone_e164) : "");
+    if (activeTerm && activeTerm.length >= 3) {
+      Api.searchChildren(activeTerm, unit?.id)
+        .then((siblings) => setSiblingMatches(siblings.filter((s) => s.id !== match.id)))
+        .catch(() => setSiblingMatches([]));
+    }
+
     // Saldo do banco de horas (planos >2h de visitas anteriores, em
     // qualquer unidade): consultado aqui para a opção "Usar banco de
     // horas" já aparecer junto dos planos, antes de vender um novo.
@@ -394,10 +403,6 @@ export function EntradaScreen({
     // script precisa chegar ao operador ANTES de a conversa virar "qual
     // plano?" — depois de escolhido o plano, propor outra coisa é desfazer
     // uma decisão já tomada na frente do cliente.
-    //
-    // `.catch(() => {})` de propósito: um erro aqui não pode aparecer como
-    // falha do check-in. Sem oferta, o atendimento segue exatamente como
-    // sempre seguiu.
     if (unit) {
       Api.upsellOffer(unit.id, match.id, null, employee?.id)
         .then((result) => setOffer(result.eligible ? result : null))
@@ -418,7 +423,6 @@ export function EntradaScreen({
       Api.lastAssetForChild(match.id)
         .then((r) => {
           setFavoriteAssetId(r.assetId);
-          // Carrinho preferido já selecionado quando está livre — um toque a menos.
           if (r.assetId && assets.find((a) => a.id === r.assetId)?.status === "DISPONIVEL") {
             setAssetId(r.assetId);
           }
@@ -432,15 +436,9 @@ export function EntradaScreen({
     setMatchedChild(null);
     setMatches([]);
     setOffer(null);
-    // O que o operador já digitou na busca quase sempre é o nome da criança.
     if (query.trim() && !/\d/.test(query)) setChildName(query.trim());
   }
 
-  // Próxima criança do MESMO responsável (irmão/irmã). Os dados do
-  // responsável já ficam preservados pelo resetForNextChild(true) após o
-  // check-in — este atalho só abre o cadastro direto, com eles prefilados,
-  // em vez de deixar o operador descobrir isso sozinho pela dica de texto.
-  // Pode ser tocado quantas vezes forem as crianças da família.
   function addSiblingChild() {
     setQuery("");
     setChildName("");
@@ -479,20 +477,23 @@ export function EntradaScreen({
     setFavoriteAssetId(null);
     setQuickUpsellAccepted(false);
     setPreCheckinId(null);
-    // Sem isto, "＋ Mais uma criança deste responsável" herdaria o
-    // `startNow = false` de um irmão anterior e venderia saldo pré-pago
-    // por engano em vez de iniciar a sessão do próximo.
     setStartNow(true);
     if (!keepGuardian) {
       setCpf("");
       setGuardianName("");
       setPhone("");
       setLastGuardianId(null);
-      // Cupom de desconto vale para a entrada inteira do responsável — só
-      // limpa ao trocar de família, senão o irmão seguinte perde o desconto
-      // que o operador já tinha aplicado.
+      setSiblingMatches([]);
+      setSiblingCheckinCount(0);
       setCouponCode("");
       lastAutoCouponRef.current = null;
+    } else {
+      const activeTerm = normalizeCpf(cpf) || phone.replace(/\D/g, "");
+      if (activeTerm && activeTerm.length >= 3) {
+        Api.searchChildren(activeTerm, unit?.id)
+          .then((list) => setSiblingMatches(list))
+          .catch(() => setSiblingMatches([]));
+      }
     }
     searchRef.current?.focus();
   }
@@ -1103,20 +1104,78 @@ export function EntradaScreen({
           </div>
         )}
 
-        {lastGuardianId && !matchedChild && !showNewForm && (
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-            <Tag color="var(--color-teal)" title="Os dados do responsável seguem preenchidos para o irmão/irmã">
-              ➕ Mesmo responsável ({guardianName}) — busque ou cadastre a próxima criança
-            </Tag>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={addSiblingChild}
-              title={`Cadastrar mais uma criança de ${guardianName}, com os dados do responsável já preenchidos`}
-            >
-              ＋ Mais uma criança deste responsável
-            </Button>
-          </div>
+        {(lastGuardianId || (cpf && isValidCpf(cpf))) && !matchedChild && !showNewForm && (
+          <Card
+            style={{
+              padding: "16px",
+              borderRadius: "16px",
+              border: "2px solid var(--color-teal)",
+              background: "rgba(46, 207, 181, 0.08)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+              <div>
+                <Tag color="var(--color-teal)" style={{ fontWeight: "bold", marginBottom: "4px" }}>
+                  👤 Responsável Ativo (Dados Mantidos)
+                </Tag>
+                <div style={{ fontSize: "16px", fontWeight: "bold", color: "var(--text-main)" }}>
+                  {guardianName || "Responsável"}
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                  {cpf ? `CPF: ${cpf}` : ""} {phone ? `· WhatsApp: ${phone}` : ""}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => resetForNextChild(false)}
+                title="Limpar dados do responsável e buscar outro cliente"
+              >
+                🔄 Trocar responsável
+              </Button>
+            </div>
+
+            {siblingMatches.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "bold", color: "var(--color-teal-text)" }}>
+                  👶 Crianças já cadastradas para este responsável ({siblingMatches.length}):
+                </span>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {siblingMatches.map((sibling) => (
+                    <Button
+                      key={sibling.id}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => pickMatch(sibling)}
+                      style={{ borderColor: "var(--color-teal)", background: "#fff", color: "var(--text-main)" }}
+                      title={`Fazer check-in para ${sibling.full_name}`}
+                    >
+                      🧒 {sibling.full_name} ({formatAge(sibling.birth_date)})
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={addSiblingChild}
+                title={`Cadastrar mais uma criança de ${guardianName}, mantendo CPF e WhatsApp`}
+              >
+                ＋ Cadastrar nova criança de {guardianName.split(" ")[0]}
+              </Button>
+              {siblingCheckinCount >= 1 && (
+                <Tag color="var(--color-gold)" style={{ fontWeight: "bold" }}>
+                  🎉 {siblingCheckinCount + 1}ª Criança deste responsável (Combo Irmãos)
+                </Tag>
+              )}
+            </div>
+          </Card>
         )}
       </section>
 
