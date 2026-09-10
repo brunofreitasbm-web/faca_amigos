@@ -10,10 +10,15 @@ export function SelectModuleScreen() {
   const { units, setUnitId, setGerencial, employee } = useAppState();
   const { can } = useAuth();
   const mobile = useMobileShell();
-  const [showOverview, setShowOverview] = useState(false);
 
   const isOperador = employee?.role === "OPERADOR";
   const isOwner = !isOperador && can("config.write");
+
+  // No celular, o Owner cai direto na Visão geral das 3 unidades ao abrir o
+  // app — a grade de seleção de módulo (pensada para escolher ENTRE
+  // operações) continua existindo, só que agora atrás do botão "Voltar" da
+  // Visão geral, não como primeira tela.
+  const [showOverview, setShowOverview] = useState(() => mobile.active && isOwner);
 
   if (mobile.active && isOwner && showOverview) {
     return <MobileOwnerOverview units={units} onBack={() => setShowOverview(false)} />;
