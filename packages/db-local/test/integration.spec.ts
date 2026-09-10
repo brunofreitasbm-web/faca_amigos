@@ -11,6 +11,8 @@ import { insertSession, getSession, tryMarkAwaitingPayment, finalizeSession } fr
 import { createOrder, markOrderPaid, recordPayment, sumPaymentsByMethodForShift } from "../src/repositories/orders.js";
 import { openShift, recordCashMovement, closeShift, getOpenShift } from "../src/repositories/shifts.js";
 import { appendAuditLog, listAuditLog, verifyAuditChain } from "../src/repositories/audit.js";
+import { createPrepaidPackage, getTotalRemainingPrepaidMinutes, deductMinutesFromPrepaid, listActivePrepaidPackages } from "../src/repositories/prepaid.js";
+
 import type { Db } from "../src/connection.js";
 
 let db: Db;
@@ -136,3 +138,66 @@ describe("fluxo completo: check-in até fechamento de turno", () => {
     expect(verifyAuditChain(log)).toBe(-1);
   });
 });
+
+describe("módulo de crédito pré-pago (Porto Seguro)", () => {
+  it("permite compra de pacote, consulta de saldo e dedução fracionada em múltiplas visitas", () => {
+    const unitId = uuidv7(NOW);
+    insertUnit(db, { id: unitId, kind: "QUIOSQUE", name: "Quiosque Porto" }, NOW);
+
+    const guardianId = uuidv7(NOW);
+    insertGuardian(db, { id: guardianId, full_name: "Carlos Eduardo", phone_e164: "+5591999998888" }, NOW);
+
+    const childId = uuidv7(NOW);
+    insertChild(db, { id: childId, full_name: "Lucas Eduardo", birth_date: "2020-01-01", inclusive_eligible: 0, inclusive_proof_type: null }, NOW);
+    linkChildGuardian(db, childId, guardianId);
+
+    // Compra inicial: Pacote 60 minutos (Porto Seguro) por R$ 60,00
+    const pkg = createPrepaidPackage(
+      db,
+      {
+        unitId,
+        guardianId,
+        childId,
+        planName: "Porto Seguro 60 Minutos",
+        totalMinutes: 60,
+        amountCents: 6000,
+      },
+      NOW,
+    );
+
+    expect(pkg.remainingMinutes).toBe(60);
+    expect(getTotalRemainingPrepaidMinutes(db, guardianId, childId)).toBe(60);
+
+    // 1ª Visita (Daqui a 2 dias): Brinca 35 minutos
+    const res1 = deductMinutesFromPrepaid(
+      db,
+      {
+        guardianId,
+        childId,
+        minutesToDeduct: 35,
+      },
+      NOW + 2 * 86_400_000,
+    );
+
+    expect(res1.minutesDeducted).toBe(35);
+    expect(res1.remainingExcessMinutes).toBe(0);
+    expect(getTotalRemainingPrepaidMinutes(db, guardianId, childId)).toBe(25);
+
+    // 2ª Visita: Brinca 30 minutos (saldo era 25, restam 5 min excedentes para cobrança avulsa)
+    const res2 = deductMinutesFromPrepaid(
+      db,
+      {
+        guardianId,
+        childId,
+        minutesToDeduct: 30,
+      },
+      NOW + 4 * 86_400_000,
+    );
+
+    expect(res2.minutesDeducted).toBe(25);
+    expect(res2.remainingExcessMinutes).toBe(5);
+    expect(getTotalRemainingPrepaidMinutes(db, guardianId, childId)).toBe(0);
+    expect(listActivePrepaidPackages(db, guardianId, childId)).toHaveLength(0);
+  });
+});
+

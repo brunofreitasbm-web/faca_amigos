@@ -3,6 +3,8 @@ export * from "./time/session-timer.js";
 export * from "./time/closing-time.js";
 export * from "./pricing/types.js";
 export * from "./pricing/pricing-engine.js";
+export * from "./pricing/prepaid-engine.js";
+
 export * from "./loyalty/loyalty-engine.js";
 export * from "./loyalty/visit-frequency.js";
 export * from "./rbac/permissions.js";

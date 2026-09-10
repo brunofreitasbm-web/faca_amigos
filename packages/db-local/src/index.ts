@@ -17,3 +17,5 @@ export * from "./repositories/audit.js";
 export * from "./repositories/reports.js";
 export * from "./repositories/bonus-rules.js";
 export * from "./repositories/terminal.js";
+export * from "./repositories/prepaid.js";
+
