@@ -5,13 +5,23 @@
 # depende de alguém rodar na própria máquina, e a versão distribuída passa
 # a variar conforme quem buildou.
 #
-# Disparo automático a cada push na main, ou manual via workflow_dispatch.
+# Disparo automático a cada push na main que mexa em código do kiosk, ou
+# manual via workflow_dispatch. Antes de buildar, o job `bump-version`
+# incrementa sozinho o patch de apps/kiosk/package.json: sem isso, dois
+# pushes seguidos publicam o MESMO número de versão e o electron-updater
+# nos terminais simplesmente ignora o segundo (ele só reage a versão nova).
 name: Build do instalador (kiosk)
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "apps/kiosk/**"
+      - "apps/kiosk-ui/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/build-kiosk.yml"
   workflow_dispatch:
     inputs:
       publicar:
@@ -20,11 +30,51 @@ on:
         default: true
 
 jobs:
+  # Roda ANTES do build para que o instalador já saia com a versão nova. O
+  # commit de bump leva "[skip-bump]" na mensagem — é o que impede o loop
+  # infinito (o próprio push do bump dispara este workflow de novo; sem a
+  # marca, esse segundo run bumparia outra vez, e o terceiro run de novo...).
+  bump-version:
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-bump]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Incrementar versão do kiosk
+        id: bump
+        run: |
+          VERSION=$(node scripts/bump-kiosk-version.mjs)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Nova versão: $VERSION"
+
+      - name: Commitar e publicar o bump direto na main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/kiosk/package.json
+          git commit -m "chore(release): kiosk v${{ steps.bump.outputs.version }} [skip-bump]"
+          git push
+
   build:
+    needs: bump-version
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
+      # Traz o commit de bump que o job anterior acabou de publicar na main —
+      # sem isso o build pegaria a versão antiga e a publicação seria
+      # descartada pelo electron-updater dos terminais (versão repetida).
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: pnpm/action-setup@v4
         with:
@@ -86,13 +136,17 @@ jobs:
   # Settings > Environments > producao > Required reviewers (remover os
   # revisores obrigatórios) — não removendo o environment daqui.
   publicar:
-    needs: build
+    needs: [bump-version, build]
     if: github.event_name == 'push' || inputs.publicar == true
     runs-on: windows-latest
     timeout-minutes: 40
     environment: producao
     steps:
+      # Mesmo motivo do job `build`: precisa do commit de bump já na main
+      # para publicar o instalador com a versão nova, não a antiga.
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: pnpm/action-setup@v4
         with:
