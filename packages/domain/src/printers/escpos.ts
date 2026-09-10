@@ -1,4 +1,5 @@
 import { formatAccessCode } from "../utils/accessCode.js";
+import { LOGO_BITMAP_HEX, LOGO_HEIGHT_DOTS, LOGO_WIDTH_BYTES } from "./logoBitmap.js";
 
 export interface ReceiptPrintPayload {
   title: string; // Ex: "Check-in", "Comprovante de Saída", "Comprovante PDV"
@@ -147,6 +148,51 @@ function bytesToHex(bytes: number[]): string {
 
 function textToHex(str: string): string {
   return bytesToHex(encodeCp860(str));
+}
+
+/**
+ * Número do slot de imagem na memória NV (não-volátil) da impressora onde o
+ * timbre Faça Amigos fica gravado. NV Graphics sobrevive a desligar/religar
+ * a impressora — grava-se UMA VEZ (ver `nvLogoStoreCommandHex`) e depois
+ * cada cupom só manda o comando de impressão (`nvLogoPrintCommandHex`),
+ * 4 bytes, em vez de reenviar os ~3.5KB do bitmap em toda venda.
+ */
+export const LOGO_NV_IMAGE_NUMBER = 1;
+
+/**
+ * Comando `FS q` (Store NV graphics data) — grava o bitmap 1-bit do timbre
+ * na memória não-volátil da impressora, no slot `LOGO_NV_IMAGE_NUMBER`.
+ * É comando de PROVISIONAMENTO: manda-se uma vez por impressora (ex: numa
+ * tela de configuração), não em toda impressão de cupom — impressoras
+ * térmicas ESC/POS (Elgin, Epson, Bematech, Daruma) têm ciclo de escrita
+ * limitado na NV, então regravar a cada venda desgastaria a memória.
+ * O bitmap em si (dados gerados a partir da arte oficial, sem cor — cabeça
+ * térmica é monocromática) vem de `logoBitmap.ts`, gerado por
+ * `scripts/generate-print-logo.mjs`.
+ */
+export function nvLogoStoreCommandHex(): string {
+  const widthBytes = LOGO_WIDTH_BYTES;
+  const heightDots = LOGO_HEIGHT_DOTS;
+  const header = [
+    0x1c,
+    0x71, // FS q
+    0x01, // n = 1 imagem
+    widthBytes & 0xff,
+    (widthBytes >> 8) & 0xff,
+    heightDots & 0xff,
+    (heightDots >> 8) & 0xff,
+  ];
+  return bytesToHex(header) + LOGO_BITMAP_HEX;
+}
+
+/**
+ * Comando `FS p` (Print NV graphics) — imprime o timbre já gravado na NV
+ * (ver `nvLogoStoreCommandHex`). 4 bytes fixos, independente do tamanho do
+ * bitmap — é isso que faz o timbre caber em todo cupom não fiscal sem pesar
+ * no tamanho do stream RAW enviado pra impressora.
+ */
+export function nvLogoPrintCommandHex(mode: 0 | 1 | 2 | 3 = 0): string {
+  return bytesToHex([0x1c, 0x70, LOGO_NV_IMAGE_NUMBER, mode]);
 }
 
 /**
@@ -383,6 +429,13 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   const hexFeed = "1b6403"; // ESC d 3
   const hexCut = "1d564200"; // GS V 66 0
 
+  // Timbre no topo do cupom: só em cupom não fiscal (venda/guarda) — a
+  // NFC-e é documento fiscal com layout regulado, sem espaço pra marca.
+  // Assume que o timbre já foi gravado na NV da impressora uma vez (ver
+  // `nvLogoStoreCommandHex`); aqui só manda o comando de impressão (4
+  // bytes) + um avanço de linha (ESC d 3) pro texto não colar na imagem.
+  const hexLogo = isFiscalReceipt ? "" : nvLogoPrintCommandHex() + hexFeed;
+
   // Quando há QR de acompanhamento, os bytes do comando de QR entram no meio
   // do stream ESC/POS — text/lines seguem só como transcrição legível
   // (preview na tela e fallback HTML), o QR em si é comando de impressora.
@@ -399,7 +452,7 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
     hexBody = textToHex(text);
   }
 
-  return { text, commandsHex: hexHeader + hexBody + hexFeed + hexCut };
+  return { text, commandsHex: hexHeader + hexLogo + hexBody + hexFeed + hexCut };
 }
 
 /**
