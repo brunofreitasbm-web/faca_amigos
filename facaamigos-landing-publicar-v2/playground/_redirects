@@ -9,13 +9,11 @@
 # Truque: quando o "from" é uma URL absoluta (com o domínio incluído), o
 # Netlify só aplica a regra para requisições que chegam com aquele Host —
 # outros domínios do mesmo site continuam com o roteamento normal por
-# arquivo. index.html não precisa de regra própria por ser o nome de
-# arquivo padrão do Netlify em "/".
-#
-# Só a raiz ("/") é reescrita — de propósito, sem curinga (/*). Um curinga
-# aqui capturaria também /img/*, /circuito.html etc. quando acessados por
-# este domínio, e tudo viraria hub.html (imagem quebrada, página errada).
-# circuito.html e index.html continuam acessíveis normalmente por este
-# domínio se alguém digitar o caminho direto — só a home muda.
-https://institutofacaamigos.com.br/      /hub.html   200
-https://www.institutofacaamigos.com.br/  /hub.html   200
+# arquivo.
+# Usamos "200!" (com exclamação) para FORÇAR a reescrita no domínio raiz,
+# pois sem o "!", o Netlify prioriza o arquivo index.html existente na raiz.
+
+http://institutofacaamigos.com.br/       /hub.html   200!
+http://www.institutofacaamigos.com.br/   /hub.html   200!
+https://institutofacaamigos.com.br/      /hub.html   200!
+https://www.institutofacaamigos.com.br/  /hub.html   200!

@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, Button, Badge, Modal, HelpText } from "@facaamigos/ui";
 import type { Candidate, CandidateStatus, CandidateRole } from "@facaamigos/contracts";
 import {
   getStoredCandidates,
-  updateCandidateStatus,
+  fetchCandidatesFromApi,
+  updateCandidateStatusApi,
   addCandidate,
   generateWhatsAppLink,
 } from "../api/talentosApi.js";
@@ -11,18 +12,26 @@ import { useToast } from "../state/ToastContext.js";
 
 const STATUS_LABELS: Record<CandidateStatus, string> = {
   NOVO: "Novo",
+  LIDO: "Lido",
   EM_ANALISE: "Em Análise",
+  ENTREVISTA: "Entrevista Agendada",
   ENTREVISTADO: "Entrevistado",
+  CONTATADO: "Contatado",
   CONTRATADO: "Contratado",
+  ARQUIVADO: "Arquivado",
   BANCO_RESERVA: "Banco de Reserva",
   DESQUALIFICADO: "Desqualificado",
 };
 
 const STATUS_VARIANTS: Record<CandidateStatus, "teal" | "amber" | "neutral"> = {
   NOVO: "teal",
+  LIDO: "teal",
   EM_ANALISE: "amber",
+  ENTREVISTA: "amber",
   ENTREVISTADO: "teal",
+  CONTATADO: "teal",
   CONTRATADO: "teal",
+  ARQUIVADO: "neutral",
   BANCO_RESERVA: "neutral",
   DESQUALIFICADO: "neutral",
 };
@@ -39,6 +48,9 @@ const ROLE_LABELS: Record<CandidateRole, string> = {
 export function TalentosScreen() {
   const toast = useToast();
   const [candidates, setCandidates] = useState<Candidate[]>(() => getStoredCandidates());
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<CandidateStatus | "TODOS">("TODOS");
   const [selectedRole, setSelectedRole] = useState<CandidateRole | "TODOS">("TODOS");
@@ -57,12 +69,31 @@ export function TalentosScreen() {
   const [newRole, setNewRole] = useState<CandidateRole>("VENDAS");
   const [newExp, setNewExp] = useState("");
 
+  const loadCandidates = useCallback(async (statusFilter: string = "TODOS") => {
+    setIsLoading(true);
+    try {
+      const res = await fetchCandidatesFromApi(statusFilter);
+      setCandidates(res.candidates);
+      setIsLive(res.isLive);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCandidates(selectedStatus);
+  }, [selectedStatus, loadCandidates]);
+
   const filteredCandidates = useMemo(() => {
     return candidates.filter((c) => {
       const matchSearch =
         search.trim() === "" ||
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         c.city.toLowerCase().includes(search.toLowerCase()) ||
+        (c.course && c.course.toLowerCase().includes(search.toLowerCase())) ||
+        (c.desiredArea && c.desiredArea.toLowerCase().includes(search.toLowerCase())) ||
         (c.preferredUnit && c.preferredUnit.toLowerCase().includes(search.toLowerCase())) ||
         (c.experienceSummary && c.experienceSummary.toLowerCase().includes(search.toLowerCase()));
 
@@ -81,9 +112,9 @@ export function TalentosScreen() {
     setEditNotes(cand.notes || "");
   }
 
-  function handleSaveDetails() {
+  async function handleSaveDetails() {
     if (!selectedCandidate) return;
-    const updated = updateCandidateStatus(selectedCandidate.id, editStatus, editNotes);
+    const updated = await updateCandidateStatusApi(selectedCandidate.id, editStatus, editNotes);
     setCandidates(updated);
     toast.success("Status do candidato atualizado com sucesso!");
     setSelectedCandidate(null);
@@ -129,15 +160,29 @@ export function TalentosScreen() {
                 {newCount} Novo{newCount > 1 ? "s" : ""}
               </Badge>
             )}
+            {isLive ? (
+              <Badge variant="teal" style={{ fontSize: "12px", background: "rgba(16,185,129,0.15)", color: "#10b981" }}>
+                ● API Online
+              </Badge>
+            ) : (
+              <Badge variant="neutral" style={{ fontSize: "12px" }}>
+                Local Cache
+              </Badge>
+            )}
           </div>
           <HelpText style={{ marginTop: "4px" }}>
-            Gerencie candidatos recebidos, faça triagem rápida de perfis de vendas e inicie contato via WhatsApp com 1 clique.
+            Consulte currículos enviados, faça triagem rápida de candidatos e entre em contato via WhatsApp ou abra o PDF do currículo.
           </HelpText>
         </div>
 
-        <Button variant="primary" onClick={() => setShowAddModal(true)} style={{ borderRadius: "9999px" }}>
-          + Cadastrar Candidato Manualmente
-        </Button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <Button variant="secondary" onClick={() => loadCandidates(selectedStatus)} disabled={isLoading} style={{ borderRadius: "9999px" }}>
+            {isLoading ? "Carregando..." : "🔄 Atualizar Dados"}
+          </Button>
+          <Button variant="primary" onClick={() => setShowAddModal(true)} style={{ borderRadius: "9999px" }}>
+            + Cadastrar Candidato
+          </Button>
+        </div>
       </div>
 
       {/* Barra de Filtros e Busca */}
@@ -149,7 +194,7 @@ export function TalentosScreen() {
             </label>
             <input
               type="text"
-              placeholder="Nome, cidade, palavra-chave..."
+              placeholder="Nome, curso, área, palavra-chave..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -165,7 +210,7 @@ export function TalentosScreen() {
 
           <div>
             <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", marginBottom: "6px", color: "var(--text-muted)" }}>
-              FILTRAR POR CARGO
+              FILTRAR POR CARGO / ÁREA
             </label>
             <select
               value={selectedRole}
@@ -232,7 +277,12 @@ export function TalentosScreen() {
       </Card>
 
       {/* Grid de Candidatos */}
-      {filteredCandidates.length === 0 ? (
+      {isLoading ? (
+        <Card style={{ padding: "48px", textAlign: "center", color: "var(--text-muted)" }}>
+          <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>
+          <p style={{ margin: 0, fontWeight: "bold" }}>Carregando currículos do Banco de Talentos...</p>
+        </Card>
+      ) : filteredCandidates.length === 0 ? (
         <Card style={{ padding: "48px", textAlign: "center", color: "var(--text-muted)" }}>
           <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔍</div>
           <h3>Nenhum candidato encontrado</h3>
@@ -241,7 +291,7 @@ export function TalentosScreen() {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))", gap: "20px" }}>
           {filteredCandidates.map((cand) => {
-            const waLink = generateWhatsAppLink(cand.phone, cand.name, ROLE_LABELS[cand.role] || cand.role);
+            const waLink = generateWhatsAppLink(cand.phone, cand.name, ROLE_LABELS[cand.role] || cand.desiredArea || cand.role);
             return (
               <Card
                 key={cand.id}
@@ -261,10 +311,10 @@ export function TalentosScreen() {
                       📍 {cand.city} {cand.preferredUnit ? `• Unidade: ${cand.preferredUnit}` : ""}
                     </span>
                   </div>
-                  <Badge variant={STATUS_VARIANTS[cand.status]}>{STATUS_LABELS[cand.status]}</Badge>
+                  <Badge variant={STATUS_VARIANTS[cand.status] || "neutral"}>{STATUS_LABELS[cand.status] || cand.status}</Badge>
                 </div>
 
-                <div style={{ marginBottom: "12px" }}>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
                   <span
                     style={{
                       display: "inline-block",
@@ -276,9 +326,30 @@ export function TalentosScreen() {
                       borderRadius: "6px",
                     }}
                   >
-                    🎯 Vaga: {ROLE_LABELS[cand.role] || cand.role}
+                    🎯 Vaga: {ROLE_LABELS[cand.role] || cand.desiredArea || cand.role}
                   </span>
+                  {cand.opportunityType && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: "rgba(59, 130, 246, 0.12)",
+                        color: "#2563eb",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      💼 {cand.opportunityType}
+                    </span>
+                  )}
                 </div>
+
+                {cand.course && (
+                  <div style={{ fontSize: "13px", fontWeight: "bold", color: "var(--text-primary)", marginBottom: "8px" }}>
+                    🎓 Formação: <span style={{ fontWeight: "normal" }}>{cand.course}</span>
+                  </div>
+                )}
 
                 <p
                   style={{
@@ -299,7 +370,7 @@ export function TalentosScreen() {
                   📅 Cadastrado em: {new Date(cand.createdAt).toLocaleDateString("pt-BR")}
                 </div>
 
-                <div style={{ display: "flex", gap: "10px", marginTop: "auto" }}>
+                <div style={{ display: "flex", gap: "8px", marginTop: "auto", flexWrap: "wrap" }}>
                   <a
                     href={waLink}
                     target="_blank"
@@ -307,6 +378,7 @@ export function TalentosScreen() {
                     style={{
                       flex: 1,
                       textDecoration: "none",
+                      minWidth: "120px",
                     }}
                   >
                     <Button
@@ -325,6 +397,32 @@ export function TalentosScreen() {
                       💬 WhatsApp
                     </Button>
                   </a>
+
+                  {cand.resumeUrl && (
+                    <a
+                      href={cand.resumeUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        textDecoration: "none",
+                      }}
+                    >
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        style={{
+                          borderRadius: "8px",
+                          fontWeight: "bold",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        📄 PDF
+                      </Button>
+                    </a>
+                  )}
+
                   <Button variant="secondary" size="sm" onClick={() => handleOpenDetails(cand)} style={{ borderRadius: "8px" }}>
                     Detalhes
                   </Button>
@@ -349,12 +447,30 @@ export function TalentosScreen() {
               </p>
             </div>
 
+            {selectedCandidate.course && (
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)" }}>CURSO / FORMAÇÃO ACADÊMICA</label>
+                <p style={{ margin: "4px 0", fontSize: "14px", fontWeight: "bold" }}>{selectedCandidate.course}</p>
+              </div>
+            )}
+
             <div>
               <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)" }}>RESUMO DE EXPERIÊNCIA</label>
               <div style={{ padding: "12px", background: "var(--surface-sunken)", borderRadius: "8px", marginTop: "4px", fontSize: "14px" }}>
                 {selectedCandidate.experienceSummary}
               </div>
             </div>
+
+            {selectedCandidate.resumeUrl && (
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>CURRÍCULO EM ANEXO (PDF)</label>
+                <a href={selectedCandidate.resumeUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                  <Button variant="secondary" style={{ width: "100%", justifyContent: "center" }}>
+                    📄 Abrir/Visualizar Currículo em PDF
+                  </Button>
+                </a>
+              </div>
+            )}
 
             <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "16px" }}>
               <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
@@ -509,3 +625,4 @@ export function TalentosScreen() {
     </div>
   );
 }
+
