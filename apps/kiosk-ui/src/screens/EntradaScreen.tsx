@@ -4,6 +4,8 @@ import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Package, Plan, Product, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
+import { PrepaidPaymentModal } from "../components/PrepaidPaymentModal.js";
+import { IfCan } from "../auth/RequireCapability.js";
 import { generateCheckinSuggestions, type CheckinOffer } from "../lib/geminiAgent.js";
 import { PhotoCapture } from "../components/PhotoCapture.js";
 import { ContractModal } from "../components/ContractModal.js";
@@ -174,6 +176,16 @@ export function EntradaScreen({
   const [contractOpen, setContractOpen] = useState(false);
   const [acompanharOpen, setAcompanharOpen] = useState(false);
 
+  // Modo pré-pago: o operador decide na Entrada se a contagem começa
+  // agora (padrão, ~90% dos casos) ou se o pai paga e vai embora com a
+  // criança, deixando o tempo como saldo para uma visita futura. Marcado
+  // por padrão de propósito — o caso raro exige um toque a mais, nunca
+  // o contrário.
+  const [startNow, setStartNow] = useState(true);
+  const [hasOpenShift, setHasOpenShift] = useState<boolean | null>(null);
+  const [prepaidModalOpen, setPrepaidModalOpen] = useState(false);
+  const [donePrepaid, setDonePrepaid] = useState<{ childName: string; sourceName: string; minutesTotal: number } | null>(null);
+
   // Endereço público (Vercel) para o QR de acompanhamento — em localhost/Electron,
   // utiliza o fallback automático de produção.
   const publicAppOrigin = getPublicAppUrl();
@@ -242,6 +254,9 @@ export function EntradaScreen({
     Api.products(unit.id).then(setProducts);
     Api.coupons(unit.id).then(setCoupons);
     if (activity === "CARRINHO") Api.assets(unit.id).then(setAssets);
+    // Só a venda pré-paga exige turno aberto (o dinheiro precisa cair
+    // num turno) — o check-in normal nunca exigiu isso.
+    Api.currentShift(unit.id).then((shift) => setHasOpenShift(!!shift)).catch(() => setHasOpenShift(null));
   }, [unit, activity]);
 
   // Pré-cadastro do QR de Acesso Rápido: preenche o formulário exatamente
@@ -440,6 +455,10 @@ export function EntradaScreen({
     setFavoriteAssetId(null);
     setQuickUpsellAccepted(false);
     setPreCheckinId(null);
+    // Sem isto, "＋ Mais uma criança deste responsável" herdaria o
+    // `startNow = false` de um irmão anterior e venderia saldo pré-pago
+    // por engano em vez de iniciar a sessão do próximo.
+    setStartNow(true);
     if (!keepGuardian) {
       setCpf("");
       setGuardianName("");
@@ -571,11 +590,30 @@ export function EntradaScreen({
     if (!isValidPhoneBr(phone)) return "WhatsApp do responsável inválido";
     if (!planId) return "Escolha o plano de permanência";
     if (activity === "CARRINHO" && !assetId) return "Escolha o carrinho";
+
+    if (!startNow) {
+      // TODO(human): guardas de política da venda pré-paga. O servidor
+      // (fa_kiosk_sell_prepaid_credit) já recusa turno fechado com
+      // SEM_TURNO_ABERTO — isto aqui é só a mensagem amigável ANTES de
+      // o operador preencher tudo. Três perguntas em aberto, cada uma
+      // um `if (...) return "mensagem";`:
+      //   1. Venda pré-paga exige caixa aberto? (o dinheiro tem que
+      //      cair num turno — provavelmente sim)
+      //   2. Pode pré-pagar saldo de CARRINHO, se o carrinho em si não
+      //      pode ser reservado com antecedência?
+      //   3. Cupom de desconto vale para saldo vendido hoje e
+      //      consumido só daqui a semanas/meses?
+    }
+
     return null;
-  }, [identified, childName, birthDate, guardianName, cpf, phone, planId, activity, assetId]);
+  }, [identified, childName, birthDate, guardianName, cpf, phone, planId, activity, assetId, startNow, hasOpenShift]);
 
   async function submit() {
     if (!unit || !employee || readiness) return;
+    if (!startNow) {
+      setPrepaidModalOpen(true);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -607,6 +645,7 @@ export function EntradaScreen({
         onPrefillConsumed?.();
       }
 
+      setDonePrepaid(null);
       setDone({
         sessionId: res.sessionId,
         accessCode: res.accessCode,
@@ -665,6 +704,18 @@ export function EntradaScreen({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handlePrepaidSold(result: { minutesTotal: number }) {
+    setPrepaidModalOpen(false);
+    setDonePrepaid({
+      childName: childName.trim(),
+      sourceName: selectedPlan?.name ?? "Saldo",
+      minutesTotal: result.minutesTotal,
+    });
+    setDone(null);
+    onSuccess?.();
+    resetForNextChild(true);
   }
 
   async function reprint() {
@@ -757,6 +808,38 @@ export function EntradaScreen({
             🖨️ Reimprimir
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setDone(null)} aria-label="Dispensar aviso">
+            ✕
+          </Button>
+        </div>
+      )}
+
+      {/* Confirmação da venda pré-paga — sem pulseira, sem código de acesso,
+          sem PIN de saída: nada disso existe porque nenhuma sessão foi
+          criada. Só o comprovante do pagamento. */}
+      {donePrepaid && (
+        <div
+          role="status"
+          style={{
+            border: "2px solid #FF7A00",
+            background: "rgba(255, 122, 0, 0.08)",
+            borderRadius: "16px",
+            padding: "14px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "14px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: "200px" }}>
+            <strong style={{ display: "block", color: "#B75C00" }}>
+              ✓ Saldo de {donePrepaid.sourceName} registrado para {donePrepaid.childName}
+            </strong>
+            <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+              Comprovante enviado para impressão. Sem pulseira e sem código — quando{" "}
+              {donePrepaid.childName.split(" ")[0]} voltar, inicie a contagem pelo Painel.
+            </span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setDonePrepaid(null)} aria-label="Dispensar aviso">
             ✕
           </Button>
         </div>
@@ -1100,6 +1183,34 @@ export function EntradaScreen({
             </Button>
           </div>
         )}
+
+        {/* Pré-pago: o pai paga e vai embora, o tempo fica como saldo da
+            criança. Marcado ("Iniciar contagem agora") é o padrão — só
+            aparece quando já há um plano escolhido e não é o banco de
+            horas (não dá pra pré-pagar um saldo que a criança já tem). */}
+        {selectedPlan && !usingHourBank && (
+          <IfCan capability="venda.prepago">
+            <div
+              style={{
+                marginTop: "10px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                padding: "12px 14px",
+                borderRadius: "14px",
+                border: "1px dashed var(--color-teal)",
+              }}
+            >
+              <Checkbox checked={startNow} onChange={setStartNow} label="Iniciar contagem agora" />
+              {!startNow && (
+                <HelpText>
+                  O tempo fica guardado como saldo da criança. Nada é impresso como pulseira; você cobra agora
+                  e inicia depois pelo Painel, quando ela voltar.
+                </HelpText>
+              )}
+            </div>
+          </IfCan>
+        )}
       </section>
 
       {activity === "CARRINHO" && (
@@ -1285,9 +1396,13 @@ export function EntradaScreen({
           disabled={submitting || Boolean(readiness)}
           onClick={submit}
           style={{ borderRadius: "9999px", padding: "16px" }}
-          title="Registrar a entrada e imprimir a pulseira e o recibo de guarda"
+          title={
+            startNow
+              ? "Registrar a entrada e imprimir a pulseira e o recibo de guarda"
+              : "Cobrar o saldo pré-pago sem iniciar a sessão — a criança volta outro dia para usar"
+          }
         >
-          Confirmar entrada
+          {startNow ? "Confirmar entrada" : "Cobrar saldo pré-pago"}
           {usingHourBank
             ? " — Banco de horas (R$ 0,00)"
             : selectedPlan
@@ -1307,6 +1422,31 @@ export function EntradaScreen({
           childName={done.childName}
           plan={done.contractPlan}
           onClose={() => setContractOpen(false)}
+        />
+      )}
+
+      {/* Cobrança do saldo pré-pago — "Iniciar contagem agora" desmarcado.
+          Não cria sessão nenhuma; só existe depois que o operador confirma
+          o pagamento aqui. */}
+      {prepaidModalOpen && unit && employee && selectedPlan && (
+        <PrepaidPaymentModal
+          unitId={unit.id}
+          employeeId={employee.id}
+          activity={activity}
+          planId={usingPackage ? null : planId}
+          packageId={usingPackage ? selectedPackageId : null}
+          priceCents={getPlanDiscountedCents(selectedPlan.valueCents, couponCode, coupons, selectedPlan.id).finalCents}
+          sourceName={selectedPlan.name}
+          child={{ id: matchedChild?.id, fullName: childName.trim(), birthDate, inclusiveEligible: isNeurodivergent }}
+          guardian={{
+            id: lastGuardianId ?? undefined,
+            fullName: guardianName.trim(),
+            cpf: normalizeCpf(cpf),
+            phoneE164: normalizePhoneE164(phone),
+          }}
+          couponCode={couponCode || undefined}
+          onClose={() => setPrepaidModalOpen(false)}
+          onSold={handlePrepaidSold}
         />
       )}
 

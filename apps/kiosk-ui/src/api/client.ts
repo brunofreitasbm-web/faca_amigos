@@ -660,6 +660,29 @@ export interface HourBankBalance {
   next_expiry_ms: number;
 }
 
+/** Saldo pré-pago agregado de uma criança (`fa_kiosk_child_credit_balance`). Não vence. */
+export interface ChildCreditBalance {
+  child_id: string;
+  remaining_minutes: number;
+  credits_count: number;
+}
+
+/** Uma criança com saldo pré-pago aguardando início — fila do Painel (`fa_kiosk_child_credit_queue`). */
+export interface PrepaidCreditQueueItem {
+  credit_id: string;
+  child_id: string;
+  child_name: string;
+  guardian_id: string;
+  guardian_name: string;
+  guardian_phone: string | null;
+  remaining_minutes: number;
+  source_name_snapshot: string;
+  activity: "PLAYGROUND" | "CARRINHO";
+  purchased_at_ms: number;
+  /** true quando a criança já entrou por outro caminho — o Painel desabilita o ▶ Iniciar. */
+  has_active_session: boolean;
+}
+
 export interface GerencialCliente {
   guardian_id: string;
   guardian_name: string;
@@ -1784,6 +1807,71 @@ export const Api = {
           p_device_id: deviceId,
         },
       ),
+    ),
+
+  /**
+   * Venda de saldo pré-pago SEM iniciar sessão — o pai paga no balcão e
+   * a criança vai embora, para voltar outro dia. RPC própria
+   * (fa_kiosk_sell_prepaid_credit), não uma variação do check-in: cobra
+   * na hora (fa_checkin nunca toca em pagamento) e não cria sessão
+   * nenhuma — nada de carrinho, pulseira, código de acesso ou PIN de
+   * saída. Quando a criança voltar, o saldo aparece na fila do Painel
+   * ("Saldos aguardando início") e também como card na busca da Entrada.
+   */
+  sellPrepaidCredit: (body: {
+    unitId: string;
+    activity: "PLAYGROUND" | "CARRINHO";
+    /** Exatamente um dos dois: origem do saldo, congelada no crédito. */
+    planId?: string | null;
+    packageId?: string | null;
+    guardian: { id?: string; fullName: string; cpf: string; phoneE164: string };
+    child: { id?: string; fullName: string; birthDate: string; inclusiveEligible: boolean; inclusiveProofType?: string };
+    couponCode?: string;
+    payments: { method: string; amountCents: number; nsu?: string; authorization?: string; pixTxid?: string }[];
+    employeeId: string;
+  }) =>
+    localDeviceId().then((deviceId) =>
+      callResilient<{
+        creditId: string;
+        childId: string;
+        guardianId: string;
+        orderId: string;
+        orderCode: string;
+        chargedCents: number;
+        minutesTotal: number;
+      }>("fa_kiosk_sell_prepaid_credit", {
+        p_unit_id: body.unitId,
+        p_activity: body.activity,
+        p_plan_id: body.planId ?? null,
+        p_package_id: body.packageId ?? null,
+        p_guardian: { id: body.guardian.id, fullName: body.guardian.fullName, cpf: body.guardian.cpf, phoneE164: body.guardian.phoneE164 },
+        p_child: {
+          id: body.child.id,
+          fullName: body.child.fullName,
+          birthDate: body.child.birthDate,
+          inclusiveEligible: body.child.inclusiveEligible,
+          inclusiveProofType: body.child.inclusiveProofType,
+        },
+        p_coupon_code: body.couponCode ?? null,
+        p_payments: body.payments,
+        p_employee_id: body.employeeId,
+        p_device_id: deviceId,
+      }),
+    ),
+
+  /** Saldo pré-pago agregado por criança — card "Usar saldo pré-pago" na Entrada. */
+  childCreditBalances: async (childIds: string[]) => {
+    if (childIds.length === 0) return new Map<string, ChildCreditBalance>();
+    const rows = await unwrap<ChildCreditBalance[]>(
+      supabase().rpc("fa_kiosk_child_credit_balance", { p_child_ids: childIds }),
+    );
+    return new Map(rows.map((r) => [r.child_id, r]));
+  },
+
+  /** Fila do Painel: crianças com saldo pré-pago aguardando o operador iniciar a sessão. */
+  prepaidCreditQueue: (unitId: string) =>
+    unwrap<PrepaidCreditQueueItem[]>(
+      supabase().rpc("fa_kiosk_child_credit_queue", { p_unit_id: unitId }),
     ),
 
   // --- QR Code de Acesso Rápido (pré-cadastro pelo responsável, sem login) --
