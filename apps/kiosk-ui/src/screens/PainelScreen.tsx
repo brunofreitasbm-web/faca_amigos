@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon } from "@facaamigos/ui";
+import type { CSSProperties } from "react";
+import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon, Tooltip, ClockIcon, ArrowClockwiseIcon } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
 import type { ActiveSessionEntry, Plan, Package, Asset, BonusRule } from "../api/client.js";
 import { bonificacaoHoje, dentroDoPiloto } from "../bonificacao.js";
@@ -34,6 +35,17 @@ const PAUSE_REASONS: Array<{ value: string; label: string }> = [
 // para evitar (criança some do controle de tempo) — por isso o card
 // pisca depois desse limite, igual ao alerta de excedente.
 const PAUSE_ALERT_MS = 10 * 60_000;
+
+// Botões só-ícone do grupo compacto (Sessão/Mudar Plano/Pulseira) — mesma
+// altura do Button "md" (44px), mas quadrado e sem o padding horizontal
+// generoso pensado pra texto.
+const ICON_BUTTON_STYLE: CSSProperties = {
+  width: "40px",
+  height: "40px",
+  padding: 0,
+  borderRadius: "50%",
+  fontSize: "18px",
+};
 
 /**
  * Painel do parque (seção 1.3/6 do plano): contagem ascendente,
@@ -699,8 +711,8 @@ export function PainelScreen() {
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                gap: "clamp(8px, 2.5cqi, 12px)",
-                padding: "clamp(12px, 4.5cqi, 18px)",
+                gap: "clamp(6px, 2cqi, 10px)",
+                padding: "clamp(10px, 3.5cqi, 14px)",
               }}
               style={{
                 cursor: isPaused ? "default" : "pointer",
@@ -924,18 +936,71 @@ export function PainelScreen() {
                 </div>
               )}
 
+              {/* Sessão/Mudar Plano/Pulseira eram botões de texto — o card
+                  virou parede de texto quando o balcão tem muitas crianças
+                  ao mesmo tempo. São ações de consulta/exceção (não as
+                  urgentes como Chamado de Retorno ou Saída manual, que
+                  continuam por extenso abaixo), então virou grupo compacto
+                  só-ícone com Tooltip explicando cada um no hover/foco. */}
+              <div style={{ display: "flex", gap: "6px" }}>
+                <Tooltip label="Ver linha do tempo completa desta sessão: chegada, plano, pausas e retomadas">
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    aria-label="Ver linha do tempo da sessão"
+                    style={ICON_BUTTON_STYLE}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTimelineFor(entry);
+                    }}
+                  >
+                    <ClockIcon />
+                  </Button>
+                </Tooltip>
+                <IfCan capability="sessao.change_plan">
+                  <Tooltip label="Trocar o plano de permanência desta sessão">
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      disabled={actionBusy.has(session.id)}
+                      aria-label="Trocar o plano desta sessão"
+                      style={ICON_BUTTON_STYLE}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPendingPlanId("");
+                        setChangingPlanFor(changingPlanFor === session.id ? null : session.id);
+                      }}
+                    >
+                      <ArrowClockwiseIcon />
+                    </Button>
+                  </Tooltip>
+                </IfCan>
+                <Tooltip label="Imprimir Pulseira Térmica">
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    aria-label="Imprimir Pulseira Térmica"
+                    style={ICON_BUTTON_STYLE}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPrintData({
+                        wristbandCode,
+                        childName: (session.child_inclusive_eligible || (session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩")
+                          ? `${session.child_name_snapshot} 🧩`
+                          : session.child_name_snapshot,
+                        guardianName: session.guardian_name_snapshot || "Responsável",
+                        phone: session.guardian_phone_snapshot || "",
+                        entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                        notes: careSummary || undefined,
+                      });
+                    }}
+                  >
+                    <PrinterIcon />
+                  </Button>
+                </Tooltip>
+              </div>
+
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <Button
-                  variant="ghost"
-                  size="md"
-                  title="Ver linha do tempo completa desta sessão: chegada, plano, pausas e retomadas"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTimelineFor(entry);
-                  }}
-                >
-                  📋 Sessão
-                </Button>
                 <Button
                   variant="primary"
                   size="md"
@@ -948,46 +1013,6 @@ export function PainelScreen() {
                   }}
                 >
                   🚻 Chamado de Retorno
-                </Button>
-                {/* Trocar o plano de uma sessão já vendida é exceção de
-                    atendimento, não rotina. Quem barra de verdade é o trigger
-                    fa_kiosk_guard_session_exception (migration 20260807000006);
-                    isto só evita mostrar ao Operador um botão que vai falhar. */}
-                <IfCan capability="sessao.change_plan">
-                  <Button
-                    variant="ghost"
-                    size="md"
-                    disabled={actionBusy.has(session.id)}
-                    title="Trocar o plano de permanência desta sessão"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPendingPlanId("");
-                      setChangingPlanFor(changingPlanFor === session.id ? null : session.id);
-                    }}
-                  >
-                    🔄 Mudar Plano
-                  </Button>
-                </IfCan>
-                <Button
-                  variant="ghost"
-                  size="md"
-                  title="Imprimir Pulseira Térmica"
-                  aria-label="Imprimir Pulseira Térmica"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPrintData({
-                      wristbandCode,
-                      childName: (session.child_inclusive_eligible || (session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩")
-                        ? `${session.child_name_snapshot} 🧩`
-                        : session.child_name_snapshot,
-                      guardianName: session.guardian_name_snapshot || "Responsável",
-                      phone: session.guardian_phone_snapshot || "",
-                      entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                      notes: careSummary || undefined,
-                    });
-                  }}
-                >
-                  <PrinterIcon /> Pulseira
                 </Button>
                 {/* Contingência de saída. Fica no card, e não escondido num
                     menu, porque é usado justamente quando algo já deu errado
