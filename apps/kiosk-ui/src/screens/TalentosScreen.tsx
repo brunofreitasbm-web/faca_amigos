@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Card, Button, Badge, Modal, HelpText } from "@facaamigos/ui";
 import type { Candidate, CandidateStatus, CandidateRole } from "@facaamigos/contracts";
 import {
@@ -51,6 +51,8 @@ export function TalentosScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLive, setIsLive] = useState(false);
 
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<CandidateStatus | "TODOS">("TODOS");
   const [selectedRole, setSelectedRole] = useState<CandidateRole | "TODOS">("TODOS");
@@ -69,22 +71,44 @@ export function TalentosScreen() {
   const [newRole, setNewRole] = useState<CandidateRole>("VENDAS");
   const [newExp, setNewExp] = useState("");
 
-  const loadCandidates = useCallback(async (statusFilter: string = "TODOS") => {
-    setIsLoading(true);
+  const checkAndNotifyNewCandidates = useCallback((list: Candidate[]) => {
+    const unnotifiedNew = list.filter(
+      (c) => c.status === "NOVO" && !notifiedIdsRef.current.has(c.id)
+    );
+
+    if (unnotifiedNew.length === 1) {
+      const cand = unnotifiedNew[0];
+      const roleName = ROLE_LABELS[cand.role] || cand.desiredArea || cand.role;
+      toast.info(`📩 Novo currículo recebido: ${cand.name} (${roleName})`);
+      notifiedIdsRef.current.add(cand.id);
+    } else if (unnotifiedNew.length > 1) {
+      toast.info(`📩 ${unnotifiedNew.length} novos currículos recebidos no Banco de Talentos!`);
+      unnotifiedNew.forEach((c) => notifiedIdsRef.current.add(c.id));
+    }
+  }, [toast]);
+
+  const loadCandidates = useCallback(async (statusFilter: string = "TODOS", isSilent: boolean = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       const res = await fetchCandidatesFromApi(statusFilter);
       setCandidates(res.candidates);
       setIsLive(res.isLive);
+      checkAndNotifyNewCandidates(res.candidates);
     } catch (err) {
       console.error(err);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
-  }, []);
+  }, [checkAndNotifyNewCandidates]);
 
   useEffect(() => {
     loadCandidates(selectedStatus);
+    const interval = setInterval(() => {
+      loadCandidates(selectedStatus, true);
+    }, 60000);
+    return () => clearInterval(interval);
   }, [selectedStatus, loadCandidates]);
+
 
   const filteredCandidates = useMemo(() => {
     return candidates.filter((c) => {
