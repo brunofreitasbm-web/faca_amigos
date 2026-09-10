@@ -193,6 +193,9 @@ declare
   v_conversion_key text;
   v_credit record;
   v_credit_allocated integer := null;
+  v_credit_name text := null;
+  v_credit_overage integer := null;
+  v_credit_min_consumption integer := null;
 begin
   v_cached := fa_kiosk_check_idempotency(p_idempotency_key);
   if v_cached is not null then return v_cached; end if;
@@ -221,6 +224,9 @@ begin
     if not found then raise exception 'SALDO_PREPAGO_INVALIDO'; end if;
 
     v_credit_allocated := case when v_remaining is not null then greatest(0, least(v_credit.remaining_minutes, v_remaining)) else v_credit.remaining_minutes end;
+    v_credit_name := v_credit.source_name_snapshot;
+    v_credit_overage := v_credit.overage_cents_per_minute;
+    v_credit_min_consumption := v_credit.min_consumption_minutes;
   elsif p_use_hour_bank then
     v_child_id := nullif(p_child->>'id', '')::uuid;
     if v_child_id is null then raise exception 'BANCO_HORAS_SEM_CADASTRO'; end if;
@@ -346,9 +352,9 @@ begin
     p_use_hour_bank, v_bank_allocated, v_bank_overage,
     p_package_id is not null, p_package_id, v_pkg_name, v_pkg_price_cents,
     v_pkg_allocated, v_pkg_overage,
-    p_child_credit_id is not null, p_child_credit_id, v_credit.source_name_snapshot,
-    v_credit_allocated, v_credit.overage_cents_per_minute,
-    v_credit.min_consumption_minutes
+    p_child_credit_id is not null, p_child_credit_id, v_credit_name,
+    v_credit_allocated, v_credit_overage,
+    v_credit_min_consumption
   );
 
   insert into fa_kiosk_visit_log (child_id, activity, at, at_ms) values (v_child_id, p_activity, to_timestamp(v_now_ms / 1000.0), v_now_ms);
