@@ -78,12 +78,18 @@ export function TalentosScreen() {
 
     if (unnotifiedNew.length === 1) {
       const cand = unnotifiedNew[0];
-      const roleName = ROLE_LABELS[cand.role] || cand.desiredArea || cand.role;
-      toast.info(`📩 Novo currículo recebido: ${cand.name} (${roleName})`);
-      notifiedIdsRef.current.add(cand.id);
+      if (cand) {
+        const roleName = ROLE_LABELS[cand.role] || cand.desiredArea || cand.role;
+        toast.success(`📩 Novo currículo recebido: ${cand.name} (${roleName})`);
+        notifiedIdsRef.current.add(cand.id);
+      }
     } else if (unnotifiedNew.length > 1) {
-      toast.info(`📩 ${unnotifiedNew.length} novos currículos recebidos no Banco de Talentos!`);
-      unnotifiedNew.forEach((c) => notifiedIdsRef.current.add(c.id));
+      toast.success(`📩 ${unnotifiedNew.length} novos currículos recebidos no Banco de Talentos!`);
+      unnotifiedNew.forEach((c) => {
+        if (c?.id) {
+          notifiedIdsRef.current.add(c.id);
+        }
+      });
     }
   }, [toast]);
 
