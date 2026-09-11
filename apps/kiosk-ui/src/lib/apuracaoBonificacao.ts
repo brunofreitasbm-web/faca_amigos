@@ -38,6 +38,23 @@ const CIRCUITO_REGRAS: readonly (RegraDia | null)[] = [
   { metaFat: null, superFat: null, metaLoc: 30, superLoc: 35, bonusMetaCents: 1000, bonusSuperCents: 1600 },
 ];
 
+/** Mês atual no formato "AAAA-MM", usado como padrão dos seletores de mês. */
+export function mesAtualValue(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Primeiro e último dia (AAAA-MM-DD) do mês no formato "AAAA-MM". */
+export function rangeDoMes(mesValue: string): { from: string; to: string } {
+  const [yStr, mStr] = mesValue.split("-");
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const from = `${yStr}-${mStr}-01`;
+  const ultimoDia = new Date(y, m, 0).getDate();
+  const to = `${yStr}-${mStr}-${String(ultimoDia).padStart(2, "0")}`;
+  return { from, to };
+}
+
 /** Dia da semana ISO (1=segunda … 7=domingo) a partir de "AAAA-MM-DD". */
 export function diaSemanaISO(businessDate: string): number {
   const partes = businessDate.split("-").map(Number);
@@ -120,6 +137,8 @@ export interface ApuracaoDia {
   businessDate: string;
   employeeId: string;
   faturamentoCents: number;
+  /** Pedidos PAGA distintos das sessões com check-in do operador no dia (base do ticket médio). */
+  pedidos: number;
   sessoes: number;
   sessoes1hMais: number;
   itens: number;
@@ -140,6 +159,9 @@ export interface ApuracaoOperador {
   diasComBonus: number;
   diasTrabalhados: number;
   itensMes: number;
+  pedidosMes: number;
+  /** Faturamento ÷ pedidos do mês (0 se não houve pedido). */
+  ticketMedioMesCents: number;
   bonusProdutosMesCents: number;
   bonusMetaMesCents: number;
   acumuladoMesCents: number; // já com o teto de R$200 aplicado
@@ -277,6 +299,7 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     if (!regra) continue;
 
     const fat = revByKey.get(key) ?? 0;
+    const pedidos = sessOrders.get(key)?.size ?? 0;
     const agg = sessAgg.get(key) ?? { sessoes: 0, sessoes1hMais: 0 };
     const prod = prodByKey.get(key) ?? { itens: 0, prodCents: 0, bonusProdCents: 0 };
     const sd = shiftsDia.get(shiftUnitDateKey(unitId, businessDate));
@@ -302,6 +325,7 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
       businessDate,
       employeeId,
       faturamentoCents: fat,
+      pedidos,
       sessoes: agg.sessoes,
       sessoes1hMais: agg.sessoes1hMais,
       itens: prod.itens,
@@ -341,6 +365,8 @@ export function agregarPorOperador(dias: ApuracaoDia[], units: RawUnit[], employ
     const bonusItensMesCents = itensMes >= ITENS_MES_META ? ITENS_MES_BONUS_CENTS : 0;
     const somaBonusDia = list.reduce((sum, d) => sum + d.bonusDiaCents, 0);
     const acumuladoMesCents = Math.min(somaBonusDia + bonusItensMesCents, TETO_MES_CENTS);
+    const faturamentoMesCents = list.reduce((sum, d) => sum + d.faturamentoCents, 0);
+    const pedidosMes = list.reduce((sum, d) => sum + d.pedidos, 0);
 
     result.push({
       unitId,
@@ -351,6 +377,8 @@ export function agregarPorOperador(dias: ApuracaoDia[], units: RawUnit[], employ
       diasComBonus: list.filter((d) => d.bonusDiaCents > 0).length,
       diasTrabalhados: list.length,
       itensMes,
+      pedidosMes,
+      ticketMedioMesCents: pedidosMes > 0 ? Math.round(faturamentoMesCents / pedidosMes) : 0,
       bonusProdutosMesCents: list.reduce((sum, d) => sum + d.bonusProdutosCents, 0),
       bonusMetaMesCents: list.reduce((sum, d) => sum + d.bonusMetaCents, 0),
       acumuladoMesCents,

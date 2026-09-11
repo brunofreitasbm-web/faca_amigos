@@ -45,6 +45,7 @@ describe("apurarBonificacaoPorDia", () => {
 
     expect(dias).toHaveLength(1);
     expect(dias[0]?.faturamentoCents).toBe(95_000);
+    expect(dias[0]?.pedidos).toBe(1);
     expect(dias[0]?.travaAberturaOk).toBe(true);
     expect(dias[0]?.travaCaixaOk).toBe(true);
     expect(dias[0]?.bonusDiaCents).toBe(800);
@@ -88,13 +89,32 @@ describe("apurarBonificacaoPorDia", () => {
 describe("agregarPorOperador", () => {
   it("aplica o teto de R$200/mês somando os dias do operador", () => {
     const dias = [
-      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, sessoes: 0, sessoes1hMais: 0, itens: 12, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600 },
-      { unitId: "u1", businessDate: "2026-09-09", employeeId: "e1", faturamentoCents: 0, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600 },
+      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 12, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600 },
+      { unitId: "u1", businessDate: "2026-09-09", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600 },
     ];
     const [op] = agregarPorOperador(dias, [UNIT_PLAYGROUND], [EMP]);
     // 1600 + 1600 + 1000 (bônus de 10+ produtos no mês) = 4200, bem abaixo do teto
     expect(op?.acumuladoMesCents).toBe(4200);
     expect(op?.itensMes).toBe(12);
     expect(op?.atingiuTeto).toBe(false);
+  });
+
+  it("calcula o ticket médio do mês (faturamento ÷ pedidos)", () => {
+    const dias = [
+      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 30_000, pedidos: 3, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0 },
+      { unitId: "u1", businessDate: "2026-09-09", employeeId: "e1", faturamentoCents: 20_000, pedidos: 1, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0 },
+    ];
+    const [op] = agregarPorOperador(dias, [UNIT_PLAYGROUND], [EMP]);
+    expect(op?.pedidosMes).toBe(4);
+    // (30_000 + 20_000) / 4 pedidos = 12_500
+    expect(op?.ticketMedioMesCents).toBe(12_500);
+  });
+
+  it("ticket médio do mês é zero quando não houve nenhum pedido", () => {
+    const dias = [
+      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0 },
+    ];
+    const [op] = agregarPorOperador(dias, [UNIT_PLAYGROUND], [EMP]);
+    expect(op?.ticketMedioMesCents).toBe(0);
   });
 });

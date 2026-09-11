@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
 import { assertValidImageUpload, compressImageForUpload } from "../lib/imageCompression.js";
-import { apurarBonificacaoPorDia, agregarPorOperador, type ApuracaoOperador, type RawEmployee, type RawOrder, type RawOrderItem, type RawPlan, type RawSession, type RawShift, type RawUnit } from "../lib/apuracaoBonificacao.js";
+import { apurarBonificacaoPorDia, agregarPorOperador, type ApuracaoDia, type ApuracaoOperador, type RawEmployee, type RawOrder, type RawOrderItem, type RawPlan, type RawSession, type RawShift, type RawUnit } from "../lib/apuracaoBonificacao.js";
 
 export interface ApiError {
   error: string;
@@ -1407,6 +1407,114 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
 
 async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): Promise<ActiveSessionEntry[]> {
   return computeActiveSessionEntries(await fetchActiveSessionsRaw(unitId), nowMs);
+}
+
+/**
+ * Busca os dados brutos e roda `apurarBonificacaoPorDia` (mesma lógica de
+ * docs/bonificacao/apuracao_bonificacao.sql) — reaproveitado por
+ * `Api.bonusAccrualMonth` (agregado, Gerencial > Bonificação) e
+ * `Api.myBonusAccrual` (filtrado a um colaborador, menu Minha Bonificação).
+ */
+async function fetchApuracaoDias(
+  unitIds: string[],
+  from: string,
+  to: string,
+): Promise<{ dias: ApuracaoDia[]; units: RawUnit[]; employees: RawEmployee[] }> {
+  const [sessions, orders, shifts, employees, units] = await Promise.all([
+    unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_sessions")
+        .select("unit_id, business_date, checkin_by_employee_id, order_id, plan_id, status")
+        .in("unit_id", unitIds)
+        .gte("business_date", from)
+        .lte("business_date", to),
+    ),
+    unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_orders")
+        .select("id, unit_id, business_date, status, total_cents, closed_by_employee_id")
+        .in("unit_id", unitIds)
+        .gte("business_date", from)
+        .lte("business_date", to),
+    ),
+    unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_shifts")
+        .select("unit_id, business_date, status, opened_at_ms, opened_by_employee_id, declared_json, expected_json, close_justifications_json")
+        .in("unit_id", unitIds)
+        .gte("business_date", from)
+        .lte("business_date", to),
+    ),
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_employees").select("id, full_name, role")),
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_units").select("id, name, kind").in("id", unitIds)),
+  ]);
+
+  const planIds = [...new Set(sessions.map((s) => s.plan_id as string | null).filter((id): id is string => Boolean(id)))];
+  const orderIds = orders.map((o) => o.id as string);
+  const [plans, orderItems] = await Promise.all([
+    planIds.length === 0
+      ? Promise.resolve([] as Record<string, unknown>[])
+      : unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("id, duration_unit, duration_value").in("id", planIds)),
+    orderIds.length === 0
+      ? Promise.resolve([] as Record<string, unknown>[])
+      : unwrap<Record<string, unknown>[]>(
+          supabase().from("fa_kiosk_order_items").select("order_id, item_type, quantity, total_cents, unit_price_cents").in("order_id", orderIds),
+        ),
+  ]);
+
+  const rawSessions: RawSession[] = sessions.map((s) => ({
+    unit_id: s.unit_id as string,
+    business_date: s.business_date as string,
+    checkin_by_employee_id: (s.checkin_by_employee_id as string | null) ?? null,
+    order_id: (s.order_id as string | null) ?? null,
+    plan_id: (s.plan_id as string | null) ?? null,
+    canceled: s.status === "CANCELADA",
+  }));
+  const rawPlans: RawPlan[] = plans.map((p) => ({
+    id: p.id as string,
+    duration_unit: p.duration_unit as string,
+    duration_value: p.duration_value as number,
+  }));
+  const rawOrders: RawOrder[] = orders.map((o) => ({
+    id: o.id as string,
+    unit_id: o.unit_id as string,
+    business_date: o.business_date as string,
+    status: o.status as string,
+    total_cents: o.total_cents as number,
+    closed_by_employee_id: (o.closed_by_employee_id as string | null) ?? null,
+  }));
+  const rawOrderItems: RawOrderItem[] = orderItems.map((i) => ({
+    order_id: i.order_id as string,
+    item_type: i.item_type as string,
+    quantity: i.quantity as number,
+    total_cents: i.total_cents as number,
+    unit_price_cents: i.unit_price_cents as number,
+  }));
+  const rawShifts: RawShift[] = shifts.map((s) => ({
+    unit_id: s.unit_id as string,
+    business_date: s.business_date as string,
+    status: s.status as "ABERTO" | "FECHADO",
+    opened_at_ms: s.opened_at_ms as number,
+    opened_by_employee_id: s.opened_by_employee_id as string,
+    declared_json: (s.declared_json as Record<string, number> | null) ?? null,
+    expected_json: (s.expected_json as Record<string, number> | null) ?? null,
+    close_justifications_json: (s.close_justifications_json as Record<string, string> | null) ?? null,
+  }));
+  const rawEmployees: RawEmployee[] = employees.map((e) => ({ id: e.id as string, full_name: e.full_name as string, role: e.role as string }));
+  const rawUnits: RawUnit[] = units.map((u) => ({ id: u.id as string, name: u.name as string, kind: u.kind as string }));
+
+  const dias = apurarBonificacaoPorDia({
+    from,
+    to,
+    sessions: rawSessions,
+    plans: rawPlans,
+    orders: rawOrders,
+    orderItems: rawOrderItems,
+    shifts: rawShifts,
+    employees: rawEmployees,
+    units: rawUnits,
+  });
+  return { dias, units: rawUnits, employees: rawEmployees };
 }
 
 export const Api = {
@@ -3537,107 +3645,31 @@ export const Api = {
     });
   },
   // Saldo de bonificação acumulado por operador no mês (aba Gerencial >
-  // Bonificação), mesma lógica de docs/bonificacao/apuracao_bonificacao.sql
-  // (ver apps/kiosk-ui/src/lib/apuracaoBonificacao.ts) — só que buscando os
-  // dados brutos aqui, no mesmo padrão dos outros relatórios (reportSales
-  // etc.), em vez de rodar a query manual contra o Supabase.
+  // Bonificação, e o menu individual "Minha Bonificação"), mesma lógica de
+  // docs/bonificacao/apuracao_bonificacao.sql (ver
+  // apps/kiosk-ui/src/lib/apuracaoBonificacao.ts) — só que buscando os dados
+  // brutos aqui, no mesmo padrão dos outros relatórios (reportSales etc.),
+  // em vez de rodar a query manual contra o Supabase.
   bonusAccrualMonth: async (unitIds: string[], from: string, to: string): Promise<ApuracaoOperador[]> => {
     if (unitIds.length === 0) return [];
-    const [sessions, orders, shifts, employees, units] = await Promise.all([
-      unwrap<Record<string, unknown>[]>(
-        supabase()
-          .from("fa_kiosk_sessions")
-          .select("unit_id, business_date, checkin_by_employee_id, order_id, plan_id, status")
-          .in("unit_id", unitIds)
-          .gte("business_date", from)
-          .lte("business_date", to),
-      ),
-      unwrap<Record<string, unknown>[]>(
-        supabase()
-          .from("fa_kiosk_orders")
-          .select("id, unit_id, business_date, status, total_cents, closed_by_employee_id")
-          .in("unit_id", unitIds)
-          .gte("business_date", from)
-          .lte("business_date", to),
-      ),
-      unwrap<Record<string, unknown>[]>(
-        supabase()
-          .from("fa_kiosk_shifts")
-          .select("unit_id, business_date, status, opened_at_ms, opened_by_employee_id, declared_json, expected_json, close_justifications_json")
-          .in("unit_id", unitIds)
-          .gte("business_date", from)
-          .lte("business_date", to),
-      ),
-      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_employees").select("id, full_name, role")),
-      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_units").select("id, name, kind").in("id", unitIds)),
-    ]);
-
-    const planIds = [...new Set(sessions.map((s) => s.plan_id as string | null).filter((id): id is string => Boolean(id)))];
-    const orderIds = orders.map((o) => o.id as string);
-    const [plans, orderItems] = await Promise.all([
-      planIds.length === 0
-        ? Promise.resolve([] as Record<string, unknown>[])
-        : unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("id, duration_unit, duration_value").in("id", planIds)),
-      orderIds.length === 0
-        ? Promise.resolve([] as Record<string, unknown>[])
-        : unwrap<Record<string, unknown>[]>(
-            supabase().from("fa_kiosk_order_items").select("order_id, item_type, quantity, total_cents, unit_price_cents").in("order_id", orderIds),
-          ),
-    ]);
-
-    const rawSessions: RawSession[] = sessions.map((s) => ({
-      unit_id: s.unit_id as string,
-      business_date: s.business_date as string,
-      checkin_by_employee_id: (s.checkin_by_employee_id as string | null) ?? null,
-      order_id: (s.order_id as string | null) ?? null,
-      plan_id: (s.plan_id as string | null) ?? null,
-      canceled: s.status === "CANCELADA",
-    }));
-    const rawPlans: RawPlan[] = plans.map((p) => ({
-      id: p.id as string,
-      duration_unit: p.duration_unit as string,
-      duration_value: p.duration_value as number,
-    }));
-    const rawOrders: RawOrder[] = orders.map((o) => ({
-      id: o.id as string,
-      unit_id: o.unit_id as string,
-      business_date: o.business_date as string,
-      status: o.status as string,
-      total_cents: o.total_cents as number,
-      closed_by_employee_id: (o.closed_by_employee_id as string | null) ?? null,
-    }));
-    const rawOrderItems: RawOrderItem[] = orderItems.map((i) => ({
-      order_id: i.order_id as string,
-      item_type: i.item_type as string,
-      quantity: i.quantity as number,
-      total_cents: i.total_cents as number,
-      unit_price_cents: i.unit_price_cents as number,
-    }));
-    const rawShifts: RawShift[] = shifts.map((s) => ({
-      unit_id: s.unit_id as string,
-      business_date: s.business_date as string,
-      status: s.status as "ABERTO" | "FECHADO",
-      opened_at_ms: s.opened_at_ms as number,
-      opened_by_employee_id: s.opened_by_employee_id as string,
-      declared_json: (s.declared_json as Record<string, number> | null) ?? null,
-      expected_json: (s.expected_json as Record<string, number> | null) ?? null,
-      close_justifications_json: (s.close_justifications_json as Record<string, string> | null) ?? null,
-    }));
-    const rawEmployees: RawEmployee[] = employees.map((e) => ({ id: e.id as string, full_name: e.full_name as string, role: e.role as string }));
-    const rawUnits: RawUnit[] = units.map((u) => ({ id: u.id as string, name: u.name as string, kind: u.kind as string }));
-
-    const dias = apurarBonificacaoPorDia({
-      from,
-      to,
-      sessions: rawSessions,
-      plans: rawPlans,
-      orders: rawOrders,
-      orderItems: rawOrderItems,
-      shifts: rawShifts,
-      employees: rawEmployees,
-      units: rawUnits,
-    });
-    return agregarPorOperador(dias, rawUnits, rawEmployees);
+    const { dias, units, employees } = await fetchApuracaoDias(unitIds, from, to);
+    return agregarPorOperador(dias, units, employees);
+  },
+  // Mesma apuração acima, mas filtrada a UM colaborador — usada pelo menu
+  // individual "Minha Bonificação" para mostrar o dia de hoje e o acumulado
+  // do mês sem expor os dados dos colegas (a apuração inteira roda no
+  // cliente, então o filtro por employeeId acontece depois, não é uma
+  // policy no banco).
+  myBonusAccrual: async (
+    employeeId: string,
+    unitIds: string[],
+    from: string,
+    to: string,
+  ): Promise<{ dias: ApuracaoDia[]; mes: ApuracaoOperador[] }> => {
+    if (unitIds.length === 0) return { dias: [], mes: [] };
+    const { dias, units, employees } = await fetchApuracaoDias(unitIds, from, to);
+    const minhasDias = dias.filter((d) => d.employeeId === employeeId);
+    return { dias: minhasDias, mes: agregarPorOperador(minhasDias, units, employees) };
   },
   reportSessions: async (unitId: string | null, from: string, to: string) => {
     let sessionsQuery = supabase()

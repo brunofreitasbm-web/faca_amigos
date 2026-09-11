@@ -8,6 +8,7 @@ export type Screen =
   | "CAIXA"
   | "ANIVERSARIOS"
   | "PONTO"
+  | "MINHA_BONIFICACAO"
   | "RELATORIO"
   | "CONFIGURACOES";
 
@@ -27,6 +28,7 @@ export const SCREEN_CAPABILITY: Record<Screen, Capability> = {
   CAIXA: "caixa.open_close",
   ANIVERSARIOS: "relatorio.read",
   PONTO: "ponto.self",
+  MINHA_BONIFICACAO: "bonificacao.self",
   RELATORIO: "relatorio.read",
   CONFIGURACOES: "config.read",
 };
