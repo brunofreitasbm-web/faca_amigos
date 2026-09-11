@@ -1,51 +1,15 @@
-// Regras do Piloto de Bonificação (Circuito + Playground), Fase 1 —
-// mesma tabela de metas/valores de docs/bonificacao/programa-bonificacao-set-2026.md
-// e docs/bonificacao/apuracao_bonificacao.sql. Cálculo 100% no cliente: não
-// existe ainda meta por dia da semana no banco (fa_kiosk_app_settings.daily_goal_cents
-// é um valor único por unidade — ver Fase 2 no documento), então este módulo
-// só espelha as mesmas regras para o Painel poder mostrar o progresso ao vivo.
-//
-// Isto é o placar do piloto (08/09 a 05/10/2026), não a apuração oficial:
-// quem decide o bônus pago é `apuracao_bonificacao.sql`, que também aplica
-// as travas de abertura de caixa e de divergência de fechamento — nenhuma
-// das duas trava entra nesta conta, de propósito, porque o Painel não tem
-// esse dado à mão durante o turno. Depois da recalibração de 06/10, atualize
-// as tabelas abaixo (ou remova o bloco do Painel) para não deixar uma meta
-// velha no ar.
+// Placar "ao vivo" do dia do programa de Bonificação (Circuito + Playground)
+// mostrado no Painel — mesma fonte de meta/supermeta que
+// apps/kiosk-ui/src/lib/apuracaoBonificacao.ts usa para a apuração oficial
+// (fa_kiosk_bonus_program_goals/config, configurados pelo Owner em
+// Gerencial > Metas). Este módulo só resolve o nível/percentual/estimativa
+// do dia a partir da meta já carregada — não sabe nada de trava de abertura
+// de caixa nem de divergência de fechamento, porque o Painel não tem esse
+// dado à mão durante o turno (só o relatório oficial sabe).
+
+import type { BonusProgramGoal } from "./lib/apuracaoBonificacao.js";
 
 export type UnidadeTipo = "PLAYGROUND" | "CIRCUITO";
-
-interface RegraDia {
-  meta: number;
-  super: number;
-  bonusMetaCents: number;
-  bonusSuperCents: number;
-}
-
-const PLAYGROUND_SEMANA: RegraDia = { meta: 90_000, super: 110_000, bonusMetaCents: 800, bonusSuperCents: 1200 };
-// Índice 0 não é usado (dias vão de 1 a 7); mantém o acesso por isodow direto e tipado.
-const PLAYGROUND_REGRAS: readonly RegraDia[] = [
-  PLAYGROUND_SEMANA,
-  PLAYGROUND_SEMANA, // 1 = segunda
-  PLAYGROUND_SEMANA, // 2 = terça
-  PLAYGROUND_SEMANA, // 3 = quarta
-  PLAYGROUND_SEMANA, // 4 = quinta
-  { meta: 150_000, super: 180_000, bonusMetaCents: 1200, bonusSuperCents: 1600 }, // 5 = sexta
-  { meta: 240_000, super: 280_000, bonusMetaCents: 1200, bonusSuperCents: 1600 }, // 6 = sábado
-  { meta: 220_000, super: 260_000, bonusMetaCents: 1200, bonusSuperCents: 1600 }, // 7 = domingo
-];
-
-const CIRCUITO_SEMANA: RegraDia = { meta: 8, super: 10, bonusMetaCents: 600, bonusSuperCents: 1000 };
-const CIRCUITO_REGRAS: readonly RegraDia[] = [
-  CIRCUITO_SEMANA,
-  CIRCUITO_SEMANA, // 1 = segunda
-  CIRCUITO_SEMANA, // 2 = terça
-  CIRCUITO_SEMANA, // 3 = quarta
-  CIRCUITO_SEMANA, // 4 = quinta
-  { meta: 10, super: 12, bonusMetaCents: 1000, bonusSuperCents: 1600 }, // 5 = sexta
-  { meta: 22, super: 27, bonusMetaCents: 1000, bonusSuperCents: 1600 }, // 6 = sábado
-  { meta: 30, super: 35, bonusMetaCents: 1000, bonusSuperCents: 1600 }, // 7 = domingo
-];
 
 /** Dia da semana ISO (1=segunda … 7=domingo) a partir de um business_date "AAAA-MM-DD". */
 export function diaSemanaISO(businessDate: string): number {
@@ -69,25 +33,37 @@ export interface BonificacaoHoje {
   bonusCents: number;
 }
 
-export function bonificacaoHoje(tipo: UnidadeTipo, businessDate: string, atual: number): BonificacaoHoje {
+/**
+ * Calcula o placar do dia a partir da meta/supermeta já configurada para
+ * essa unidade/dia da semana. Retorna null quando a unidade ainda não tem
+ * meta configurada (Gerencial > Metas) — o card não deve aparecer nesse
+ * caso, nunca mostrar um valor adivinhado.
+ */
+export function bonificacaoHoje(
+  tipo: UnidadeTipo,
+  businessDate: string,
+  atual: number,
+  goal: BonusProgramGoal | null,
+  locacaoExtraBonusCents = 0,
+): BonificacaoHoje | null {
+  if (!goal) return null;
   const dow = diaSemanaISO(businessDate);
-  const regra = (tipo === "PLAYGROUND" ? PLAYGROUND_REGRAS : CIRCUITO_REGRAS)[dow] ?? CIRCUITO_SEMANA;
   let nivel: BonificacaoHoje["nivel"] = "abaixo";
   let bonusCents = 0;
-  if (atual >= regra.super) {
+  if (atual >= goal.superValor) {
     nivel = "supermeta";
-    bonusCents = regra.bonusSuperCents;
-  } else if (atual >= regra.meta) {
+    bonusCents = goal.superBonusCents;
+  } else if (atual >= goal.metaValor) {
     nivel = "meta";
-    bonusCents = regra.bonusMetaCents;
+    bonusCents = goal.metaBonusCents;
   }
-  // Circuito: +R$1 por locação acima da meta, some com o bônus da meta ou da
-  // supermeta — mesma regra de docs/bonificacao/apuracao_bonificacao.sql.
-  if (tipo === "CIRCUITO" && atual > regra.meta) {
-    bonusCents += (atual - regra.meta) * 100;
+  // Circuito: bônus por locação acima da meta, some com o bônus da meta ou
+  // da supermeta — mesma regra de apuracaoBonificacao.ts.
+  if (tipo === "CIRCUITO" && atual > goal.metaValor) {
+    bonusCents += (atual - goal.metaValor) * locacaoExtraBonusCents;
   }
-  const percent = Math.min(100, Math.round((atual / regra.super) * 100));
-  return { tipo, dow, atual, meta: regra.meta, super: regra.super, percent, nivel, bonusCents };
+  const percent = goal.superValor > 0 ? Math.min(100, Math.round((atual / goal.superValor) * 100)) : 0;
+  return { tipo, dow, atual, meta: goal.metaValor, super: goal.superValor, percent, nivel, bonusCents };
 }
 
 export const PILOTO_INICIO = "2026-09-08";

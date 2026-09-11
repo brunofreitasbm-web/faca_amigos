@@ -3,7 +3,22 @@ import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
 import { assertValidImageUpload, compressImageForUpload } from "../lib/imageCompression.js";
-import { apurarBonificacaoPorDia, agregarPorOperador, type ApuracaoDia, type ApuracaoOperador, type RawEmployee, type RawOrder, type RawOrderItem, type RawPlan, type RawSession, type RawShift, type RawUnit } from "../lib/apuracaoBonificacao.js";
+import {
+  apurarBonificacaoPorDia,
+  agregarPorOperador,
+  type ApuracaoDia,
+  type ApuracaoOperador,
+  type BonusProgramConfig,
+  type BonusProgramGoal,
+  type BonusProgramsByUnit,
+  type RawEmployee,
+  type RawOrder,
+  type RawOrderItem,
+  type RawPlan,
+  type RawSession,
+  type RawShift,
+  type RawUnit,
+} from "../lib/apuracaoBonificacao.js";
 
 export interface ApiError {
   error: string;
@@ -1410,6 +1425,58 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
 }
 
 /**
+ * Configuração do programa de bonificação (metas/supermetas por dia da
+ * semana + teto/produtos/bônus extras) de cada unidade pedida — vazio para
+ * quem ainda não foi configurado em Gerencial > Metas. Reaproveitado por
+ * `fetchApuracaoDias` (apuração) e por quem só precisa da meta de hoje
+ * (card do Painel, menu Minha Bonificação).
+ */
+async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgramsByUnit> {
+  if (unitIds.length === 0) return {};
+  const [goalRows, configRows] = await Promise.all([
+    unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_bonus_program_goals")
+        .select("unit_id, weekday, meta_valor, super_valor, meta_bonus_cents, super_bonus_cents")
+        .in("unit_id", unitIds),
+    ),
+    unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_program_config").select("*").in("unit_id", unitIds)),
+  ]);
+
+  const goalsByUnit = new Map<string, BonusProgramGoal[]>();
+  for (const row of goalRows) {
+    const unitId = row.unit_id as string;
+    const list = goalsByUnit.get(unitId) ?? [];
+    list.push({
+      weekday: row.weekday as number,
+      metaValor: row.meta_valor as number,
+      superValor: row.super_valor as number,
+      metaBonusCents: row.meta_bonus_cents as number,
+      superBonusCents: row.super_bonus_cents as number,
+    });
+    goalsByUnit.set(unitId, list);
+  }
+
+  const result: BonusProgramsByUnit = {};
+  for (const row of configRows) {
+    const unitId = row.unit_id as string;
+    result[unitId] = {
+      goals: goalsByUnit.get(unitId) ?? [],
+      tetoMesCents: row.teto_mes_cents as number,
+      produtoPrecoCorteCents: row.produto_preco_corte_cents as number,
+      produtoBonusBaixoCents: row.produto_bonus_baixo_cents as number,
+      produtoBonusAltoCents: row.produto_bonus_alto_cents as number,
+      itensMesMeta: row.itens_mes_meta as number,
+      itensMesBonusCents: row.itens_mes_bonus_cents as number,
+      sessao1hPercentualMin: row.sessao_1h_percentual_min as number,
+      sessao1hBonusCents: row.sessao_1h_bonus_cents as number,
+      locacaoExtraBonusCents: row.locacao_extra_bonus_cents as number,
+    };
+  }
+  return result;
+}
+
+/**
  * Busca os dados brutos e roda `apurarBonificacaoPorDia` (mesma lógica de
  * docs/bonificacao/apuracao_bonificacao.sql) — reaproveitado por
  * `Api.bonusAccrualMonth` (agregado, Gerencial > Bonificação) e
@@ -1419,8 +1486,8 @@ async function fetchApuracaoDias(
   unitIds: string[],
   from: string,
   to: string,
-): Promise<{ dias: ApuracaoDia[]; units: RawUnit[]; employees: RawEmployee[] }> {
-  const [sessions, orders, shifts, employees, units] = await Promise.all([
+): Promise<{ dias: ApuracaoDia[]; units: RawUnit[]; employees: RawEmployee[]; programs: BonusProgramsByUnit }> {
+  const [sessions, orders, shifts, employees, units, programs] = await Promise.all([
     unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_sessions")
@@ -1447,6 +1514,7 @@ async function fetchApuracaoDias(
     ),
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_employees").select("id, full_name, role")),
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_units").select("id, name, kind").in("id", unitIds)),
+    fetchBonusProgramsByUnit(unitIds),
   ]);
 
   const planIds = [...new Set(sessions.map((s) => s.plan_id as string | null).filter((id): id is string => Boolean(id)))];
@@ -1513,8 +1581,9 @@ async function fetchApuracaoDias(
     shifts: rawShifts,
     employees: rawEmployees,
     units: rawUnits,
+    programs,
   });
-  return { dias, units: rawUnits, employees: rawEmployees };
+  return { dias, units: rawUnits, employees: rawEmployees, programs };
 }
 
 export const Api = {
@@ -3652,8 +3721,8 @@ export const Api = {
   // em vez de rodar a query manual contra o Supabase.
   bonusAccrualMonth: async (unitIds: string[], from: string, to: string): Promise<ApuracaoOperador[]> => {
     if (unitIds.length === 0) return [];
-    const { dias, units, employees } = await fetchApuracaoDias(unitIds, from, to);
-    return agregarPorOperador(dias, units, employees);
+    const { dias, units, employees, programs } = await fetchApuracaoDias(unitIds, from, to);
+    return agregarPorOperador(dias, units, employees, programs);
   },
   // Mesma apuração acima, mas filtrada a UM colaborador — usada pelo menu
   // individual "Minha Bonificação" para mostrar o dia de hoje e o acumulado
@@ -3667,9 +3736,62 @@ export const Api = {
     to: string,
   ): Promise<{ dias: ApuracaoDia[]; mes: ApuracaoOperador[] }> => {
     if (unitIds.length === 0) return { dias: [], mes: [] };
-    const { dias, units, employees } = await fetchApuracaoDias(unitIds, from, to);
+    const { dias, units, employees, programs } = await fetchApuracaoDias(unitIds, from, to);
     const minhasDias = dias.filter((d) => d.employeeId === employeeId);
-    return { dias: minhasDias, mes: agregarPorOperador(minhasDias, units, employees) };
+    return { dias: minhasDias, mes: agregarPorOperador(minhasDias, units, employees, programs) };
+  },
+  // Configuração do programa de bonificação (meta/supermeta por dia da
+  // semana + teto/produtos/bônus extras) das unidades pedidas — usada pelo
+  // card "Hoje" do Painel/Minha Bonificação (só a unidade atual) e pela
+  // aba Gerencial > Metas (todas as unidades, para editar).
+  bonusProgramsByUnit: (unitIds: string[]): Promise<BonusProgramsByUnit> => fetchBonusProgramsByUnit(unitIds),
+  // Salva as 7 metas (uma por dia da semana) + a configuração geral de UMA
+  // unidade de uma vez só — sempre os dois juntos, para nunca existir meta
+  // sem configuração geral (ou vice-versa) e a apuração ler estado parcial.
+  setBonusProgram: async (
+    unitId: string,
+    goals: BonusProgramGoal[],
+    config: Omit<BonusProgramConfig, "goals">,
+  ): Promise<void> => {
+    const now = Date.now();
+    await Promise.all([
+      unwrap(
+        supabase()
+          .from("fa_kiosk_bonus_program_goals")
+          .upsert(
+            goals.map((g) => ({
+              unit_id: unitId,
+              weekday: g.weekday,
+              meta_valor: g.metaValor,
+              super_valor: g.superValor,
+              meta_bonus_cents: g.metaBonusCents,
+              super_bonus_cents: g.superBonusCents,
+              updated_at_ms: now,
+            })),
+            { onConflict: "unit_id,weekday" },
+          ),
+      ),
+      unwrap(
+        supabase()
+          .from("fa_kiosk_bonus_program_config")
+          .upsert(
+            {
+              unit_id: unitId,
+              teto_mes_cents: config.tetoMesCents,
+              produto_preco_corte_cents: config.produtoPrecoCorteCents,
+              produto_bonus_baixo_cents: config.produtoBonusBaixoCents,
+              produto_bonus_alto_cents: config.produtoBonusAltoCents,
+              itens_mes_meta: config.itensMesMeta,
+              itens_mes_bonus_cents: config.itensMesBonusCents,
+              sessao_1h_percentual_min: config.sessao1hPercentualMin,
+              sessao_1h_bonus_cents: config.sessao1hBonusCents,
+              locacao_extra_bonus_cents: config.locacaoExtraBonusCents,
+              updated_at_ms: now,
+            },
+            { onConflict: "unit_id" },
+          ),
+      ),
+    ]);
   },
   reportSessions: async (unitId: string | null, from: string, to: string) => {
     let sessionsQuery = supabase()

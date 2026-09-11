@@ -2,12 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, HelpText, Badge } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
 import type { TicketGoal } from "../api/client.js";
-import { bonificacaoHoje, dentroDoPiloto } from "../bonificacao.js";
-import { mesAtualValue, rangeDoMes, type ApuracaoDia, type ApuracaoOperador } from "../lib/apuracaoBonificacao.js";
+import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO } from "../bonificacao.js";
+import { mesAtualValue, rangeDoMes, type ApuracaoDia, type ApuracaoOperador, type BonusProgramsByUnit } from "../lib/apuracaoBonificacao.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
-
-const TETO_MES_CENTS = 20_000;
 
 type Escopo = "UNIDADE" | "TODAS";
 
@@ -24,6 +22,7 @@ export function MinhaBonificacaoScreen() {
   const [dias, setDias] = useState<ApuracaoDia[]>([]);
   const [mes, setMes] = useState<ApuracaoOperador[]>([]);
   const [ticketGoal, setTicketGoal] = useState<TicketGoal | null>(null);
+  const [programs, setPrograms] = useState<BonusProgramsByUnit>({});
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -60,6 +59,20 @@ export function MinhaBonificacaoScreen() {
   }, [employee, unitIds, from, to]);
 
   useEffect(() => {
+    if (unitIds.length === 0) {
+      setPrograms({});
+      return;
+    }
+    let cancelado = false;
+    Api.bonusProgramsByUnit(unitIds).then((p) => {
+      if (!cancelado) setPrograms(p);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [unitIds]);
+
+  useEffect(() => {
     if (escopo !== "UNIDADE" || !unit) {
       setTicketGoal(null);
       return;
@@ -79,10 +92,12 @@ export function MinhaBonificacaoScreen() {
   const hojeStr = unit ? businessDateFor(Date.now(), unit.business_day_cutoff_hour) : null;
   const diaHoje = hojeStr ? dias.find((d) => d.unitId === unit?.id && d.businessDate === hojeStr) : undefined;
 
-  // O teto de R$200/mês é por colaborador (não por unidade) — agregarPorOperador
-  // aplica o teto por unidade+colaborador (ver comentário em apuracaoBonificacao.ts),
-  // então ao somar unidades aqui aplicamos o teto global de novo, na exibição.
-  const acumuladoMesCents = Math.min(mes.reduce((sum, m) => sum + m.acumuladoMesCents, 0), TETO_MES_CENTS);
+  // O teto do mês é configurado por unidade (Gerencial > Metas) — cada linha
+  // de `mes` já vem com o teto da própria unidade aplicado; aqui só somamos
+  // os tetos das unidades no escopo para mostrar "de até X" no total.
+  const tetoMesCents = unitIds.reduce((sum, id) => sum + (programs[id]?.tetoMesCents ?? 0), 0);
+  const somaAcumuladoCents = mes.reduce((sum, m) => sum + m.acumuladoMesCents, 0);
+  const acumuladoMesCents = tetoMesCents > 0 ? Math.min(somaAcumuladoCents, tetoMesCents) : somaAcumuladoCents;
   const diasComBonus = mes.reduce((sum, m) => sum + m.diasComBonus, 0);
   const diasTrabalhados = mes.reduce((sum, m) => sum + m.diasTrabalhados, 0);
   const itensMes = mes.reduce((sum, m) => sum + m.itensMes, 0);
@@ -137,10 +152,13 @@ export function MinhaBonificacaoScreen() {
         </Card>
       )}
 
-      {escopo === "UNIDADE" && unit && dentroDoPiloto(hojeStr ?? "") && (() => {
+      {escopo === "UNIDADE" && unit && hojeStr && dentroDoPiloto(hojeStr) && (() => {
         const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
         const atual = tipo === "CIRCUITO" ? (diaHoje?.sessoes ?? 0) : (diaHoje?.faturamentoCents ?? 0);
-        const b = bonificacaoHoje(tipo, hojeStr ?? "", atual);
+        const program = programs[unit.id] ?? null;
+        const goal = program?.goals.find((g) => g.weekday === diaSemanaISO(hojeStr)) ?? null;
+        const b = bonificacaoHoje(tipo, hojeStr, atual, goal, program?.locacaoExtraBonusCents ?? 0);
+        if (!b) return null;
         const corNivel = b.nivel === "supermeta" ? "var(--color-amber)" : b.nivel === "meta" ? "var(--color-success)" : "var(--color-primary)";
         const badgeVariant = b.nivel === "supermeta" ? "solid_amber" : b.nivel === "meta" ? "green" : "neutral";
         const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta!" : b.nivel === "meta" ? "🥈 Meta batida!" : "Em andamento";
@@ -188,17 +206,25 @@ export function MinhaBonificacaoScreen() {
         <h3 style={{ fontSize: "15px", margin: "0 0 12px" }}>💰 Bonificação do mês</h3>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
           <span style={{ fontSize: "24px", fontWeight: "bold" }}>{money(acumuladoMesCents)}</span>
-          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>de até {money(TETO_MES_CENTS)} no mês</span>
+          {tetoMesCents > 0 && <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>de até {money(tetoMesCents)} no mês</span>}
         </div>
-        <div className="capacity-bar-track" role="progressbar" aria-valuenow={Math.round((acumuladoMesCents / TETO_MES_CENTS) * 100)} aria-valuemin={0} aria-valuemax={100}>
-          <div
-            className="capacity-bar-fill"
-            style={{ width: `${Math.min(100, Math.round((acumuladoMesCents / TETO_MES_CENTS) * 100))}%`, backgroundColor: "var(--color-amber)" }}
-          />
-        </div>
+        {tetoMesCents > 0 && (
+          <div className="capacity-bar-track" role="progressbar" aria-valuenow={Math.round((acumuladoMesCents / tetoMesCents) * 100)} aria-valuemin={0} aria-valuemax={100}>
+            <div
+              className="capacity-bar-fill"
+              style={{ width: `${Math.min(100, Math.round((acumuladoMesCents / tetoMesCents) * 100))}%`, backgroundColor: "var(--color-amber)" }}
+            />
+          </div>
+        )}
         <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "8px" }}>
           {diasComBonus} de {diasTrabalhados} dia{diasTrabalhados === 1 ? "" : "s"} trabalhado{diasTrabalhados === 1 ? "" : "s"} com bônus · {itensMes}{" "}
-          produto{itensMes === 1 ? "" : "s"} vendido{itensMes === 1 ? "" : "s"} no mês{itensMes >= 10 ? " (bateu a meta de 10, +R$10)" : ""}
+          produto{itensMes === 1 ? "" : "s"} vendido{itensMes === 1 ? "" : "s"} no mês
+          {escopo === "UNIDADE" && unit && (() => {
+            const meta = programs[unit.id]?.itensMesMeta ?? 0;
+            const bonusCents = programs[unit.id]?.itensMesBonusCents ?? 0;
+            if (meta <= 0) return null;
+            return itensMes >= meta ? ` (bateu a meta de ${meta}, +${money(bonusCents)})` : ` (meta: ${meta})`;
+          })()}
         </div>
       </Card>
 
