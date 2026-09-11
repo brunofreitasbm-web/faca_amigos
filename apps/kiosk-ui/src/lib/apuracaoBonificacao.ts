@@ -3,40 +3,66 @@
 // programa, docs/bonificacao/programa-bonificacao-set-2026.md), generalizada
 // para qualquer unidade/período em vez dos IDs e datas fixas do script manual.
 // Mantenha os dois em sincronia se as regras do piloto mudarem.
+//
+// As metas/valores do programa (antes hardcoded aqui) agora vêm de fora, via
+// `programs` — configurados pelo Owner em Gerencial > Metas e lidos de
+// fa_kiosk_bonus_program_goals/fa_kiosk_bonus_program_config (migration
+// 20260911100000). Uma unidade sem configuração simplesmente não gera bônus
+// (nunca um valor adivinhado) — ver `BonusProgramConfig` abaixo.
 
 export type UnidadeTipo = "PLAYGROUND" | "CIRCUITO";
 
-interface RegraDia {
-  metaFat: number | null;
-  superFat: number | null;
-  metaLoc: number | null;
-  superLoc: number | null;
-  bonusMetaCents: number;
-  bonusSuperCents: number;
+/** Meta/supermeta do dia da semana de uma unidade (weekday: isodow 1-7). */
+export interface BonusProgramGoal {
+  weekday: number;
+  /** Faturamento em centavos (Playground) ou nº de locações (Circuito). */
+  metaValor: number;
+  superValor: number;
+  metaBonusCents: number;
+  superBonusCents: number;
 }
 
-// index 0 não é usado (isodow vai de 1 a 7)
-const PLAYGROUND_REGRAS: readonly (RegraDia | null)[] = [
-  null,
-  { metaFat: 90_000, superFat: 110_000, metaLoc: null, superLoc: null, bonusMetaCents: 800, bonusSuperCents: 1200 },
-  { metaFat: 90_000, superFat: 110_000, metaLoc: null, superLoc: null, bonusMetaCents: 800, bonusSuperCents: 1200 },
-  { metaFat: 90_000, superFat: 110_000, metaLoc: null, superLoc: null, bonusMetaCents: 800, bonusSuperCents: 1200 },
-  { metaFat: 90_000, superFat: 110_000, metaLoc: null, superLoc: null, bonusMetaCents: 800, bonusSuperCents: 1200 },
-  { metaFat: 150_000, superFat: 180_000, metaLoc: null, superLoc: null, bonusMetaCents: 1200, bonusSuperCents: 1600 },
-  { metaFat: 240_000, superFat: 280_000, metaLoc: null, superLoc: null, bonusMetaCents: 1200, bonusSuperCents: 1600 },
-  { metaFat: 220_000, superFat: 260_000, metaLoc: null, superLoc: null, bonusMetaCents: 1200, bonusSuperCents: 1600 },
-];
+/** Configuração do programa de bonificação de UMA unidade, editável em Gerencial > Metas. */
+export interface BonusProgramConfig {
+  goals: BonusProgramGoal[];
+  /** Teto de bônus (metas + produtos) por operador no mês; 0 = sem teto. */
+  tetoMesCents: number;
+  produtoPrecoCorteCents: number;
+  produtoBonusBaixoCents: number;
+  produtoBonusAltoCents: number;
+  /** 0 = bônus de itens do mês desativado nesta unidade. */
+  itensMesMeta: number;
+  itensMesBonusCents: number;
+  /** Só Playground: % mínimo (0-100) de sessões de 1h+ para o bônus extra do dia. */
+  sessao1hPercentualMin: number;
+  sessao1hBonusCents: number;
+  /** Só Circuito: bônus por locação acima da meta do dia. */
+  locacaoExtraBonusCents: number;
+}
 
-const CIRCUITO_REGRAS: readonly (RegraDia | null)[] = [
-  null,
-  { metaFat: null, superFat: null, metaLoc: 8, superLoc: 10, bonusMetaCents: 600, bonusSuperCents: 1000 },
-  { metaFat: null, superFat: null, metaLoc: 8, superLoc: 10, bonusMetaCents: 600, bonusSuperCents: 1000 },
-  { metaFat: null, superFat: null, metaLoc: 8, superLoc: 10, bonusMetaCents: 600, bonusSuperCents: 1000 },
-  { metaFat: null, superFat: null, metaLoc: 8, superLoc: 10, bonusMetaCents: 600, bonusSuperCents: 1000 },
-  { metaFat: null, superFat: null, metaLoc: 10, superLoc: 12, bonusMetaCents: 1000, bonusSuperCents: 1600 },
-  { metaFat: null, superFat: null, metaLoc: 22, superLoc: 27, bonusMetaCents: 1000, bonusSuperCents: 1600 },
-  { metaFat: null, superFat: null, metaLoc: 30, superLoc: 35, bonusMetaCents: 1000, bonusSuperCents: 1600 },
-];
+/** unitId -> configuração; uma unidade ausente do mapa está "não configurada" (zero bônus). */
+export type BonusProgramsByUnit = Record<string, BonusProgramConfig>;
+
+function metaDoDia(program: BonusProgramConfig | null, weekday: number): BonusProgramGoal | null {
+  return program?.goals.find((g) => g.weekday === weekday) ?? null;
+}
+
+/** Mês atual no formato "AAAA-MM", usado como padrão dos seletores de mês. */
+export function mesAtualValue(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Primeiro e último dia (AAAA-MM-DD) do mês no formato "AAAA-MM". */
+export function rangeDoMes(mesValue: string): { from: string; to: string } {
+  const [yStr, mStr] = mesValue.split("-");
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const from = `${yStr}-${mStr}-01`;
+  const ultimoDia = new Date(y, m, 0).getDate();
+  const to = `${yStr}-${mStr}-${String(ultimoDia).padStart(2, "0")}`;
+  return { from, to };
+}
 
 /** Dia da semana ISO (1=segunda … 7=domingo) a partir de "AAAA-MM-DD". */
 export function diaSemanaISO(businessDate: string): number {
@@ -48,9 +74,6 @@ export function diaSemanaISO(businessDate: string): number {
   return jsDow === 0 ? 7 : jsDow;
 }
 
-const ITENS_MES_BONUS_CENTS = 1000; // +R$10 ao bater 10 produtos vendidos no mês
-const ITENS_MES_META = 10;
-const TETO_MES_CENTS = 20_000; // R$200/mês por operador
 const ABERTURA_LIMITE_HORA = 10 * 60 + 15; // 10:15 em minutos desde 00:00
 const DIVERGENCIA_SEM_JUSTIFICATIVA_LIMIT_CENTS = 2000; // R$20
 
@@ -113,6 +136,8 @@ export interface ApuracaoInput {
   shifts: RawShift[];
   employees: RawEmployee[];
   units: RawUnit[];
+  /** Configuração do programa por unidade — unidade ausente aqui não gera bônus. */
+  programs: BonusProgramsByUnit;
 }
 
 export interface ApuracaoDia {
@@ -120,6 +145,8 @@ export interface ApuracaoDia {
   businessDate: string;
   employeeId: string;
   faturamentoCents: number;
+  /** Pedidos PAGA distintos das sessões com check-in do operador no dia (base do ticket médio). */
+  pedidos: number;
   sessoes: number;
   sessoes1hMais: number;
   itens: number;
@@ -140,9 +167,12 @@ export interface ApuracaoOperador {
   diasComBonus: number;
   diasTrabalhados: number;
   itensMes: number;
+  pedidosMes: number;
+  /** Faturamento ÷ pedidos do mês (0 se não houve pedido). */
+  ticketMedioMesCents: number;
   bonusProdutosMesCents: number;
   bonusMetaMesCents: number;
-  acumuladoMesCents: number; // já com o teto de R$200 aplicado
+  acumuladoMesCents: number; // já com o teto configurado da unidade aplicado
   atingiuTeto: boolean;
 }
 
@@ -216,10 +246,14 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     if (!items || items.length === 0) continue;
     const key = revKey(o.unit_id, o.business_date, o.closed_by_employee_id);
     const cur = prodByKey.get(key) ?? { itens: 0, prodCents: 0, bonusProdCents: 0 };
+    const program = input.programs[o.unit_id] ?? null;
     for (const item of items) {
       cur.itens += item.quantity;
       cur.prodCents += item.total_cents;
-      cur.bonusProdCents += (item.unit_price_cents < 4000 ? 200 : 400) * item.quantity;
+      if (program) {
+        const bonusPorItem = item.unit_price_cents < program.produtoPrecoCorteCents ? program.produtoBonusBaixoCents : program.produtoBonusAltoCents;
+        cur.bonusProdCents += bonusPorItem * item.quantity;
+      }
     }
     prodByKey.set(key, cur);
   }
@@ -273,10 +307,11 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
 
     const tipo = tipoDaUnidade(unit.kind);
     const dow = diaSemanaISO(businessDate);
-    const regra = (tipo === "PLAYGROUND" ? PLAYGROUND_REGRAS : CIRCUITO_REGRAS)[dow];
-    if (!regra) continue;
+    const program = input.programs[unitId] ?? null;
+    const goal = metaDoDia(program, dow);
 
     const fat = revByKey.get(key) ?? 0;
+    const pedidos = sessOrders.get(key)?.size ?? 0;
     const agg = sessAgg.get(key) ?? { sessoes: 0, sessoes1hMais: 0 };
     const prod = prodByKey.get(key) ?? { itens: 0, prodCents: 0, bonusProdCents: 0 };
     const sd = shiftsDia.get(shiftUnitDateKey(unitId, businessDate));
@@ -284,15 +319,19 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     const travaAberturaOk = sd?.aberturaMin !== null && sd?.aberturaMin !== undefined && sd.aberturaMin <= ABERTURA_LIMITE_HORA;
     const travaCaixaOk = Boolean(sd?.fechado) && !sd?.divergSemJustificativa;
 
+    // Sem meta configurada para este dia/unidade, o bônus do dia é zero —
+    // nunca um valor adivinhado (ver comentário na migration da config).
     let bonusMetaCents = 0;
-    if (tipo === "PLAYGROUND") {
-      if (fat >= (regra.superFat ?? Infinity)) bonusMetaCents = regra.bonusSuperCents;
-      else if (fat >= (regra.metaFat ?? Infinity)) bonusMetaCents = regra.bonusMetaCents;
-      if (agg.sessoes > 0 && agg.sessoes1hMais / agg.sessoes >= 0.45) bonusMetaCents += 200;
-    } else {
-      if (agg.sessoes >= (regra.superLoc ?? Infinity)) bonusMetaCents = regra.bonusSuperCents;
-      else if (agg.sessoes >= (regra.metaLoc ?? Infinity)) bonusMetaCents = regra.bonusMetaCents;
-      bonusMetaCents += Math.max(agg.sessoes - (regra.metaLoc ?? 0), 0) * 100;
+    if (goal) {
+      const atual = tipo === "PLAYGROUND" ? fat : agg.sessoes;
+      if (atual >= goal.superValor) bonusMetaCents = goal.superBonusCents;
+      else if (atual >= goal.metaValor) bonusMetaCents = goal.metaBonusCents;
+      if (tipo === "PLAYGROUND" && program) {
+        const fracao1h = agg.sessoes > 0 ? agg.sessoes1hMais / agg.sessoes : 0;
+        if (fracao1h * 100 >= program.sessao1hPercentualMin) bonusMetaCents += program.sessao1hBonusCents;
+      } else if (tipo === "CIRCUITO" && program) {
+        bonusMetaCents += Math.max(agg.sessoes - goal.metaValor, 0) * program.locacaoExtraBonusCents;
+      }
     }
 
     const bonusDiaCents = travaAberturaOk && travaCaixaOk ? bonusMetaCents + prod.bonusProdCents : 0;
@@ -302,6 +341,7 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
       businessDate,
       employeeId,
       faturamentoCents: fat,
+      pedidos,
       sessoes: agg.sessoes,
       sessoes1hMais: agg.sessoes1hMais,
       itens: prod.itens,
@@ -316,8 +356,13 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
   return result.sort((a, b) => a.businessDate.localeCompare(b.businessDate));
 }
 
-/** Agrega os dias em um total acumulado por operador/unidade no mês, com teto de R$200. */
-export function agregarPorOperador(dias: ApuracaoDia[], units: RawUnit[], employees: RawEmployee[]): ApuracaoOperador[] {
+/** Agrega os dias em um total acumulado por operador/unidade no mês, com o teto configurado por unidade. */
+export function agregarPorOperador(
+  dias: ApuracaoDia[],
+  units: RawUnit[],
+  employees: RawEmployee[],
+  programs: BonusProgramsByUnit,
+): ApuracaoOperador[] {
   const unitById = new Map(units.map((u) => [u.id, u]));
   const employeeById = new Map(employees.map((e) => [e.id, e]));
 
@@ -337,10 +382,15 @@ export function agregarPorOperador(dias: ApuracaoDia[], units: RawUnit[], employ
     const employee = employeeById.get(employeeId);
     if (!unit || !employee) continue;
 
+    const program = programs[unitId] ?? null;
     const itensMes = list.reduce((sum, d) => sum + d.itens, 0);
-    const bonusItensMesCents = itensMes >= ITENS_MES_META ? ITENS_MES_BONUS_CENTS : 0;
+    const bonusItensMesCents = program && program.itensMesMeta > 0 && itensMes >= program.itensMesMeta ? program.itensMesBonusCents : 0;
     const somaBonusDia = list.reduce((sum, d) => sum + d.bonusDiaCents, 0);
-    const acumuladoMesCents = Math.min(somaBonusDia + bonusItensMesCents, TETO_MES_CENTS);
+    const totalAntesDoTeto = somaBonusDia + bonusItensMesCents;
+    const tetoMesCents = program?.tetoMesCents ?? 0;
+    const acumuladoMesCents = tetoMesCents > 0 ? Math.min(totalAntesDoTeto, tetoMesCents) : totalAntesDoTeto;
+    const faturamentoMesCents = list.reduce((sum, d) => sum + d.faturamentoCents, 0);
+    const pedidosMes = list.reduce((sum, d) => sum + d.pedidos, 0);
 
     result.push({
       unitId,
@@ -351,10 +401,12 @@ export function agregarPorOperador(dias: ApuracaoDia[], units: RawUnit[], employ
       diasComBonus: list.filter((d) => d.bonusDiaCents > 0).length,
       diasTrabalhados: list.length,
       itensMes,
+      pedidosMes,
+      ticketMedioMesCents: pedidosMes > 0 ? Math.round(faturamentoMesCents / pedidosMes) : 0,
       bonusProdutosMesCents: list.reduce((sum, d) => sum + d.bonusProdutosCents, 0),
       bonusMetaMesCents: list.reduce((sum, d) => sum + d.bonusMetaCents, 0),
       acumuladoMesCents,
-      atingiuTeto: somaBonusDia + bonusItensMesCents >= TETO_MES_CENTS,
+      atingiuTeto: tetoMesCents > 0 && totalAntesDoTeto >= tetoMesCents,
     });
   }
   return result.sort((a, b) => b.acumuladoMesCents - a.acumuladoMesCents);

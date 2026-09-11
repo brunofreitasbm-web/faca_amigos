@@ -38,6 +38,7 @@ export const CAPABILITIES = [
   "notificacoes.owner_push",
   "metas.ticket.write",
   "clientes.write",
+  "bonificacao.self",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -74,6 +75,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "notificacoes.owner_push": "Ativar notificações de relatório do Owner neste dispositivo",
   "metas.ticket.write": "Configurar meta de Ticket Médio (mínimo e alvo) de cada unidade",
   "clientes.write": "Editar dados de clientes (responsável e crianças vinculadas)",
+  "bonificacao.self": "Ver a própria bonificação (menu Minha Bonificação)",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */

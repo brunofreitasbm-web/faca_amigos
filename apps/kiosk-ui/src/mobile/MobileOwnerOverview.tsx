@@ -3,7 +3,7 @@ import { Badge } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
 import type { Unit } from "../api/client.js";
 import { unitBrandFor } from "../branding/unitBrand.js";
-import { bonificacaoHoje, dentroDoPiloto, type UnidadeTipo } from "../bonificacao.js";
+import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO, type UnidadeTipo } from "../bonificacao.js";
 import { money } from "../format.js";
 
 interface UnitOverview {
@@ -37,18 +37,21 @@ export function MobileOwnerOverview({ units, onBack }: { units: Unit[]; onBack: 
         units.map(async (unit): Promise<UnitOverview> => {
           const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
           const tipo: UnidadeTipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
-          const [goalCents, revenue, ticketMedio] = await Promise.all([
+          const [goalCents, revenue, ticketMedio, programs] = await Promise.all([
             Api.todayGoal(unit.id, unit.business_day_cutoff_hour).catch(() => 0),
             Api.todayRevenue(unit.id, unit.business_day_cutoff_hour).catch(() => ({ totalCents: 0 })),
             Api.todayTicketMedio(unit.id, unit.business_day_cutoff_hour).catch(() => ({ ordersCount: 0 })),
+            Api.bonusProgramsByUnit([unit.id]).catch(() => ({}) as Record<string, never>),
           ]);
+          const program = programs[unit.id] ?? null;
+          const goal = program?.goals.find((g) => g.weekday === diaSemanaISO(businessDate)) ?? null;
           const atual = tipo === "CIRCUITO" ? ticketMedio.ordersCount : revenue.totalCents;
           return {
             unit,
             goalCents: goalCents || 0,
             revenueCents: revenue.totalCents,
             ordersCount: ticketMedio.ordersCount,
-            bonificacao: dentroDoPiloto(businessDate) ? bonificacaoHoje(tipo, businessDate, atual) : null,
+            bonificacao: dentroDoPiloto(businessDate) ? bonificacaoHoje(tipo, businessDate, atual, goal, program?.locacaoExtraBonusCents ?? 0) : null,
           };
         }),
       );

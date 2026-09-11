@@ -8,6 +8,7 @@ import { money } from "../../../format.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
 import { IfCan } from "../../../auth/RequireCapability.js";
 import { useAuth } from "../../../auth/AuthContext.js";
+import { BonusProgramSection } from "./BonusProgramSection.js";
 
 /**
  * Regras de bonificação + meta de Ticket Médio (mínimo/alvo) por unidade.
@@ -111,6 +112,7 @@ export function MetasTab() {
 
   return (
     <div>
+      <BonusProgramSection units={units} />
       <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
         <h2 title="Faixas que alimentam o termômetro de Ticket Médio no Painel de cada unidade">
           Meta de Ticket Médio

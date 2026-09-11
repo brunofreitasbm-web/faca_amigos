@@ -1,26 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, HelpText } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
-import type { ApuracaoOperador } from "../../../lib/apuracaoBonificacao.js";
+import { mesAtualValue, rangeDoMes, type ApuracaoOperador } from "../../../lib/apuracaoBonificacao.js";
 import { useAppState } from "../../../state/AppState.js";
 import { money } from "../../../format.js";
 
 const TETO_MES_CENTS = 20_000;
-
-function mesAtualValue(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function rangeDoMes(mesValue: string): { from: string; to: string } {
-  const [yStr, mStr] = mesValue.split("-");
-  const y = Number(yStr);
-  const m = Number(mStr);
-  const from = `${yStr}-${mStr}-01`;
-  const ultimoDia = new Date(y, m, 0).getDate();
-  const to = `${yStr}-${mStr}-${String(ultimoDia).padStart(2, "0")}`;
-  return { from, to };
-}
 
 /**
  * Saldo de bonificação acumulado por operador no mês — apuração feita no
