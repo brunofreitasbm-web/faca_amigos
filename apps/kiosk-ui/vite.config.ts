@@ -69,8 +69,15 @@ export default defineConfig({
         importScripts: ["push-sw.js"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/ws/],
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        // json/bin: manifests e pesos dos modelos do face-api.js em
+        // public/models, self-hosted de propósito (ver faceRecognition.ts)
+        // para o reconhecimento facial funcionar offline/com internet
+        // instável no local. Sem isso o SW nunca precacheava os modelos e
+        // o fetch falhava direto ("Load failed") quando a rede caía.
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2,json,bin}"],
+        // face_recognition_model.bin tem ~6.44MB — o limite de 4MB padrão
+        // excluía esse arquivo do precache mesmo com o glob correto.
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         // Google Fonts em runtime cache (offline após o primeiro load).
         // Sem handler para *.supabase.co de propósito: auth/realtime/RPC
         // passam direto, nunca cacheados.
