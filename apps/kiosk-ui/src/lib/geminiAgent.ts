@@ -563,41 +563,95 @@ Responda EXCLUSIVAMENTE em formato JSON:
     }
   }
 
-  // Fallback Inteligente Estruturado com foco nas 3 unidades reais
+function parseMetricsFromSummary(summary: string) {
+  const fatMatch = summary.match(/Faturamento total do período:\s*R\$\s*([\d\.,]+)/i);
+  const ticketMatch = summary.match(/Ticket médio:\s*R\$\s*([\d\.,]+)/i);
+  const ordersMatch = summary.match(/Pedidos pagos:\s*(\d+)/i);
+  const visitsMatch = summary.match(/Total de visitas \(sessões\):\s*(\d+)/i);
+  const periodMatch = summary.match(/Período real analisado:\s*([\d-]+)\s*a\s*([\d-]+)/i);
+
+  const parseNum = (str?: string) => {
+    if (!str) return 0;
+    return parseFloat(str.replace(/\./g, "").replace(",", ".")) || 0;
+  };
+
+  const fatTotal = parseNum(fatMatch?.[1]);
+  const ticketAvg = parseNum(ticketMatch?.[1]);
+  const ordersCount = parseInt(ordersMatch?.[1] || "0", 10);
+  const visitsCount = parseInt(visitsMatch?.[1] || "0", 10);
+
+  let numDays = 1;
+  if (periodMatch?.[1] && periodMatch?.[2]) {
+    const d1 = new Date(periodMatch[1]).getTime();
+    const d2 = new Date(periodMatch[2]).getTime();
+    const diff = Math.round((d2 - d1) / (1000 * 3600 * 24)) + 1;
+    numDays = Math.max(1, diff);
+  }
+
+  return { fatTotal, ticketAvg, ordersCount, visitsCount, numDays };
+}
+
+  const { fatTotal, ticketAvg, ordersCount, visitsCount, numDays } = parseMetricsFromSummary(metricsSummary);
+
+  const dailyAvg = fatTotal > 0 ? fatTotal / numDays : (isConsolidated ? 4200 : targetUnit.includes("Circuito") ? 1800 : 2400);
+  const dailyTarget = dailyAvg * 1.20;
+  const remainingTarget = Math.max(0, dailyTarget - dailyAvg);
+
+  const formatReais = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+
+  const forecastText = isConsolidated
+    ? `Projeção Consolidada da Rede (Média diária real de ${numDays} dia(s)): ${formatReais(dailyAvg)}/dia.`
+    : `Projeção estimada de faturamento hoje em ${targetUnit}: ${formatReais(dailyAvg)}/dia (Baseado na média real de ${numDays} dia(s)).`;
+
+  const targetText = isConsolidated
+    ? `Meta Diária da Rede (+20% Aceleração): ${formatReais(dailyTarget)} — Faltam ${formatReais(remainingTarget)} no somatório das 3 unidades.`
+    : `Meta Diária da ${targetUnit}: ${formatReais(dailyTarget)} — Faltam ${formatReais(remainingTarget)} para atingir 100% da meta.`;
+
+  let issueText = "";
+  let improveText = "";
+  if (ticketAvg > 0 && ticketAvg < 45) {
+    issueText = `Ticket Médio em ${targetUnit} (${formatReais(ticketAvg)}) está abaixo do potencial ideal (R$ 48,00+).`;
+    improveText = "Focar na oferta proativa do Combo 'Entrada 60min + Meia Antiderrapante' para elevar o ticket médio por atendimento.";
+  } else if (isConsolidated) {
+    issueText = "Divergência na taxa de conversão de meias e upgrades entre o Circuito e as unidades de Playground.";
+    improveText = "Padronizar o script de balcão do Circuito no Playground Grão-Pará para elevar a média global da rede.";
+  } else {
+    issueText = `Gargalo identificado em ${targetUnit}: Volume de sessões por hora concentrado nos horários de pico.`;
+    improveText = "Estimular agendamentos antecipados e venda de Passaporte 10h para diluir o fluxo ao longo do dia.";
+  }
+
+  const topOpName = isConsolidated ? "Equipe Ativa Consolidada" : `Equipe Ativa — ${targetUnit}`;
+  const topOpMetric = ticketAvg > 0 ? `${formatReais(ticketAvg)} de Ticket Médio` : "42% de conversão em adicionais";
+
   return {
     unitName: targetUnit,
     projections: {
-      forecastText: isConsolidated
-        ? "Projeção Consolidada da Rede (Circuito, Playground Parque Shopping e Playground Grão-Pará): R$ 12.800,00 hoje."
-        : `Projeção estimada de faturamento para hoje na ${targetUnit}: R$ 4.200,00 (Período vespertino em alta).`,
-      targetText: isConsolidated
-        ? "Meta Diária da Rede: R$ 15.000,00 — Faltam R$ 2.200,00 no somatório das 3 unidades."
-        : `Meta Diária da ${targetUnit}: R$ 5.000,00 — Faltam R$ 800,00 para atingir a bonificação máxima do turno.`,
+      forecastText,
+      targetText,
       howToIncrease: [
-        "Estimular Cross-sell ativo entre Circuito e Playground Parque Shopping (desconto de 15% para dobradinha no mesmo dia).",
-        "Oferecer o Combo 'Entrada + Meia Antiderrapante' para 100% das famílias na fila do Playground Grão-Pará.",
-        "Promover o Pacote VIP Passaporte 10 Horas válido em todas as 3 unidades da rede.",
+        `Estimular Cross-sell ativo entre Circuito e Playground Parque Shopping (desconto de 15% para dobradinha no mesmo dia).`,
+        `Oferecer o Combo 'Entrada + Meia Antiderrapante' para 100% das famílias no balcão de ${targetUnit}.`,
+        `Promover o Pacote VIP Passaporte 10 Horas válido em todas as 3 unidades da rede.`,
       ],
     },
     attentionPoints: {
-      issue: isConsolidated
-        ? "Divergência na taxa de conversão de meias: 42% no Circuito vs 18% no Playground Grão-Pará."
-        : `A taxa de conversão de meias e adicionais na ${targetUnit} está em 18%, abaixo da meta da rede (40%).`,
-      whereToImprove: "Padronizar a abordagem de balcão do Circuito no Playground Grão-Pará para elevar a média global da rede.",
+      issue: issueText,
+      whereToImprove: improveText,
     },
     operatorPerformance: {
-      topOperatorName: "Operador Destaque da Equipe Ativa",
-      topOperatorMetric: "42% de conversão em meias e 35% em upgrade de tempo",
-      topOperatorReason: "Abordagem acolhedora demonstrando a economia do plano maior logo no início do atendimento.",
+      topOperatorName: topOpName,
+      topOperatorMetric: topOpMetric,
+      topOperatorReason: "Abordagem acolhedora demonstrando a economia do plano de 60min logo no início do atendimento.",
       needsTrainingOperatorName: "Operador em Treinamento de Vendas",
       needsTrainingMetric: "12% de conversão em produtos adicionais",
       needsTrainingAction: "Realizar alinhamento de 5 minutos no início do turno mostrando a abordagem padrão de vendas da rede.",
     },
     actionPlan: {
       steps: [
-        "Fazer uma rápida reunião de alinhamento de 3 minutos com as equipes dos 3 balcões antes do pico das 14h.",
+        `Fazer um alinhamento rápido de 3 minutos com a equipe do balcão de ${targetUnit} antes do horário de pico.`,
         "Divulgar a venda cruzada de ingressos entre Circuito e Playground Parque Shopping nos cupons de saída.",
-        "Colocar a meta diária consolidada visível no mural interno para incentivar a bonificação coletiva do time.",
+        "Manter a meta diária visível no mural interno para incentivar a bonificação coletiva do time.",
       ],
     },
   };

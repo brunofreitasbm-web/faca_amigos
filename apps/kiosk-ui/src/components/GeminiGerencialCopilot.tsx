@@ -201,6 +201,32 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
     };
   }, [activeMetricsContext, selectedUnit]);
 
+  const handleSelectUnit = (unitId: string) => {
+    if (unitId === selectedUnit) return;
+    setSelectedUnit(unitId);
+    setLoading(true);
+  };
+
+  const handleSelectPeriod = (p: PeriodFilter) => {
+    if (p === periodFilter) return;
+    setPeriodFilter(p);
+    setLoading(true);
+  };
+
+  const handleToggleActive = () => {
+    setOnlyActiveEmployees((prev) => !prev);
+    setLoading(true);
+  };
+
+  const selectedUnitBadge = OFFICIAL_UNITS.find((u) => u.id === selectedUnit)?.name ?? selectedUnit;
+  const periodLabelMap: Record<PeriodFilter, string> = {
+    SINCE_AUG_29: "Pós-29/08",
+    LAST_7_DAYS: "Últimos 7 Dias",
+    LAST_30_DAYS: "Últimos 30 Dias",
+    CURRENT_MONTH: "Mês Atual",
+  };
+  const activePeriodLabel = periodLabelMap[periodFilter] || "Pós-29/08";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* SEÇÃO DE FILTROS AVANÇADOS PARA ANÁLISE DA ZOEIA */}
@@ -233,7 +259,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
                 <button
                   key={u.id}
                   type="button"
-                  onClick={() => setSelectedUnit(u.id)}
+                  onClick={() => handleSelectUnit(u.id)}
                   aria-pressed={isSelected}
                   style={{
                     padding: "6px 14px",
@@ -265,7 +291,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               <button
                 type="button"
-                onClick={() => setPeriodFilter("SINCE_AUG_29")}
+                onClick={() => handleSelectPeriod("SINCE_AUG_29")}
                 style={{
                   padding: "5px 12px",
                   borderRadius: "8px",
@@ -281,7 +307,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
               </button>
               <button
                 type="button"
-                onClick={() => setPeriodFilter("LAST_7_DAYS")}
+                onClick={() => handleSelectPeriod("LAST_7_DAYS")}
                 style={{
                   padding: "5px 12px",
                   borderRadius: "8px",
@@ -297,7 +323,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
               </button>
               <button
                 type="button"
-                onClick={() => setPeriodFilter("LAST_30_DAYS")}
+                onClick={() => handleSelectPeriod("LAST_30_DAYS")}
                 style={{
                   padding: "5px 12px",
                   borderRadius: "8px",
@@ -321,7 +347,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
             </strong>
             <button
               type="button"
-              onClick={() => setOnlyActiveEmployees(!onlyActiveEmployees)}
+              onClick={handleToggleActive}
               style={{
                 padding: "6px 14px",
                 borderRadius: "8px",
@@ -384,7 +410,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <Tag style={{ background: "rgba(168, 85, 247, 0.2)", color: "#e9d5ff", border: "1px solid rgba(168, 85, 247, 0.4)" }}>
-              {metricsLoading || loading ? "🔄 Atualizando..." : "🟢 Resposta Confiável"}
+              {metricsLoading || loading ? "🔄 Recalculando..." : "🟢 Resposta Confiável"}
             </Tag>
           </div>
         </div>
@@ -394,15 +420,25 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
       {loading ? (
         <Card style={{ padding: "32px", textAlign: "center", background: "var(--surface-card)" }}>
           <div style={{ fontSize: "28px", marginBottom: "12px" }}>✦</div>
-          <strong style={{ fontSize: "16px", display: "block" }}>ZoeIA está consolidando as métricas e gerando estratégias comerciais...</strong>
+          <strong style={{ fontSize: "16px", display: "block" }}>ZoeIA está recalculando as métricas e estratégias...</strong>
           <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: "6px 0 0" }}>
-            Filtrando apenas a equipe com contrato ativo e faturamento pós-29/08/2026.
+            Filtrando dados para {selectedUnitBadge} ({activePeriodLabel}).
           </p>
         </Card>
       ) : report ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+        <div
+          key={`${selectedUnit}-${periodFilter}-${onlyActiveEmployees}`}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: "16px",
+          }}
+        >
           {/* PROJEÇÕES & COMO AUMENTAR */}
           <Card style={{ padding: "20px", borderLeft: "4px solid #3b82f6" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#3b82f6", marginBottom: "8px", letterSpacing: "0.5px" }}>
+              📍 {selectedUnitBadge} • {activePeriodLabel}
+            </div>
             <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#1d4ed8", display: "flex", alignItems: "center", gap: "8px" }}>
               📈 Projeções & Alavancagem de Vendas
             </h3>
@@ -420,6 +456,9 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
 
           {/* PONTOS DE ATENÇÃO */}
           <Card style={{ padding: "20px", borderLeft: "4px solid #f59e0b" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#d97706", marginBottom: "8px", letterSpacing: "0.5px" }}>
+              📍 {selectedUnitBadge} • {activePeriodLabel}
+            </div>
             <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#b45309", display: "flex", alignItems: "center", gap: "8px" }}>
               ⚠️ Pontos de Atenção na Operação
             </h3>
@@ -433,6 +472,9 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
 
           {/* EFICIÊNCIA DA EQUIPE ATIVA */}
           <Card style={{ padding: "20px", borderLeft: "4px solid #10b981" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#10b981", marginBottom: "8px", letterSpacing: "0.5px" }}>
+              📍 {selectedUnitBadge} • {activePeriodLabel}
+            </div>
             <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#047857", display: "flex", alignItems: "center", gap: "8px" }}>
               👥 Performance da Equipe Ativa
             </h3>
