@@ -12,19 +12,30 @@ const MATCH_THRESHOLD = 0.60;
 
 let modelsLoadedPromise: Promise<void> | null = null;
 
-/** Carrega os modelos uma única vez por sessão da SPA — chamadas repetidas reaproveitam a mesma promise. */
-export function loadFaceModels(): Promise<void> {
+/** Carrega os modelos uma única vez por sessão da SPA — com até 3 tentativas automáticas em caso de oscilação de rede. */
+export function loadFaceModels(retries = 3): Promise<void> {
   if (!modelsLoadedPromise) {
-    modelsLoadedPromise = Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-    ])
-      .then(() => undefined)
-      .catch((err) => {
-        modelsLoadedPromise = null;
+    const attemptLoad = async (remaining: number): Promise<void> => {
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        ]);
+      } catch (err) {
+        if (remaining > 1) {
+          console.warn(`[FaceRecognition] Tentativa de carregar modelos neurais falhou, tentando novamente (${remaining - 1} tentativas restantes)...`, err);
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          return attemptLoad(remaining - 1);
+        }
         throw err;
-      });
+      }
+    };
+
+    modelsLoadedPromise = attemptLoad(retries).catch((err) => {
+      modelsLoadedPromise = null;
+      throw err;
+    });
   }
   return modelsLoadedPromise;
 }

@@ -69,20 +69,20 @@ export function useFaceCapture() {
       let message = "Não foi possível acessar a câmera.";
       const errStr = String((err as { message?: string })?.message || err || "");
 
-      if (err instanceof DOMException || errStr.includes("NotAllowedError") || errStr.includes("NotFoundError")) {
+      if (err instanceof DOMException || errStr.includes("NotAllowedError") || errStr.includes("NotFoundError") || errStr.includes("DevicesNotFoundError")) {
         if (errStr.includes("NotAllowedError") || errStr.includes("SecurityError")) {
           message = isElectron
             ? "Acesso à câmera bloqueado. Verifique as permissões de câmera no sistema Windows."
-            : "Acesso à câmera bloqueado. Libere a permissão no navegador ou sistema.";
+            : "Acesso à câmera bloqueado. Libere a permissão no navegador ou continue pelo PIN.";
         } else if (errStr.includes("NotFoundError") || errStr.includes("DevicesNotFoundError")) {
           message = isElectron
             ? "Nenhuma câmera foi encontrada neste dispositivo. Verifique se a câmera USB está conectada ao computador."
-            : "Nenhuma câmera foi encontrada neste dispositivo.";
+            : "Nenhuma câmera foi encontrada neste dispositivo. Verifique se a permissão foi concedida ou continue pelo PIN.";
         } else if (errStr.includes("NotReadableError") || errStr.includes("TrackStartError")) {
           message = "A câmera já está sendo usada por outro aplicativo ou processo.";
         }
-      } else if (errStr.includes("Load failed") || errStr.includes("Failed to fetch") || errStr.includes("404")) {
-        message = "Não foi possível carregar os recursos de reconhecimento facial. Verifique a conexão de rede ou o servidor de modelos do terminal.";
+      } else if (errStr.includes("Load failed") || errStr.includes("Failed to fetch") || errStr.includes("404") || errStr.includes("TypeError")) {
+        message = "Não foi possível carregar os recursos de reconhecimento facial. Verifique a conexão de rede ou continue pelo PIN.";
       } else if (err instanceof Error && err.message) {
         message = err.message;
       }
@@ -94,6 +94,21 @@ export function useFaceCapture() {
       });
     }
   }, [attachStreamToVideo]);
+
+  // Escuta conexão/desconexão de dispositivos (ex: webcam USB conectada durante o uso)
+  useEffect(() => {
+    if (typeof window === "undefined" || !navigator.mediaDevices?.addEventListener) return;
+    const handleDeviceChange = () => {
+      if (state.error && (state.error.includes("câmera") || state.error.includes("dispositivo"))) {
+        console.log("[useFaceCapture] Alteração de dispositivo detectada. Tentando reconectar a câmera...");
+        start();
+      }
+    };
+    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+    return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+    };
+  }, [state.error, start]);
 
   // Garante a vinculação do stream ao elemento <video> assim que ele for renderizado/montado no DOM
   useEffect(() => {

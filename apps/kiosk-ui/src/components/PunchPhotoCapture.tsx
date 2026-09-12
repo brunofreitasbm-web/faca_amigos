@@ -192,10 +192,11 @@ export function PunchPhotoCapture({
         )}
       </div>
 
-      {faceCapture.starting && <HelpText>Ligando a câmera…</HelpText>}
-      {faceCapture.error && <p style={{ color: "var(--color-error-text)", margin: 0 }}>{faceCapture.error}</p>}
-      {faceCapture.ready && !scanState && (
-        <HelpText icon="📷">Centralize seu rosto e toque na marcação abaixo.</HelpText>
+      {faceCapture.starting && (
+        <HelpText icon="⏳">Carregando modelos de IA e ligando a câmera…</HelpText>
+      )}
+      {faceCapture.ready && scanState === "idle" && (
+        <HelpText icon="📷">Centralize seu rosto e toque no momento da jornada para registrar.</HelpText>
       )}
       {geofenceRadiusM !== null && (
         <HelpText icon="📍">
