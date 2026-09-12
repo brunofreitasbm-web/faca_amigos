@@ -521,22 +521,66 @@ export function PainelScreen() {
           um único chip por indicador (resumo + %, sem barra), lado a lado —
           o foco da tela continua sendo os cards das crianças logo abaixo. */}
       {(ticketTargetCents > 0 || bonusRules.length > 0 || (unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)))) && (
-        <div style={{ flexShrink: 0, display: "flex", flexWrap: "wrap", gap: "8px" }}>
+        <div style={{ flexShrink: 0, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
           {ticketTargetCents > 0 && (() => {
-            const zoneColor =
-              ticketMedioCents < ticketMinCents
-                ? "var(--color-error)"
-                : ticketMedioCents < ticketTargetCents
-                  ? "var(--color-amber)"
-                  : "var(--color-success)";
-            const percent = Math.min(100, Math.round((ticketMedioCents / ticketTargetCents) * 100));
+            const percent = Math.min(120, Math.round((ticketMedioCents / ticketTargetCents) * 100));
+            const progressTrackWidth = Math.min(100, percent);
+
+            let zoneColor = "#3b82f6";
+            let zoneGradient = "linear-gradient(90deg, #3b82f6, #60a5fa)";
+            let badgeClass = "";
+
+            if (percent < 50) {
+              zoneColor = "#ef4444";
+              zoneGradient = "linear-gradient(90deg, #ef4444, #f59e0b)";
+            } else if (percent < 75) {
+              zoneColor = "#d97706";
+              zoneGradient = "linear-gradient(90deg, #f59e0b, #eab308)";
+            } else if (percent < 100) {
+              zoneColor = "#16a34a";
+              zoneGradient = "linear-gradient(90deg, #eab308, #10b981)";
+            } else if (percent < 120) {
+              zoneColor = "#059669";
+              zoneGradient = "linear-gradient(90deg, #10b981, #047857)";
+              badgeClass = "meta-batida";
+            } else {
+              zoneColor = "#b45309";
+              zoneGradient = "linear-gradient(90deg, #f59e0b, #eab308, #3b82f6)";
+              badgeClass = "super-meta";
+            }
+
+            const deltaCents = ticketTargetCents - ticketMedioCents;
+            let incentiveText = "";
+            if (deltaCents > 0) {
+              incentiveText = `Falta R$ ${(deltaCents / 100).toFixed(2).replace(".", ",")} p/ meta`;
+            } else {
+              incentiveText = `🔥 Meta Batida! (+${percent - 100}%)`;
+            }
+
             return (
               <span
-                title={`Ticket médio de hoje: ${money(ticketMedioCents)} (mín ${money(ticketMinCents)} / alvo ${money(ticketTargetCents)}) — configurado pelo Owner em Gerencial → Metas`}
-                className="metric-chip"
+                title={`Ticket médio de hoje: ${money(ticketMedioCents)} (mín ${money(ticketMinCents)} / alvo ${money(ticketTargetCents)}) — ${incentiveText}`}
+                className="metric-progress-chip"
               >
-                🌡️ Ticket médio <strong>{money(ticketMedioCents)}</strong>
-                <span className="metric-chip-pill" style={{ backgroundColor: zoneColor }}>{percent}%</span>
+                <div
+                  className="metric-progress-track"
+                  style={{
+                    width: `${progressTrackWidth}%`,
+                    background: zoneGradient,
+                  }}
+                />
+
+                <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
+                  🌡️ Ticket médio <strong>{money(ticketMedioCents)}</strong>
+                </span>
+
+                <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: zoneColor }}>
+                  {percent}%
+                </span>
+
+                <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
+                  {incentiveText}
+                </span>
               </span>
             );
           })()}
@@ -549,18 +593,58 @@ export function PainelScreen() {
             const goal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
             const b = bonificacaoHoje(tipo, businessDate, atual, goal, bonusProgram?.locacaoExtraBonusCents ?? 0);
             if (!b) return null;
-            const corNivel = b.nivel === "supermeta" ? "var(--color-amber)" : b.nivel === "meta" ? "var(--color-success)" : "var(--color-primary)";
-            const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta" : b.nivel === "meta" ? "🥈 Meta batida" : "Em andamento";
+
+            const percentBonus = b.meta > 0 ? Math.min(120, Math.round((b.atual / b.meta) * 100)) : 0;
+            const progressTrackWidth = Math.min(100, percentBonus);
+
+            const corNivel = b.nivel === "supermeta" ? "#d97706" : b.nivel === "meta" ? "#059669" : "#2563eb";
+            const bonusGradient = b.nivel === "supermeta"
+              ? "linear-gradient(90deg, #f59e0b, #eab308, #3b82f6)"
+              : b.nivel === "meta"
+                ? "linear-gradient(90deg, #10b981, #059669)"
+                : "linear-gradient(90deg, #3b82f6, #10b981)";
+            const badgeClass = b.nivel === "supermeta" ? "super-meta" : b.nivel === "meta" ? "meta-batida" : "";
+
+            const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta" : b.nivel === "meta" ? "🥈 Meta batida" : `${percentBonus}%`;
             const atualLabel = tipo === "CIRCUITO" ? `${b.atual} locações` : money(b.atual);
             const metaLabel = tipo === "CIRCUITO" ? `${b.meta}` : money(b.meta);
             const superLabel = tipo === "CIRCUITO" ? `${b.super}` : money(b.super);
+
+            let bonusIncentiveText = "";
+            if (b.nivel === "abaixo") {
+              const delta = b.meta - b.atual;
+              bonusIncentiveText = tipo === "CIRCUITO" ? `Falta ${delta} loc. p/ bônus!` : `Falta ${money(delta)} p/ bônus!`;
+            } else if (b.nivel === "meta") {
+              const deltaSuper = b.super - b.atual;
+              bonusIncentiveText = tipo === "CIRCUITO" ? `Falta ${deltaSuper} loc. p/ SUPERMETA!` : `Falta ${money(deltaSuper)} p/ SUPERMETA!`;
+            } else {
+              bonusIncentiveText = `🏆 SUPERMETA ALCANÇADA!`;
+            }
+
             return (
               <span
-                title={`Piloto de Bonificação (08/09 a 05/10): ${atualLabel} (meta ${metaLabel} / super ${superLabel}) — bônus estimado ${money(b.bonusCents)}. Só conta se o caixa abrir até 10h15 e fechar sem diferença.`}
-                className="metric-chip"
+                title={`Piloto de Bonificação (08/09 a 05/10): ${atualLabel} (meta ${metaLabel} / super ${superLabel}) — bônus estimado ${money(b.bonusCents)}`}
+                className="metric-progress-chip"
               >
-                🎮 Bonificação <strong>{atualLabel}</strong>
-                <span className="metric-chip-pill" style={{ backgroundColor: corNivel }}>{badgeLabel}</span>
+                <div
+                  className="metric-progress-track"
+                  style={{
+                    width: `${progressTrackWidth}%`,
+                    background: bonusGradient,
+                  }}
+                />
+
+                <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
+                  🎮 Bonificação <strong>{atualLabel}</strong>
+                </span>
+
+                <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: corNivel }}>
+                  {badgeLabel}
+                </span>
+
+                <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
+                  {bonusIncentiveText}
+                </span>
               </span>
             );
           })()}
@@ -568,9 +652,9 @@ export function PainelScreen() {
           {bonusRules.length > 0 && (
             <span
               title={bonusRules.map((rule) => `🎁 ${rule.description} (${money(rule.rewardValueCents)})`).join(" · ")}
-              className="metric-chip"
+              className="metric-progress-chip"
             >
-              🏆 {bonusRules.length} regra{bonusRules.length > 1 ? "s" : ""} de bônus ativa{bonusRules.length > 1 ? "s" : ""}
+              🏆 <strong>{bonusRules.length}</strong> regra{bonusRules.length > 1 ? "s" : ""} de bônus ativa{bonusRules.length > 1 ? "s" : ""}
             </span>
           )}
         </div>

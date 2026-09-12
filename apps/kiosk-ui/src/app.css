@@ -314,3 +314,82 @@ body {
 .pin-pad-shake {
   animation: pin-shake 0.4s ease-in-out;
 }
+
+/* ---------- Barra de Progresso Gamificada & Motivacional (Espaço Reservado do Cabeçalho) ---------- */
+.metric-progress-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  padding: 4px 10px;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.metric-progress-chip:hover {
+  border-color: var(--border-medium, #cbd5e1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.metric-progress-track {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.4s ease;
+  opacity: 0.16;
+}
+
+.metric-progress-chip-pill {
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  z-index: 1;
+}
+
+.metric-progress-chip-pill.meta-batida {
+  animation: pulseMeta 2s infinite ease-in-out;
+}
+
+.metric-progress-chip-pill.super-meta {
+  animation: shimmerGold 1.5s infinite linear;
+}
+
+@keyframes pulseMeta {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  70% { transform: scale(1.03); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes shimmerGold {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.25); }
+  100% { filter: brightness(1); }
+}
+
+.metric-progress-incentive {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-primary);
+  margin-left: 2px;
+}
+
