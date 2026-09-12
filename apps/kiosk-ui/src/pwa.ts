@@ -42,12 +42,53 @@ export function applyPwaUpdate(): void {
   if (updateSW) {
     void updateSW(true);
   } else {
-    window.location.reload();
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const reg of registrations) {
+          void reg.unregister();
+        }
+        window.location.reload();
+      }).catch(() => {
+        window.location.reload();
+      });
+    } else {
+      window.location.reload();
+    }
   }
 }
 
 export function setupPwa(): void {
   if (isElectronLocal()) return;
+
+  // Checagem proativa do arquivo version.json no servidor Vercel
+  const checkVersionJson = async () => {
+    try {
+      const res = await fetch(`/version.json?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { version?: string; buildSha?: string };
+        const localVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "";
+        const localSha = typeof __BUILD_SHA__ !== "undefined" ? __BUILD_SHA__ : "";
+        if (data.version && (data.version !== localVersion || (data.buildSha && data.buildSha !== localSha))) {
+          console.log(`[PWA AutoUpdate] Versão nova detectada (${data.version} / ${data.buildSha}). Forçando atualização...`);
+          applyPwaUpdate();
+        }
+      }
+    } catch {
+      // Ignorar erros de conectividade transitórios
+    }
+  };
+
+  // Checa 5s após abrir, depois a cada 1 minuto e em eventos de foco/online
+  setTimeout(checkVersionJson, 5000);
+  setInterval(checkVersionJson, 60_000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void checkVersionJson();
+  });
+  window.addEventListener("online", () => void checkVersionJson());
+
   if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
 
   // Import dinâmico: o módulo virtual só é resolvido quando necessário.
@@ -57,12 +98,16 @@ export function setupPwa(): void {
       onNeedRefresh() {
         updateAvailable = true;
         updateListeners.forEach((fn) => fn(() => void applyPwaUpdate()));
+        // Força o auto-reload automático após 1.5s do aviso visual
+        setTimeout(() => {
+          applyPwaUpdate();
+        }, 1500);
       },
       onRegisteredSW(_swUrl, registration) {
         if (!registration) return;
 
-        // Checar atualizações periodicamente (a cada 15 minutos)
-        const INTERVAL_MS = 15 * 60 * 1000;
+        // Checar atualizações periodicamente (a cada 5 minutos)
+        const INTERVAL_MS = 5 * 60 * 1000;
         setInterval(() => {
           if (navigator.onLine) {
             void registration.update();
@@ -82,4 +127,5 @@ export function setupPwa(): void {
     });
   });
 }
+
 

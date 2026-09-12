@@ -21,6 +21,32 @@ function shortSha(): string {
   }
 }
 
+import { writeFileSync, mkdirSync } from "node:fs";
+import { resolve } from "node:path";
+
+function generateVersionJsonPlugin(version: string, sha: string) {
+  const content = JSON.stringify({ version, buildSha: sha, timestamp: Date.now() }, null, 2);
+  return {
+    name: "generate-version-json",
+    buildStart() {
+      try {
+        const publicDir = resolve(fileURLToPath(new URL(".", import.meta.url)), "public");
+        mkdirSync(publicDir, { recursive: true });
+        writeFileSync(resolve(publicDir, "version.json"), content);
+      } catch (e) {
+        console.warn("Falha ao escrever public/version.json:", e);
+      }
+    },
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: content,
+      });
+    },
+  };
+}
+
 // D1 do plano: mesma SPA para o Electron (127.0.0.1:7317) e para os
 // tablets da LAN. Em dev, o proxy evita CORS entre o Vite (5173) e o
 // servidor Fastify local (apps/kiosk).
@@ -35,6 +61,7 @@ export default defineConfig({
     __BUILD_SHA__: JSON.stringify(shortSha()),
   },
   plugins: [
+    generateVersionJsonPlugin(appVersion, shortSha()),
     react(),
     VitePWA({
       registerType: "autoUpdate",

@@ -41,6 +41,21 @@ export function UpdatePwaBanner() {
     });
   }, []);
 
+  // Auto-trigger imediato para atualização forçada
+  useEffect(() => {
+    if (hasUpdate && !updating) {
+      const timer = setTimeout(() => {
+        setUpdating(true);
+        if (isElectron && window.facaamigos?.applyUpdate) {
+          void window.facaamigos.applyUpdate();
+        } else {
+          applyPwaUpdate();
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [hasUpdate, updating, isElectron]);
+
   if (!hasUpdate) return null;
 
   const handleUpdate = () => {
