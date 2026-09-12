@@ -8,6 +8,7 @@ import { money } from "../../../format.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
 import { IfCan } from "../../../auth/RequireCapability.js";
 import { useAuth } from "../../../auth/AuthContext.js";
+import { BonusProgramSection } from "./BonusProgramSection.js";
 
 interface WeekdayGoal {
   dayLabel: string;
@@ -203,6 +204,7 @@ export function MetasTab() {
   const simulatedNetRevenue = Math.max(0, simulatedMonthlyRevenue - simulatedTotalBonusCost);
 
   return (
+<<<<<<< HEAD
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* HEADER SECTION */}
       <Card style={{ padding: "20px", background: "linear-gradient(135deg, var(--surface-card) 0%, rgba(59, 130, 246, 0.05) 100%)", borderRadius: "12px" }}>
@@ -410,6 +412,15 @@ export function MetasTab() {
           🎯 Meta Estratégica de Ticket Médio
           {!can("metas.ticket.write") && <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> (exclusivo Owner)</span>}
         </h3>
+=======
+    <div>
+      <BonusProgramSection units={units} />
+      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <h2 title="Faixas que alimentam o termômetro de Ticket Médio no Painel de cada unidade">
+          Meta de Ticket Médio
+          {!can("metas.ticket.write") && <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> (só o Owner edita)</span>}
+        </h2>
+>>>>>>> 105884e6212c03ed87b78ecbfa76e707f80c47f0
         {units.map((u) => {
           const g = ticketGoals[u.id];
           if (!g) return null;

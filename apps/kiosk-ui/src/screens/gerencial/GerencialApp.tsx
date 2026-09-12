@@ -9,6 +9,7 @@ import { ProdutosTab } from "./tabs/ProdutosTab.js";
 import { CuponsTab } from "./tabs/CuponsTab.js";
 import { FidelidadeTab } from "./tabs/FidelidadeTab.js";
 import { MetasTab } from "./tabs/MetasTab.js";
+import { BonificacaoTab } from "./tabs/BonificacaoTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
 import { OcorrenciasTab } from "./tabs/OcorrenciasTab.js";
 import { FrequenciaTab } from "./tabs/FrequenciaTab.js";
@@ -25,7 +26,7 @@ import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "FREQUENCIA" | "OCORRENCIAS" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "FREQUENCIA" | "OCORRENCIAS" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "BONIFICACAO" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "COPILOT_IA", label: "✦ ZoeIA (Copilot)" },
@@ -42,6 +43,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "CLIENTES", label: "Clientes" },
   { value: "TALENTOS", label: "Banco de Talentos" },
   { value: "FOLHA", label: "Folha de Pagamento" },
+  { value: "BONIFICACAO", label: "Bonificação" },
   { value: "RELATORIOS", label: "Relatórios" },
   { value: "ABERTURA_FECHAMENTO", label: "Abertura e Fechamento" },
   { value: "FOTOS_ENVELOPE", label: "Fotos de Envelope" },
@@ -56,7 +58,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
 // então a seta do teclado circula dentro do grupo, não pelos 21 juntos.
 const TAB_GROUPS: { label: string; values: GerencialTab[] }[] = [
   { label: "Comercial", values: ["PLANOS", "PACOTES", "PRODUTOS", "CUPONS", "FIDELIDADE", "METAS"] },
-  { label: "Pessoas", values: ["COLABORADORES", "FREQUENCIA", "OCORRENCIAS", "PERMISSOES", "CLIENTES", "TALENTOS", "FOLHA"] },
+  { label: "Pessoas", values: ["COLABORADORES", "FREQUENCIA", "OCORRENCIAS", "PERMISSOES", "CLIENTES", "TALENTOS", "FOLHA", "BONIFICACAO"] },
   {
     label: "Financeiro & Operações",
     values: ["RELATORIOS", "ABERTURA_FECHAMENTO", "FOTOS_ENVELOPE", "SALDO_ENVELOPES", "HISTORICO", "AUDITORIA", "CONTRATO"],
@@ -80,6 +82,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
   CLIENTES: "Base de dados unificada de responsáveis e crianças cadastradas em todas as unidades da rede — consulte histórico de visitas, CPF e contatos.",
   TALENTOS: "Candidaturas recebidas pelo formulário \"Venha Fazer Parte do Nosso Time\" da landing page — analise o currículo e atualize o status conforme a triagem avança.",
   FOLHA: "Extrato mensal de salários, dados bancários e fechamento da folha para conferência e exportação/Bradesco.",
+  BONIFICACAO: "Saldo de bonificação acumulado por operador no mês, já com o teto de R$200 aplicado — apuração das metas, produtos vendidos e travas de caixa.",
   RELATORIOS: "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só.",
   ABERTURA_FECHAMENTO: "Horário de abertura e fechamento do caixa de cada loja, quem abriu/fechou e o troco inicial.",
   FOTOS_ENVELOPE: "Fotos dos envelopes de sangria registrados em cada loja, com valor e operador responsável.",
@@ -180,6 +183,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                   {tab === "CLIENTES" && <ClientesTab />}
                   {tab === "TALENTOS" && <BancoTalentosTab />}
                   {tab === "FOLHA" && <FolhaPagamentoTab />}
+                  {tab === "BONIFICACAO" && <BonificacaoTab />}
                   {tab === "RELATORIOS" && <GerencialRelatorioTab />}
                   {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
                   {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}

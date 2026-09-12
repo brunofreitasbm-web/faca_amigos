@@ -3,7 +3,8 @@ import type { CSSProperties } from "react";
 import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon, Tooltip, ClockIcon, ArrowClockwiseIcon } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
 import type { ActiveSessionEntry, Plan, Package, Asset, BonusRule } from "../api/client.js";
-import { bonificacaoHoje, dentroDoPiloto } from "../bonificacao.js";
+import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO } from "../bonificacao.js";
+import type { BonusProgramConfig } from "../lib/apuracaoBonificacao.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { usePendingRenewals, resolveRenewal } from "../api/renewalRequests.js";
 import { useAppState } from "../state/AppState.js";
@@ -98,6 +99,7 @@ export function PainelScreen() {
   const [ticketTargetCents, setTicketTargetCents] = useState(0);
   const [todayOrdersCount, setTodayOrdersCount] = useState(0);
   const [bonusRules, setBonusRules] = useState<BonusRule[]>([]);
+  const [bonusProgram, setBonusProgram] = useState<BonusProgramConfig | null>(null);
   const [entradaOpen, setEntradaOpen] = useState(false);
   const [preCheckinPrefill, setPreCheckinPrefill] = useState<PreCheckinPrefill | null>(null);
   const [pendingPreCheckins, setPendingPreCheckins] = useState<PreCheckinPrefill[]>([]);
@@ -257,11 +259,12 @@ export function PainelScreen() {
     let cancelled = false;
     async function poll() {
       try {
-        const [revenueRes, ticketMedioRes, ticketGoalRes, bonusRulesRes] = await Promise.allSettled([
+        const [revenueRes, ticketMedioRes, ticketGoalRes, bonusRulesRes, bonusProgramsRes] = await Promise.allSettled([
           Api.todayRevenue(unit!.id, unit!.business_day_cutoff_hour),
           Api.todayTicketMedio(unit!.id, unit!.business_day_cutoff_hour),
           Api.ticketGoal(unit!.id),
           Api.bonusRules(unit!.id),
+          Api.bonusProgramsByUnit([unit!.id]),
         ]);
         if (!cancelled) {
           if (revenueRes.status === "fulfilled") {
@@ -277,6 +280,9 @@ export function PainelScreen() {
           }
           if (bonusRulesRes.status === "fulfilled") {
             setBonusRules(bonusRulesRes.value || []);
+          }
+          if (bonusProgramsRes.status === "fulfilled") {
+            setBonusProgram(bonusProgramsRes.value[unit!.id] ?? null);
           }
         }
       } catch {
@@ -1202,7 +1208,10 @@ export function PainelScreen() {
         const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
         const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
         const atual = tipo === "CIRCUITO" ? todayOrdersCount : todayRevenueCents;
-        const b = bonificacaoHoje(tipo, businessDate, atual);
+        const dow = diaSemanaISO(businessDate);
+        const goal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
+        const b = bonificacaoHoje(tipo, businessDate, atual, goal, bonusProgram?.locacaoExtraBonusCents ?? 0);
+        if (!b) return null;
         const corNivel = b.nivel === "supermeta" ? "var(--color-amber)" : b.nivel === "meta" ? "var(--color-success)" : "var(--color-primary)";
         const badgeVariant = b.nivel === "supermeta" ? "solid_amber" : b.nivel === "meta" ? "green" : "neutral";
         const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta!" : b.nivel === "meta" ? "🥈 Meta batida!" : "Em andamento";

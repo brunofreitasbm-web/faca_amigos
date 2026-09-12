@@ -75,7 +75,10 @@ export function useFaceCapture() {
           message = "A câmera já está sendo usada por outro aplicativo ou processo.";
         }
       } else if (err instanceof Error) {
-        message = err.message;
+        // Erros de fetch (ex.: TypeError "Load failed" no Safari/WebKit) ao
+        // carregar os modelos de reconhecimento facial não devem vazar a
+        // string crua do navegador para o operador do terminal.
+        message = "Não foi possível carregar os recursos de reconhecimento facial. Verifique a conexão de rede do terminal e tente novamente.";
       }
       setState({
         ready: false,

@@ -38,6 +38,7 @@ import { PainelScreen } from "./screens/PainelScreen.js";
 import { PdvScreen } from "./screens/PdvScreen.js";
 import { CaixaScreen } from "./screens/CaixaScreen.js";
 import { PontoScreen } from "./screens/PontoScreen.js";
+import { MinhaBonificacaoScreen } from "./screens/MinhaBonificacaoScreen.js";
 import { RelatorioScreen } from "./screens/RelatorioScreen.js";
 import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
 import { AniversariosScreen } from "./screens/AniversariosScreen.js";
@@ -105,6 +106,7 @@ const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon:
   { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento", icon: <WalletIcon /> },
   { value: "ANIVERSARIOS", label: "Aniversários", help: "Acompanhar aniversariantes do mês e enviar cupons/felicitações", icon: <span>🎂</span> },
   { value: "PONTO", label: "Ponto", help: "Bater o ponto: registrar entrada, intervalo e saída do colaborador", icon: <ClockIcon /> },
+  { value: "MINHA_BONIFICACAO", label: "Minha Bonificação", help: "Consultar só os seus números do programa de bonificação: ticket médio, progresso da meta e acumulado do mês. Somente consulta.", icon: <span>🎮</span> },
   { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa e folha de ponto de períodos anteriores", icon: <ChartBarIcon /> },
   { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, colaboradores, unidade, dados fiscais e termos de uso", icon: <GearIcon /> },
 ];
@@ -117,6 +119,7 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
   CAIXA: CaixaScreen,
   ANIVERSARIOS: AniversariosScreen,
   PONTO: PontoScreen,
+  MINHA_BONIFICACAO: MinhaBonificacaoScreen,
   RELATORIO: RelatorioScreen,
   CONFIGURACOES: ConfiguracoesScreen,
 };
