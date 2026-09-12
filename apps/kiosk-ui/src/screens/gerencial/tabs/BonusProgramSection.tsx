@@ -221,7 +221,27 @@ export function BonusProgramSection({ units }: { units: Unit[] }) {
   }
 
   function updateConfig(unitId: string, patch: Partial<UnitForm>) {
-    setForms((prev) => ({ ...prev, [unitId]: { ...(prev[unitId] ?? EMPTY_FORM), ...patch } }));
+    setForms((prev) => {
+      const current = prev[unitId] ?? EMPTY_FORM;
+      const updated = { ...current, ...patch };
+
+      // Se o Teto Mensal (R$) mudou, recalcula automaticamente os prêmios diários de Meta e Supermeta!
+      if (patch.tetoMesReais !== undefined && patch.tetoMesReais > 0 && current.tetoMesReais > 0) {
+        const ratio = patch.tetoMesReais / current.tetoMesReais;
+        const newGroups = { ...updated.groups };
+        for (const g of GROUPS) {
+          const group = newGroups[g.key];
+          newGroups[g.key] = {
+            ...group,
+            metaBonusReais: Math.max(1, Math.round(group.metaBonusReais * ratio)),
+            superBonusReais: Math.max(1, Math.round(group.superBonusReais * ratio)),
+          };
+        }
+        updated.groups = newGroups;
+      }
+
+      return { ...prev, [unitId]: updated };
+    });
   }
 
   function applyPreset(unitId: string, percentMultiplier: number) {
@@ -321,7 +341,7 @@ export function BonusProgramSection({ units }: { units: Unit[] }) {
         }
 
         // Estimativa do Custo Máximo do Bônus em Folha caso 100% da Meta Seja Batida
-        const maxOperadoresEstimados = 3;
+        const maxOperadoresEstimados = 2;
         const custoBonusMetaMes = GROUPS.reduce((acc, g) => acc + form.groups[g.key].metaBonusReais * g.pesoDias, 0) * maxOperadoresEstimados;
 
         const maxRangeSlider = isCircuito ? Math.max(150, Math.round(unitStats.dailyAvgLocacoes * 2.5)) : Math.max(5000, Math.round(unitStats.dailyAvgRevenue * 2.5));

@@ -250,7 +250,7 @@ export function MetasTab() {
 
   // Interactive Simulator Slider (% of Goal Attainment)
   const [simulationPercent, setSimulationPercent] = useState<number>(100);
-  const [simulatingOperatorsCount, setSimulatingOperatorsCount] = useState<number>(4);
+  const [simulatingOperatorsCount, setSimulatingOperatorsCount] = useState<number>(2);
 
   // Ticket Goals per unit
   const [ticketGoals, setTicketGoals] = useState<Record<string, { minReais: string; targetReais: string }>>({});
@@ -318,13 +318,14 @@ export function MetasTab() {
     loadTicketGoalsAndSuggestions();
   }, [units]);
 
-  // Recalcula a tabela por dia da semana automaticamente ao mover o slider de % da meta
+  // Recalcula a tabela por dia da semana automaticamente ao mover o slider de % da meta ou o Teto Mensal
   useEffect(() => {
     if (Object.keys(historicalBaselines).length === 0) return;
 
     setWeekdayGoals((prev) => {
       const updated = { ...prev };
       const factor = simulationPercent / 100;
+      const tetoFactor = Math.max(0.2, Number(monthlyCapReais || 200) / 200);
 
       for (const u of units) {
         const baseList = historicalBaselines[u.id] || (u.kind === "QUIOSQUE" ? DEFAULT_CIRCUITO_GOALS : DEFAULT_PLAYGROUND_GOALS);
@@ -334,8 +335,8 @@ export function MetasTab() {
           const calculatedMeta = Math.round(bg.meta * factor);
           const meta = Math.max(isCircuito ? 1 : 100, calculatedMeta);
           const superMeta = Math.round(meta * 1.22);
-          const bonusMeta = Math.round(bg.bonusMeta * Math.max(0.8, factor));
-          const bonusSuper = Math.round(bg.bonusSuper * Math.max(0.8, factor));
+          const bonusMeta = Math.max(1, Math.round(bg.bonusMeta * Math.max(0.8, factor) * tetoFactor));
+          const bonusSuper = Math.max(1, Math.round(bg.bonusSuper * Math.max(0.8, factor) * tetoFactor));
           return {
             dayLabel: bg.dayLabel,
             meta,
@@ -347,7 +348,7 @@ export function MetasTab() {
       }
       return updated;
     });
-  }, [simulationPercent, historicalBaselines, units]);
+  }, [simulationPercent, monthlyCapReais, historicalBaselines, units]);
 
   function applyAllHistoricalSuggestions() {
     setTicketGoals((prev) => {
@@ -505,13 +506,44 @@ export function MetasTab() {
 
         <Card style={{ padding: "16px" }}>
           <h3 style={{ margin: "0 0 12px", fontSize: "15px" }}>⚙️ Travas Operacionais & Limites Globais</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
-            <Input
-              label="Teto Mensal (R$)"
-              type="number"
-              value={monthlyCapReais}
-              onChange={(e) => setMonthlyCapReais(e.target.value)}
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label style={{ fontSize: "12px", fontWeight: "600" }}>Teto Mensal (R$)</label>
+                <strong style={{ color: "#D97706", fontSize: "14px" }}>R$ {monthlyCapReais}</strong>
+              </div>
+              <input
+                type="range"
+                min="100"
+                max="500"
+                step="10"
+                value={monthlyCapReais}
+                onChange={(e) => setMonthlyCapReais(e.target.value)}
+                style={{ width: "100%", accentColor: "#D97706", cursor: "pointer" }}
+              />
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "2px" }}>
+                {[200, 300, 350, 400].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setMonthlyCapReais(String(val))}
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: "12px",
+                      border: Number(monthlyCapReais) === val ? "1px solid #D97706" : "1px solid var(--border-subtle)",
+                      background: Number(monthlyCapReais) === val ? "rgba(217, 119, 6, 0.15)" : "var(--surface-sunken)",
+                      color: Number(monthlyCapReais) === val ? "#B45309" : "var(--text-secondary)",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                    }}
+                  >
+                    R$ {val}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Input
               label="Horário Abertura"
               type="text"
