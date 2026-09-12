@@ -4,7 +4,6 @@ import { generateEscPosReceipt } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
 import type {
   Asset,
-  BonusRule,
   Coupon,
   Employee,
   LoyaltyRule,
@@ -32,25 +31,12 @@ import { money } from "../format.js";
 import { AutoUpdateCard } from "../components/AutoUpdateCard.js";
 import { getPublicAppUrl } from "../lib/appUrl.js";
 
-// isodow: 1=segunda … 7=domingo — mesma convenção do `weekday` em
-// fa_kiosk_unit_daily_goals e de `extract(isodow from ...)` no banco.
-const WEEKDAYS: Array<{ value: number; label: string }> = [
-  { value: 1, label: "Segunda" },
-  { value: 2, label: "Terça" },
-  { value: 3, label: "Quarta" },
-  { value: 4, label: "Quinta" },
-  { value: 5, label: "Sexta" },
-  { value: 6, label: "Sábado" },
-  { value: 7, label: "Domingo" },
-];
-
 type Tab =
   | "PLANOS"
   | "PACOTES"
   | "PRODUTOS"
   | "CUPONS"
   | "FIDELIDADE"
-  | "META"
   | "FROTA"
   | "PONTO"
   | "UNIDADE"
@@ -80,7 +66,6 @@ const TAB_CAPABILITY: Record<Tab, Capability> = {
   PRODUTOS: "config.write",
   CUPONS: "config.write",
   FIDELIDADE: "config.write",
-  META: "config.write",
   FROTA: "config.write",
   IMPRESSORAS: "config.write",
   PONTO: "relatorio.ponto",
@@ -104,7 +89,6 @@ export function ConfiguracoesScreen() {
     { value: "PRODUTOS", label: "Produtos" },
     { value: "CUPONS", label: "Cupons" },
     { value: "FIDELIDADE", label: "Fidelidade" },
-    { value: "META", label: "Meta" },
     ...(isQuiosque ? ([{ value: "FROTA" as const, label: "Frota" }]) : []),
     { value: "PONTO", label: "Espelho de Ponto" },
     { value: "UNIDADE", label: "Unidade" },
@@ -122,7 +106,6 @@ export function ConfiguracoesScreen() {
     PRODUTOS: "Cadastre os itens vendidos avulsos no PDV (loja/lanchonete) e o estoque disponível de cada um.",
     CUPONS: "Crie códigos de desconto ou parceria que o operador pode aplicar na tela de Entrada.",
     FIDELIDADE: "Defina recompensas automáticas para clientes recorrentes — ex.: a cada 10 visitas, uma entrada grátis.",
-    META: "Configure a meta de faturamento do dia, o horário de fechamento e as regras de bônus para a equipe.",
     FROTA: "Cadastre os carrinhos do Circuito (nome, cor, emoji e foto) e marque quando um estiver em manutenção.",
     PONTO: "Gere e imprima o espelho de ponto mensal de qualquer colaborador, com as marcações do mês e linha para assinatura.",
     UNIDADE: "Dados da unidade: nome, fuso, virada do dia operacional e o que aparece no cabeçalho do cupom.",
@@ -149,7 +132,6 @@ export function ConfiguracoesScreen() {
           {tab === "PRODUTOS" && <ProdutosTab unitId={unit.id} />}
           {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
           {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
-          {tab === "META" && <MetaTab unitId={unit.id} />}
           {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
           {tab === "PONTO" && <EspelhoPontoTab unitId={unit.id} />}
           {tab === "UNIDADE" && <UnidadeTab unitId={unit.id} />}
@@ -289,224 +271,7 @@ function NotificacoesTab() {
   );
 }
 
-function MetaTab({ unitId }: { unitId: string }) {
-  const toast = useToast();
-  const { employee } = useAppState();
-  const isOwner = employee?.role === "ADMIN";
 
-  const [goalsReais, setGoalsReais] = useState<Record<number, string>>({ 1: "0", 2: "0", 3: "0", 4: "0", 5: "0", 6: "0", 7: "0" });
-  const [savingGoalWeekday, setSavingGoalWeekday] = useState<number | null>(null);
-
-  const [rules, setRules] = useState<BonusRule[]>([]);
-  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
-  const [ruleDescription, setRuleDescription] = useState("");
-  const [ruleValueReais, setRuleValueReais] = useState("0");
-  const [busyRule, setBusyRule] = useState(false);
-  
-  const [closingTime, setClosingTime] = useState("");
-  const [savingClosingTime, setSavingClosingTime] = useState(false);
-
-  function loadGoals() {
-    Api.dailyGoals(unitId).then((byWeekday) => {
-      const next: Record<number, string> = {};
-      for (const wd of WEEKDAYS) next[wd.value] = ((byWeekday[wd.value] ?? 0) / 100).toString();
-      setGoalsReais(next);
-    });
-  }
-  function loadRules() {
-    Api.bonusRules(unitId).then(setRules);
-  }
-  function loadClosingTime() {
-    Api.unitSetting(unitId, "closing_time").then((r) => setClosingTime(r.value ?? ""));
-  }
-  useEffect(loadGoals, [unitId]);
-  useEffect(loadRules, [unitId]);
-  useEffect(loadClosingTime, [unitId]);
-
-  // As 4 funções abaixo eram só `try { await api() } finally { setBusy(false) }`
-  // — sem catch e sem nenhum retorno visual em caso de sucesso. Salvar a
-  // meta do dia e falhar era indistinguível de salvar e dar certo: o
-  // operador tocava "Salvar", nada mudava na tela, e não tinha como saber
-  // qual dos dois aconteceu. toast.success/error cobre os dois lados.
-
-  async function saveGoal(weekday: number) {
-    setSavingGoalWeekday(weekday);
-    try {
-      await Api.setDailyGoal(unitId, weekday, Math.round(Number(goalsReais[weekday]) * 100));
-      toast.success("Meta salva.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a meta.");
-    } finally {
-      setSavingGoalWeekday(null);
-    }
-  }
-
-  function startEditRule(r: BonusRule) {
-    setEditingRuleId(r.id);
-    setRuleDescription(r.description);
-    setRuleValueReais((r.rewardValueCents / 100).toFixed(2));
-  }
-
-  function cancelEditRule() {
-    setEditingRuleId(null);
-    setRuleDescription("");
-    setRuleValueReais("0");
-  }
-
-  async function saveRule() {
-    setBusyRule(true);
-    try {
-      const payload = {
-        description: ruleDescription,
-        rewardValueCents: Math.round(Number(ruleValueReais) * 100),
-      };
-
-      if (editingRuleId) {
-        await Api.updateBonusRule(editingRuleId, payload);
-        toast.success("Regra de bonificação atualizada.");
-      } else {
-        await Api.createBonusRule({ unitId, ...payload });
-        toast.success("Regra de bonificação criada.");
-      }
-      cancelEditRule();
-      loadRules();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a regra.");
-    } finally {
-      setBusyRule(false);
-    }
-  }
-
-  async function handleToggleActiveRule(r: BonusRule) {
-    if (!window.confirm(`Deseja realmente ${r.active ? "inativar/excluir" : "reativar"} a regra "${r.description}"?`)) return;
-    try {
-      await Api.setBonusRuleActive(r.id, !r.active);
-      toast.success(r.active ? "Regra removida com sucesso." : "Regra reativada.");
-      loadRules();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível alterar a regra.");
-    }
-  }
-
-  async function saveClosingTime() {
-    setSavingClosingTime(true);
-    try {
-      await Api.setUnitSetting(unitId, "closing_time", closingTime);
-      toast.success("Horário de fechamento salvo.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o horário de fechamento.");
-    } finally {
-      setSavingClosingTime(false);
-    }
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 title="Meta de faturamento por dia da semana, usada na barra de progresso do Painel e no 'Meta do dia' dos relatórios de 17h/19h/20h e do fechamento">
-          Meta diária de faturamento
-        </h2>
-        {WEEKDAYS.map((wd) => (
-          <div key={wd.value} style={{ display: "flex", alignItems: "flex-end", gap: "12px" }}>
-            <div style={{ width: "160px" }}>
-              <Input
-                label={wd.label}
-                type="number"
-                value={goalsReais[wd.value] ?? "0"}
-                onChange={(e) => setGoalsReais((prev) => ({ ...prev, [wd.value]: e.target.value }))}
-                title={`Faturamento que a unidade deve atingir num(a) ${wd.label.toLowerCase()}`}
-              />
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={savingGoalWeekday === wd.value}
-              onClick={() => saveGoal(wd.value)}
-              title={`Salvar a meta de ${wd.label.toLowerCase()}`}
-            >
-              Salvar
-            </Button>
-          </div>
-        ))}
-      </Card>
-
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 title="Se faltar menos tempo até este horário do que a duração de um plano, a venda desse plano é bloqueada">
-          Encerramento Inteligente de Turno
-        </h2>
-        <label>Horário de fechamento do shopping</label>
-        <input
-          type="time"
-          value={closingTime}
-          onChange={(e) => setClosingTime(e.target.value)}
-          title="Planos que não caibam até este horário deixam de ser vendidos automaticamente"
-          style={{ padding: "10px", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}
-        />
-        <Button variant="primary" disabled={savingClosingTime} onClick={saveClosingTime} title="Salvar o horário de fechamento">
-          Salvar horário
-        </Button>
-      </Card>
-
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 title="Recompensas para o colaborador quando a meta diária é batida">
-            {editingRuleId ? "Editar Regra de Bonificação" : "Regras de Bonificação"}
-          </h2>
-          {editingRuleId && (
-            <Button variant="secondary" onClick={cancelEditRule} disabled={busyRule}>
-              Cancelar Edição
-            </Button>
-          )}
-        </div>
-        <Input
-          label="Descrição"
-          placeholder="Ex: Bônus para o turno ao bater a meta"
-          value={ruleDescription}
-          onChange={(e) => setRuleDescription(e.target.value)}
-          title="Descreva a regra de bonificação para o colaborador"
-        />
-        <Input
-          label="Valor (R$)"
-          type="number"
-          value={ruleValueReais}
-          onChange={(e) => setRuleValueReais(e.target.value)}
-          title="Valor da bonificação em reais"
-        />
-        <Button variant="primary" disabled={busyRule || !ruleDescription} onClick={saveRule} title={editingRuleId ? "Salvar regra" : "Criar nova regra"}>
-          {editingRuleId ? "Salvar regra" : "Criar regra"}
-        </Button>
-        {rules.map((r) => (
-          <Card key={r.id} style={{ padding: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: r.active ? 1 : 0.5 }}>
-            <span>{r.description}</span>
-            <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <strong>{money(r.rewardValueCents)}</strong>
-              <Button variant="secondary" onClick={() => startEditRule(r)} disabled={busyRule}>
-                Editar
-              </Button>
-              {r.active ? (
-                <Button variant="secondary" style={isOwner ? { color: "#d32f2f", borderColor: "#d32f2f" } : undefined} onClick={() => handleToggleActiveRule(r)} disabled={busyRule}>
-                  {isOwner ? "Excluir" : "Inativar"}
-                </Button>
-              ) : (
-                <Button variant="secondary" onClick={() => handleToggleActiveRule(r)} disabled={busyRule}>
-                  Reativar
-                </Button>
-              )}
-            </span>
-          </Card>
-        ))}
-      </Card>
-
-      {/* Os Termos de Uso saíram daqui para a aba própria "Termos de Uso":
-          eram gravados com `setUnitSetting` (upsert direto, exige só
-          config.write) enquanto a aba nova grava por `fa_config_set_terms`
-          (exige config.terms.write e audita o texto). Manter os dois
-          caminhos abertos para a mesma chave anularia a capacidade
-          específica — o Owner salvaria por um lado ou pelo outro, com
-          registros diferentes. */}
-    </div>
-  );
-}
 
 // Nome de cada hex da paleta — os seletores de cor (plano e carrinho)
 // eram 6 botões redondos sem nenhum nome: nem aria-label, nem title, só

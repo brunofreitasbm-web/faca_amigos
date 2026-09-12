@@ -36,6 +36,30 @@
   transition: width 0.3s ease, background-color 0.3s ease;
 }
 
+/* Chip compacto para indicadores do Painel (Ticket Médio, Bonificação,
+   Regras) — uma linha só, sem barra de progresso, para não competir por
+   altura com a área de rolagem dos cards das crianças. */
+.metric-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+.metric-chip-pill {
+  color: #fff;
+  font-weight: bold;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
 /* Estilos de impressão da pulseira térmica em modo paisagem (20mm x 270mm / Gainscha GS-2208D) */
 @media print {
   @page {

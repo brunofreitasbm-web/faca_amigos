@@ -37,15 +37,29 @@ const PAUSE_REASONS: Array<{ value: string; label: string }> = [
 // pisca depois desse limite, igual ao alerta de excedente.
 const PAUSE_ALERT_MS = 10 * 60_000;
 
-// Botões só-ícone do grupo compacto (Sessão/Mudar Plano/Pulseira) — mesma
-// altura do Button "md" (44px), mas quadrado e sem o padding horizontal
-// generoso pensado pra texto.
+// Botões do grupo compacto (Sessão/Mudar Plano/Pulseira): eram só-ícone
+// com a explicação escondida no Tooltip — que só aparece no hover, e o
+// balcão opera em tela touch, sem mouse parado em cima de nada. Agora cada
+// um mostra um rótulo curto sempre visível embaixo do ícone; o Tooltip
+// continua por cima só como reforço pra quem usa teclado/mouse.
 const ICON_BUTTON_STYLE: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  padding: 0,
-  borderRadius: "50%",
-  fontSize: "18px",
+  minWidth: "44px",
+  height: "44px",
+  padding: "2px 8px",
+  borderRadius: "12px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "1px",
+  fontSize: "16px",
+};
+
+const ICON_BUTTON_LABEL_STYLE: CSSProperties = {
+  fontSize: "9px",
+  lineHeight: 1,
+  fontWeight: "normal",
+  whiteSpace: "nowrap",
 };
 
 /**
@@ -501,6 +515,67 @@ export function PainelScreen() {
         </div>
       </div>
 
+      {/* Faixa compacta de indicadores (Ticket Médio, Bonificação, Regras):
+          antes eram cards com barra de progresso empilhados abaixo da lista
+          de crianças, empurrando a área de rolagem para baixo do fold. Viram
+          um único chip por indicador (resumo + %, sem barra), lado a lado —
+          o foco da tela continua sendo os cards das crianças logo abaixo. */}
+      {(ticketTargetCents > 0 || bonusRules.length > 0 || (unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)))) && (
+        <div style={{ flexShrink: 0, display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          {ticketTargetCents > 0 && (() => {
+            const zoneColor =
+              ticketMedioCents < ticketMinCents
+                ? "var(--color-error)"
+                : ticketMedioCents < ticketTargetCents
+                  ? "var(--color-amber)"
+                  : "var(--color-success)";
+            const percent = Math.min(100, Math.round((ticketMedioCents / ticketTargetCents) * 100));
+            return (
+              <span
+                title={`Ticket médio de hoje: ${money(ticketMedioCents)} (mín ${money(ticketMinCents)} / alvo ${money(ticketTargetCents)}) — configurado pelo Owner em Gerencial → Metas`}
+                className="metric-chip"
+              >
+                🌡️ Ticket médio <strong>{money(ticketMedioCents)}</strong>
+                <span className="metric-chip-pill" style={{ backgroundColor: zoneColor }}>{percent}%</span>
+              </span>
+            );
+          })()}
+
+          {unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)) && (() => {
+            const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
+            const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
+            const atual = tipo === "CIRCUITO" ? todayOrdersCount : todayRevenueCents;
+            const dow = diaSemanaISO(businessDate);
+            const goal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
+            const b = bonificacaoHoje(tipo, businessDate, atual, goal, bonusProgram?.locacaoExtraBonusCents ?? 0);
+            if (!b) return null;
+            const corNivel = b.nivel === "supermeta" ? "var(--color-amber)" : b.nivel === "meta" ? "var(--color-success)" : "var(--color-primary)";
+            const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta" : b.nivel === "meta" ? "🥈 Meta batida" : "Em andamento";
+            const atualLabel = tipo === "CIRCUITO" ? `${b.atual} locações` : money(b.atual);
+            const metaLabel = tipo === "CIRCUITO" ? `${b.meta}` : money(b.meta);
+            const superLabel = tipo === "CIRCUITO" ? `${b.super}` : money(b.super);
+            return (
+              <span
+                title={`Piloto de Bonificação (08/09 a 05/10): ${atualLabel} (meta ${metaLabel} / super ${superLabel}) — bônus estimado ${money(b.bonusCents)}. Só conta se o caixa abrir até 10h15 e fechar sem diferença.`}
+                className="metric-chip"
+              >
+                🎮 Bonificação <strong>{atualLabel}</strong>
+                <span className="metric-chip-pill" style={{ backgroundColor: corNivel }}>{badgeLabel}</span>
+              </span>
+            );
+          })()}
+
+          {bonusRules.length > 0 && (
+            <span
+              title={bonusRules.map((rule) => `🎁 ${rule.description} (${money(rule.rewardValueCents)})`).join(" · ")}
+              className="metric-chip"
+            >
+              🏆 {bonusRules.length} regra{bonusRules.length > 1 ? "s" : ""} de bônus ativa{bonusRules.length > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Se já havia sessões na tela e a última reconsulta falhou (ex: uma
           troca de Realtime disparou refetch e a rede caiu), mantém o
           último dado bom visível — mas avisa, em vez de deixar a tela
@@ -746,8 +821,8 @@ export function PainelScreen() {
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                gap: "clamp(6px, 2cqi, 10px)",
-                padding: "clamp(10px, 3.5cqi, 14px)",
+                gap: "clamp(4px, 1.5cqi, 8px)",
+                padding: "clamp(8px, 3cqi, 12px)",
               }}
               style={{
                 cursor: isPaused ? "default" : "pointer",
@@ -971,12 +1046,12 @@ export function PainelScreen() {
                 </div>
               )}
 
-              {/* Sessão/Mudar Plano/Pulseira eram botões de texto — o card
-                  virou parede de texto quando o balcão tem muitas crianças
-                  ao mesmo tempo. São ações de consulta/exceção (não as
-                  urgentes como Chamado de Retorno ou Saída manual, que
-                  continuam por extenso abaixo), então virou grupo compacto
-                  só-ícone com Tooltip explicando cada um no hover/foco. */}
+              {/* Sessão/Mudar Plano/Pulseira: ações de consulta/exceção (não
+                  as urgentes como Chamado de Retorno ou Saída manual, que
+                  continuam por extenso abaixo), por isso viraram grupo
+                  compacto — mas cada botão leva um rótulo curto sempre
+                  visível embaixo do ícone (ver ICON_BUTTON_LABEL_STYLE
+                  acima), não só um Tooltip de hover. */}
               <div style={{ display: "flex", gap: "6px" }}>
                 <Tooltip label="Ver linha do tempo completa desta sessão: chegada, plano, pausas e retomadas">
                   <Button
@@ -990,6 +1065,7 @@ export function PainelScreen() {
                     }}
                   >
                     <ClockIcon />
+                    <span style={ICON_BUTTON_LABEL_STYLE}>Sessão</span>
                   </Button>
                 </Tooltip>
                 <IfCan capability="sessao.change_plan">
@@ -1007,6 +1083,7 @@ export function PainelScreen() {
                       }}
                     >
                       <ArrowClockwiseIcon />
+                      <span style={ICON_BUTTON_LABEL_STYLE}>Plano</span>
                     </Button>
                   </Tooltip>
                 </IfCan>
@@ -1031,6 +1108,7 @@ export function PainelScreen() {
                     }}
                   >
                     <PrinterIcon />
+                    <span style={ICON_BUTTON_LABEL_STYLE}>Pulseira</span>
                   </Button>
                 </Tooltip>
               </div>
@@ -1174,91 +1252,6 @@ export function PainelScreen() {
         </div>
         )}
       </div>
-
-      {ticketTargetCents > 0 && (
-        <div
-          title="Ticket médio de hoje comparado ao mínimo e ao alvo configurados pelo Owner em Gerencial → Metas"
-          style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
-          className="capacity-container"
-        >
-          {(() => {
-            const zoneColor =
-              ticketMedioCents < ticketMinCents
-                ? "var(--color-error)"
-                : ticketMedioCents < ticketTargetCents
-                  ? "var(--color-amber)"
-                  : "var(--color-success)";
-            const percent = Math.min(100, Math.round((ticketMedioCents / ticketTargetCents) * 100));
-            return (
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "#595959" }}>
-                  <span>🌡️ Ticket Médio hoje: <strong style={{ color: "var(--text-primary)" }}>{money(ticketMedioCents)}</strong> (mín {money(ticketMinCents)} / alvo {money(ticketTargetCents)})</span>
-                  <span style={{ backgroundColor: "#F1F3F5", color: "#212529", fontWeight: "bold", padding: "2px 6px", borderRadius: "4px" }}>{percent}%</span>
-                </div>
-                <div className="capacity-bar-track" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="capacity-bar-fill" style={{ width: `${percent}%`, backgroundColor: zoneColor }} />
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      )}
-
-      {unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)) && (() => {
-        const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
-        const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
-        const atual = tipo === "CIRCUITO" ? todayOrdersCount : todayRevenueCents;
-        const dow = diaSemanaISO(businessDate);
-        const goal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
-        const b = bonificacaoHoje(tipo, businessDate, atual, goal, bonusProgram?.locacaoExtraBonusCents ?? 0);
-        if (!b) return null;
-        const corNivel = b.nivel === "supermeta" ? "var(--color-amber)" : b.nivel === "meta" ? "var(--color-success)" : "var(--color-primary)";
-        const badgeVariant = b.nivel === "supermeta" ? "solid_amber" : b.nivel === "meta" ? "green" : "neutral";
-        const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta!" : b.nivel === "meta" ? "🥈 Meta batida!" : "Em andamento";
-        const atualLabel = tipo === "CIRCUITO" ? `${b.atual} locações` : money(b.atual);
-        const metaLabel = tipo === "CIRCUITO" ? `${b.meta}` : money(b.meta);
-        const superLabel = tipo === "CIRCUITO" ? `${b.super}` : money(b.super);
-        return (
-          <div
-            title="Piloto de Bonificação (08/09 a 05/10) — placar ao vivo. Só conta de verdade se o caixa abrir até 10h15 e fechar sem diferença; o valor final sai do relatório oficial, não deste card."
-            style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
-            className="capacity-container"
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", fontSize: "12px", color: "#595959" }}>
-              <span>
-                🎮 Bonificação de hoje: <strong style={{ color: "var(--text-primary)" }}>{atualLabel}</strong> (meta {metaLabel} / super {superLabel})
-              </span>
-              <span style={{ backgroundColor: "#F1F3F5", color: "#212529", fontWeight: "bold", padding: "2px 8px", borderRadius: "12px", fontSize: "11px" }}>{badgeLabel}</span>
-            </div>
-            <div className="capacity-bar-track" role="progressbar" aria-valuenow={b.percent} aria-valuemin={0} aria-valuemax={100}>
-              <div className="capacity-bar-fill" style={{ width: `${b.percent}%`, backgroundColor: corNivel }} />
-            </div>
-            <div style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px" }}>
-              <span>Bônus estimado do dia: <strong style={{ color: "var(--text-primary)" }}>{money(b.bonusCents)}</strong></span>
-              <span>Vale se abrir até 10h15 e fechar sem diferença</span>
-            </div>
-          </div>
-        );
-      })()}
-
-      {bonusRules.length > 0 && (
-        <div
-          title="Regras ativas do programa de bonificação da unidade"
-          style={{ flexShrink: 0, minWidth: "280px", maxWidth: "480px" }}
-          className="capacity-container"
-        >
-          <div style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-secondary)", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
-            <span>🏆 Programa de Bonificação:</span>
-          </div>
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-            {bonusRules.map((rule) => (
-              <Badge key={rule.id} variant="vip" style={{ fontSize: "11px", padding: "4px 8px" }}>
-                🎁 {rule.description} ({money(rule.rewardValueCents)})
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )}
 
       {selected.size > 0 && (
         <div style={{ position: "fixed", bottom: "calc(24px + var(--install-banner-height, 0px))", left: "50%", transform: "translateX(-50%)", zIndex: 100 }}>

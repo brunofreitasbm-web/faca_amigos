@@ -106,8 +106,8 @@ body {
    ocupando a tela inteira. */
 .painel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-  gap: clamp(10px, 1.5vw, 18px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: clamp(8px, 1.2vw, 14px);
 }
 
 /* Cada card é um container de consulta: quem decide o respiro e o corpo
@@ -128,13 +128,13 @@ body {
 }
 
 .painel-card-thumb-img {
-  width: 88px;
-  height: 88px;
+  width: 64px;
+  height: 64px;
 }
 
 .painel-card-thumb-emoji {
-  font-size: 56px;
-  line-height: 88px;
+  font-size: 42px;
+  line-height: 64px;
 }
 
 /* Abaixo de ~210px de card, foto e texto lado a lado não cabem sem picotar
