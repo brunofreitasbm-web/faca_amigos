@@ -128,6 +128,10 @@ export function PainelScreen() {
   const [manualExitFor, setManualExitFor] = useState<ActiveSessionEntry | null>(null);
   const [vipChildIds, setVipChildIds] = useState<Set<string>>(new Set());
   const [assets, setAssets] = useState<Asset[]>([]);
+  // Retrátil: começa fechada mostrando só a descrição (quantos saldos e
+  // resumo), porque essa fila pode ficar aberta o turno inteiro e comia
+  // espaço fixo da tela mesmo sem nenhuma ação pendente do operador.
+  const [prepaidQueueOpen, setPrepaidQueueOpen] = useState(false);
   const [tipDismissed, setTipDismissed] = useState(() => localStorage.getItem("facaamigos_panel_tip_dismissed") === "true");
 
   useEffect(() => {
@@ -772,17 +776,39 @@ export function PainelScreen() {
             flexShrink: 0,
             display: "flex",
             flexDirection: "column",
-            gap: "8px",
+            gap: prepaidQueueOpen ? "8px" : 0,
             padding: "10px 12px",
             borderRadius: "14px",
             border: "1px dashed #7C4DFF",
             background: "rgba(124, 77, 255, 0.06)",
           }}
         >
-          <strong style={{ fontSize: "13px", color: "#5B32C4" }}>
-            💳 {prepaidCreditQueue.length} saldo{prepaidCreditQueue.length > 1 ? "s" : ""} pré-pago
-            {prepaidCreditQueue.length > 1 ? "s" : ""} aguardando início
-          </strong>
+          <button
+            type="button"
+            onClick={() => setPrepaidQueueOpen((v) => !v)}
+            aria-expanded={prepaidQueueOpen}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "8px",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              width: "100%",
+              textAlign: "left",
+            }}
+          >
+            <strong style={{ fontSize: "13px", color: "#5B32C4" }}>
+              💳 {prepaidCreditQueue.length} saldo{prepaidCreditQueue.length > 1 ? "s" : ""} pré-pago
+              {prepaidCreditQueue.length > 1 ? "s" : ""} aguardando início
+            </strong>
+            <span style={{ fontSize: "12px", color: "#5B32C4", flexShrink: 0 }}>
+              {prepaidQueueOpen ? "▲ recolher" : "▼ ver"}
+            </span>
+          </button>
+          {prepaidQueueOpen && (
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             {prepaidCreditQueue.map((item) => (
               <div
@@ -822,6 +848,7 @@ export function PainelScreen() {
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 
