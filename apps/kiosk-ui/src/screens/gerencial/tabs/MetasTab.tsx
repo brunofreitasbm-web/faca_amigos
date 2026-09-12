@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
-import type { BonusRule, TicketGoal } from "../../../api/client.js";
+import type { TicketGoal } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { money } from "../../../format.js";
-import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
 import { IfCan } from "../../../auth/RequireCapability.js";
 import { useAuth } from "../../../auth/AuthContext.js";
-import { BonusProgramSection } from "./BonusProgramSection.js";
 
 interface WeekdayGoal {
   dayLabel: string;
@@ -59,13 +57,6 @@ export function MetasTab() {
   const [ticketGoals, setTicketGoals] = useState<Record<string, { minReais: string; targetReais: string }>>({});
   const [ticketBusyUnitId, setTicketBusyUnitId] = useState<string | null>(null);
 
-  // Legacy/Custom Bonus Rules
-  const [rules, setRules] = useState<BonusRule[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [description, setDescription] = useState("");
-  const [valueReais, setValueReais] = useState("0");
-  const [unitIds, setUnitIds] = useState<string[]>(units.map((u) => u.id));
-  const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
   // Calculate Next Month Label for Publication
@@ -87,16 +78,9 @@ export function MetasTab() {
     });
   }
 
-  function loadRules() {
-    Api.bonusRulesAllUnits().then(setRules);
-  }
-
   useEffect(() => {
     loadTicketGoals();
-    loadRules();
   }, [units]);
-
-  useEffect(() => setUnitIds(units.map((u) => u.id)), [units]);
 
   async function saveTicketGoal(unitId: string) {
     const g = ticketGoals[unitId];
@@ -142,51 +126,6 @@ export function MetasTab() {
     }
   }
 
-  function startEdit(r: BonusRule) {
-    setEditingId(r.id);
-    setDescription(r.description);
-    setValueReais((r.rewardValueCents / 100).toFixed(2));
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setDescription("");
-    setValueReais("0");
-    setUnitIds(units.map((u) => u.id));
-  }
-
-  async function saveBonusRule() {
-    setBusy(true);
-    try {
-      const payload = { description, rewardValueCents: Math.round(Number(valueReais) * 100) };
-
-      if (editingId) {
-        await Api.updateBonusRule(editingId, payload);
-        toast.success("Regra de bonificação atualizada.");
-      } else {
-        await Promise.all(unitIds.map((unitId) => Api.createBonusRule({ unitId, ...payload })));
-        toast.success(`Regra criada em ${unitIds.length} unidade(s).`);
-      }
-      cancelEdit();
-      loadRules();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a regra.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleToggleActive(r: BonusRule) {
-    if (!window.confirm(`Deseja realmente ${r.active ? "inativar/excluir" : "reativar"} a regra "${r.description}"?`)) return;
-    try {
-      await Api.setBonusRuleActive(r.id, !r.active);
-      toast.success(r.active ? "Regra removida com sucesso." : "Regra reativada.");
-      loadRules();
-    } catch {
-      toast.error("Não foi possível alterar a regra.");
-    }
-  }
-
   // --- Simulation Metrics Calculation ---
   const activeUnitKey = units.find((u) => u.id === selectedUnitId)?.name?.toLowerCase().includes("circuito") ? "circuito" : "playground";
   const goalsList: WeekdayGoal[] = weekdayGoals[activeUnitKey] ?? DEFAULT_PLAYGROUND_GOALS;
@@ -204,7 +143,6 @@ export function MetasTab() {
   const simulatedNetRevenue = Math.max(0, simulatedMonthlyRevenue - simulatedTotalBonusCost);
 
   return (
-<<<<<<< HEAD
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* HEADER SECTION */}
       <Card style={{ padding: "20px", background: "linear-gradient(135deg, var(--surface-card) 0%, rgba(59, 130, 246, 0.05) 100%)", borderRadius: "12px" }}>
@@ -412,15 +350,6 @@ export function MetasTab() {
           🎯 Meta Estratégica de Ticket Médio
           {!can("metas.ticket.write") && <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> (exclusivo Owner)</span>}
         </h3>
-=======
-    <div>
-      <BonusProgramSection units={units} />
-      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-        <h2 title="Faixas que alimentam o termômetro de Ticket Médio no Painel de cada unidade">
-          Meta de Ticket Médio
-          {!can("metas.ticket.write") && <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> (só o Owner edita)</span>}
-        </h2>
->>>>>>> 105884e6212c03ed87b78ecbfa76e707f80c47f0
         {units.map((u) => {
           const g = ticketGoals[u.id];
           if (!g) return null;
@@ -457,51 +386,6 @@ export function MetasTab() {
           );
         })}
       </Card>
-
-      {/* REGRAS DE RECOMPENSA E PRODUTOS AVULSOS */}
-      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: "15px" }}>
-            {editingId ? "Editar Regra de Recompensa" : "Regras Adicionais de Bonificação por Item/Produto"}
-          </h3>
-          {editingId && (
-            <Button variant="secondary" onClick={cancelEdit} disabled={busy}>
-              Cancelar Edição
-            </Button>
-          )}
-        </div>
-        <Input label="Descrição" placeholder="Ex: Bônus por venda de meia ou garrafa d'água" value={description} onChange={(e) => setDescription(e.target.value)} />
-        <Input label="Valor (R$)" type="number" value={valueReais} onChange={(e) => setValueReais(e.target.value)} />
-        {!editingId && <UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} />}
-        <Button variant="primary" disabled={busy || !description || (!editingId && unitIds.length === 0)} onClick={saveBonusRule}>
-          {editingId ? "Salvar regra" : `Criar regra em ${unitIds.length} unidade(s)`}
-        </Button>
-      </Card>
-
-      {/* LISTA DE REGRAS CADASTRADAS */}
-      {rules.map((r) => (
-        <Card key={r.id} style={{ padding: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: r.active ? 1 : 0.5, flexWrap: "wrap", gap: "8px" }}>
-          <span>
-            {r.description}
-            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · {units.find((u) => u.id === r.unitId)?.name ?? "—"}</span>
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <strong>{money(r.rewardValueCents)}</strong>
-            <Button variant="secondary" onClick={() => startEdit(r)} disabled={busy}>
-              Editar
-            </Button>
-            {r.active ? (
-              <Button variant="secondary" style={{ color: "#d32f2f", borderColor: "#d32f2f" }} onClick={() => handleToggleActive(r)} disabled={busy}>
-                Excluir
-              </Button>
-            ) : (
-              <Button variant="secondary" onClick={() => handleToggleActive(r)} disabled={busy}>
-                Reativar
-              </Button>
-            )}
-          </span>
-        </Card>
-      ))}
     </div>
   );
 }

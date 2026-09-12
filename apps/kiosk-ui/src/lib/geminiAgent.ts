@@ -510,11 +510,12 @@ REGRA ABSOLUTA E INEGOCIÁVEL SOBRE OS DADOS:
 1. Use SOMENTE os números reais fornecidos no contexto abaixo (faturamento, pedidos, visitas, planos vendidos). NUNCA invente, estime ou arredonde valores que não estejam explicitamente no contexto.
 2. O contexto cobre exclusivamente o período de ${ZOEIA_DATA_START_DATE} em diante — dados de datas anteriores a essa não são confiáveis e nunca devem ser mencionados ou assumidos.
 3. Se o contexto indicar que não há dados suficientes no período, diga isso explicitamente em vez de fabricar uma projeção.
+4. FILTRO RÍGIDO DE EQUIPE: Considere EXCLUSIVAMENTE colaboradores com contrato ATIVO atualmente. NUNCA cite, recomende para treinamento ou mencione ex-funcionários demitidos antes de 29/08/2026.
 
 Gere um relatório gerencial estratégico em JSON para "${targetUnit}" considerando a realidade e sinergia entre estas 3 unidades da rede, cobrindo:
 1. Projeções de Faturamento & Como Aumentar Receita (comparações entre as 3 unidades se for análise consolidada).
 2. Pontos de Atenção & Onde melhorar (identifique gargalos específicos ou compartilhados).
-3. Eficiência dos Operadores (destaque de operador mais eficiente e operador em desenvolvimento na unidade).
+3. Eficiência dos Operadores (destaque de operador ativo mais eficiente e operador em desenvolvimento na unidade).
 4. Plano de Ação (passos acionáveis para o gerente aplicar hoje).
 
 Responda EXCLUSIVAMENTE em formato JSON:
@@ -533,10 +534,10 @@ Responda EXCLUSIVAMENTE em formato JSON:
     "whereToImprove": "Onde melhorar imediatamente para estancar perdas de receita"
   },
   "operatorPerformance": {
-    "topOperatorName": "Nome do operador destaque",
+    "topOperatorName": "Nome do operador destaque ativo",
     "topOperatorMetric": "Métrica de destaque (ex: 42% de conversão em meias e upsell)",
     "topOperatorReason": "Motivo do sucesso para replicar na equipe",
-    "needsTrainingOperatorName": "Nome do operador que precisa de suporte",
+    "needsTrainingOperatorName": "Nome do operador ativo que precisa de suporte",
     "needsTrainingMetric": "Métrica abaixo da média (ex: 12% de conversão de adicionais)",
     "needsTrainingAction": "Ação prática de treinamento em 5min"
   },
@@ -585,12 +586,12 @@ Responda EXCLUSIVAMENTE em formato JSON:
       whereToImprove: "Padronizar a abordagem de balcão do Circuito no Playground Grão-Pará para elevar a média global da rede.",
     },
     operatorPerformance: {
-      topOperatorName: "Ana Silva (Circuito)",
+      topOperatorName: "Operador Destaque da Equipe Ativa",
       topOperatorMetric: "42% de conversão em meias e 35% em upgrade de tempo",
       topOperatorReason: "Abordagem acolhedora demonstrando a economia do plano maior logo no início do atendimento.",
-      needsTrainingOperatorName: "Lucas Costa (Playground Grão-Pará)",
+      needsTrainingOperatorName: "Operador em Treinamento de Vendas",
       needsTrainingMetric: "12% de conversão em produtos adicionais",
-      needsTrainingAction: "Realizar alinhamento de 5 minutos com o Lucas no início do turno mostrando a abordagem padrão do Circuito.",
+      needsTrainingAction: "Realizar alinhamento de 5 minutos no início do turno mostrando a abordagem padrão de vendas da rede.",
     },
     actionPlan: {
       steps: [

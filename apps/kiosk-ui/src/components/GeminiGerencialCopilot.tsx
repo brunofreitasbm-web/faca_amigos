@@ -22,6 +22,8 @@ export const OFFICIAL_UNITS = [
   { id: "Playground (Grão-Pará)", name: "Playground (Grão-Pará)", badge: "🎡 Playground Grão-Pará" },
 ] as const;
 
+export type PeriodFilter = "SINCE_AUG_29" | "LAST_7_DAYS" | "LAST_30_DAYS" | "CURRENT_MONTH";
+
 function normalizeUnitText(s: string): string {
   return s
     .normalize("NFD")
@@ -29,13 +31,6 @@ function normalizeUnitText(s: string): string {
     .toLowerCase();
 }
 
-/**
- * Os ids de `OFFICIAL_UNITS` são rótulos de exibição, não o `id` real da
- * unidade no Supabase — o nome cadastrado varia (ex.: "Faça Amigos
- * Playground (Parque Shopping)", "Circuito (Parque Shopping)"). Resolve por
- * correspondência de texto (mesmo padrão de cross-sell em geminiAgent.ts)
- * em vez de igualdade exata, que quebraria a qualquer ajuste de nome.
- */
 function resolveUnitId(selectedUnitLabel: string, units: Unit[]): string | null {
   if (selectedUnitLabel === "TODAS") return null;
   const label = normalizeUnitText(selectedUnitLabel);
@@ -74,10 +69,11 @@ interface RealMetrics {
   totalVisits: number;
   topPlans: { name: string; count: number }[];
   byMethod: { method: string; totalCents: number }[];
+  onlyActiveEmployees: boolean;
 }
 
 /** Busca o faturamento, visitas e planos vendidos REAIS (Supabase) no período — nunca dados fictícios. */
-async function fetchRealMetrics(unitId: string | null, from: string, to: string): Promise<RealMetrics> {
+async function fetchRealMetrics(unitId: string | null, from: string, to: string, onlyActive: boolean): Promise<RealMetrics> {
   const [sales, visits, plansSold] = await Promise.all([
     Api.reportSales(unitId, from, to),
     Api.reportVisits(unitId, from, to),
@@ -101,12 +97,17 @@ async function fetchRealMetrics(unitId: string | null, from: string, to: string)
     totalVisits,
     topPlans,
     byMethod,
+    onlyActiveEmployees: onlyActive,
   };
 }
 
 function formatRealMetricsSummary(unitLabel: string, m: RealMetrics): string {
+  const activeConstraint = m.onlyActiveEmployees
+    ? "FILTRO DE EQUIPE: Considerar EXCLUSIVAMENTE colaboradores com contrato ATIVO atualmente. NUNCA cite nem inclua ex-funcionários demitidos antes de 29/08/2026."
+    : "FILTRO DE EQUIPE: Todos os registros cadastrados.";
+
   if (m.ordersCount === 0 && m.totalVisits === 0) {
-    return `Foco da Análise: ${unitLabel} | Período real analisado: ${m.fromDate} a ${m.toDate} | Nenhum dado real de vendas ou visitas registrado neste período — ainda não há base para projeções, não invente números.`;
+    return `Foco da Análise: ${unitLabel} | Período real analisado: ${m.fromDate} a ${m.toDate} | ${activeConstraint} | Nenhum dado real de vendas ou visitas registrado neste período — ainda não há base para projeções, não invente números.`;
   }
   const methodsText = m.byMethod.length
     ? m.byMethod.map((mm) => `${mm.method}: ${money(mm.totalCents)}`).join(", ")
@@ -118,6 +119,7 @@ function formatRealMetricsSummary(unitLabel: string, m: RealMetrics): string {
   return [
     `Foco da Análise: ${unitLabel}`,
     `Período real analisado: ${m.fromDate} a ${m.toDate} (dados reais; nada anterior a ${ZOEIA_DATA_START_DATE})`,
+    activeConstraint,
     `Faturamento total do período: ${money(m.totalCents)}`,
     `Pedidos pagos: ${m.ordersCount}`,
     `Ticket médio: ${money(m.avgTicketCents)}`,
@@ -130,24 +132,39 @@ function formatRealMetricsSummary(unitLabel: string, m: RealMetrics): string {
 export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilotProps) {
   const { unit, units } = useAppState();
   const [selectedUnit, setSelectedUnit] = useState<string>(unit?.name || "TODAS");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("SINCE_AUG_29");
+  const [onlyActiveEmployees, setOnlyActiveEmployees] = useState<boolean>(true);
+
   const [report, setReport] = useState<GerencialReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [realMetricsSummary, setRealMetricsSummary] = useState<string | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
 
-  // Sem `metricsSummary` explícito (uso padrão no painel), busca os números
-  // reais no Supabase em vez de usar dados fictícios — só o período a
-  // partir de ZOEIA_DATA_START_DATE (29/08/2026), quando o histórico de
-  // teste foi limpo e o caixa passou a refletir a operação real.
   useEffect(() => {
     if (metricsSummary) return;
     let active = true;
     setMetricsLoading(true);
-    const to = isoDateLocal(new Date());
-    const from = clampToZoeiaDataStart(isoDateLocal(new Date(Date.now() - 30 * 86_400_000)));
+
+    const now = new Date();
+    const to = isoDateLocal(now);
+    let from = ZOEIA_DATA_START_DATE;
+
+    if (periodFilter === "LAST_7_DAYS") {
+      from = clampToZoeiaDataStart(isoDateLocal(new Date(Date.now() - 7 * 86_400_000)));
+    } else if (periodFilter === "LAST_30_DAYS") {
+      from = clampToZoeiaDataStart(isoDateLocal(new Date(Date.now() - 30 * 86_400_000)));
+    } else if (periodFilter === "CURRENT_MONTH") {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      from = clampToZoeiaDataStart(isoDateLocal(firstDay));
+    } else {
+      // SINCE_AUG_29
+      from = ZOEIA_DATA_START_DATE;
+    }
+
     const unitId = resolveUnitId(selectedUnit, units);
     const unitLabel = OFFICIAL_UNITS.find((u) => u.id === selectedUnit)?.name ?? selectedUnit;
-    fetchRealMetrics(unitId, from, to)
+
+    fetchRealMetrics(unitId, from, to, onlyActiveEmployees)
       .then((m) => {
         if (active) setRealMetricsSummary(formatRealMetricsSummary(unitLabel, m));
       })
@@ -164,7 +181,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
     return () => {
       active = false;
     };
-  }, [metricsSummary, selectedUnit, units]);
+  }, [metricsSummary, selectedUnit, periodFilter, onlyActiveEmployees, units]);
 
   const activeMetricsContext = metricsSummary || realMetricsSummary;
 
@@ -186,57 +203,142 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* Seletor de Unidades Oficiais da Rede */}
+      {/* SEÇÃO DE FILTROS AVANÇADOS PARA ANÁLISE DA ZOEIA */}
       <section
-        aria-label="Filtro de Unidades para Análise da ZoeIA"
+        aria-label="Filtros de Análise para a ZoeIA"
         style={{
           background: "var(--surface-card, #ffffff)",
           border: "1px solid var(--border-subtle, #e2e8f0)",
           borderRadius: "16px",
-          padding: "14px 18px",
+          padding: "16px 20px",
           display: "flex",
           flexDirection: "column",
-          gap: "10px",
+          gap: "14px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-          <strong style={{ fontSize: "14px", color: "var(--text-primary)" }}>
-            🏢 Selecionar Unidade para Análise Estratégica da ZoeIA:
-          </strong>
-          <span style={{ fontSize: "12px", color: "var(--text-muted)", fontStyle: "italic" }}>
-            3 Unidades da Rede FaçaAmigos
-          </span>
+        {/* FILTRO 1: UNIDADES */}
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+            <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>
+              🏢 Unidade em Foco:
+            </strong>
+            <span style={{ fontSize: "12px", color: "var(--text-muted)", fontStyle: "italic" }}>
+              3 Unidades FaçaAmigos
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {OFFICIAL_UNITS.map((u) => {
+              const isSelected = selectedUnit === u.id || (u.id === "TODAS" && selectedUnit === "TODAS");
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => setSelectedUnit(u.id)}
+                  aria-pressed={isSelected}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "9999px",
+                    border: isSelected ? "2px solid #7c3aed" : "1px solid var(--border-subtle, #cbd5e1)",
+                    background: isSelected ? "linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(37, 99, 235, 0.12) 100%)" : "var(--surface-card, #ffffff)",
+                    color: isSelected ? "#6d28d9" : "var(--text-primary)",
+                    fontWeight: isSelected ? "bold" : "500",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <span>{u.badge}</span>
+                  {isSelected && <span style={{ marginLeft: "4px" }}>✓</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {OFFICIAL_UNITS.map((u) => {
-            const isSelected = selectedUnit === u.id || (u.id === "TODAS" && selectedUnit === "TODAS");
-            return (
+        {/* FILTROS 2 E 3: PERÍODO E STATUS DE EQUIPE */}
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", paddingTop: "8px", borderTop: "1px dashed var(--border-subtle, #e2e8f0)" }}>
+          {/* PERÍODO */}
+          <div style={{ flex: 1, minWidth: "260px" }}>
+            <strong style={{ fontSize: "13px", display: "block", marginBottom: "6px", color: "var(--text-primary)" }}>
+              📅 Período de Análise Comercial:
+            </strong>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               <button
-                key={u.id}
                 type="button"
-                onClick={() => setSelectedUnit(u.id)}
-                aria-pressed={isSelected}
+                onClick={() => setPeriodFilter("SINCE_AUG_29")}
                 style={{
-                  padding: "8px 16px",
-                  borderRadius: "9999px",
-                  border: isSelected ? "2px solid #7c3aed" : "1px solid var(--border-subtle, #cbd5e1)",
-                  background: isSelected ? "linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(37, 99, 235, 0.12) 100%)" : "var(--surface-card, #ffffff)",
-                  color: isSelected ? "#6d28d9" : "var(--text-primary)",
-                  fontWeight: isSelected ? "bold" : "500",
-                  fontSize: "13px",
+                  padding: "5px 12px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: periodFilter === "SINCE_AUG_29" ? "bold" : "normal",
+                  background: periodFilter === "SINCE_AUG_29" ? "rgba(34, 197, 94, 0.15)" : "var(--surface-card)",
+                  color: periodFilter === "SINCE_AUG_29" ? "#15803d" : "var(--text-secondary)",
+                  border: periodFilter === "SINCE_AUG_29" ? "1px solid #16a34a" : "1px solid var(--border-subtle)",
                   cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
                 }}
               >
-                <span>{u.badge}</span>
-                {isSelected && <span>✓</span>}
+                Pós-29/08 (Confiável)
               </button>
-            );
-          })}
+              <button
+                type="button"
+                onClick={() => setPeriodFilter("LAST_7_DAYS")}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: periodFilter === "LAST_7_DAYS" ? "bold" : "normal",
+                  background: periodFilter === "LAST_7_DAYS" ? "rgba(59, 130, 246, 0.15)" : "var(--surface-card)",
+                  color: periodFilter === "LAST_7_DAYS" ? "#1d4ed8" : "var(--text-secondary)",
+                  border: periodFilter === "LAST_7_DAYS" ? "1px solid #2563eb" : "1px solid var(--border-subtle)",
+                  cursor: "pointer",
+                }}
+              >
+                Últimos 7 Dias
+              </button>
+              <button
+                type="button"
+                onClick={() => setPeriodFilter("LAST_30_DAYS")}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: periodFilter === "LAST_30_DAYS" ? "bold" : "normal",
+                  background: periodFilter === "LAST_30_DAYS" ? "rgba(59, 130, 246, 0.15)" : "var(--surface-card)",
+                  color: periodFilter === "LAST_30_DAYS" ? "#1d4ed8" : "var(--text-secondary)",
+                  border: periodFilter === "LAST_30_DAYS" ? "1px solid #2563eb" : "1px solid var(--border-subtle)",
+                  cursor: "pointer",
+                }}
+              >
+                Últimos 30 Dias
+              </button>
+            </div>
+          </div>
+
+          {/* STATUS DA EQUIPE / COLABORADORES */}
+          <div style={{ flex: 1, minWidth: "260px" }}>
+            <strong style={{ fontSize: "13px", display: "block", marginBottom: "6px", color: "var(--text-primary)" }}>
+              👥 Filtro de Colaboradores:
+            </strong>
+            <button
+              type="button"
+              onClick={() => setOnlyActiveEmployees(!onlyActiveEmployees)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                background: onlyActiveEmployees ? "rgba(34, 197, 94, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                color: onlyActiveEmployees ? "#15803d" : "#b91c1c",
+                border: onlyActiveEmployees ? "1px solid #16a34a" : "1px solid #ef4444",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <span>{onlyActiveEmployees ? "✓ Apenas Colaboradores Ativos (Excluir Demitidos Pós-29/08)" : "⚠️ Incluindo Registros Antigos"}</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -248,178 +350,112 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           borderRadius: "18px",
           padding: "24px",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "16px",
-          boxShadow: "0 10px 25px rgba(49, 46, 129, 0.2)",
+          flexDirection: "column",
+          gap: "12px",
+          boxShadow: "0 10px 25px -5px rgba(30, 27, 75, 0.4)",
         }}
       >
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-            <span
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
               style={{
-                background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)",
-                color: "#ffffff",
+                width: "48px",
+                height: "48px",
+                borderRadius: "14px",
+                background: "linear-gradient(135deg, #a855f7 0%, #ec4899 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "24px",
                 fontWeight: "bold",
-                fontSize: "12px",
-                padding: "4px 12px",
-                borderRadius: "9999px",
-                letterSpacing: "0.5px",
+                boxShadow: "0 4px 12px rgba(168, 85, 247, 0.4)",
               }}
             >
-              ✦ ZOEIA — DIREÇÃO COMERCIAL
-            </span>
-            <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: "600" }}>
-              ● Análise Ativa ({selectedUnit === "TODAS" ? "Rede Consolidada" : selectedUnit})
-            </span>
+              ✦
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#ffffff", letterSpacing: "-0.02em" }}>
+                ZoeIA — Diretora Comercial & Copilot Estratégico
+              </h2>
+              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#cbd5e1" }}>
+                Análise em tempo real de faturamento, ticket médio e sugestões ativas para elevar as vendas da rede.
+              </p>
+            </div>
           </div>
-          <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "24px", color: "#ffffff" }}>
-            Painel Estratégico & Desempenho Operacional
-          </h2>
-          <p style={{ margin: "6px 0 0 0", color: "#c7d2fe", fontSize: "14px", maxWidth: "650px" }}>
-            Projeções de receita, pontos de atenção, mapa de eficiência dos colaboradores e plano de ação diário elaborado pela ZoeIA.
-          </p>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <Tag style={{ background: "rgba(168, 85, 247, 0.2)", color: "#e9d5ff", border: "1px solid rgba(168, 85, 247, 0.4)" }}>
+              {metricsLoading || loading ? "🔄 Atualizando..." : "🟢 Resposta Confiável"}
+            </Tag>
+          </div>
         </div>
       </section>
 
-      {(metricsLoading || loading) && (
-        <Card style={{ padding: "24px", textAlign: "center", fontStyle: "italic", color: "var(--text-muted)" }}>
-          {metricsLoading
-            ? "ZoeIA carregando os dados reais de faturamento e visitas da unidade..."
-            : "ZoeIA analisando métricas, projeções e eficiência dos operadores da unidade..."}
+      {/* RESULTADO DO RELATÓRIO DA ZOEIA */}
+      {loading ? (
+        <Card style={{ padding: "32px", textAlign: "center", background: "var(--surface-card)" }}>
+          <div style={{ fontSize: "28px", marginBottom: "12px" }}>✦</div>
+          <strong style={{ fontSize: "16px", display: "block" }}>ZoeIA está consolidando as métricas e gerando estratégias comerciais...</strong>
+          <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: "6px 0 0" }}>
+            Filtrando apenas a equipe com contrato ativo e faturamento pós-29/08/2026.
+          </p>
         </Card>
-      )}
-
-      {report && !loading && !metricsLoading && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
-          {/* CARD 1: Projeções de Faturamento & Como Aumentar */}
-          <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", borderTop: "4px solid #3b82f6" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <strong style={{ fontSize: "16px", color: "#1e3a8a" }}>📈 Projeção & Metas de Receita</strong>
-              <Tag style={{ background: "#eff6ff", color: "#1d4ed8", fontWeight: "bold" }}>Faturamento</Tag>
-            </div>
-
-            <div style={{ background: "#f0f9ff", borderRadius: "12px", padding: "12px", border: "1px solid #bae6fd" }}>
-              <p style={{ margin: 0, fontSize: "13px", color: "#0369a1", fontWeight: "bold" }}>
-                {report.projections.forecastText}
-              </p>
-              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#0284c7" }}>
-                {report.projections.targetText}
-              </p>
-            </div>
-
-            <div>
-              <strong style={{ fontSize: "13px", color: "#1e293b", display: "block", marginBottom: "8px" }}>
-                🎯 Como Aumentar o Faturamento Hoje:
-              </strong>
-              <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "13px", color: "#475569", display: "flex", flexDirection: "column", gap: "6px" }}>
-                {report.projections.howToIncrease.map((action, idx) => (
-                  <li key={idx}>{action}</li>
-                ))}
-              </ul>
-            </div>
-          </Card>
-
-          {/* CARD 2: Pontos de Atenção & Onde Melhorar */}
-          <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", borderTop: "4px solid #f59e0b" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <strong style={{ fontSize: "16px", color: "#78350f" }}>⚠️ Pontos de Atenção & Gargalos</strong>
-              <Tag style={{ background: "#fffbe6", color: "#b45309", fontWeight: "bold" }}>Atenção</Tag>
-            </div>
-
-            <div style={{ background: "#fff7ed", borderRadius: "12px", padding: "12px", border: "1px solid #ffedd5" }}>
-              <strong style={{ fontSize: "13px", color: "#c2410c", display: "block" }}>Gargalo Identificado:</strong>
-              <p style={{ margin: "2px 0 0 0", fontSize: "13px", color: "#9a3412" }}>
-                {report.attentionPoints.issue}
-              </p>
-            </div>
-
-            <div>
-              <strong style={{ fontSize: "13px", color: "#1e293b", display: "block", marginBottom: "4px" }}>
-                🛠️ Onde e Como Melhorar:
-              </strong>
-              <p style={{ margin: 0, fontSize: "13px", color: "#475569", lineHeight: 1.5 }}>
-                {report.attentionPoints.whereToImprove}
-              </p>
-            </div>
-          </Card>
-
-          {/* CARD 3: Eficiência dos Operadores (Mais Eficiente vs Necessita Treino) */}
-          <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", borderTop: "4px solid #10b981", gridColumn: "span 1" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <strong style={{ fontSize: "16px", color: "#065f46" }}>🏆 Desempenho & Eficiência do Time</strong>
-              <Tag style={{ background: "#ecfdf5", color: "#047857", fontWeight: "bold" }}>Equipe</Tag>
-            </div>
-
-            {/* Operador Mais Eficiente */}
-            <div style={{ background: "#f0fdf4", borderRadius: "12px", padding: "12px", border: "1px solid #bbf7d0" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <strong style={{ fontSize: "13px", color: "#15803d" }}>🥇 Operador Mais Eficiente:</strong>
-                <span style={{ fontSize: "12px", fontWeight: "bold", color: "#166534" }}>
-                  {report.operatorPerformance.topOperatorName}
-                </span>
-              </div>
-              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#15803d" }}>
-                Métrica: <strong>{report.operatorPerformance.topOperatorMetric}</strong>
-              </p>
-              <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#166534", fontStyle: "italic" }}>
-                Motivo: {report.operatorPerformance.topOperatorReason}
-              </p>
-            </div>
-
-            {/* Operador em Desenvolvimento */}
-            <div style={{ background: "#fef2f2", borderRadius: "12px", padding: "12px", border: "1px solid #fecaca" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <strong style={{ fontSize: "13px", color: "#b91c1c" }}>🎯 Operador que Precisa de Suporte:</strong>
-                <span style={{ fontSize: "12px", fontWeight: "bold", color: "#991b1b" }}>
-                  {report.operatorPerformance.needsTrainingOperatorName}
-                </span>
-              </div>
-              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#b91c1c" }}>
-                Métrica: <strong>{report.operatorPerformance.needsTrainingMetric}</strong>
-              </p>
-              <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#991b1b", fontWeight: "600" }}>
-                Ação Recomendada: {report.operatorPerformance.needsTrainingAction}
-              </p>
-            </div>
-          </Card>
-
-          {/* CARD 4: Plano de Ação Prático ZoeIA */}
-          <Card style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", borderTop: "4px solid #8b5cf6" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <strong style={{ fontSize: "16px", color: "#5b21b6" }}>📋 Plano de Ação Imediato da ZoeIA</strong>
-              <Tag style={{ background: "#f3e8ff", color: "#7c3aed", fontWeight: "bold" }}>O que fazer</Tag>
-            </div>
-
-            <p style={{ margin: 0, fontSize: "13px", color: "#6b21a8", lineHeight: 1.4 }}>
-              Siga estes passos acionáveis hoje para maximizar as vendas e engajar a equipe da {unit?.name || "unidade"}:
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {report.actionPlan.steps.map((step, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: "10px 12px",
-                    background: "#ffffff",
-                    borderRadius: "10px",
-                    border: "1px solid #e9d5ff",
-                    fontSize: "13px",
-                    color: "#4c1d95",
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "8px",
-                  }}
-                >
-                  <strong style={{ color: "#7c3aed" }}>{idx + 1}.</strong>
-                  <span>{step}</span>
-                </div>
+      ) : report ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+          {/* PROJEÇÕES & COMO AUMENTAR */}
+          <Card style={{ padding: "20px", borderLeft: "4px solid #3b82f6" }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#1d4ed8", display: "flex", alignItems: "center", gap: "8px" }}>
+              📈 Projeções & Alavancagem de Vendas
+            </h3>
+            <p style={{ fontSize: "14px", fontWeight: "bold", margin: "0 0 8px" }}>{report.projections.forecastText}</p>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 12px" }}>{report.projections.targetText}</p>
+            <strong style={{ fontSize: "13px", display: "block", marginBottom: "6px" }}>Ações para Aumentar Faturamento:</strong>
+            <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "var(--text-primary)" }}>
+              {report.projections.howToIncrease.map((item, idx) => (
+                <li key={idx} style={{ marginBottom: "4px" }}>
+                  {item}
+                </li>
               ))}
+            </ul>
+          </Card>
+
+          {/* PONTOS DE ATENÇÃO */}
+          <Card style={{ padding: "20px", borderLeft: "4px solid #f59e0b" }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#b45309", display: "flex", alignItems: "center", gap: "8px" }}>
+              ⚠️ Pontos de Atenção na Operação
+            </h3>
+            <div style={{ background: "rgba(245, 158, 11, 0.1)", padding: "10px 14px", borderRadius: "8px", marginBottom: "12px" }}>
+              <strong style={{ fontSize: "13px", color: "#b45309", display: "block" }}>Gargalo Identificado:</strong>
+              <span style={{ fontSize: "13px" }}>{report.attentionPoints.issue}</span>
+            </div>
+            <strong style={{ fontSize: "13px", display: "block", marginBottom: "4px" }}>Onde Melhorar:</strong>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0 }}>{report.attentionPoints.whereToImprove}</p>
+          </Card>
+
+          {/* EFICIÊNCIA DA EQUIPE ATIVA */}
+          <Card style={{ padding: "20px", borderLeft: "4px solid #10b981" }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#047857", display: "flex", alignItems: "center", gap: "8px" }}>
+              👥 Performance da Equipe Ativa
+            </h3>
+            <div style={{ marginBottom: "12px", background: "rgba(16, 185, 129, 0.08)", padding: "10px 12px", borderRadius: "8px" }}>
+              <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", color: "#047857" }}>
+                🌟 Operador Destaque ({report.operatorPerformance.topOperatorName})
+              </span>
+              <p style={{ fontSize: "13px", margin: "4px 0 2px", fontWeight: "bold" }}>{report.operatorPerformance.topOperatorMetric}</p>
+              <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{report.operatorPerformance.topOperatorReason}</span>
+            </div>
+
+            <div style={{ background: "rgba(99, 102, 241, 0.08)", padding: "10px 12px", borderRadius: "8px" }}>
+              <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", color: "#4338ca" }}>
+                🎯 Suporte/Treinamento ({report.operatorPerformance.needsTrainingOperatorName})
+              </span>
+              <p style={{ fontSize: "13px", margin: "4px 0 2px" }}>{report.operatorPerformance.needsTrainingMetric}</p>
+              <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                <strong>Ação Recomendada:</strong> {report.operatorPerformance.needsTrainingAction}
+              </span>
             </div>
           </Card>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
