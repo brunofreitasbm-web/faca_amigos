@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { app, BrowserWindow, Menu, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, Menu, ipcMain, dialog, session } from "electron";
 import { openDatabase, migrate, ensureDeviceId } from "@facaamigos/db-local";
 import { buildApp } from "../server/app.js";
 import { seedDevData } from "../server/seed-dev.js";
@@ -226,6 +226,22 @@ if (isPrimaryInstance) {
 
   app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
+
+    // Permissão automática de câmera/mídia para o app Kiosk no Electron
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+      if (permission === "media" || permission === "notifications") {
+        callback(true);
+      } else {
+        callback(false);
+      }
+    });
+
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+      if (permission === "media") {
+        return true;
+      }
+      return false;
+    });
 
     // Splash imediata: migrate + TLS + fiscal levam alguns segundos e a
     // janela principal só aparece no ready-to-show da SPA.

@@ -65,21 +65,28 @@ export function useFaceCapture() {
 
       setState({ ready: true, starting: false, error: null });
     } catch (err) {
+      const isElectron = typeof window !== "undefined" && "facaamigos" in window;
       let message = "Não foi possível acessar a câmera.";
-      if (err instanceof DOMException) {
-        if (err.name === "NotAllowedError" || err.name === "SecurityError") {
-          message = "Acesso à câmera bloqueado. Libere a permissão no navegador ou sistema.";
-        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-          message = "Nenhuma câmera foi encontrada neste dispositivo.";
-        } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+      const errStr = String((err as { message?: string })?.message || err || "");
+
+      if (err instanceof DOMException || errStr.includes("NotAllowedError") || errStr.includes("NotFoundError")) {
+        if (errStr.includes("NotAllowedError") || errStr.includes("SecurityError")) {
+          message = isElectron
+            ? "Acesso à câmera bloqueado. Verifique as permissões de câmera no sistema Windows."
+            : "Acesso à câmera bloqueado. Libere a permissão no navegador ou sistema.";
+        } else if (errStr.includes("NotFoundError") || errStr.includes("DevicesNotFoundError")) {
+          message = isElectron
+            ? "Nenhuma câmera foi encontrada neste dispositivo. Verifique se a câmera USB está conectada ao computador."
+            : "Nenhuma câmera foi encontrada neste dispositivo.";
+        } else if (errStr.includes("NotReadableError") || errStr.includes("TrackStartError")) {
           message = "A câmera já está sendo usada por outro aplicativo ou processo.";
         }
-      } else if (err instanceof Error) {
-        // Erros de fetch (ex.: TypeError "Load failed" no Safari/WebKit) ao
-        // carregar os modelos de reconhecimento facial não devem vazar a
-        // string crua do navegador para o operador do terminal.
-        message = "Não foi possível carregar os recursos de reconhecimento facial. Verifique a conexão de rede do terminal e tente novamente.";
+      } else if (errStr.includes("Load failed") || errStr.includes("Failed to fetch") || errStr.includes("404")) {
+        message = "Não foi possível carregar os recursos de reconhecimento facial. Verifique a conexão de rede ou o servidor de modelos do terminal.";
+      } else if (err instanceof Error && err.message) {
+        message = err.message;
       }
+
       setState({
         ready: false,
         starting: false,

@@ -27,6 +27,8 @@ export function PunchPhotoCapture({
   detectedName,
   onUseFallback,
 }: PunchPhotoCaptureProps) {
+  const isElectron = typeof window !== "undefined" && "facaamigos" in window;
+
   if (faceCapture.error) {
     return (
       <div
@@ -50,27 +52,46 @@ export function PunchPhotoCapture({
           {faceCapture.error}
         </strong>
         <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-          Verifique o ícone de câmera na barra de endereço do navegador e permita o acesso, ou continue pelo PIN.
+          {isElectron
+            ? "Verifique se a câmera USB está conectada ao computador e ativada nas configurações do Windows, ou continue pelo PIN."
+            : "Verifique a permissão de câmera no seu navegador ou continue pelo PIN."}
         </span>
-        {onUseFallback && (
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginTop: "6px" }}>
           <button
             type="button"
-            onClick={onUseFallback}
+            onClick={() => faceCapture.start()}
             style={{
-              marginTop: "6px",
-              border: "none",
+              border: "1px solid #d1d5db",
               borderRadius: "9999px",
-              padding: "10px 20px",
+              padding: "10px 18px",
               fontSize: "14px",
-              fontWeight: 700,
+              fontWeight: 600,
               cursor: "pointer",
-              background: "var(--color-primary-hover, #F0196B)",
-              color: "#fff",
+              background: "#fff",
+              color: "#374151",
             }}
           >
-            🔑 Usar Seleção / PIN
+            🔄 Tentar Novamente
           </button>
-        )}
+          {onUseFallback && (
+            <button
+              type="button"
+              onClick={onUseFallback}
+              style={{
+                border: "none",
+                borderRadius: "9999px",
+                padding: "10px 20px",
+                fontSize: "14px",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: "var(--color-primary-hover, #F0196B)",
+                color: "#fff",
+              }}
+            >
+              🔑 Usar Seleção / PIN
+            </button>
+          )}
+        </div>
       </div>
     );
   }

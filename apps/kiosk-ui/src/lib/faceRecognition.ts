@@ -19,7 +19,12 @@ export function loadFaceModels(): Promise<void> {
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-    ]).then(() => undefined);
+    ])
+      .then(() => undefined)
+      .catch((err) => {
+        modelsLoadedPromise = null;
+        throw err;
+      });
   }
   return modelsLoadedPromise;
 }
