@@ -207,6 +207,7 @@ function createWindow(protocol: "http" | "https", splash?: BrowserWindow) {
   });
   win.once("ready-to-show", () => {
     splash?.close();
+    win.maximize();
     win.show();
   });
   win.loadURL(`${protocol}://127.0.0.1:${PORT}`);
@@ -218,6 +219,7 @@ if (isPrimaryInstance) {
     const [win] = BrowserWindow.getAllWindows();
     if (win) {
       if (win.isMinimized()) win.restore();
+      win.maximize();
       win.focus();
     }
   });

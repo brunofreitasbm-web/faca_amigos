@@ -64,7 +64,10 @@ async function fetchHistoricalTicketSuggestions(units: Unit[]): Promise<Record<s
     const safeOrders = orders || [];
 
     for (const u of units) {
-      const uOrders = safeOrders.filter((o) => o.unit_id === u.id && (o.total_cents || 0) > 0);
+      const isParqueShopping = u.name.toLowerCase().includes("parque");
+      const uOrders = safeOrders.filter(
+        (o) => o.unit_id === u.id && (o.total_cents || 0) > 0 && (!isParqueShopping || (o.business_date && o.business_date >= "2026-08-26"))
+      );
       const isCircuito = u.kind === "QUIOSQUE" || u.name.toLowerCase().includes("circuito");
 
       if (uOrders.length === 0) {
@@ -113,7 +116,7 @@ async function fetchHistoricalTicketSuggestions(units: Unit[]): Promise<Record<s
         minReais: minReais.toFixed(2),
         targetReais: targetReais.toFixed(2),
         avgTicketReais: Math.round(combinedAvgReais),
-        reason: `Média ponderada para ${weekdayName} e dia ${currentDayOfMonth} (${uOrders.length} vendas analisadas nos últimos 90 dias)`,
+        reason: `Média ponderada para ${weekdayName} e dia ${currentDayOfMonth} (${uOrders.length} vendas analisadas${isParqueShopping ? " a partir de 26/08/2026" : " nos últimos 90 dias"})`,
         hasData: true,
       };
     }
@@ -164,8 +167,13 @@ async function fetchHistoricalWeekdayBaselines(units: Unit[]): Promise<Record<st
 
     for (const u of units) {
       const isCircuito = u.kind === "QUIOSQUE" || u.name.toLowerCase().includes("circuito");
-      const uOrders = safeOrders.filter((o) => o.unit_id === u.id);
-      const uSessions = safeSessions.filter((s) => s.unit_id === u.id);
+      const isParqueShopping = u.name.toLowerCase().includes("parque");
+      const uOrders = safeOrders.filter(
+        (o) => o.unit_id === u.id && (!isParqueShopping || (o.business_date && o.business_date >= "2026-08-26"))
+      );
+      const uSessions = safeSessions.filter(
+        (s) => s.unit_id === u.id && (!isParqueShopping || (s.business_date && s.business_date >= "2026-08-26"))
+      );
 
       if (uOrders.length === 0 && uSessions.length === 0) {
         result[u.id] = isCircuito ? DEFAULT_CIRCUITO_GOALS : DEFAULT_PLAYGROUND_GOALS;

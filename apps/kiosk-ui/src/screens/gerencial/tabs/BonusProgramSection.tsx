@@ -162,8 +162,9 @@ export function BonusProgramSection({ units }: { units: Unit[] }) {
       const statsMap: Record<string, HistoricalStats> = {};
 
       for (const u of units) {
-        const uOrders = orders.filter((o) => o.unit_id === u.id);
-        const uSessions = sessions.filter((s) => s.unit_id === u.id);
+        const isParqueShopping = u.name.toLowerCase().includes("parque");
+        const uOrders = orders.filter((o) => o.unit_id === u.id && (!isParqueShopping || (o.business_date && o.business_date >= "2026-08-26")));
+        const uSessions = sessions.filter((s) => s.unit_id === u.id && (!isParqueShopping || (s.business_date && s.business_date >= "2026-08-26")));
 
         const uniqueDays = new Set([
           ...uOrders.map((o) => o.business_date),
