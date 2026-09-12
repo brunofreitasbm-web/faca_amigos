@@ -279,13 +279,14 @@ export function BonusProgramSection({ units }: { units: Unit[] }) {
 
         const dailyMetaPonderadaAvg = totalMetaPonderadaMes / 29.4;
 
-        // 2. Faturamento Esperado no Mês (100% Meta e Supermeta)
+        // 2. Faturamento Esperado no Mês (100% Meta e Supermeta - Locações * R$ 48 TM para Quiosque)
+        const CIRCUITO_TM_REAIS = 48;
         const faturamentoEsperadoMeta = isCircuito
-          ? totalMetaPonderadaMes * unitStats.avgTicket
+          ? totalMetaPonderadaMes * CIRCUITO_TM_REAIS
           : totalMetaPonderadaMes;
 
         const faturamentoEsperadoSuper = isCircuito
-          ? totalSupermetaPonderadaMes * unitStats.avgTicket
+          ? totalSupermetaPonderadaMes * CIRCUITO_TM_REAIS
           : totalSupermetaPonderadaMes;
 
         // Estudo de Viabilidade da Meta em Relação ao Histórico
