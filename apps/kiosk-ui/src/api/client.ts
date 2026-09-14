@@ -1,4 +1,4 @@
-import { quoteForSession } from "@facaamigos/domain";
+import { quoteForSession, normalizeCpf, normalizePhoneE164 } from "@facaamigos/domain";
 import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
@@ -2249,6 +2249,53 @@ export const Api = {
     if (cleanCpf.length !== 11) throw new Error("CPF deve conter 11 dígitos numéricos.");
     const { error } = await supabase().from("fa_kiosk_guardians").update({ cpf: cleanCpf }).eq("id", guardianId);
     if (error) throw new Error(`Erro ao atualizar CPF: ${error.message}`);
+  },
+  /** Atualiza dados cadastrais de responsável, telefone, CPF e/ou nome da criança (utilizado no balcão e no Painel). */
+  updateCustomerRegistration: async (params: {
+    guardianId?: string | null;
+    childId?: string | null;
+    sessionId?: string | null;
+    guardianName?: string;
+    guardianPhone?: string;
+    guardianCpf?: string;
+    childName?: string;
+  }): Promise<void> => {
+    const { guardianId, childId, sessionId, guardianName, guardianPhone, guardianCpf, childName } = params;
+
+    if (guardianId) {
+      const updates: Record<string, unknown> = {};
+      if (guardianName !== undefined) updates.full_name = guardianName.trim();
+      if (guardianPhone !== undefined) {
+        const norm = normalizePhoneE164(guardianPhone);
+        if (norm) updates.phone_e164 = norm;
+      }
+      if (guardianCpf !== undefined) {
+        const cleanCpf = guardianCpf.replace(/\D/g, "");
+        if (cleanCpf) updates.cpf = cleanCpf;
+      }
+      if (Object.keys(updates).length > 0) {
+        const { error } = await supabase().from("fa_kiosk_guardians").update(updates).eq("id", guardianId);
+        if (error) throw new Error(`Erro ao atualizar dados do responsável: ${error.message}`);
+      }
+    }
+
+    if (childId && childName !== undefined) {
+      const { error } = await supabase().from("fa_kiosk_children").update({ full_name: childName.trim() }).eq("id", childId);
+      if (error) throw new Error(`Erro ao atualizar nome da criança: ${error.message}`);
+    }
+
+    if (sessionId) {
+      const sessionUpdates: Record<string, unknown> = {};
+      if (childName !== undefined) sessionUpdates.child_name_snapshot = childName.trim();
+      if (guardianName !== undefined) sessionUpdates.guardian_name_snapshot = guardianName.trim();
+      if (guardianPhone !== undefined) {
+        const norm = normalizePhoneE164(guardianPhone);
+        if (norm) sessionUpdates.guardian_phone_snapshot = norm;
+      }
+      if (Object.keys(sessionUpdates).length > 0) {
+        await supabase().from("fa_kiosk_sessions").update(sessionUpdates).eq("id", sessionId);
+      }
+    }
   },
   pdvOrder: (body: {
     unitId: string;

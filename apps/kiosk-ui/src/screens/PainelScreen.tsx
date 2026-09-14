@@ -16,6 +16,7 @@ import { SaidaManualModal } from "../components/SaidaManualModal.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
 import type { WristbandData } from "../components/WristbandPrintModal.js";
 import { SessionTimelineModal } from "../components/SessionTimelineModal.js";
+import { EditRegistrationModal } from "../components/EditRegistrationModal.js";
 import { getFriendlyWristbandCode } from "@facaamigos/domain";
 import { formatAge, formatElapsed, money } from "../format.js";
 import { EntradaScreen } from "./EntradaScreen.js";
@@ -101,6 +102,7 @@ export function PainelScreen() {
   const [closingSnapshot, setClosingSnapshot] = useState<Map<string, ActiveSessionEntry>>(new Map());
   const [printData, setPrintData] = useState<WristbandData | null>(null);
   const [timelineFor, setTimelineFor] = useState<ActiveSessionEntry | null>(null);
+  const [editRegistrationFor, setEditRegistrationFor] = useState<ActiveSessionEntry | null>(null);
   const [planOptions, setPlanOptions] = useState<Plan[]>([]);
   const [packageOptions, setPackageOptions] = useState<Package[]>([]);
   const [changingPlanFor, setChangingPlanFor] = useState<string | null>(null);
@@ -507,15 +509,31 @@ export function PainelScreen() {
           )}
         </div>
 
-        {/* Gauge de Ocupação do Parque */}
-        <div style={{ minWidth: "280px", flex: "0 1 340px" }} className="capacity-container">
-          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "13px", fontWeight: "bold" }}>
-            <span>Ocupação: {currentOccupancy} / {maxCapacity} {unit.kind === "QUIOSQUE" ? "carrinhos" : "crianças"}</span>
-            <span style={{ color: capacityTextColor }}>{occupancyPercent}% ({capacityLabel})</span>
+        {/* Gauge de Ocupação do Parque & Botão de Check-in */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ minWidth: "280px", flex: "0 1 340px" }} className="capacity-container">
+            <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "13px", fontWeight: "bold" }}>
+              <span>Ocupação: {currentOccupancy} / {maxCapacity} {unit.kind === "QUIOSQUE" ? "carrinhos" : "crianças"}</span>
+              <span style={{ color: capacityTextColor }}>{occupancyPercent}% ({capacityLabel})</span>
+            </div>
+            <div className="capacity-bar-track" role="progressbar" aria-valuenow={occupancyPercent} aria-valuemin={0} aria-valuemax={100}>
+              <div className="capacity-bar-fill" style={{ width: `${occupancyPercent}%`, backgroundColor: capacityColor }} />
+            </div>
           </div>
-          <div className="capacity-bar-track" role="progressbar" aria-valuenow={occupancyPercent} aria-valuemin={0} aria-valuemax={100}>
-            <div className="capacity-bar-fill" style={{ width: `${occupancyPercent}%`, backgroundColor: capacityColor }} />
-          </div>
+          <IfCan capability="sessao.checkin">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => {
+                setPreCheckinPrefill(null);
+                setEntradaOpen(true);
+              }}
+              title="Fazer nova entrada/check-in sem sair do Painel (Teclas E ou F2)"
+              style={{ gap: "6px", fontWeight: "bold", whiteSpace: "nowrap", height: "42px", borderRadius: "12px" }}
+            >
+              ⚡ Novo Check-in (E)
+            </Button>
+          </IfCan>
         </div>
       </div>
 
@@ -1164,6 +1182,23 @@ export function PainelScreen() {
                   visível embaixo do ícone (ver ICON_BUTTON_LABEL_STYLE
                   acima), não só um Tooltip de hover. */}
               <div style={{ display: "flex", gap: "6px" }}>
+                <IfCan capability="clientes.write">
+                  <Tooltip label="Editar dados cadastrais: responsável, telefone, CPF e criança">
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      aria-label="Editar dados cadastrais"
+                      style={ICON_BUTTON_STYLE}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditRegistrationFor(entry);
+                      }}
+                    >
+                      <span style={{ fontSize: "16px" }}>✏️</span>
+                      <span style={ICON_BUTTON_LABEL_STYLE}>Editar</span>
+                    </Button>
+                  </Tooltip>
+                </IfCan>
                 <Tooltip label="Ver linha do tempo completa desta sessão: chegada, plano, pausas e retomadas">
                   <Button
                     variant="ghost"
@@ -1426,6 +1461,24 @@ export function PainelScreen() {
       )}
 
       {timelineFor && <SessionTimelineModal entry={timelineFor} onClose={() => setTimelineFor(null)} />}
+
+      {editRegistrationFor && (
+        <EditRegistrationModal
+          open={Boolean(editRegistrationFor)}
+          onClose={() => setEditRegistrationFor(null)}
+          onSaved={() => {
+            refetchActiveSessions();
+          }}
+          initialData={{
+            guardianId: editRegistrationFor.session.guardian_id,
+            childId: editRegistrationFor.session.child_id,
+            sessionId: editRegistrationFor.session.id,
+            guardianName: editRegistrationFor.session.guardian_name_snapshot,
+            guardianPhone: editRegistrationFor.session.guardian_phone_snapshot,
+            childName: editRegistrationFor.session.child_name_snapshot,
+          }}
+        />
+      )}
 
 
 
