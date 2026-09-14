@@ -27,14 +27,17 @@ const STATUS_LABEL: Record<FiscalDoc["status"], string> = {
   CANCELADO: "Cancelada",
 };
 
+import { Api } from "../api/client.js";
+
 /**
- * Cupom NFC-e de uma venda do PDV. Só mostra chave de acesso e QR Code
- * quando o documento está AUTORIZADO — chave e URL do QR vêm prontas do
- * worker (que é quem tem o CSC); nunca são montadas aqui, porque uma chave
- * ou QR fabricados no cliente não têm valor fiscal e confundiriam o balcão.
+ * Cupom NFC-e de uma venda do PDV.
+ * Exibe o DANFE NFC-e quando autorizado pela SEFAZ ou o Comprovante Auxiliar de Venda
+ * nos demais casos, permitindo sempre impressão, exportação em PDF e envio por WhatsApp.
  */
 export function NfceModal({ doc, unitName, orderCode, items = [], payments = [], fiscalCpf, onClose }: NfceModalProps) {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [retryBusy, setRetryBusy] = useState(false);
+  const [retryMsg, setRetryMsg] = useState<string | null>(null);
 
   const isAutorizado = doc?.status === "AUTORIZADO";
   const isContingencia = doc?.status === "CONTINGENCIA_OFFLINE" || doc?.emission_type === "CONTINGENCIA_OFFLINE";
@@ -68,6 +71,54 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
       } satisfies DanfeNfcePayload)
     : null;
 
+  const statusLabel = doc ? STATUS_LABEL[doc.status] ?? doc.status : "Sem documento fiscal";
+  const errorText = doc?.last_error ?? doc?.reject_message ?? null;
+
+  function buildAuxiliaryReceiptText(): string {
+    const lines: string[] = [];
+    lines.push("================================================");
+    lines.push("               FAÇA AMIGOS                      ");
+    lines.push(`           ${unitName.toUpperCase()}`);
+    lines.push("================================================");
+    lines.push("           COMPROVANTE AUXILIAR DE VENDA        ");
+    lines.push("        DA NOTA FISCAL DE CONSUMIDOR ELETRÔNICA   ");
+    lines.push("------------------------------------------------");
+    if (orderCode) lines.push(`Pedido nº ${orderCode}`);
+    lines.push(`Data/Hora: ${dateTimeStr}`);
+    lines.push("------------------------------------------------");
+    lines.push("ITEM                                QTD    VALOR");
+    lines.push("------------------------------------------------");
+    for (const item of items) {
+      const desc = item.description.padEnd(28, " ").slice(0, 28);
+      const qty = String(item.quantity).padStart(4, " ");
+      const val = (item.amountCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).padStart(10, " ");
+      lines.push(`${desc} ${qty} R$ ${val}`);
+    }
+    lines.push("------------------------------------------------");
+    lines.push(`TOTAL:                                 R$ ${(totalCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).padStart(10, " ")}`);
+
+    if (payments.length > 0) {
+      lines.push("------------------------------------------------");
+      lines.push("FORMA DE PAGAMENTO:");
+      for (const p of payments) {
+        const pVal = (p.amountCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).padStart(10, " ");
+        lines.push(` - ${p.method.padEnd(20, " ")} R$ ${pVal}`);
+      }
+    }
+
+    lines.push("------------------------------------------------");
+    lines.push(fiscalCpf ? `CONSUMIDOR CPF: ${fiscalCpf}` : "CONSUMIDOR NÃO IDENTIFICADO");
+    lines.push("------------------------------------------------");
+    lines.push(`SITUAÇÃO FISCAL: ${statusLabel.toUpperCase()}`);
+    if (doc?.numero != null) {
+      lines.push(`Numeração Reservada: NFC-e nº ${doc.numero} / série ${doc.serie ?? "1"}`);
+    }
+    lines.push("================================================");
+    return lines.join("\n");
+  }
+
+  const receiptText = danfe ? danfe.text : buildAuxiliaryReceiptText();
+
   useEffect(() => {
     if (!qrCodeUrl) {
       setQrCodeDataUrl(null);
@@ -86,8 +137,22 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
     };
   }, [qrCodeUrl]);
 
+  async function handleRetryNfce() {
+    if (!doc) return;
+    setRetryBusy(true);
+    setRetryMsg(null);
+    try {
+      await Api.retryNfce(doc.id);
+      setRetryMsg("✅ Reenviado para transmissão! Uma nova numeração e chave de acesso foram reservadas para evitar duplicidade.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao tentar novamente";
+      setRetryMsg(`❌ ${msg}`);
+    } finally {
+      setRetryBusy(false);
+    }
+  }
+
   function handlePrint() {
-    if (!danfe) return;
     let iframe = document.getElementById("fa-nfce-print-iframe") as HTMLIFrameElement | null;
     if (!iframe) {
       iframe = document.createElement("iframe");
@@ -114,7 +179,7 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
       <html lang="pt-BR">
         <head>
           <meta charset="UTF-8">
-          <title>DANFE NFC-e — FaçaAmigos</title>
+          <title>DANFE NFC-e / Comprovante — FaçaAmigos</title>
           <style>
             @page {
               size: 80mm auto;
@@ -148,7 +213,7 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
           </style>
         </head>
         <body>
-          <pre>${danfe.text}</pre>
+          <pre>${receiptText}</pre>
           ${
             qrCodeDataUrl
               ? `<div class="qr-container"><img src="${qrCodeDataUrl}" alt="QR Code NFC-e" /></div>`
@@ -169,15 +234,88 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
     }, 150);
   }
 
-  const statusLabel = doc ? STATUS_LABEL[doc.status] ?? doc.status : "Sem documento fiscal";
-  const errorText = doc?.last_error ?? doc?.reject_message ?? null;
+  function handleOpenPdf() {
+    const printWin = window.open("", "_blank");
+    if (!printWin) return;
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <title>Comprovante de Venda — FaçaAmigos ${orderCode ? `#${orderCode}` : ""}</title>
+          <style>
+            body {
+              font-family: "Consolas", "Courier New", monospace;
+              font-size: 12px;
+              line-height: 1.3;
+              max-width: 400px;
+              margin: 20px auto;
+              padding: 20px;
+              border: 1px solid #ccc;
+              border-radius: 8px;
+              background: #fff;
+              color: #111;
+            }
+            pre {
+              white-space: pre-wrap;
+              word-break: break-all;
+              margin: 0;
+              font-family: inherit;
+            }
+            .qr-container {
+              text-align: center;
+              margin-top: 16px;
+            }
+            .qr-container img {
+              width: 150px;
+              height: 150px;
+            }
+            .no-print {
+              margin-bottom: 16px;
+              text-align: center;
+            }
+            @media print {
+              .no-print { display: none; }
+              body { border: none; margin: 0; padding: 0; max-width: 100%; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print">
+            <button onclick="window.print()" style="padding: 8px 16px; font-size: 14px; cursor: pointer; background: #2ECFB5; color: #fff; border: none; border-radius: 6px; font-weight: bold;">
+              🖨️ Salvar como PDF / Imprimir
+            </button>
+          </div>
+          <pre>${receiptText}</pre>
+          ${qrCodeDataUrl ? `<div class="qr-container"><img src="${qrCodeDataUrl}" alt="QR Code NFC-e" /></div>` : ""}
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+  }
+
+  function handleWhatsAppSend() {
+    const textLines = [
+      `*FaçaAmigos — Comprovante de Venda* (${unitName})`,
+      orderCode ? `Pedido: #${orderCode}` : "",
+      `Data: ${dateTimeStr}`,
+      `Total: R$ ${(totalCents / 100).toFixed(2).replace(".", ",")}`,
+      "",
+      "Itens:",
+      ...items.map((it) => `- ${it.quantity}x ${it.description} (R$ ${(it.amountCents / 100).toFixed(2).replace(".", ",")})`),
+      "",
+      accessKey ? `✅ NFC-e Autorizada: ${accessKey}` : `Status Fiscal: ${statusLabel}`,
+    ].filter(Boolean).join("\n");
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(textLines)}`, "_blank");
+  }
 
   return (
     <Modal
       title={
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
           <span style={{ fontFamily: "var(--font-display)", color: "var(--color-primary-hover)" }}>
-            Cupom Fiscal — NFC-e {orderCode ? `(#${orderCode})` : ""}
+            Cupom Fiscal / Comprovante {orderCode ? `(#${orderCode})` : ""}
           </span>
           {isAutorizado && <Tag color="var(--color-teal, #2ECFB5)">✅ Autorizado SEFAZ-PA</Tag>}
           {isContingencia && <Tag color="var(--color-amber, #F59E0B)">⚠️ Contingência Offline</Tag>}
@@ -203,70 +341,62 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
       )}
 
       {isErro && (
-        <div style={{ background: "#FEE2E2", color: "#991B1B", padding: "10px 14px", borderRadius: "8px", fontSize: "13px" }}>
-          ❌ <strong>Falha no processamento fiscal{doc?.reject_code ? ` (código ${doc.reject_code})` : ""}:</strong>{" "}
-          {errorText ?? "Verifique o NCM dos produtos, o CSC ou os dados da Inscrição Estadual em Gerencial > Dados Fiscais."}
-        </div>
-      )}
-
-      {canRenderDanfe && danfe ? (
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-start" }}>
-          <div style={{ flex: 1, minWidth: "260px" }}>
-            <pre
-              style={{
-                background: "#ffffff",
-                color: "#141414",
-                padding: "12px",
-                borderRadius: "8px",
-                border: "1px dashed var(--border-subtle, #ccc)",
-                fontFamily: '"Consolas", "Courier New", monospace',
-                fontSize: "11px",
-                lineHeight: "1.25",
-                fontWeight: 600,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
-                maxHeight: "300px",
-                overflowY: "auto",
-                margin: 0,
-              }}
-            >
-              {danfe.text}
-            </pre>
-          </div>
-
-          {qrCodeDataUrl ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "8px", background: "#F9FAFB", borderRadius: "8px", border: "1px solid var(--border-subtle, #eee)" }}>
-              <img src={qrCodeDataUrl} alt="QR Code Consulta NFC-e" style={{ width: "130px", height: "130px" }} />
-              <span style={{ fontSize: "10px", color: "var(--text-muted)", textAlign: "center", maxWidth: "130px" }}>
-                Escaneie para consultar na SEFAZ-PA
-              </span>
-            </div>
-          ) : (
-            <HelpText style={{ maxWidth: "150px", fontSize: "11px" }}>
-              QR Code ainda não disponível para este documento (o emissor grava a URL do QR junto com a autorização).
-            </HelpText>
-          )}
-        </div>
-      ) : (
-        <div style={{ background: "var(--surface-sunken, #F3F4F6)", padding: "12px 14px", borderRadius: "8px", fontSize: "13px", display: "flex", flexDirection: "column", gap: "6px" }}>
+        <div style={{ background: "#FEE2E2", color: "#991B1B", padding: "10px 14px", borderRadius: "8px", fontSize: "13px", display: "flex", flexDirection: "column", gap: "8px" }}>
           <div>
-            <strong>Situação:</strong> {statusLabel}
+            ❌ <strong>Falha no processamento fiscal{doc?.reject_code ? ` (código ${doc.reject_code})` : ""}:</strong>{" "}
+            {errorText ?? "Verifique os dados fiscais da unidade ou tente o reenvio automático."}
           </div>
-          {doc?.numero != null && (
-            <div>
-              <strong>Numeração reservada:</strong> NFC-e nº {doc.numero} / série {doc.serie ?? "1"}
-            </div>
-          )}
-          {errorText && (
-            <div>
-              <strong>Detalhe:</strong> {errorText}
-            </div>
-          )}
-          <HelpText style={{ margin: 0 }}>
-            O cupom com chave de acesso e QR Code só fica disponível depois da autorização pela SEFAZ-PA.
-          </HelpText>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <Button variant="primary" size="sm" onClick={handleRetryNfce} loading={retryBusy}>
+              🔄 Tentar Novamente na SEFAZ
+            </Button>
+          </div>
         </div>
       )}
+
+      {retryMsg && (
+        <div style={{ background: "#F0FDF4", color: "#166534", padding: "10px 14px", borderRadius: "8px", fontSize: "13px" }}>
+          {retryMsg}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: "260px" }}>
+          <pre
+            style={{
+              background: "#ffffff",
+              color: "#141414",
+              padding: "12px",
+              borderRadius: "8px",
+              border: "1px dashed var(--border-subtle, #ccc)",
+              fontFamily: '"Consolas", "Courier New", monospace',
+              fontSize: "11px",
+              lineHeight: "1.25",
+              fontWeight: 600,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+              maxHeight: "300px",
+              overflowY: "auto",
+              margin: 0,
+            }}
+          >
+            {receiptText}
+          </pre>
+        </div>
+
+        {qrCodeDataUrl ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "8px", background: "#F9FAFB", borderRadius: "8px", border: "1px solid var(--border-subtle, #eee)" }}>
+            <img src={qrCodeDataUrl} alt="QR Code Consulta NFC-e" style={{ width: "130px", height: "130px" }} />
+            <span style={{ fontSize: "10px", color: "var(--text-muted)", textAlign: "center", maxWidth: "130px" }}>
+              Escaneie para consultar na SEFAZ-PA
+            </span>
+          </div>
+        ) : (
+          <HelpText style={{ maxWidth: "150px", fontSize: "11px" }}>
+            {isAutorizado ? "Gerando QR Code..." : "QR Code fiscal será incluído assim que a SEFAZ autorizar a NFC-e."}
+          </HelpText>
+        )}
+      </div>
 
       {accessKey && (
         <HelpText style={{ fontSize: "11px", wordBreak: "break-all" }}>
@@ -276,26 +406,25 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
         </HelpText>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-        {isAutorizado ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-            <Button variant="ghost" disabled title="Cancelamento pela SEFAZ será liberado em uma próxima versão.">
-              🚫 Solicitar Cancelamento
-            </Button>
-            <HelpText style={{ margin: 0, fontSize: "11px" }}>Cancelamento pela SEFAZ será liberado em uma próxima versão.</HelpText>
-          </div>
-        ) : (
-          <div />
-        )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <Button variant="secondary" onClick={handleWhatsAppSend} title="Enviar resumo do comprovante por WhatsApp para o cliente">
+            📱 Enviar WhatsApp
+          </Button>
+          <Button variant="secondary" onClick={handleOpenPdf} title="Abrir em nova aba para salvar em PDF ou imprimir em folha A4">
+            📄 Baixar / Ver PDF
+          </Button>
+        </div>
         <div style={{ display: "flex", gap: "8px" }}>
           <Button variant="secondary" onClick={onClose}>
             Fechar
           </Button>
-          <Button variant="primary" onClick={handlePrint} disabled={!canRenderDanfe}>
-            🖨️ Imprimir DANFE NFC-e
+          <Button variant="primary" onClick={handlePrint} title="Imprimir comprovante térmico (80mm)">
+            🖨️ Imprimir
           </Button>
         </div>
       </div>
     </Modal>
   );
 }
+

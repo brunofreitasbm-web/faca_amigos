@@ -211,25 +211,32 @@ export async function processarNfceReal(deps: ClaimDeps, item: ClaimedFiscalDoc)
   let numero = doc.numero;
   let codigoNumerico: string;
 
-  if (doc.accessKey) {
+  const isDuplicidade539 =
+    doc.accessKey &&
+    (item.doc.status === "REJEITADO" ||
+      item.doc.status === "BLOQUEADO" ||
+      (doc as { reject_code?: string }).reject_code === "539" ||
+      (doc as { last_error?: string }).last_error?.includes("539") ||
+      (doc as { last_error?: string }).last_error?.includes("Duplicidade"));
+
+  if (doc.accessKey && !isDuplicidade539) {
     // Retentativa de um documento que já chegou a montar uma chave de
     // acesso antes — reaproveita número e cNF para a chave sair idêntica.
     numero = doc.numero;
     codigoNumerico = doc.accessKey.slice(35, 43);
   } else {
-    if (numero == null) {
-      const { data: reservado, error: reserveError } = await supabase.rpc("fa_fiscal_reserve_number", {
-        p_unit_id: unit.id,
-        p_doc_type: "NFCE",
-        p_environment: doc.environment,
-        p_serie: serie,
-      });
-      if (reserveError) {
-        await bloquear(supabase, doc.id, `Falha ao reservar numeração da NFC-e: ${reserveError.message}`);
-        return;
-      }
-      numero = reservado as number;
+    // Se for Rejeição 539 (duplicidade na SEFAZ) ou documento novo sem chave, reserva um NOVO número
+    const { data: reservado, error: reserveError } = await supabase.rpc("fa_fiscal_reserve_number", {
+      p_unit_id: unit.id,
+      p_doc_type: "NFCE",
+      p_environment: doc.environment,
+      p_serie: serie,
+    });
+    if (reserveError) {
+      await bloquear(supabase, doc.id, `Falha ao reservar nova numeração da NFC-e após rejeição de duplicidade: ${reserveError.message}`);
+      return;
     }
+    numero = reservado as number;
     codigoNumerico = randomInt(0, 1e8).toString().padStart(8, "0");
     // cNF aleatório não pode coincidir com nNF — montarXmlNfce lançaria erro
     // de validação; regenera uma vez para evitar isso na prática.
