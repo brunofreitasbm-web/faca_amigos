@@ -212,14 +212,18 @@ export async function processarNfceReal(deps: ClaimDeps, item: ClaimedFiscalDoc)
   let codigoNumerico: string;
 
   const isDuplicidade539 =
-    doc.accessKey &&
+    Boolean(doc.accessKey) &&
     (item.doc.status === "REJEITADO" ||
       item.doc.status === "BLOQUEADO" ||
       (doc as { reject_code?: string }).reject_code === "539" ||
       (doc as { last_error?: string }).last_error?.includes("539") ||
       (doc as { last_error?: string }).last_error?.includes("Duplicidade"));
 
-  if (doc.accessKey && !isDuplicidade539) {
+  if (isDuplicidade539) {
+    doc.accessKey = null;
+  }
+
+  if (doc.accessKey && doc.numero != null) {
     // Retentativa de um documento que já chegou a montar uma chave de
     // acesso antes — reaproveita número e cNF para a chave sair idêntica.
     numero = doc.numero;

@@ -344,13 +344,25 @@ describe("processarNfceReal", () => {
     expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ status: "AUTORIZADO" }));
   });
 
-  it("não reserva numeração quando o documento já tem doc.numero", async () => {
-    const item = makeItem({ doc: { numero: 55 } });
+  it("não reserva numeração quando o documento já tem doc.numero e accessKey válidos", async () => {
+    const item = makeItem({ doc: { numero: 55, accessKey: CHAVE_TESTE } });
     const { supabase, rpcMock } = createSupabaseMock();
 
     await processarNfceReal({ supabase, terminalId: "t1", simulado: false } as ClaimDeps, item);
 
     expect(rpcMock).not.toHaveBeenCalledWith("fa_fiscal_reserve_number", expect.anything());
+  });
+
+  it("reserva nova numeração quando o documento teve rejeição 539 de duplicidade", async () => {
+    const item = makeItem({ doc: { numero: 55, accessKey: CHAVE_TESTE, reject_code: "539", status: "REJEITADO" } });
+    const { supabase, rpcMock } = createSupabaseMock();
+
+    await processarNfceReal({ supabase, terminalId: "t1", simulado: false } as ClaimDeps, item);
+
+    expect(rpcMock).toHaveBeenCalledWith(
+      "fa_fiscal_reserve_number",
+      expect.objectContaining({ p_unit_id: item.unit.id, p_doc_type: "NFCE", p_environment: item.doc.environment, p_serie: "1" }),
+    );
   });
 
   it("consulta por chave antes de retransmitir quando o documento já tem access_key; autorizada, não chama autorizar de novo", async () => {
