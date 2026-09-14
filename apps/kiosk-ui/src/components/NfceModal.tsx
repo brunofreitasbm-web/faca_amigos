@@ -346,7 +346,13 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
             ❌ <strong>Falha no processamento fiscal{doc?.reject_code ? ` (código ${doc.reject_code})` : ""}:</strong>{" "}
             {errorText ?? "Verifique os dados fiscais da unidade ou tente o reenvio automático."}
           </div>
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+            <Button variant="secondary" size="sm" onClick={handleOpenPdf} title="Baixar ou visualizar Comprovante Auxiliar de Venda em PDF">
+              📄 Baixar / Ver PDF
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleWhatsAppSend} title="Enviar Comprovante Auxiliar de Venda por WhatsApp">
+              📱 Enviar WhatsApp
+            </Button>
             <Button variant="primary" size="sm" onClick={handleRetryNfce} loading={retryBusy}>
               🔄 Tentar Novamente na SEFAZ
             </Button>

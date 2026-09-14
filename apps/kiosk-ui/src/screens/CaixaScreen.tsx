@@ -1133,14 +1133,24 @@ export function CaixaScreen() {
                               >
                                 ❌ {doc.status} (Motivo)
                               </button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEmitNfse(s)}
-                                title="Tentar emitir NFS-e novamente"
-                              >
-                                🔄 Tentar Novamente
-                              </Button>
+                              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center" }}>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => setSelectedSaleForNfce({ sale: s, doc })}
+                                  title="Ver Comprovante Auxiliar de Venda, gerar PDF ou enviar por WhatsApp"
+                                >
+                                  📄 Comprovante
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEmitNfse(s)}
+                                  title="Tentar emitir novamente"
+                                >
+                                  🔄 Reenviar
+                                </Button>
+                              </div>
                             </div>
                           );
                         }
@@ -1279,35 +1289,48 @@ export function CaixaScreen() {
               </div>
             )}
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
               <Button variant="ghost" onClick={() => setFiscalErrorModal(null)}>
                 Fechar
               </Button>
-              {isNfse ? (
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <Button
                   variant="secondary"
                   onClick={() => {
-                    const sale = fiscalErrorModal.sale;
+                    const { sale, doc } = fiscalErrorModal;
                     setFiscalErrorModal(null);
-                    handleEmitNfse(sale);
+                    setSelectedSaleForNfce({ sale, doc });
                   }}
+                  title="Abrir Comprovante Auxiliar de Venda para gerar PDF ou enviar por WhatsApp"
                 >
-                  🔄 Tentar Emissão Novamente
+                  📄 Ver Comprovante / PDF / WhatsApp
                 </Button>
-              ) : (
-                <IfCan capability="nfce.retry">
+                {isNfse ? (
                   <Button
                     variant="secondary"
                     onClick={() => {
-                      const { sale, doc } = fiscalErrorModal;
+                      const sale = fiscalErrorModal.sale;
                       setFiscalErrorModal(null);
-                      handleRetryNfce(sale, doc);
+                      handleEmitNfse(sale);
                     }}
                   >
-                    🔄 Tentar Novamente
+                    🔄 Tentar Emissão Novamente
                   </Button>
-                </IfCan>
-              )}
+                ) : (
+                  <IfCan capability="nfce.retry">
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        const { sale, doc } = fiscalErrorModal;
+                        setFiscalErrorModal(null);
+                        handleRetryNfce(sale, doc);
+                      }}
+                    >
+                      🔄 Tentar Novamente
+                    </Button>
+                  </IfCan>
+                )}
+              </div>
             </div>
           </div>
         </Modal>
