@@ -715,7 +715,7 @@ export function CaixaScreen() {
               <SummaryRow
                 label="Quebra / sobra"
                 value={fmtBreak(closeResult.cashBreakCents ?? 0, "quebra")}
-                tone={(closeResult.cashBreakCents ?? 0) === 0 ? "ok" : "warn"}
+                tone={(closeResult.cashBreakCents ?? 0) < 0 ? "warn" : "ok"}
               />
               <SummaryRow label="Fundo de caixa para o próximo dia" value={money(closeResult.nextDayFloatCents ?? 0)} strong />
               <SummaryRow label="Valor no envelope" value={money(closeResult.envelopeCents ?? 0)} strong />
@@ -763,7 +763,7 @@ export function CaixaScreen() {
       const isShortage = divergenceCents < 0;
       return !isShortage || (closeJustifications[method] ?? "").trim().length >= 3;
     });
-    const gavetaJustificationOk = cm.cashBreakCents === 0 || (closeJustifications.GAVETA ?? "").trim().length >= 3;
+    const gavetaJustificationOk = cm.cashBreakCents >= 0 || (closeJustifications.GAVETA ?? "").trim().length >= 3;
     const canConfirmClose = methodsOk && cm.countedValid && cm.floatValid && cm.envelopeRegistered && gavetaJustificationOk;
     const otherMovementsCents = cm.suprimentosCents + cm.ajustesCents - cm.sangriasAvulsasCents - cm.envelopesCents;
     return (
@@ -870,17 +870,17 @@ export function CaixaScreen() {
               style={{
                 margin: 0,
                 fontWeight: "bold",
-                color: cm.cashBreakCents === 0 ? "var(--color-teal-text)" : "var(--color-error-text)",
+                color: cm.cashBreakCents < 0 ? "var(--color-error-text)" : "var(--color-teal-text)",
               }}
             >
-              {cm.cashBreakCents === 0
-                ? "✓ Contagem bate com o esperado pelo sistema"
-                : `⚠ ${fmtBreak(cm.cashBreakCents, "quebra")} em relação ao esperado — justifique abaixo`}
+              {cm.cashBreakCents < 0
+                ? `⚠ ${fmtBreak(cm.cashBreakCents, "quebra")} em relação ao esperado — justifique abaixo`
+                : "✓ Contagem bate com o esperado pelo sistema (sem divergência)"}
             </p>
           )}
-          {cm.countedValid && cm.cashBreakCents !== 0 && (
+          {cm.countedValid && cm.cashBreakCents < 0 && (
             <Input
-              placeholder="Por que a contagem não bateu? (mín. 3 caracteres)"
+              placeholder="Por que houve falta na contagem? (mín. 3 caracteres)"
               value={closeJustifications.GAVETA ?? ""}
               onChange={(e) => setCloseJustifications((prev) => ({ ...prev, GAVETA: e.target.value }))}
             />
@@ -956,7 +956,7 @@ export function CaixaScreen() {
         </div>
       )}
 
-      {shift.opening_divergence_cents !== null && shift.opening_divergence_cents !== 0 && (
+      {shift.opening_divergence_cents !== null && shift.opening_divergence_cents < 0 && (
         <div
           role="alert"
           style={{ fontSize: "13px", color: "var(--color-error-text)", background: "rgba(232,48,48,0.08)", border: "1px solid var(--color-error)", borderRadius: "10px", padding: "8px 12px" }}
@@ -1511,7 +1511,7 @@ export function CaixaScreen() {
                   Fundo previsto pelo último fechamento: <strong>{money(shiftOpenSuccessModal.expectedOpeningCashCents)}</strong>
                 </div>
               )}
-              {shiftOpenSuccessModal.openingDivergenceCents !== null && shiftOpenSuccessModal.openingDivergenceCents !== 0 ? (
+              {shiftOpenSuccessModal.openingDivergenceCents !== null && shiftOpenSuccessModal.openingDivergenceCents < 0 ? (
                 <div
                   role="alert"
                   style={{ fontSize: "14px", fontWeight: "bold", color: "var(--color-error-text)", background: "rgba(232,48,48,0.08)", padding: "8px", borderRadius: "8px" }}

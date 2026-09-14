@@ -19,7 +19,7 @@ function DiffCell({ cents, negativeWord }: { cents: number | null; negativeWord:
   if (cents === null) return <>—</>;
   if (cents === 0) return <span style={{ color: "var(--color-teal-text)" }}>✓ ok</span>;
   return (
-    <span style={{ color: "var(--color-error-text)", fontWeight: "bold" }}>
+    <span style={{ color: cents > 0 ? "var(--color-teal-text)" : "var(--color-error-text)", fontWeight: "bold" }}>
       {cents > 0 ? `sobra ${money(cents)}` : `${negativeWord} ${money(Math.abs(cents))}`}
     </span>
   );
