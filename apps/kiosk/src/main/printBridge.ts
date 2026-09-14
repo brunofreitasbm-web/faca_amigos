@@ -31,6 +31,17 @@ const SWEEP_INTERVAL_MS = 10_000;
 import QRCode from "qrcode";
 import { getFriendlyWristbandCode } from "@facaamigos/domain";
 
+/**
+ * Suspenso a pedido: a Gainscha GS-2208D não está em modo de comando TSPL
+ * neste momento e imprime cada linha do payload literalmente como texto
+ * (SIZE, GAP, DIRECTION, CLS, CODEPAGE... saem impressos na pulseira em vez
+ * de virarem configuração de etiqueta). Até a impressora ser reconfigurada
+ * para modo TSPL/label, nenhum job de pulseira tenta imprimir — só falha
+ * de forma visível (toast em Configurações > Impressoras via
+ * usePrintFailureAlerts) em vez de desperdiçar etiqueta.
+ */
+const WRISTBAND_PRINTING_SUSPENDED = true;
+
 interface WristbandPayload {
   wristbandCode: string;
   childName: string;
@@ -434,6 +445,11 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
       const isVirtualOrPdf = isVirtualOrPdfPrinter(deviceName);
 
       if (job.kind === "WRISTBAND") {
+        if (WRISTBAND_PRINTING_SUSPENDED) {
+          throw new Error(
+            "Impressão de pulseira suspensa manualmente: impressora fora do modo TSPL, imprimindo comando cru como texto.",
+          );
+        }
         if (isVirtualOrPdf) {
           const html = await wristbandHtml(job.payload_json as unknown as WristbandPayload);
           await printHtml(html, deviceName);
