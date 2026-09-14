@@ -123,10 +123,21 @@ export function encodeCp860(str: string): number[] {
   return bytes;
 }
 
+/**
+ * Não faz mais centralização manual (preenchendo com espaços à esquerda).
+ * A impressora já recebe `ESC a 1` (alinhamento centralizado, ver
+ * `hexHeader`) e o fallback HTML usa `text-align: center` — ambos calculam
+ * a centralização a partir da largura REAL da bobina/área de impressão.
+ * Quando esta função também preenchia espaços à esquerda assumindo 42
+ * colunas, as duas centralizações se somavam: em bobinas de 80mm (cuja
+ * Font A costuma ter 48 colunas, não 42) o texto saía puxado para a
+ * direita, e de forma inconsistente entre linhas curtas (dupla
+ * centralização) e linhas de largura cheia como os divisores (só uma).
+ * Só recorta o texto se ele estourar a largura máxima da linha.
+ */
 function centerText(str: string, width = WIDTH): string {
   if (str.length >= width) return str.slice(0, width);
-  const left = Math.floor((width - str.length) / 2);
-  return " ".repeat(left) + str;
+  return str;
 }
 
 /**
