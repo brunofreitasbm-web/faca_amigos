@@ -13,9 +13,10 @@
 // hub.operacao.lojas@gmail.com, o que deixava esse canal fora do domínio
 // institutofacaamigos.com.br e sem DKIM/SPF alinhados aos demais envios.
 // BREVO_API_KEY, BREVO_FROM e BREVO_REPLY_TO cadastrados como secrets da
-// Edge Function (BREVO_REPLY_TO é obrigatório: o domínio não tem caixa de
-// entrada própria — sem MX — então qualquer resposta precisa ir para uma
-// caixa que alguém lê de verdade).
+// Edge Function. BREVO_REPLY_TO é obrigatório na prática — o domínio não
+// tem caixa de entrada própria (sem MX) — mas o código já cai para
+// institutofacaamigos@gmail.com (caixa oficial monitorada, definida pelo
+// dono em 2026-09-14) se o secret não estiver setado.
 //
 // CORS/JSON helpers inline pelo mesmo motivo de owner-report-dispatch:
 // nunca é chamada por um navegador (só pelo pg_cron/pg_net), e o import
@@ -122,7 +123,7 @@ Deno.serve(async (req) => {
   const brevoApiKey = Deno.env.get("BREVO_API_KEY");
   const brevoFrom =
     Deno.env.get("BREVO_FROM") ?? "Instituto Faça Amigos <instituto@institutofacaamigos.com.br>";
-  const brevoReplyTo = Deno.env.get("BREVO_REPLY_TO");
+  const brevoReplyTo = Deno.env.get("BREVO_REPLY_TO") ?? "institutofacaamigos@gmail.com";
   if (!brevoApiKey) {
     return jsonResponse({ error: "BREVO_API_KEY não configurado" }, 500);
   }

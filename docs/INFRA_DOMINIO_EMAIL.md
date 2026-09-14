@@ -42,19 +42,49 @@ de `Reply-To` apontando para uma caixa que alguém realmente lê, senão
 qualquer resposta de paciente/responsável volta com erro de entrega.
 
 - `clinica_facaamigos`: `lib/email.ts` exporta `DEFAULT_REPLY_TO` (env
-  `BREVO_REPLY_TO`).
+  `BREVO_REPLY_TO`, cai em `institutofacaamigos@gmail.com` se não setado).
 - `faca_amigos`: `supabase/functions/owner-email-dispatch/index.ts` lê
-  `BREVO_REPLY_TO` da mesma forma.
+  `BREVO_REPLY_TO` da mesma forma (mesmo fallback).
 - `controle-de-estagiario`: `supabase/functions/notify-professional-nfse/index.ts`
-  já aceita `BREVO_FROM`/`BREVO_SENDER_EMAIL` — adicionar `BREVO_REPLY_TO`
-  no mesmo padrão quando for feita a próxima alteração nessa função.
+  também lê `BREVO_REPLY_TO` (mesmo fallback), além de `BREVO_FROM`/
+  `BREVO_SENDER_EMAIL`.
 
-**Pendência que só o dono resolve**: `CLINIC_SUPPORT_EMAIL` em
-`clinica_facaamigos/lib/clinic-identity.ts` ainda aponta para
-`contato@clinicafacaamigos.com.br` (domínio de terceiro, não confiável)
-porque nenhuma alternativa real existe hoje. Ou cria-se uma caixa de
-verdade (Google Workspace no domínio) ou usa-se um Gmail existente já
-monitorado como contato oficial.
+**Resolvido em 2026-09-14**: `CLINIC_SUPPORT_EMAIL` em
+`clinica_facaamigos/lib/clinic-identity.ts` e o `DEFAULT_REPLY_TO` dos três
+apps agora apontam para `institutofacaamigos@gmail.com` — caixa real
+monitorada pelo dono, definida nesta data. Não é o ideal (não é o domínio
+próprio, e SMTP autenticado por essa conta não pode assinar mensagens
+"From: @institutofacaamigos.com.br" sem um alias verificado, o que não é
+possível hoje sem MX) — mas resolve o problema real: antes não existia
+inbox nenhum para onde uma resposta pudesse ir.
+
+## Autenticar o domínio no Brevo — não depende da migração de DNS
+
+O domínio `institutofacaamigos.com.br` já foi adicionado no Brevo (Senders,
+Domains & Dedicated IPs → Domains) — a tela de "Adicionar registros" já
+mostra o código de verificação e os dois CNAME de DKIM. **Isso pode ser
+concluído agora mesmo, sem esperar a migração de hospedagem para a
+Vercel**: os registros só precisam existir em algum lugar que responda
+pelo domínio — hoje isso ainda é o Netlify DNS (painel Netlify → Domains →
+institutofacaamigos.com.br → DNS settings → Add new record). Adicionar lá:
+
+```
+@                 TXT    brevo-code:<valor exato da tela do Brevo>
+brevo1._domainkey CNAME  <valor exato da tela do Brevo>
+brevo2._domainkey CNAME  <valor exato da tela do Brevo>
+_dmarc            TXT    v=DMARC1; p=none; rua=mailto:institutofacaamigos@gmail.com
+@                 TXT    v=spf1 include:spf.brevo.com -all
+```
+
+`-all` no SPF é seguro aqui porque não existe MX/caixa própria — nenhum
+outro servidor deveria estar autorizado a enviar como esse domínio. Depois
+de ~2 semanas sem falso positivo de spam, subir o DMARC de `p=none` para
+`p=quarantine`. Depois de adicionar, esperar a propagação (minutos a
+poucas horas — conferir com `https://dns.google/resolve?name=institutofacaamigos.com.br&type=TXT`)
+e no Brevo clicar "Verificar registros" → "Autenticar domínio". Quando a
+zona migrar para a Vercel (seção seguinte), os mesmos 5 registros precisam
+ser recriados lá antes da troca de nameservers, senão a autenticação quebra
+de novo.
 
 ## Zona DNS: migrando do Netlify para a Vercel
 
@@ -67,27 +97,19 @@ monitorado como contato oficial.
 2. **Exportar a zona atual do Netlify** (painel Netlify → Domains →
    institutofacaamigos.com.br → DNS settings) antes de desligar
    qualquer coisa, para não perder registros de verificação
-   (Search Console, etc.) que já existam lá.
-3. **Registros manuais na zona Vercel** (painel Domains → DNS Records,
-   ou `vercel dns add institutofacaamigos.com.br ...`):
-   ```
-   @                 TXT    brevo-code:<valor da tela de autenticação do Brevo>
-   brevo1._domainkey CNAME  <valor Brevo>
-   brevo2._domainkey CNAME  <valor Brevo>
-   _dmarc            TXT    v=DMARC1; p=none; rua=mailto:<gmail do dono>
-   @                 TXT    v=spf1 include:spf.brevo.com -all
-   ```
-   `-all` no SPF é seguro aqui porque não existe MX/caixa própria — nenhum
-   outro servidor deveria estar autorizado a enviar como esse domínio.
-   Depois de ~2 semanas sem falso positivo de spam, subir o DMARC de
-   `p=none` para `p=quarantine`.
+   (Search Console, os 5 registros do Brevo acima, etc.) que já existam
+   lá.
+3. **Recriar na zona Vercel** (painel Domains → DNS Records, ou
+   `vercel dns add institutofacaamigos.com.br ...`) todos os registros
+   exportados no passo 2, incluindo os 5 do Brevo.
 4. **Só então trocar os nameservers no Registro.br** para
    `ns1.vercel-dns.com` / `ns2.vercel-dns.com`. Trocar antes da zona
    Vercel estar completa derruba o site raiz e o playground — o
    Registro.br valida que os nameservers já respondem antes de aceitar.
 5. Depois da propagação (checar com
-   `https://dns.google/resolve?name=<host>&type=A`), voltar ao Brevo e
-   rodar "Verificar registros" → "Autenticar domínio".
+   `https://dns.google/resolve?name=<host>&type=A`), confirmar no Brevo
+   que o domínio continua "Autenticado" (a mudança de nameserver não deve
+   derrubar a autenticação se os registros foram recriados corretamente).
 6. **Não apagar a zona do Netlify por 30 dias** — é o caminho de
    rollback: basta voltar os nameservers para `dns1.p03.nsone.net` etc.
 
@@ -99,19 +121,55 @@ monitorado como contato oficial.
 | `clinica_facaamigos` edge function `sync-grupoib-professional` | `nao-responda@facaamigos.com.br` (domínio de outra empresa — uma gráfica em SP, ver aviso em `lib/clinic-identity.ts`) | `instituto@institutofacaamigos.com.br` |
 | `faca_amigos` edge function `owner-email-dispatch` | Gmail SMTP, `hub.operacao.lojas@gmail.com` | Brevo REST, mesmo remetente/domínio dos outros apps |
 | `faca_amigos` push (`VAPID_SUBJECT`) | `mailto:contato@facaamigos.com.br` | `mailto:instituto@institutofacaamigos.com.br` |
-| `controle-de-estagiario` edge function `notify-professional-nfse` | configurável via `BREVO_FROM`, sem default | sem mudança nesta rodada — configurar `BREVO_FROM` na Vercel/Supabase apontando para `instituto@institutofacaamigos.com.br` |
+| `controle-de-estagiario` edge function `notify-professional-nfse` | `BREVO_FROM` obrigatório, sem Reply-To | `BREVO_REPLY_TO` adicionado (mesmo fallback `institutofacaamigos@gmail.com`) — configurar `BREVO_FROM` na Vercel/Supabase apontando para `instituto@institutofacaamigos.com.br` continua pendente, é config de secret, não de código |
 
 ## Supabase Auth (convites, reset de senha)
 
-Hoje os três projetos Supabase usam o mailer built-in (limite baixo,
-remetente `noreply@mail.app.supabase.io`) — é a causa mais provável de
-"convite não chegou". Configurar SMTP customizado em cada projeto
-(Authentication → SMTP Settings):
+Só existem **dois** projetos Supabase reais no ecossistema, não três — a
+clínica (`clinica_facaamigos`) e o RH (`controle-de-estagiario`)
+compartilham o mesmo projeto:
 
+| Projeto Supabase | ref | Usado por | Link direto |
+|---|---|---|---|
+| `controle-caixa` | `ivjvpdzsfjdpyabbzzuj` | `faca_amigos` / kiosk | `app.supabase.com/project/ivjvpdzsfjdpyabbzzuj/auth/providers` (SMTP em Auth → Emails → SMTP Settings) |
+| `controle-de-estagiario` | `vththexblpxwocbowhsv` | `controle-de-estagiario` **e** `clinica_facaamigos` (mesmo backend) | `app.supabase.com/project/vththexblpxwocbowhsv/auth/providers` |
+
+Hoje os dois usam o mailer built-in (limite baixo, remetente
+`noreply@mail.app.supabase.io`) — é a causa mais provável de "convite não
+chegou".
+
+**Decisão do dono (2026-09-14)**: usar `institutofacaamigos@gmail.com`
+(Gmail SMTP, com senha de app) como stopgap, em vez de esperar a
+autenticação do domínio no Brevo terminar. Isso funciona e é **melhor do
+que o mailer padrão do Supabase** (sem o limite de poucos e-mails por
+hora), mas tem duas pegadinhas que valem registrar:
+- O remetente efetivo será `institutofacaamigos@gmail.com`, não um
+  endereço `@institutofacaamigos.com.br` — o Gmail rejeita (ou reescreve)
+  um `From` que não seja a própria conta autenticada, a menos que se
+  configure um alias verificado em "Enviar como" nas configurações do
+  Gmail, o que exige receber um código de confirmação no domínio — hoje
+  impossível, sem MX. Ou seja: e-mail de convite virá visivelmente do
+  Gmail até o domínio ter caixa própria.
+- Limite de envio de conta Gmail pessoal: ~500 destinatários/dia. Tranquilo
+  para convite/reset, mas não escalar esse mesmo SMTP para newsletters ou
+  campanhas.
+
+Assim que a autenticação do Brevo estiver concluída (seção acima), trocar
+para o relay do Brevo é a melhora natural — mantém o remetente no domínio
+próprio com DKIM/SPF alinhados:
 - Host: `smtp-relay.brevo.com`, porta 587
 - Usuário/senha: login Brevo + uma SMTP key gerada em
   Settings → SMTP & API
 - Remetente: `instituto@institutofacaamigos.com.br`
+
+Em qualquer um dos dois casos, configurar em **cada um dos dois projetos**:
+Authentication → Emails → SMTP Settings → "Enable Custom SMTP" → host/
+porta/usuário/senha/remetente. A senha do Gmail (senha de app, gerada nas
+configurações de segurança da conta Google) só entra nesse campo do
+painel Supabase — **nunca em código, `.env` versionado ou secret de Edge
+Function**. Se ela já foi compartilhada em texto puro em algum lugar (chat,
+e-mail, etc.), o mais seguro é revogar essa senha de app específica depois
+de configurada e gerar uma nova.
 
 E em Authentication → URL Configuration, atualizar Site URL e Redirect
 URLs para os hosts finais (`sistema.`, `app.`, `rh.`), mantendo os
