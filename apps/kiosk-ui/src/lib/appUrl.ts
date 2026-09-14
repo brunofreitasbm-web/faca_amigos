@@ -4,10 +4,13 @@
  * Ordem de resolução:
  * 1. `VITE_PUBLIC_APP_URL` (se definida no ambiente de build).
  * 2. `window.location.origin` (se a aplicação estiver rodando num domínio não-local, ex.: Vercel em produção).
- * 3. Fallback padrão: `"https://kiosk-ui.vercel.app"` (garante que QR codes de pareamento móvel,
+ * 3. Fallback padrão: `"https://app.institutofacaamigos.com.br"` (garante que QR codes de pareamento móvel,
  *    links de cadastro e acompanhamento funcionem imediatamente no Electron/localhost local).
+ *    Antes do DNS de app.institutofacaamigos.com.br existir, o fallback era
+ *    `kiosk-ui.vercel.app` — esse domínio continua na allowlist de CORS
+ *    (`supabase/functions/_shared/http.ts`) durante a transição.
  */
-export const DEFAULT_PUBLIC_APP_URL = "https://kiosk-ui.vercel.app";
+export const DEFAULT_PUBLIC_APP_URL = "https://app.institutofacaamigos.com.br";
 
 export function getPublicAppUrl(): string {
   const envUrl = import.meta.env.VITE_PUBLIC_APP_URL as string | undefined;
