@@ -39,6 +39,38 @@ function loadOrCreateTerminalId(userDataPath: string): string {
   return id;
 }
 
+/**
+ * Grava `last_error` em `fa_kiosk_fiscal_terminal_status` para cada unidade
+ * fiscal-habilitada, usando uma chave que ainda tem acesso de escrita ao
+ * banco (service_role legada) mesmo quando o worker está desligado por não
+ * poder chamar a Edge Function de certificado. Best-effort: se isto falhar,
+ * o único efeito é a mensagem continuar restrita ao console do terminal.
+ */
+async function reportWorkerDisabled(
+  url: string,
+  secretKey: string,
+  terminalId: string,
+  motivo: string,
+): Promise<void> {
+  try {
+    const client = createClient(url, secretKey);
+    const { data: units } = await client.from("fa_kiosk_units").select("id").eq("fiscal_enabled", true);
+    if (!units || units.length === 0) return;
+    const nowMs = Date.now();
+    await client.from("fa_kiosk_fiscal_terminal_status").upsert(
+      (units as Array<{ id: string }>).map((unit) => ({
+        unit_id: unit.id,
+        terminal_id: terminalId,
+        last_heartbeat_ms: nowMs,
+        last_error: motivo,
+      })),
+      { onConflict: "unit_id" },
+    );
+  } catch {
+    // best-effort — ver comentário acima.
+  }
+}
+
 export function startFiscalWorker(userDataPath: string, deviceId?: string | null): void {
   const url = process.env.FACAAMIGOS_SUPABASE_URL || "https://ivjvpdzsfjdpyabbzzuj.supabase.co";
   // Mesma guarda do print bridge (main/printBridge.ts), via helper
@@ -47,7 +79,8 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
   // produção), o fallback cairia numa chave que a Edge Function
   // `nfse-certificate-fetch` SEMPRE rejeita com "não autorizado" — um erro
   // que parece problema no certificado mas na verdade é .env deste terminal.
-  const { secretKey, canFetchFiscalCredentials, kind } = resolveTerminalSupabaseKey();
+  const { secretKey, canFetchFiscalCredentials, hasServiceRoleKey, kind } = resolveTerminalSupabaseKey();
+  const terminalId = loadOrCreateTerminalId(userDataPath);
 
   if (!url || !secretKey) {
     console.warn(
@@ -69,17 +102,25 @@ export function startFiscalWorker(userDataPath: string, deviceId?: string | null
       kind === "publishable" || kind === "none"
         ? "a chave configurada é a PUBLICÁVEL (ou não há chave nenhuma)"
         : "a service_role LEGADA (eyJ...) não é mais aceita pela Edge Function de certificado";
-    console.warn(
+    const mensagem =
       `[fiscal] emissão de NFC-e/NFS-e desligada neste terminal: ${motivo}. ` +
-        "Cole a chave secreta nova (sb_secret_..., em Supabase > Project Settings > API Keys > Secret keys) " +
-        "em FACAAMIGOS_SUPABASE_SECRET_KEY no .env deste terminal (%APPDATA%\\FacaAmigos\\.env) e reinicie. " +
-        "Ver apps/kiosk/.env.example.",
-    );
+      "Cole a chave secreta nova (sb_secret_..., em Supabase > Project Settings > API Keys > Secret keys) " +
+      "em FACAAMIGOS_SUPABASE_SECRET_KEY no .env deste terminal (%APPDATA%\\FacaAmigos\\.env) e reinicie. " +
+      "Ver apps/kiosk/.env.example.";
+    console.warn(mensagem);
+
+    // O console do Electron não é visto por ninguém no balcão. Uma chave
+    // legada (eyJ...) ainda grava no banco mesmo sem poder chamar a Edge
+    // Function — usamos essa brecha para deixar o motivo visível em
+    // Configurações (fa_kiosk_fiscal_terminal_status.last_error) em vez de
+    // a fila só ficar acumulando PENDENTE sem nenhum sinal em lugar nenhum.
+    if (hasServiceRoleKey) {
+      void reportWorkerDisabled(url, secretKey, terminalId, mensagem);
+    }
     return;
   }
 
   const simulado = process.env.FACAAMIGOS_FISCAL_MODE === "SIMULADO";
-  const terminalId = loadOrCreateTerminalId(userDataPath);
   const log = (message: string) => console.log(message);
 
   // O `Authorization` explícito NÃO é redundante — é o que faz a emissão
