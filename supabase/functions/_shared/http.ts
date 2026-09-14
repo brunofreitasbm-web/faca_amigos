@@ -16,6 +16,7 @@ const FALLBACK_ORIGINS = [
   "https://institutofacaamigos.com.br",
   "https://www.institutofacaamigos.com.br",
   "https://playground.institutofacaamigos.com.br",
+  "https://rh.institutofacaamigos.com.br",
   "http://127.0.0.1:5500",
   // App Electron do quiosque (apps/kiosk): a SPA é servida pelo Fastify
   // local em 127.0.0.1:7317 e chama estas functions direto do renderer —

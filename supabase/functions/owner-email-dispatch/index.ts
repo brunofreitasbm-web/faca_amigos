@@ -7,15 +7,33 @@
 // cadastrado — se o cron sobrepuser invocações, a segunda não pega as
 // mesmas linhas.
 //
-// Remetente fixo hub.operacao.lojas@gmail.com via Gmail SMTP — GMAIL_USER
-// e GMAIL_APP_PASSWORD já cadastrados como secrets da Edge Function.
+// Remetente via Brevo (API transacional REST), mesmo provedor usado pelas
+// outras duas apps do ecossistema (clinica_facaamigos, controle-de-
+// estagiario) — antes ia por Gmail SMTP/nodemailer com o remetente fixo
+// hub.operacao.lojas@gmail.com, o que deixava esse canal fora do domínio
+// institutofacaamigos.com.br e sem DKIM/SPF alinhados aos demais envios.
+// BREVO_API_KEY, BREVO_FROM e BREVO_REPLY_TO cadastrados como secrets da
+// Edge Function. BREVO_REPLY_TO é obrigatório na prática — o domínio não
+// tem caixa de entrada própria (sem MX) — mas o código já cai para
+// institutofacaamigos@gmail.com (caixa oficial monitorada, definida pelo
+// dono em 2026-09-14) se o secret não estiver setado.
 //
 // CORS/JSON helpers inline pelo mesmo motivo de owner-report-dispatch:
 // nunca é chamada por um navegador (só pelo pg_cron/pg_net), e o import
 // relativo pro _shared causava falha de bundling no deploy via MCP.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.14";
+
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+
+function parseAddress(address: string): { name?: string; email: string } {
+  const match = address.match(/^(.*)<(.+)>$/);
+  if (match) {
+    const name = match[1].trim().replace(/^"|"$/g, "");
+    return { name: name || undefined, email: match[2].trim() };
+  }
+  return { email: address.trim() };
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -102,10 +120,12 @@ function buildHtmlEmail(title: string, body: string, photoUrl: string | null): s
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: { "Content-Type": "application/json" } });
 
-  const gmailUser = Deno.env.get("GMAIL_USER");
-  const gmailAppPassword = Deno.env.get("GMAIL_APP_PASSWORD");
-  if (!gmailUser || !gmailAppPassword) {
-    return jsonResponse({ error: "GMAIL_USER/GMAIL_APP_PASSWORD não configurados" }, 500);
+  const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+  const brevoFrom =
+    Deno.env.get("BREVO_FROM") ?? "Instituto Faça Amigos <instituto@institutofacaamigos.com.br>";
+  const brevoReplyTo = Deno.env.get("BREVO_REPLY_TO") ?? "institutofacaamigos@gmail.com";
+  if (!brevoApiKey) {
+    return jsonResponse({ error: "BREVO_API_KEY não configurado" }, 500);
   }
 
   const adminClient = createClient(
@@ -127,23 +147,30 @@ Deno.serve(async (req) => {
 
   if (rows.length === 0) return jsonResponse({ checked: 0, sent: 0, failed: 0 });
 
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: { user: gmailUser, pass: gmailAppPassword },
-  });
-
   const results = await Promise.allSettled(
-    rows.map((row) =>
-      transporter.sendMail({
-        from: `"Façaamigos" <${gmailUser}>`,
-        to: row.recipient_email,
-        subject: row.title,
-        text: row.body,
-        html: buildHtmlEmail(row.title, row.body, row.photo_url),
-      }),
-    ),
+    rows.map(async (row) => {
+      const response = await fetch(BREVO_API_URL, {
+        method: "POST",
+        headers: {
+          "api-key": brevoApiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          sender: parseAddress(brevoFrom),
+          to: [parseAddress(row.recipient_email)],
+          subject: row.title,
+          htmlContent: buildHtmlEmail(row.title, row.body, row.photo_url),
+          textContent: row.body,
+          ...(brevoReplyTo ? { replyTo: parseAddress(brevoReplyTo) } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(`Brevo respondeu ${response.status}: ${detail}`);
+      }
+    }),
   );
 
   const failed = results.filter((r) => r.status === "rejected").length;
