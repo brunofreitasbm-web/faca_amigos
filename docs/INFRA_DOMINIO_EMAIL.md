@@ -58,33 +58,49 @@ próprio, e SMTP autenticado por essa conta não pode assinar mensagens
 possível hoje sem MX) — mas resolve o problema real: antes não existia
 inbox nenhum para onde uma resposta pudesse ir.
 
-## Autenticar o domínio no Brevo — não depende da migração de DNS
+## Domínio autenticado no Brevo — feito em 2026-09-14
 
-O domínio `institutofacaamigos.com.br` já foi adicionado no Brevo (Senders,
-Domains & Dedicated IPs → Domains) — a tela de "Adicionar registros" já
-mostra o código de verificação e os dois CNAME de DKIM. **Isso pode ser
-concluído agora mesmo, sem esperar a migração de hospedagem para a
-Vercel**: os registros só precisam existir em algum lugar que responda
-pelo domínio — hoje isso ainda é o Netlify DNS (painel Netlify → Domains →
-institutofacaamigos.com.br → DNS settings → Add new record). Adicionar lá:
+`institutofacaamigos.com.br` está com `authenticated: true` /
+`verified: true` na API do Brevo (`GET /v3/senders/domains`), confirmado
+também via DNS ao vivo (DNS-over-HTTPS). Registros publicados hoje no
+Netlify DNS (painel Netlify → Domains → institutofacaamigos.com.br → DNS
+settings):
 
 ```
-@                 TXT    brevo-code:<valor exato da tela do Brevo>
-brevo1._domainkey CNAME  <valor exato da tela do Brevo>
-brevo2._domainkey CNAME  <valor exato da tela do Brevo>
-_dmarc            TXT    v=DMARC1; p=none; rua=mailto:institutofacaamigos@gmail.com
+@                 TXT    brevo-code:cd6044541926004cf1be5862617bd03e
+brevo1._domainkey CNAME  b1.institutofacaamigos-com-br.dkim.brevo.com
+brevo2._domainkey CNAME  b2.institutofacaamigos-com-br.dkim.brevo.com
+_dmarc            TXT    v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com
+```
+
+**Pendente**: SPF. O Brevo não exige para marcar o domínio como
+autenticado (DKIM já cobre alinhamento DMARC), mas sem SPF qualquer
+servidor pode tentar enviar como se fosse este domínio. Adicionar:
+
+```
 @                 TXT    v=spf1 include:spf.brevo.com -all
 ```
 
-`-all` no SPF é seguro aqui porque não existe MX/caixa própria — nenhum
-outro servidor deveria estar autorizado a enviar como esse domínio. Depois
-de ~2 semanas sem falso positivo de spam, subir o DMARC de `p=none` para
-`p=quarantine`. Depois de adicionar, esperar a propagação (minutos a
-poucas horas — conferir com `https://dns.google/resolve?name=institutofacaamigos.com.br&type=TXT`)
-e no Brevo clicar "Verificar registros" → "Autenticar domínio". Quando a
-zona migrar para a Vercel (seção seguinte), os mesmos 5 registros precisam
-ser recriados lá antes da troca de nameservers, senão a autenticação quebra
-de novo.
+`-all` é seguro aqui porque não existe MX/caixa própria — nenhum outro
+servidor deveria estar autorizado a enviar como esse domínio. Depois de
+~2 semanas sem falso positivo de spam, considerar subir o DMARC de
+`p=none` para `p=quarantine` (o `rua` atual vai para o próprio Brevo, não
+para uma caixa do dono — trocar para `institutofacaamigos@gmail.com` se
+quiser ver os relatórios agregados diretamente).
+
+Quando a zona migrar para a Vercel (seção seguinte), estes 5 registros
+(os 4 já publicados + o SPF) precisam ser recriados lá antes da troca de
+nameservers, senão a autenticação quebra de novo.
+
+Consulta feita via API do Brevo (`api-key`), não pelo painel — a conta
+tinha restrição de IP autorizado ativa (Segurança → IPs autorizados), que
+bloqueava chamadas de qualquer IP fora da lista; como o ambiente que faz
+essas chamadas não tem IP de saída fixo, a única forma de automatizar foi
+desativar essa restrição para chaves de API (Segurança → IPs autorizados
+→ "Desativar para chaves API"). Consequência: qualquer chave de API do
+Brevo desta conta agora aceita chamadas de qualquer IP, não só dos
+autorizados — reavaliar se vale reativar depois que a automação inicial
+estiver concluída.
 
 ## Zona DNS: migrando do Netlify para a Vercel
 
@@ -138,38 +154,32 @@ Hoje os dois usam o mailer built-in (limite baixo, remetente
 `noreply@mail.app.supabase.io`) — é a causa mais provável de "convite não
 chegou".
 
-**Decisão do dono (2026-09-14)**: usar `institutofacaamigos@gmail.com`
-(Gmail SMTP, com senha de app) como stopgap, em vez de esperar a
-autenticação do domínio no Brevo terminar. Isso funciona e é **melhor do
-que o mailer padrão do Supabase** (sem o limite de poucos e-mails por
-hora), mas tem duas pegadinhas que valem registrar:
-- O remetente efetivo será `institutofacaamigos@gmail.com`, não um
-  endereço `@institutofacaamigos.com.br` — o Gmail rejeita (ou reescreve)
-  um `From` que não seja a própria conta autenticada, a menos que se
-  configure um alias verificado em "Enviar como" nas configurações do
-  Gmail, o que exige receber um código de confirmação no domínio — hoje
-  impossível, sem MX. Ou seja: e-mail de convite virá visivelmente do
-  Gmail até o domínio ter caixa própria.
-- Limite de envio de conta Gmail pessoal: ~500 destinatários/dia. Tranquilo
-  para convite/reset, mas não escalar esse mesmo SMTP para newsletters ou
-  campanhas.
+**Atualizado em 2026-09-14**: o domínio já está autenticado no Brevo (seção
+acima), então a recomendação passou a ser usar o relay do Brevo **direto**,
+sem precisar do Gmail como estágio intermediário. Dados do relay obtidos
+via `GET /v3/account` (endpoint `relay.data`):
 
-Assim que a autenticação do Brevo estiver concluída (seção acima), trocar
-para o relay do Brevo é a melhora natural — mantém o remetente no domínio
-próprio com DKIM/SPF alinhados:
 - Host: `smtp-relay.brevo.com`, porta 587
-- Usuário/senha: login Brevo + uma SMTP key gerada em
-  Settings → SMTP & API
+- Usuário: `b8aba1001@smtp-brevo.com`
+- Senha: a própria API key do Brevo (Settings → SMTP & API → API Keys) —
+  não é uma senha separada
 - Remetente: `instituto@institutofacaamigos.com.br`
 
-Em qualquer um dos dois casos, configurar em **cada um dos dois projetos**:
+Isso mantém o remetente no domínio próprio com DKIM/DMARC alinhados desde
+o primeiro envio, sem a pegadinha do Gmail (remetente `@gmail.com`,
+limite de ~500/dia). `institutofacaamigos@gmail.com` (decisão do dono,
+2026-09-14) continua sendo o Reply-To padrão em todo envio automático dos
+três apps — só deixou de ser necessário como *stopgap* de SMTP em si.
+
+Configurar em **cada um dos dois projetos**:
 Authentication → Emails → SMTP Settings → "Enable Custom SMTP" → host/
-porta/usuário/senha/remetente. A senha do Gmail (senha de app, gerada nas
-configurações de segurança da conta Google) só entra nesse campo do
+porta/usuário/senha/remetente. A senha (API key do Brevo, ou a senha de
+app do Gmail, caso ainda se opte por essa via) só entra nesse campo do
 painel Supabase — **nunca em código, `.env` versionado ou secret de Edge
-Function**. Se ela já foi compartilhada em texto puro em algum lugar (chat,
-e-mail, etc.), o mais seguro é revogar essa senha de app específica depois
-de configurada e gerar uma nova.
+Function**. Se ela já foi compartilhada em texto puro em algum lugar
+(chat, e-mail, etc.), o mais seguro é considerá-la exposta: gerar uma API
+key nova no Brevo (ou revogar a senha de app do Gmail e criar outra)
+depois de configurar, e usar só a nova daí em diante.
 
 E em Authentication → URL Configuration, atualizar Site URL e Redirect
 URLs para os hosts finais (`sistema.`, `app.`, `rh.`), mantendo os
