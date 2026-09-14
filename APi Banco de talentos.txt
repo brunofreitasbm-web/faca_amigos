@@ -1,3 +1,8 @@
 Chave de API secreta da integração do banco de talentos
 
 e1cb947a45217506d5daa32928d8076f08e82df11ab1cc097b44ea4ec54f71f4
+
+
+
+Chave API BREVO
+eyJhcGlfa2V5IjoieGtleXNpYi1hNzRiYzNlZDE4OGMwY2U2MGNmZmRkNzk3ZDU2NjkyOTk5ZTA3NGY2MGQ3ZWZjMzYwODllNDE2MGE5NmVlYjk4LW02cTNpdXpMM2d4d2VMMTkifQ==

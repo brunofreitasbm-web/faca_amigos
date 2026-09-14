@@ -2250,7 +2250,7 @@ export const Api = {
     const { error } = await supabase().from("fa_kiosk_guardians").update({ cpf: cleanCpf }).eq("id", guardianId);
     if (error) throw new Error(`Erro ao atualizar CPF: ${error.message}`);
   },
-  /** Atualiza dados cadastrais de responsável, telefone, CPF e/ou nome da criança (utilizado no balcão e no Painel). */
+  /** Atualiza dados cadastrais de responsável, telefone, CPF, nome da criança, data de nascimento e observações (utilizado no balcão e no Painel). */
   updateCustomerRegistration: async (params: {
     guardianId?: string | null;
     childId?: string | null;
@@ -2259,8 +2259,10 @@ export const Api = {
     guardianPhone?: string;
     guardianCpf?: string;
     childName?: string;
+    childBirthDate?: string | null;
+    notes?: string | null;
   }): Promise<void> => {
-    const { guardianId, childId, sessionId, guardianName, guardianPhone, guardianCpf, childName } = params;
+    const { guardianId, childId, sessionId, guardianName, guardianPhone, guardianCpf, childName, childBirthDate, notes } = params;
 
     if (guardianId) {
       const updates: Record<string, unknown> = {};
@@ -2279,9 +2281,15 @@ export const Api = {
       }
     }
 
-    if (childId && childName !== undefined) {
-      const { error } = await supabase().from("fa_kiosk_children").update({ full_name: childName.trim() }).eq("id", childId);
-      if (error) throw new Error(`Erro ao atualizar nome da criança: ${error.message}`);
+    if (childId) {
+      const childUpdates: Record<string, unknown> = {};
+      if (childName !== undefined) childUpdates.full_name = childName.trim();
+      if (childBirthDate !== undefined) childUpdates.birth_date = childBirthDate || null;
+      if (notes !== undefined) childUpdates.notes = notes ? notes.trim() : null;
+      if (Object.keys(childUpdates).length > 0) {
+        const { error } = await supabase().from("fa_kiosk_children").update(childUpdates).eq("id", childId);
+        if (error) throw new Error(`Erro ao atualizar dados da criança: ${error.message}`);
+      }
     }
 
     if (sessionId) {

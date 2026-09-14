@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button, Input, Modal, HelpText } from "@facaamigos/ui";
 import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
+import { supabase } from "../lib/supabase/client.js";
 import { useToast } from "../state/ToastContext.js";
 
 export interface EditRegistrationModalProps {
@@ -16,6 +17,39 @@ export interface EditRegistrationModalProps {
     guardianPhone?: string;
     guardianCpf?: string;
     childName?: string;
+    childBirthDate?: string | null;
+    notes?: string | null;
+  };
+}
+
+function calculateBirthdayDetails(birthDateStr?: string) {
+  if (!birthDateStr) return null;
+  const birth = new Date(birthDateStr + "T00:00:00");
+  if (isNaN(birth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+
+  const currentYearBirthday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
+  let nextBirthday = currentYearBirthday;
+  const todayReset = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  
+  if (currentYearBirthday < todayReset) {
+    nextBirthday = new Date(today.getFullYear() + 1, birth.getMonth(), birth.getDate());
+  }
+
+  const diffTime = nextBirthday.getTime() - todayReset.getTime();
+  const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return {
+    age: Math.max(0, age),
+    daysUntil,
+    isSoon: daysUntil <= 30,
+    isToday: daysUntil === 0,
   };
 }
 
@@ -25,7 +59,10 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
   const [guardianPhone, setGuardianPhone] = useState("");
   const [guardianCpf, setGuardianCpf] = useState("");
   const [childName, setChildName] = useState("");
+  const [childBirthDate, setChildBirthDate] = useState("");
+  const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadingChild, setLoadingChild] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,7 +71,30 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
       setGuardianPhone(initialData.guardianPhone ? formatPhoneBr(initialData.guardianPhone) : "");
       setGuardianCpf(initialData.guardianCpf ? formatCpf(initialData.guardianCpf) : "");
       setChildName(initialData.childName || "");
+      setChildBirthDate(initialData.childBirthDate || "");
+      setNotes(initialData.notes || "");
       setError(null);
+
+      if (initialData.childId) {
+        setLoadingChild(true);
+        (async () => {
+          try {
+            const { data } = await supabase()
+              .from("fa_kiosk_children")
+              .select("birth_date, notes")
+              .eq("id", initialData.childId)
+              .maybeSingle();
+            if (data) {
+              if (data.birth_date) setChildBirthDate(data.birth_date);
+              if (data.notes) setNotes(data.notes);
+            }
+          } catch {
+            // Silenciosamente ignora em caso de indisponibilidade
+          } finally {
+            setLoadingChild(false);
+          }
+        })();
+      }
     }
   }, [open, initialData]);
 
@@ -44,6 +104,8 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
   const isCpfValid = !cleanCpf || cleanCpf.length === 11;
   const isPhoneValid = !cleanPhone || cleanPhone.length >= 10;
   const canSave = Boolean(guardianName.trim() && childName.trim() && isCpfValid && isPhoneValid);
+
+  const birthdayInfo = calculateBirthdayDetails(childBirthDate);
 
   async function handleSave() {
     if (!canSave) return;
@@ -58,6 +120,8 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
         guardianPhone: cleanPhone,
         guardianCpf: cleanCpf,
         childName: childName.trim(),
+        childBirthDate: childBirthDate || null,
+        notes: notes.trim() || null,
       });
       toast.success("Dados cadastrais atualizados com sucesso!");
       onSaved();
@@ -72,11 +136,36 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
   if (!open) return null;
 
   return (
-    <Modal title="✏️ Editar Dados Cadastrais" onClose={onClose}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: "320px", maxWidth: "480px" }}>
+    <Modal title="✏️ Editar Cadastro & Oportunidades" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "14px", minWidth: "320px", maxWidth: "480px" }}>
         <HelpText style={{ margin: 0 }}>
-          Edite abaixo os dados do responsável e da criança. As alterações serão gravadas no cadastro e refletidas no atendimento atual.
+          Edite abaixo os dados do responsável e da criança. Atualize a data de nascimento para ativar campanhas de aniversário e combos promocionais.
         </HelpText>
+
+        {birthdayInfo?.isSoon && (
+          <div
+            style={{
+              padding: "10px 14px",
+              borderRadius: "8px",
+              background: "linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)",
+              border: "1px solid #ffb74d",
+              color: "#e65100",
+              fontSize: "13px",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span>🎂</span>
+            <div>
+              <strong>{birthdayInfo.isToday ? "ANIVERSÁRIO HOJE! 🎉" : `Aniversário próximo (${birthdayInfo.daysUntil} dias)!`}</strong>
+              <div style={{ fontSize: "12px", fontWeight: "normal", marginTop: "2px" }}>
+                Oportunidade Comercial: Ofereça o Pacote de Festa ou Combo Especial de Aniversariante!
+              </div>
+            </div>
+          </div>
+        )}
 
         <Input
           label="Nome do Responsável"
@@ -101,12 +190,36 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
           error={guardianCpf && !isCpfValid ? "CPF deve possuir 11 dígitos" : undefined}
         />
 
-        <Input
-          label="Nome da Criança"
-          placeholder="Ex: Pedrinho"
-          value={childName}
-          onChange={(e) => setChildName(e.target.value)}
-        />
+        <div style={{ borderTop: "1px solid var(--color-border, #eee)", paddingTop: "12px", marginTop: "4px" }}>
+          <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "10px", color: "var(--color-text-heading, #111)" }}>
+            👶 Dados da Criança {birthdayInfo && <span style={{ fontSize: "12px", color: "var(--color-muted, #666)", fontWeight: "normal" }}>({birthdayInfo.age} anos)</span>}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <Input
+              label="Nome da Criança"
+              placeholder="Ex: Pedrinho"
+              value={childName}
+              onChange={(e) => setChildName(e.target.value)}
+            />
+
+            <Input
+              label="Data de Nascimento"
+              type="date"
+              value={childBirthDate}
+              onChange={(e) => setChildBirthDate(e.target.value)}
+              disabled={loadingChild}
+            />
+
+            <Input
+              label="Observações / Cuidados Especiais"
+              placeholder="Ex: Alergias, restrições ou preferências"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={loadingChild}
+            />
+          </div>
+        </div>
 
         {error && (
           <div style={{ color: "var(--color-danger, #e53935)", fontSize: "13px", fontWeight: "bold" }}>
@@ -114,11 +227,11 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "8px" }}>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleSave} disabled={!canSave || busy}>
+          <Button variant="primary" onClick={handleSave} disabled={!canSave || busy || loadingChild}>
             {busy ? "Salvando..." : "Salvar Alterações"}
           </Button>
         </div>
