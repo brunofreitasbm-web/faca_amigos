@@ -102,32 +102,31 @@ Brevo desta conta agora aceita chamadas de qualquer IP, não só dos
 autorizados — reavaliar se vale reativar depois que a automação inicial
 estiver concluída.
 
-## Zona DNS: migrando do Netlify para a Vercel
+## Zona DNS: migração do Netlify para a Vercel — CONCLUÍDA em 2026-09-14
 
-1. **Antes de tocar no Registro.br**: criar os 4 projetos Vercel da
-   tabela acima, adicionar os domínios/subdomínios a cada um, e ao
-   adicionar o apex (`institutofacaamigos.com.br`) ao projeto
-   `facaamigos-site` escolher a opção "Nameservers (Vercel DNS)" — isso
-   cria a zona Vercel. Validar cada projeto pela URL `*.vercel.app`
-   antes de prosseguir.
-2. **Exportar a zona atual do Netlify** (painel Netlify → Domains →
-   institutofacaamigos.com.br → DNS settings) antes de desligar
-   qualquer coisa, para não perder registros de verificação
-   (Search Console, os 5 registros do Brevo acima, etc.) que já existam
-   lá.
-3. **Recriar na zona Vercel** (painel Domains → DNS Records, ou
-   `vercel dns add institutofacaamigos.com.br ...`) todos os registros
-   exportados no passo 2, incluindo os 5 do Brevo.
-4. **Só então trocar os nameservers no Registro.br** para
-   `ns1.vercel-dns.com` / `ns2.vercel-dns.com`. Trocar antes da zona
-   Vercel estar completa derruba o site raiz e o playground — o
-   Registro.br valida que os nameservers já respondem antes de aceitar.
-5. Depois da propagação (checar com
-   `https://dns.google/resolve?name=<host>&type=A`), confirmar no Brevo
-   que o domínio continua "Autenticado" (a mudança de nameserver não deve
-   derrubar a autenticação se os registros foram recriados corretamente).
-6. **Não apagar a zona do Netlify por 30 dias** — é o caminho de
-   rollback: basta voltar os nameservers para `dns1.p03.nsone.net` etc.
+Passo a passo que foi seguido, para referência futura (ex.: repetir o
+padrão em outro domínio):
+
+1. Criar os projetos Vercel, adicionar os domínios/subdomínios a cada
+   um, e ao adicionar o apex (`institutofacaamigos.com.br`) escolher
+   "Nameservers (Vercel DNS)" — cria a zona na Vercel. Validar cada
+   projeto pela URL `*.vercel.app` antes de prosseguir.
+2. Recriar na zona Vercel todos os registros que existiam no Netlify,
+   incluindo os 5 do Brevo (seção acima).
+3. Só então trocar os nameservers no Registro.br para
+   `ns1.vercel-dns.com` / `ns2.vercel-dns.com`.
+4. Depois da propagação, confirmar no Brevo que o domínio continua
+   "Autenticado".
+
+**Desvio da recomendação original**: o plano inicial era manter a zona
+do Netlify por 30 dias como caminho de rollback (bastava voltar os
+nameservers). O dono decidiu desligar o site Netlify imediatamente após
+confirmar que a Vercel funcionava (mesmo dia), abrindo mão desse
+caminho de rollback em troca de não manter infraestrutura duplicada. O
+site Netlify (`facaamigos`, o que tinha o domínio) foi excluído e
+confirmado via API como removido da conta. **Não existe mais rollback
+por troca de nameserver** — qualquer problema encontrado depois disso
+precisa ser corrigido na própria configuração da Vercel, não revertido.
 
 ## Remetentes de e-mail (padronizados nesta migração)
 
@@ -226,12 +225,22 @@ pré-requisito para qualquer automação futura via MCP.
 
 ## Verificação (critério de "está funcionando")
 
-- `https://dns.google/resolve?name=<host>&type=A` resolve para a Vercel
-  em todos os 6 hosts da tabela de mapa de subdomínios.
-- TXT `brevo-code`, `v=spf1` e os 2 CNAME `_domainkey` presentes; Brevo
-  mostra o domínio como "Autenticado".
-- Um e-mail de teste de cada app (assinatura da clínica, relatório do
-  owner, nfse do RH) chega numa caixa Gmail com `DKIM=pass`, `SPF=pass`,
-  `DMARC=pass` e o `Reply-To` correto.
-- Convite de usuário via Supabase Auth chega em menos de 1 minuto.
-- Nenhum projeto aparece com "!" no dashboard da Vercel.
+- [x] `https://dns.google/resolve?name=<host>&type=A` resolve para a
+  Vercel em todos os 6 hosts da tabela de mapa de subdomínios —
+  confirmado em 2026-09-14.
+- [x] TXT `brevo-code`, `v=spf1` e os 2 CNAME `_domainkey` presentes;
+  Brevo mostra o domínio como "Autenticado" — confirmado via API do
+  Brevo em 2026-09-14.
+- [x] Cada domínio serve o conteúdo certo (apex/www → hub, playground.
+  → landing, app./sistema./rh. → cada app) — confirmado com requisição
+  real (DNS já propagado, sem truque de teste) em 2026-09-14.
+- [x] SMTP customizado configurado nos dois projetos Supabase reais
+  (`ivjvpdzsfjdpyabbzzuj`, `vththexblpxwocbowhsv`) via Management API,
+  usando o relay do Brevo.
+- [ ] **Não testado ainda**: um e-mail de teste de cada app chegando de
+  fato numa caixa real com `DKIM=pass`/`SPF=pass`/`DMARC=pass` visíveis
+  no cabeçalho, e um convite de usuário via Supabase Auth chegando em
+  menos de 1 minuto. A configuração está feita e os registros de
+  autenticação batem, mas ninguém dessa sessão enviou um e-mail de
+  ponta a ponta para confirmar a entrega na caixa de entrada (só a
+  autenticação do domínio, que é pré-requisito, não a entrega em si).
