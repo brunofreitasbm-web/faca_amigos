@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     // próximo minuto).
     return jsonResponse({ error: "VAPID_PRIVATE_KEY não configurada" }, 500);
   }
-  const vapidSubject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:contato@facaamigos.com.br";
+  const vapidSubject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:instituto@institutofacaamigos.com.br";
   webpush.setVapidDetails(vapidSubject, VAPID_PUBLIC_KEY, vapidPrivateKey);
 
   const adminClient = createClient(

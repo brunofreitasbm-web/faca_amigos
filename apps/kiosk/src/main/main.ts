@@ -62,7 +62,7 @@ FACAAMIGOS_SUPABASE_URL=https://ivjvpdzsfjdpyabbzzuj.supabase.co
 # NÃO use a chave publicável (sb_publishable_...) nem a service_role legada
 # (eyJ...): as duas levam 401 na emissão fiscal.
 FACAAMIGOS_SUPABASE_SECRET_KEY=
-FACAAMIGOS_PUBLIC_APP_URL=https://kiosk-ui.vercel.app
+FACAAMIGOS_PUBLIC_APP_URL=https://app.institutofacaamigos.com.br
 `;
 
   for (const envPath of [userDataEnv, legacyAppDataEnv1, legacyAppDataEnv2].filter(Boolean)) {
