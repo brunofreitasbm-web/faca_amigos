@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button, Input, Modal, HelpText } from "@facaamigos/ui";
-import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
+import { formatCpf, formatPhoneBr, isValidCpf, isValidPhoneBr } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
 import { supabase } from "../lib/supabase/client.js";
 import { useToast } from "../state/ToastContext.js";
@@ -101,8 +101,8 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
   const cleanCpf = guardianCpf.replace(/\D/g, "");
   const cleanPhone = guardianPhone.replace(/\D/g, "");
 
-  const isCpfValid = !cleanCpf || cleanCpf.length === 11;
-  const isPhoneValid = !cleanPhone || cleanPhone.length >= 10;
+  const isCpfValid = Boolean(cleanCpf && cleanCpf.length === 11 && isValidCpf(guardianCpf));
+  const isPhoneValid = Boolean(cleanPhone && cleanPhone.length >= 10 && isValidPhoneBr(guardianPhone));
   const canSave = Boolean(guardianName.trim() && childName.trim() && isCpfValid && isPhoneValid);
 
   const birthdayInfo = calculateBirthdayDetails(childBirthDate);
@@ -175,19 +175,19 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
         />
 
         <Input
-          label="Telefone (WhatsApp)"
-          placeholder="(00) 00000-0000"
+          label="Telefone (WhatsApp) *"
+          placeholder="(00) 00000-0000 (Obrigatório)"
           value={guardianPhone}
           onChange={(e) => setGuardianPhone(formatPhoneBr(e.target.value))}
-          error={guardianPhone && !isPhoneValid ? "Informe um número de telefone válido" : undefined}
+          error={!cleanPhone ? "WhatsApp do responsável é obrigatório" : !isPhoneValid ? "Informe um número de WhatsApp válido" : undefined}
         />
 
         <Input
-          label="CPF do Responsável"
-          placeholder="000.000.000-00"
+          label="CPF do Responsável *"
+          placeholder="000.000.000-00 (Obrigatório)"
           value={guardianCpf}
           onChange={(e) => setGuardianCpf(formatCpf(e.target.value))}
-          error={guardianCpf && !isCpfValid ? "CPF deve possuir 11 dígitos" : undefined}
+          error={!cleanCpf ? "CPF do responsável é obrigatório" : !isCpfValid ? "Informe um CPF válido com 11 dígitos" : undefined}
         />
 
         <div style={{ borderTop: "1px solid var(--color-border, #eee)", paddingTop: "12px", marginTop: "4px" }}>

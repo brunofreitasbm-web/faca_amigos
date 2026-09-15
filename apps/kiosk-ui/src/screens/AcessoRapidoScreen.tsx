@@ -187,11 +187,15 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
       ? `Preencha nome e nascimento da criança ${firstIncompleteChildIndex + 1}`
       : !guardianName.trim()
         ? "Informe o nome do responsável"
-        : !isValidCpf(cpf)
-          ? "Informe um CPF válido do responsável"
-          : !isValidPhoneBr(phone)
-            ? "Informe um WhatsApp válido do responsável"
-            : !planId
+        : !cpf.trim()
+          ? "Informe o CPF do responsável"
+          : !isValidCpf(cpf)
+            ? "Informe um CPF válido do responsável"
+            : !phone.trim()
+              ? "Informe o WhatsApp do responsável"
+              : !isValidPhoneBr(phone)
+                ? "Informe um WhatsApp válido do responsável"
+                : !planId
               ? "Escolha o plano"
               : !termsAccepted
                 ? "É preciso ler e aceitar os Termos de Uso"
@@ -449,13 +453,13 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
             <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
               <strong style={{ fontSize: "15px" }}>2. E o responsável, quem é? 👋</strong>
               <Input label="Nome do responsável" placeholder="Pai, mãe ou acompanhante" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} />
-              <Input label="CPF" placeholder="000.000.000-00" inputMode="numeric" value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} />
+              <Input label="CPF do responsável *" placeholder="000.000.000-00 (Obrigatório)" inputMode="numeric" value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} />
               {cpf.length === 14 && !isValidCpf(cpf) && (
                 <Tag role="alert" color="var(--color-error)">CPF inválido</Tag>
               )}
               <Input
-                label="WhatsApp"
-                placeholder="(91) 98250-1215"
+                label="WhatsApp do responsável *"
+                placeholder="(91) 98250-1215 (Obrigatório)"
                 inputMode="numeric"
                 maxLength={15}
                 value={phone}

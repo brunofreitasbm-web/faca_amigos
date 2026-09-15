@@ -639,7 +639,9 @@ export function EntradaScreen({
     if (!childName.trim()) return "Informe o nome da criança";
     if (!birthDate) return "Informe a data de nascimento";
     if (!guardianName.trim()) return "Informe o nome do responsável";
+    if (!cpf.trim()) return "Informe o CPF do responsável";
     if (!isValidCpf(cpf)) return "CPF do responsável inválido";
+    if (!phone.trim()) return "Informe o WhatsApp do responsável";
     if (!isValidPhoneBr(phone)) return "WhatsApp do responsável inválido";
     if (!planId) return "Escolha o plano de permanência";
     if (activity === "CARRINHO" && !assetId) return "Escolha o carrinho";
@@ -978,13 +980,46 @@ export function EntradaScreen({
                 </span>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                   <Input
-                    placeholder="000.000.000-00"
+                    placeholder="000.000.000-00 (Obrigatório)"
                     inputMode="numeric"
                     value={cpf}
                     onChange={(e) => setCpf(formatCpf(e.target.value))}
                     style={{ maxWidth: "260px" }}
                   />
                   {cpf.length === 14 && !isValidCpf(cpf) && <Tag color="var(--color-error)">CPF inválido</Tag>}
+                </div>
+              </div>
+            )}
+
+            {!isValidPhoneBr(phone) && (
+              <div
+                style={{
+                  padding: "12px 16px",
+                  background: "#FEF3C7",
+                  color: "#92400E",
+                  borderRadius: "12px",
+                  border: "1px solid #F59E0B",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}
+              >
+                <strong style={{ fontSize: "13px" }}>⚠️ WhatsApp do Responsável Obrigatório:</strong>
+                <span style={{ fontSize: "12px" }}>
+                  O cadastro de <strong>{guardianName || "Responsável"}</strong> está sem WhatsApp válido. Informe o WhatsApp abaixo para continuar com o check-in:
+                </span>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <Input
+                    placeholder="(91) 98250-1215 (Obrigatório)"
+                    inputMode="numeric"
+                    maxLength={15}
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
+                    style={{ maxWidth: "260px" }}
+                  />
+                  {phone.length > 0 && !isValidPhoneBr(phone) && (
+                    <Tag color="var(--color-error)">WhatsApp inválido — DDD + número, com o 9 do celular</Tag>
+                  )}
                 </div>
               </div>
             )}
@@ -1090,11 +1125,11 @@ export function EntradaScreen({
             <Input label="Nome da criança" placeholder="Nome completo" value={childName} onChange={(e) => setChildName(e.target.value)} />
             <DateInput label="Data de nascimento" value={birthDate} onChange={setBirthDate} />
             <Input label="Nome do responsável" placeholder="Pai, mãe ou acompanhante" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} />
-            <Input label="CPF do responsável" placeholder="000.000.000-00" inputMode="numeric" value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} />
+            <Input label="CPF do responsável *" placeholder="000.000.000-00 (Obrigatório)" inputMode="numeric" value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} />
             {cpf.length === 14 && !isValidCpf(cpf) && <Tag color="var(--color-error)">CPF inválido</Tag>}
             <Input
-              label="WhatsApp do responsável"
-              placeholder="(91) 98250-1215"
+              label="WhatsApp do responsável *"
+              placeholder="(91) 98250-1215 (Obrigatório)"
               inputMode="numeric"
               maxLength={15}
               value={phone}
