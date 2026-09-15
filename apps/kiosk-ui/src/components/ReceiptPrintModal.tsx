@@ -49,8 +49,12 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
           <title>Cupom Não Fiscal — FaçaAmigos</title>
           <style>
             @page { size: 80mm auto; margin: 0; }
-            html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 74mm; font-family: "Consolas", "Courier New", monospace; font-size: 11px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; text-align: center; }
-            pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; text-align: center; }
+            /* generateEscPosReceipt já centraliza manualmente cada linha (ver centerText
+               em packages/domain/src/printers/escpos.ts) contra a largura real da bobina
+               de 80mm (48 colunas). Aplicar "text-align: center" aqui por cima somaria
+               uma segunda centralização e puxaria o texto pra um dos lados. */
+            html, body { margin: 0 !important; padding: 2mm 3mm !important; background: #fff !important; width: 78mm; font-family: "Consolas", "Courier New", monospace; font-size: 9.5px; line-height: 1.25; font-weight: 600; text-rendering: geometricPrecision; color: #000 !important; text-align: left; }
+            pre { font-family: inherit; font-size: inherit; white-space: pre; margin: 0; width: 100%; overflow: hidden; word-break: break-all; text-align: left; }
           </style>
         </head>
         <body>

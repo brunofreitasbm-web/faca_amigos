@@ -21,7 +21,7 @@ describe("generateEscPosReceipt", () => {
     expect(String.fromCharCode(...bytesPonto)).toBe("Ana - Resp");
   });
 
-  it("gera cupom não fiscal formatado em 42 colunas para impressoras de 80mm (Apptech T271U, Elgin i8/i9, Bematech 4200TH)", () => {
+  it("gera cupom não fiscal formatado em 48 colunas (Font A) para impressoras de 80mm (Apptech T271U, Elgin i8/i9, Bematech 4200TH)", () => {
     const receipt = generateEscPosReceipt({
       title: "Recibo de Caixa",
       unitName: "Playground Parque Shopping",
@@ -43,18 +43,18 @@ describe("generateEscPosReceipt", () => {
     // Quantidade > 1 vai junto da descrição do item (sem coluna QTD própria).
     expect(receipt.text).toContain("Água mineral x2");
     // Uma forma de pagamento só: TOTAL e forma de pagamento saem numa linha.
-    expect(receipt.text).toContain("TOTAL (PIX):                R$       50,00");
+    expect(receipt.text).toContain("TOTAL (PIX):                      R$       50,00");
     expect(receipt.text).toContain("Comprovante interno, sem valor fiscal");
 
-    // Verifica que cada linha de divisor tem exatamente 42 caracteres
+    // Verifica que cada linha de divisor tem exatamente 48 caracteres (Font A, 80mm)
     const lines = receipt.text.split("\n");
     const dividerLines = lines.filter((l) => l.startsWith("==="));
     expect(dividerLines.length).toBeGreaterThan(0);
-    expect(dividerLines[0]!.length).toBe(42);
+    expect(dividerLines[0]!.length).toBe(48);
 
-    // Verifica que o hex gerado possui o cabeçalho ESC @ + ESC t 3 (CP860) + ESC a 1 (Centralizado), avanço de 3 linhas (1b6403) e comando de corte de papel (1d564200)
+    // Verifica que o hex gerado possui o cabeçalho ESC @ + ESC t 3 (CP860) + ESC a 0 (Esquerda — centralização é manual), avanço de 3 linhas (1b6403) e comando de corte de papel (1d564200)
     expect(receipt.commandsHex).toBeDefined();
-    expect(receipt.commandsHex.startsWith("1b401b74031b6101")).toBe(true);
+    expect(receipt.commandsHex.startsWith("1b401b74031b6100")).toBe(true);
     expect(receipt.commandsHex.endsWith("1b64031d564200")).toBe(true);
 
     // Cupom sem accessCode não é recibo de guarda — sem trackingUrl, sem comando de QR.
@@ -74,7 +74,7 @@ describe("generateEscPosReceipt", () => {
     // gravado na NV — vem logo após o cabeçalho de inicialização.
     const logoCmd = nvLogoPrintCommandHex();
     expect(logoCmd).toBe("1c700100");
-    expect(receipt.commandsHex.indexOf(logoCmd)).toBe("1b401b74031b6101".length);
+    expect(receipt.commandsHex.indexOf(logoCmd)).toBe("1b401b74031b6100".length);
   });
 
   it("NÃO imprime o timbre no DANFE NFC-e — documento fiscal tem layout regulado", () => {
@@ -165,7 +165,7 @@ describe("generateEscPosReceipt", () => {
     expect(receipt.text).not.toContain("__________");
     // Recibo de guarda não tem tabela ITEM/QTD/VALOR — o valor já está em PREVISTO.
     expect(receipt.text).not.toContain("ITEM");
-    expect(receipt.text).toContain("PREVISTO (pagar na saída):  R$       60,00");
+    expect(receipt.text).toContain("PREVISTO (pagar na saída):        R$       60,00");
   });
 
   it("imprime o DANFE NFC-e (chave, protocolo, número/série e QR de consulta) quando fiscalQrUrl é informado", () => {
