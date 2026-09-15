@@ -76,12 +76,15 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
 
   function buildAuxiliaryReceiptText(): string {
     const lines: string[] = [];
+    // Sem espaços contados na mão para "centralizar" — quem centraliza é o
+    // `text-align: center` do CSS do `<pre>` de impressão/PDF abaixo, contra
+    // a largura real do elemento (ver generateDanfeNfce, mesmo raciocínio).
     lines.push("================================================");
-    lines.push("               FAÇA AMIGOS                      ");
-    lines.push(`           ${unitName.toUpperCase()}`);
+    lines.push("FAÇA AMIGOS");
+    lines.push(unitName.toUpperCase());
     lines.push("================================================");
-    lines.push("           COMPROVANTE AUXILIAR DE VENDA        ");
-    lines.push("        DA NOTA FISCAL DE CONSUMIDOR ELETRÔNICA   ");
+    lines.push("COMPROVANTE AUXILIAR DE VENDA");
+    lines.push("DA NOTA FISCAL DE CONSUMIDOR ELETRÔNICA");
     lines.push("------------------------------------------------");
     if (orderCode) lines.push(`Pedido nº ${orderCode}`);
     lines.push(`Data/Hora: ${dateTimeStr}`);
@@ -195,12 +198,14 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
               box-sizing: border-box;
               color: #000;
               background: #fff;
+              text-align: center;
             }
             pre {
               white-space: pre-wrap;
               word-break: break-all;
               margin: 0;
               font-family: inherit;
+              text-align: center;
             }
             .qr-container {
               text-align: center;
@@ -255,12 +260,14 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
               border-radius: 8px;
               background: #fff;
               color: #111;
+              text-align: center;
             }
             pre {
               white-space: pre-wrap;
               word-break: break-all;
               margin: 0;
               font-family: inherit;
+              text-align: center;
             }
             .qr-container {
               text-align: center;
@@ -381,6 +388,7 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
               fontWeight: 600,
               whiteSpace: "pre-wrap",
               wordBreak: "break-all",
+              textAlign: "center",
               maxHeight: "300px",
               overflowY: "auto",
               margin: 0,

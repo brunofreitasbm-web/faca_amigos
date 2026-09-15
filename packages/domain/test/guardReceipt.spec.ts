@@ -66,9 +66,9 @@ describe("recibo de guarda / Check-in (via dos pais, impressa no check-in)", () 
     expect(text).not.toContain("__________");
   });
 
-  it("respeita a largura de 42 colunas da bobina de 80mm", () => {
+  it("respeita a largura de 48 colunas (Font A) da bobina de 80mm", () => {
     for (const linha of linhas) {
-      expect(linha.length).toBeLessThanOrEqual(42);
+      expect(linha.length).toBeLessThanOrEqual(48);
     }
   });
 
