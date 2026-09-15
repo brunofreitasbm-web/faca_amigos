@@ -113,3 +113,60 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
  * nível concedido é a própria permissão.
  */
 export const ROLE_OPTIONS: ReadonlyArray<Role> = ["OPERADOR", "GERENTE", "ADMIN", "ESTAGIARIO", "PRESTADOR_PJ"];
+
+/**
+ * Retorna o conjunto de capacidades padrão para um papel de colaborador.
+ * Usado como fallback resiliente caso a consulta à view `fa_kiosk_my_capabilities` falhe ou venha vazia.
+ */
+export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
+  if (role === "ADMIN") {
+    return new Set(CAPABILITIES);
+  }
+
+  if (role === "GERENTE") {
+    return new Set(
+      CAPABILITIES.filter(
+        (c) =>
+          c !== "sessao.cancel" &&
+          c !== "config.rbac.write" &&
+          c !== "notificacoes.owner_push" &&
+          c !== "talentos.write"
+      )
+    );
+  }
+
+  if (role === "OPERADOR") {
+    return new Set([
+      "sessao.checkin",
+      "sessao.checkout",
+      "pdv.sell",
+      "venda.upsell",
+      "venda.prepago",
+      "caixa.open_close",
+      "caixa.sangria",
+      "ponto.self",
+      "config.read",
+      "config.write",
+      "config.employees.write",
+      "config.unit.write",
+      "config.fiscal.write",
+      "config.terms.write",
+      "bonificacao.self",
+      "relatorio.read",
+      "clientes.write",
+      "nfse.emit",
+      "nfce.retry",
+    ]);
+  }
+
+  if (role === "ESTAGIARIO") {
+    return new Set(["ponto.self", "bonificacao.self"]);
+  }
+
+  if (role === "PRESTADOR_PJ") {
+    return new Set(["ponto.self", "sessao.checkin", "sessao.checkout"]);
+  }
+
+  return new Set(CAPABILITIES);
+}
+

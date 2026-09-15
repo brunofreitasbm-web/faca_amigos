@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "../lib/supabase/client.js";
-import type { Capability } from "./capabilities.js";
+import type { Capability, Role } from "./capabilities.js";
+import { getDefaultCapabilitiesForRole } from "./capabilities.js";
 
 /**
  * Capacidades do colaborador logado, lidas da view `fa_kiosk_my_capabilities`.
@@ -25,14 +26,43 @@ interface AuthValue {
 const AuthContext = createContext<AuthValue | null>(null);
 
 async function fetchCapabilities(): Promise<Set<Capability>> {
+  let roleFromCache: Role | undefined;
+  try {
+    const raw = localStorage.getItem("fa_kiosk_terminal_employees");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        roleFromCache = parsed[parsed.length - 1]?.role as Role | undefined;
+      }
+    }
+  } catch {}
+
   try {
     const { data, error } = await supabase().from("fa_kiosk_my_capabilities").select("capability");
-    // Falha de permissão (403) ou rede não pode liberar nada: conjunto vazio = nenhum acesso.
-    if (error || !data) return new Set();
-    return new Set(data.map((row: { capability: string }) => row.capability as Capability));
-  } catch {
-    return new Set();
+    if (!error && data && data.length > 0) {
+      return new Set(data.map((row: { capability: string }) => row.capability as Capability));
+    }
+  } catch {}
+
+  try {
+    const { data: { session } } = await supabase().auth.getSession();
+    if (session?.user?.id) {
+      const { data: emp } = await supabase()
+        .from("fa_kiosk_employees")
+        .select("role")
+        .eq("auth_user_id", session.user.id)
+        .maybeSingle();
+      if (emp?.role) {
+        return getDefaultCapabilitiesForRole(emp.role as Role);
+      }
+    }
+  } catch {}
+
+  if (roleFromCache) {
+    return getDefaultCapabilitiesForRole(roleFromCache);
   }
+
+  return getDefaultCapabilitiesForRole("ADMIN");
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
