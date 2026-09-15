@@ -65,24 +65,36 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
   const [loadingChild, setLoadingChild] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const {
+    guardianId,
+    childId,
+    sessionId,
+    guardianName: initGuardianName,
+    guardianPhone: initGuardianPhone,
+    guardianCpf: initGuardianCpf,
+    childName: initChildName,
+    childBirthDate: initChildBirthDate,
+    notes: initNotes,
+  } = initialData;
+
   useEffect(() => {
     if (open) {
-      setGuardianName(initialData.guardianName || "");
-      setGuardianPhone(initialData.guardianPhone ? formatPhoneBr(initialData.guardianPhone) : "");
-      setGuardianCpf(initialData.guardianCpf ? formatCpf(initialData.guardianCpf) : "");
-      setChildName(initialData.childName || "");
-      setChildBirthDate(initialData.childBirthDate || "");
-      setNotes(initialData.notes || "");
+      setGuardianName(initGuardianName || "");
+      setGuardianPhone(initGuardianPhone ? formatPhoneBr(initGuardianPhone) : "");
+      setGuardianCpf(initGuardianCpf ? formatCpf(initGuardianCpf) : "");
+      setChildName(initChildName || "");
+      setChildBirthDate(initChildBirthDate || "");
+      setNotes(initNotes || "");
       setError(null);
 
-      if (initialData.childId) {
+      if (childId) {
         setLoadingChild(true);
         (async () => {
           try {
             const { data } = await supabase()
               .from("fa_kiosk_children")
               .select("birth_date, notes")
-              .eq("id", initialData.childId)
+              .eq("id", childId)
               .maybeSingle();
             if (data) {
               if (data.birth_date) setChildBirthDate(data.birth_date);
@@ -95,8 +107,25 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
           }
         })();
       }
+
+      if (guardianId && !initGuardianCpf) {
+        (async () => {
+          try {
+            const { data } = await supabase()
+              .from("fa_kiosk_guardians")
+              .select("cpf")
+              .eq("id", guardianId)
+              .maybeSingle();
+            if (data?.cpf) {
+              setGuardianCpf(formatCpf(data.cpf));
+            }
+          } catch {
+            // Silenciosamente ignora em caso de indisponibilidade
+          }
+        })();
+      }
     }
-  }, [open, initialData]);
+  }, [open, sessionId, childId, guardianId]);
 
   const cleanCpf = guardianCpf.replace(/\D/g, "");
   const cleanPhone = guardianPhone.replace(/\D/g, "");
