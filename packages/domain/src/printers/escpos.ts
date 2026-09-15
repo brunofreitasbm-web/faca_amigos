@@ -65,7 +65,19 @@ export interface ReceiptPrintPayload {
   fiscalAmbiente?: "HOMOLOGACAO" | "PRODUCAO";
 }
 
-const WIDTH = 42;
+/**
+ * Font A padrão das térmicas ESC/POS (Epson, Elgin, Bematech, Apptech,
+ * Daruma) em bobina de 80mm são 48 colunas — não 42. Usar 42 aqui e confiar
+ * no alinhamento `ESC a 1` do firmware pra centralizar (como esta constante
+ * fazia antes) sub-preenche a linha: o firmware centraliza um bloco de 42
+ * colunas dentro de uma área de 48, e como a divisão da folga não bate 1:1
+ * entre marcas/firmwares, o cupom sai puxado pra um dos lados (ver o cupom
+ * fiscal em produção, sempre puxado à direita). A correção é dupla: usar a
+ * largura real (48) e centralizar o texto nós mesmos (ver `centerText`),
+ * mandando o comando de alinhamento como `ESC a 0` (esquerda) — assim o
+ * resultado não depende de como cada firmware interpreta "centralizado".
+ */
+const WIDTH = 48;
 
 /**
  * Codifica uma string em bytes da tabela de caracteres CP860 (Português),
@@ -81,6 +93,8 @@ export function encodeCp860(str: string): number[] {
     "â": 0x83,
     "ã": 0x84,
     "à": 0x85,
+    "ª": 0xa6,
+    "º": 0xa7,
     "ç": 0x87,
     "ê": 0x88,
     "ô": 0x93,
@@ -124,28 +138,26 @@ export function encodeCp860(str: string): number[] {
 }
 
 /**
- * Não faz mais centralização manual (preenchendo com espaços à esquerda).
- * A impressora já recebe `ESC a 1` (alinhamento centralizado, ver
- * `hexHeader`) e o fallback HTML usa `text-align: center` — ambos calculam
- * a centralização a partir da largura REAL da bobina/área de impressão.
- * Quando esta função também preenchia espaços à esquerda assumindo 42
- * colunas, as duas centralizações se somavam: em bobinas de 80mm (cuja
- * Font A costuma ter 48 colunas, não 42) o texto saía puxado para a
- * direita, e de forma inconsistente entre linhas curtas (dupla
- * centralização) e linhas de largura cheia como os divisores (só uma).
- * Só recorta o texto se ele estourar a largura máxima da linha.
+ * Centralização manual, calculada contra a largura REAL da bobina (ver
+ * `WIDTH`). O comando de alinhamento enviado à impressora é `ESC a 0`
+ * (esquerda, ver `hexHeader`) — não sobra nenhuma centralização de
+ * firmware por cima desta para "somar" e puxar o texto pra um lado. O
+ * fallback HTML segue o mesmo raciocínio: usa `text-align: left`, não
+ * `center` (ver `ReceiptPrintModal.tsx`/`NfceModal.tsx`), pelo mesmo
+ * motivo — o padding já é o texto.
  */
 function centerText(str: string, width = WIDTH): string {
   if (str.length >= width) return str.slice(0, width);
-  return str;
+  const totalPad = width - str.length;
+  const left = Math.floor(totalPad / 2);
+  return " ".repeat(left) + str;
 }
 
 /**
- * Linha de valor: rótulo à esquerda, `R$ 0.000,00` encostado na coluna 42.
- *
- * Era montada com espaços contados na mão, e a linha do TOTAL saía com 43
- * colunas — uma a mais que a bobina de 80mm comporta. Na impressora isso
- * não corta: dobra, e o valor da venda aparecia sozinho na linha de baixo.
+ * Linha de valor: rótulo à esquerda, `R$ 0.000,00` encostado na última coluna
+ * (`WIDTH`). Calculada a partir do tamanho real do valor formatado — não
+ * conta espaços na mão — então não estoura a largura da bobina nem sobra
+ * coluna, o que faria o valor cair sozinho pra linha de baixo na impressora.
  */
 function moneyLine(label: string, cents: number): string {
   const value = (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -240,7 +252,7 @@ function chunkString(str: string, width = WIDTH): string[] {
   return out;
 }
 
-/** Quebra um texto longo em linhas de 42 colunas sem cortar palavra no meio. */
+/** Quebra um texto longo em linhas de `width` colunas sem cortar palavra no meio. */
 function wrap(str: string, width = WIDTH): string[] {
   const words = str.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -260,7 +272,7 @@ function wrap(str: string, width = WIDTH): string[] {
 /**
  * Gerador de comprovantes/cupons não fiscais para impressoras térmicas de 80mm
  * (Apptech T271U, Elgin i8/i9, Bematech MP-4200 TH, Epson TM-T20 / TM-T88, Daruma, etc.).
- * Formatado para 42 colunas (largura útil ideal de 72mm em bobina de 80mm).
+ * Formatado para 48 colunas (Font A, largura útil de uma bobina de 80mm).
  * Suporta emissão em formato texto limpo (driver de sistema / navegador) e comandos RAW ESC/POS.
  *
  * Duas variantes saem daqui:
@@ -275,8 +287,8 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   const isFiscalReceipt = Boolean(payload.fiscalQrUrl);
   const lines: string[] = [];
 
-  const divider = "==========================================";
-  const subDivider = "------------------------------------------";
+  const divider = "=".repeat(WIDTH);
+  const subDivider = "-".repeat(WIDTH);
 
   lines.push(divider);
   lines.push(centerText("FAÇA AMIGOS"));
@@ -436,7 +448,7 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   const text = lines.join("\n");
 
   // Bytes de inicialização ESC/POS (ESC @), seleção CP860 (ESC t 3), alinhamento (ESC a 1), avanço de 3 linhas (ESC d 3) e corte automático (GS V 66 0)
-  const hexHeader = "1b401b74031b6101"; // ESC @, ESC t 3 (CP860 Português), ESC a 1 (Centralizado)
+  const hexHeader = "1b401b74031b6100"; // ESC @, ESC t 3 (CP860 Português), ESC a 0 (Esquerda — centralização é manual, ver centerText)
   const hexFeed = "1b6403"; // ESC d 3
   const hexCut = "1d564200"; // GS V 66 0
 
@@ -474,8 +486,8 @@ export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { tex
   const dateTime = payload.dateTime || new Date().toLocaleString("pt-BR");
   const lines: string[] = [];
 
-  const divider = "==========================================";
-  const subDivider = "------------------------------------------";
+  const divider = "=".repeat(WIDTH);
+  const subDivider = "-".repeat(WIDTH);
 
   lines.push(divider);
   lines.push(centerText("FAÇA AMIGOS — CIRCUITO"));
@@ -517,7 +529,7 @@ export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { tex
   lines.push("");
 
   const text = lines.join("\n");
-  const hexHeader = "1b401b74031b6101"; // ESC @, ESC t 3 (CP860 Português), ESC a 1 (Centralizado)
+  const hexHeader = "1b401b74031b6100"; // ESC @, ESC t 3 (CP860 Português), ESC a 0 (Esquerda — centralização é manual, ver centerText)
   const hexFeed = "1b6403"; // ESC d 3
   const hexCut = "1d564200"; // GS V 66 0
 

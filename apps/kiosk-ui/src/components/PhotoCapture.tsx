@@ -177,15 +177,18 @@ export function PhotoCapture({
                   whiteSpace: "nowrap",
                 }}
               >
-                📐 Centralize o envelope no retângulo
+                📐 Aproxime e centralize o envelope no retângulo
               </div>
 
-              {/* Guia retangular com sombra de foco e cantos destacados */}
+              {/* Guia retangular vertical (mesma proporção do envelope, que é bem mais alto que largo)
+                  com sombra de foco e cantos destacados. Ocupa a maior parte da altura do quadro de
+                  propósito: força o operador a aproximar a câmera até o envelope preencher a moldura,
+                  em vez de fotografar de longe com o envelope pequeno no centro. */}
               <div
                 style={{
                   position: "absolute",
-                  width: "76%",
-                  height: "56%",
+                  width: "38%",
+                  height: "88%",
                   boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.38)",
                   border: "1.5px dashed rgba(255, 255, 255, 0.7)",
                   borderRadius: "8px",

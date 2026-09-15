@@ -44,16 +44,22 @@ function formatMoney(cents: number): string {
 export function generateDanfeNfce(payload: DanfeNfcePayload): { text: string } {
   const lines: string[] = [];
 
+  // As linhas de título abaixo NÃO levam espaços contados na mão para
+  // centralizar — isso pressupõe uma largura fixa de coluna que nem sempre
+  // bate com o container real (80mm em fonte monoespaçada), e o cupom sai
+  // puxado pra um dos lados. Quem centraliza é o `text-align: center` do
+  // `<pre>` no HTML de impressão/PDF (ver NfceModal.tsx), calculado contra
+  // a largura real do elemento.
   lines.push("================================================");
-  lines.push("               FAÇA AMIGOS                      ");
-  lines.push(`           ${payload.unitName.toUpperCase()}`);
+  lines.push("FAÇA AMIGOS");
+  lines.push(payload.unitName.toUpperCase());
   lines.push("================================================");
-  lines.push("           DANFE NFC-e — DOCUMENTO AUXILIAR      ");
-  lines.push("        DA NOTA FISCAL DE CONSUMIDOR ELETRÔNICA   ");
+  lines.push("DANFE NFC-e — DOCUMENTO AUXILIAR");
+  lines.push("DA NOTA FISCAL DE CONSUMIDOR ELETRÔNICA");
   if (payload.contingencia) {
     lines.push("------------------------------------------------");
-    lines.push("   EMITIDA EM CONTINGÊNCIA — PENDENTE DE          ");
-    lines.push("   AUTORIZAÇÃO PELA SEFAZ                         ");
+    lines.push("EMITIDA EM CONTINGÊNCIA — PENDENTE DE");
+    lines.push("AUTORIZAÇÃO PELA SEFAZ");
   }
   lines.push("------------------------------------------------");
   lines.push(`NFC-e nº ${payload.numero}  série ${payload.serie}`);
