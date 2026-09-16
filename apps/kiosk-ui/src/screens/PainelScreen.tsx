@@ -1214,25 +1214,6 @@ export function PainelScreen() {
                     <span style={ICON_BUTTON_LABEL_STYLE}>Sessão</span>
                   </Button>
                 </Tooltip>
-                <IfCan capability="sessao.change_plan">
-                  <Tooltip label="Trocar o plano de permanência desta sessão">
-                    <Button
-                      variant="ghost"
-                      size="md"
-                      disabled={actionBusy.has(session.id)}
-                      aria-label="Trocar o plano desta sessão"
-                      style={ICON_BUTTON_STYLE}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPendingPlanId("");
-                        setChangingPlanFor(changingPlanFor === session.id ? null : session.id);
-                      }}
-                    >
-                      <ArrowClockwiseIcon />
-                      <span style={ICON_BUTTON_LABEL_STYLE}>Plano</span>
-                    </Button>
-                  </Tooltip>
-                </IfCan>
                 <Tooltip label="Imprimir Pulseira Térmica">
                   <Button
                     variant="ghost"
@@ -1297,6 +1278,21 @@ export function PainelScreen() {
                 >
                   🪪 Saída manual
                 </Button>
+                <IfCan capability="sessao.change_plan">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={actionBusy.has(session.id)}
+                    title="Trocar o plano de permanência desta sessão"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingPlanId("");
+                      setChangingPlanFor(changingPlanFor === session.id ? null : session.id);
+                    }}
+                  >
+                    <ArrowClockwiseIcon /> Trocar Plano
+                  </Button>
+                </IfCan>
                 {isPaused ? (
                   <Button
                     variant="teal"
