@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { authenticateShoppingRequest, createServiceClient, getShoppingUnitMetadata } from "../../../_shopping/common.js";
+import { authenticateShoppingRequest, createServiceClient, formatIsoTimezone, getShoppingUnitMetadata } from "../../../_shopping/common.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabase = createServiceClient();
@@ -98,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const vendas = orders.map((o) => ({
     idVenda: o.id,
-    dataHora: new Date(o.closed_at_ms ?? o.created_at).toISOString(),
+    dataHora: formatIsoTimezone(o.closed_at_ms ?? o.created_at, unitMeta.timezone),
     valorCentavos: o.total_cents,
     cancelado: o.status === "CANCELADA",
     troca: false,

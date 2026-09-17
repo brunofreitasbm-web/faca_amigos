@@ -75,6 +75,15 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     expect(resolveShoppingUnitLUC("L-143")).toBe("PSB01003");
   });
 
+  it("formata a dataHora das vendas no fuso horário de Belém (-03:00)", async () => {
+    const { formatIsoTimezone } = await import("../src/server/routes/shopping.js");
+    // 2026-08-27T00:30:00.000Z UTC -> 2026-08-26T21:30:00-03:00 em Belém
+    const utcTimestamp = new Date("2026-08-27T00:30:00.000Z").getTime();
+    const formatted = formatIsoTimezone(utcTimestamp, "America/Belem");
+    expect(formatted).toBe("2026-08-26T21:30:00-03:00");
+  });
+
+
   it("retorna o endpoint de vendas item a item sem dados pessoais (LGPD compliant)", async () => {
     const res = await app.inject({
       method: "GET",

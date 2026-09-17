@@ -13,6 +13,31 @@ export interface ShoppingUnitInfo {
   cutoffHoraDiaOperacional: number;
 }
 
+export function formatIsoTimezone(dateInput: number | string | Date, timeZone = "America/Belem"): string {
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return new Date().toISOString();
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
+  let hour = get("hour");
+  if (hour === "24") hour = "00";
+
+  const offset = timeZone === "America/Belem" ? "-03:00" : "-03:00";
+
+  return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}:${get("second")}${offset}`;
+}
+
+
 /**
   Normaliza as LUCs internas e oficiais do painel para o padrão usado na API do shopping.
   As LUCs oficiais da operação internas são PSB01003 e PSBQF122.
@@ -360,7 +385,7 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
 
     const vendas = orders.map((o) => ({
       idVenda: o.id,
-      dataHora: new Date(o.created_at_ms).toISOString(),
+      dataHora: formatIsoTimezone(o.created_at_ms, unitMeta.timezone),
       valorCentavos: o.total_cents,
       cancelado: o.status === "CANCELADA",
       troca: false,
