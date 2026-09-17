@@ -104,7 +104,6 @@ const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon:
   { value: "PAINEL", label: "Painel", help: "Ver todas as crianças que estão no espaço agora, quanto tempo já ficaram e fechar o atendimento (cobrar) quando forem embora", icon: <GridIcon /> },
   { value: "PDV", label: "PDV", help: "Vender produtos avulsos (loja/lanchonete), sem estar ligado a uma entrada", icon: <ShoppingCartIcon /> },
   { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento", icon: <WalletIcon /> },
-  { value: "PONTO", label: "Ponto", help: "Bater o ponto: registrar entrada, intervalo e saída do colaborador", icon: <ClockIcon /> },
   { value: "MINHA_BONIFICACAO", label: "Minha Bonificação", help: "Consultar só os seus números do programa de bonificação: ticket médio, progresso da meta e acumulado do mês. Somente consulta.", icon: <span>🎮</span> },
   { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa e folha de ponto de períodos anteriores", icon: <ChartBarIcon /> },
   { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, colaboradores, unidade, dados fiscais e termos de uso", icon: <GearIcon /> },
@@ -433,7 +432,7 @@ export function App() {
   // caro possível. As demais telas de escape (Entrada completa, PDV,
   // Relatórios, Configurações) ainda caem no fallback abaixo, com o botão
   // flutuante "Voltar ao modo celular" — ainda não vestidas.
-  const MOBILE_FRAMED_TITLE: Partial<Record<Screen, string>> = { SAIDA: "Saída", CAIXA: "Caixa", PONTO: "Ponto", PDV: "PDV" };
+  const MOBILE_FRAMED_TITLE: Partial<Record<Screen, string>> = { SAIDA: "Saída", CAIXA: "Caixa", PDV: "PDV" };
   if (mobile.active && mobileEscape != null && mobileEscape in MOBILE_FRAMED_TITLE && employee) {
     const FramedComponent = SCREEN_COMPONENTS[mobileEscape];
     return (

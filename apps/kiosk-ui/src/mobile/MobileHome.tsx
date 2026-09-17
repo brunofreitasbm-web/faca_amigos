@@ -209,7 +209,6 @@ export function MobileHome({
           {can("caixa.open_close") && (
             <AtalhoTela titulo="Caixa" ajuda="abrir, sangria, fechar" onClick={() => onAbrirTela("CAIXA")} />
           )}
-          {can("ponto.self") && <AtalhoTela titulo="Ponto" ajuda="entrada e intervalo" onClick={() => onAbrirTela("PONTO")} />}
         </div>
       </div>
     </>

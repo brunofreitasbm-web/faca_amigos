@@ -192,7 +192,6 @@ function MobileMais({
     { screen: "SAIDA", titulo: "Saída", ajuda: "cobrar o excedente, emitir nota e liberar", show: can("sessao.checkout") },
     { screen: "PDV", titulo: "PDV", ajuda: "vender produto avulso", show: can("pdv.sell") },
     { screen: "CAIXA", titulo: "Caixa", ajuda: "abrir turno, sangria, fechar", show: can("caixa.open_close") },
-    { screen: "PONTO", titulo: "Ponto", ajuda: "entrada, intervalo e saída", show: can("ponto.self") },
     { screen: "MINHA_BONIFICACAO", titulo: "Minha Bonificação", ajuda: "seu ticket médio e o acumulado do mês, só seu", show: can("bonificacao.self") },
     { screen: "RELATORIO", titulo: "Relatórios", ajuda: "vendas, visitas e folha de ponto", show: can("relatorio.read") },
     { screen: "CONFIGURACOES", titulo: "Configurações", ajuda: "planos, produtos, equipe, unidade", show: can("config.read") },
