@@ -101,8 +101,8 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const ROLE_DESCRIPTION: Record<Role, string> = {
   ESTAGIARIO: "Só acessa o Controle de Frequência. Não opera caixa, vendas nem check-in/saída.",
   PRESTADOR_PJ: "Só acessa o Registro de Prestação de Serviço (Check-in/Check-out). Sem vínculo empregatício CLT.",
-  OPERADOR: "Caixa, vendas e Configurações.",
-  GERENTE: "Tudo do Operador, mais troca de planos, sangrias, estornos e relatórios.",
+  OPERADOR: "Caixa, vendas, troca de planos e Configurações.",
+  GERENTE: "Tudo do Operador, mais sangrias, estornos e relatórios.",
   ADMIN: "Acesso total, incluindo cancelamento de sessões.",
 };
 
@@ -139,6 +139,7 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
     return new Set([
       "sessao.checkin",
       "sessao.checkout",
+      "sessao.change_plan",
       "pdv.sell",
       "venda.upsell",
       "venda.prepago",
