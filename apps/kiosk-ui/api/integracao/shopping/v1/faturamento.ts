@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { authenticateShoppingRequest, createServiceClient, getShoppingUnitMetadata } from "../../../_shopping/common.js";
+import { authenticateShoppingRequest, createServiceClient, formatIsoTimezone, getShoppingUnitMetadata } from "../../../_shopping/common.js";
 
 interface DayAggregate {
   data: string;
@@ -34,31 +34,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const targetUnitId = authUnit.id;
   const unitMeta = getShoppingUnitMetadata(authUnit);
 
-  // 1. Busca TODAS as ordens no período sem truncamento de 1.000 registros (PostgREST default limit)
-  let orders: { id: string; business_date: string; status: string; total_cents: number }[] = [];
+  function shiftDateStr(dateStr: string, days: number): string {
+    const d = new Date(`${dateStr}T00:00:00Z`);
+    if (isNaN(d.getTime())) return dateStr;
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().split("T")[0]!;
+  }
+
+  const deBuf = shiftDateStr(de, -1);
+  const ateBuf = shiftDateStr(ate, 1);
+
+  // 1. Busca TODAS as ordens no período com buffer
+  let allOrders: { id: string; created_at: string; closed_at_ms: number | null; status: string; total_cents: number }[] = [];
   let from = 0;
   const step = 1000;
 
   while (true) {
     const ordersRes = await supabase
       .from("fa_kiosk_orders")
-      .select("id, business_date, status, total_cents")
+      .select("id, created_at, closed_at_ms, status, total_cents")
       .eq("unit_id", targetUnitId)
-      .gte("business_date", de)
-      .lte("business_date", ate)
+      .gte("business_date", deBuf)
+      .lte("business_date", ateBuf)
       .range(from, from + step - 1);
 
     if (ordersRes.error) {
       return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar dados de faturamento." });
     }
 
-    const chunk = (ordersRes.data || []) as { id: string; business_date: string; status: string; total_cents: number }[];
-    orders = orders.concat(chunk);
+    const chunk = (ordersRes.data || []) as any[];
+    allOrders = allOrders.concat(chunk);
     if (chunk.length < step) break;
     from += step;
   }
 
-  const businessDateByOrderId = new Map(orders.map((o) => [o.id, o.business_date]));
+  const saleDateByOrderId = new Map<string, string>();
+  const orders = allOrders.filter((o) => {
+    const dataHora = formatIsoTimezone(o.closed_at_ms ?? o.created_at, unitMeta.timezone);
+    const saleDate = dataHora.slice(0, 10);
+    saleDateByOrderId.set(o.id, saleDate);
+    return saleDate >= de && saleDate <= ate;
+  });
 
   // 2. Busca TODOS os pagamentos sem truncamento
   let payments: { order_id: string; amount_cents: number; method: string }[] = [];
@@ -66,11 +82,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   while (true) {
     const paymentsRes = await supabase
       .from("fa_kiosk_payments")
-      .select("order_id, amount_cents, method, fa_kiosk_orders!inner(unit_id, business_date, status)")
+      .select("order_id, amount_cents, method, fa_kiosk_orders!inner(unit_id, status)")
       .eq("fa_kiosk_orders.unit_id", targetUnitId)
       .eq("fa_kiosk_orders.status", "PAGA")
-      .gte("fa_kiosk_orders.business_date", de)
-      .lte("fa_kiosk_orders.business_date", ate)
+      .gte("fa_kiosk_orders.business_date", deBuf)
+      .lte("fa_kiosk_orders.business_date", ateBuf)
       .range(from, from + step - 1);
 
     if (paymentsRes.error) {
@@ -89,11 +105,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   while (true) {
     const itemsRes = await supabase
       .from("fa_kiosk_order_items")
-      .select("order_id, total_cents, item_nature, fa_kiosk_orders!inner(unit_id, business_date, status)")
+      .select("order_id, total_cents, item_nature, fa_kiosk_orders!inner(unit_id, status)")
       .eq("fa_kiosk_orders.unit_id", targetUnitId)
       .eq("fa_kiosk_orders.status", "PAGA")
-      .gte("fa_kiosk_orders.business_date", de)
-      .lte("fa_kiosk_orders.business_date", ate)
+      .gte("fa_kiosk_orders.business_date", deBuf)
+      .lte("fa_kiosk_orders.business_date", ateBuf)
       .range(from, from + step - 1);
 
     if (itemsRes.error) {
@@ -106,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     from += step;
   }
 
-  // 4. Preenche todos os dias do intervalo de 'de' até 'ate' (garante que dias sem movimento apareçam com zeros)
+  // 4. Preenche todos os dias do intervalo de 'de' até 'ate'
   const daysMap = new Map<string, DayAggregate>();
   const startDate = new Date(`${de}T00:00:00Z`);
   const endDate = new Date(`${ate}T00:00:00Z`);
@@ -131,10 +147,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   for (const o of orders) {
     if (o.status !== "PAGA" && o.status !== "CANCELADA") continue;
-    let day = daysMap.get(o.business_date);
+    const saleDate = saleDateByOrderId.get(o.id) || o.created_at.slice(0, 10);
+    let day = daysMap.get(saleDate);
     if (!day) {
       day = {
-        data: o.business_date,
+        data: saleDate,
         brutoCentavos: 0,
         descontosCentavos: 0,
         liquidoCentavos: 0,
@@ -145,7 +162,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         porNatureza: { SERVICO: 0, PRODUTO: 0 },
         porMeioPagamento: { DINHEIRO: 0, PIX: 0, CREDITO: 0, DEBITO: 0, VOUCHER: 0 },
       };
-      daysMap.set(o.business_date, day);
+      daysMap.set(saleDate, day);
     }
     if (o.status === "PAGA") {
       day.brutoCentavos += o.total_cents;
@@ -158,16 +175,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   for (const p of payments) {
-    const businessDate = businessDateByOrderId.get(p.order_id);
-    const day = businessDate ? daysMap.get(businessDate) : undefined;
+    const saleDate = saleDateByOrderId.get(p.order_id);
+    const day = saleDate ? daysMap.get(saleDate) : undefined;
     if (day && Object.prototype.hasOwnProperty.call(day.porMeioPagamento, p.method)) {
       (day.porMeioPagamento as Record<string, number>)[p.method] += p.amount_cents;
     }
   }
 
   for (const it of items) {
-    const businessDate = businessDateByOrderId.get(it.order_id);
-    const day = businessDate ? daysMap.get(businessDate) : undefined;
+    const saleDate = saleDateByOrderId.get(it.order_id);
+    const day = saleDate ? daysMap.get(saleDate) : undefined;
     if (day && Object.prototype.hasOwnProperty.call(day.porNatureza, it.item_nature)) {
       (day.porNatureza as Record<string, number>)[it.item_nature] += it.total_cents;
     }

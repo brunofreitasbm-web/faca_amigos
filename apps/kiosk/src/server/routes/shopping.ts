@@ -150,6 +150,13 @@ function authenticateShoppingRequest(ctx: AppContext, req: FastifyRequest, reply
   return null;
 }
 
+function shiftDateStr(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (isNaN(d.getTime())) return dateStr;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split("T")[0]!;
+}
+
 export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
   // 1. Health Check
   app.get("/integracao/shopping/v1/health", async (req, reply) => {
@@ -171,7 +178,6 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
 
     const query = req.query as { de?: string; ate?: string; formato?: string; unitId?: string };
     const { de, ate, formato = "json" } = query;
-    // O escopo da credencial prevalece sobre o parâmetro unitId
     const targetUnitId = defaultUnitId;
 
     if (!de || !ate) {
@@ -179,61 +185,53 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
     }
 
     const unitMeta = getShoppingUnitMetadata(ctx, targetUnitId);
+    const deBuf = shiftDateStr(de, -1);
+    const ateBuf = shiftDateStr(ate, 1);
 
-    // Consulta vendas agregadas por dia
-    const salesRows = ctx.db
-      .prepare(
-        `SELECT o.business_date,
-                COUNT(CASE WHEN o.status = 'PAGA' THEN 1 END) as qtd_vendas,
-                COUNT(CASE WHEN o.status = 'CANCELADA' THEN 1 END) as qtd_cancelamentos,
-                COALESCE(SUM(CASE WHEN o.status = 'PAGA' THEN o.total_cents ELSE 0 END), 0) as liquido_cents,
-                COALESCE(SUM(CASE WHEN o.status = 'CANCELADA' THEN o.total_cents ELSE 0 END), 0) as cancelamentos_cents
-         FROM orders o
-         WHERE o.unit_id = ? AND o.business_date BETWEEN ? AND ?
-         GROUP BY o.business_date
-         ORDER BY o.business_date`,
-      )
-      .all(targetUnitId, de, ate) as unknown as {
-      business_date: string;
-      qtd_vendas: number;
-      qtd_cancelamentos: number;
-      liquido_cents: number;
-      cancelamentos_cents: number;
+    const rawOrders = ctx.db
+      .prepare(`SELECT id, created_at_ms, total_cents, status FROM orders WHERE unit_id = ? AND business_date BETWEEN ? AND ?`)
+      .all(targetUnitId, deBuf, ateBuf) as unknown as {
+      id: string;
+      created_at_ms: number;
+      total_cents: number;
+      status: string;
     }[];
 
-    // Consulta meios de pagamento por dia
+    const saleDateByOrderId = new Map<string, string>();
+    const orders = rawOrders.filter((o) => {
+      const dataHora = formatIsoTimezone(o.created_at_ms, unitMeta.timezone);
+      const saleDate = dataHora.slice(0, 10);
+      saleDateByOrderId.set(o.id, saleDate);
+      return saleDate >= de && saleDate <= ate;
+    });
+
     const paymentRows = ctx.db
       .prepare(
-        `SELECT o.business_date, p.method, SUM(p.amount_cents) as total_cents
+        `SELECT p.order_id, p.method, p.amount_cents
          FROM payments p
          JOIN orders o ON o.id = p.order_id
-         WHERE o.unit_id = ? AND o.status = 'PAGA' AND o.business_date BETWEEN ? AND ?
-         GROUP BY o.business_date, p.method`,
+         WHERE o.unit_id = ? AND o.status = 'PAGA' AND o.business_date BETWEEN ? AND ?`,
       )
-      .all(targetUnitId, de, ate) as unknown as {
-      business_date: string;
+      .all(targetUnitId, deBuf, ateBuf) as unknown as {
+      order_id: string;
       method: string;
-      total_cents: number;
+      amount_cents: number;
     }[];
 
-    // Consulta natureza (SERVICO x PRODUTO) por dia
     const natureRows = ctx.db
       .prepare(
-        `SELECT o.business_date, oi.item_nature, SUM(oi.total_cents) as total_cents
+        `SELECT oi.order_id, oi.item_nature, oi.total_cents
          FROM order_items oi
          JOIN orders o ON o.id = oi.order_id
-         WHERE o.unit_id = ? AND o.status = 'PAGA' AND o.business_date BETWEEN ? AND ?
-         GROUP BY o.business_date, oi.item_nature`,
+         WHERE o.unit_id = ? AND o.status = 'PAGA' AND o.business_date BETWEEN ? AND ?`,
       )
-      .all(targetUnitId, de, ate) as unknown as {
-      business_date: string;
+      .all(targetUnitId, deBuf, ateBuf) as unknown as {
+      order_id: string;
       item_nature: string;
       total_cents: number;
     }[];
 
     const daysMap = new Map<string, any>();
-
-    // Preenche todos os dias do intervalo de 'de' até 'ate'
     const startDate = new Date(`${de}T00:00:00Z`);
     const endDate = new Date(`${ate}T00:00:00Z`);
 
@@ -255,33 +253,54 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
       }
     }
 
-    for (const s of salesRows) {
-      daysMap.set(s.business_date, {
-        data: s.business_date,
-        brutoCentavos: s.liquido_cents, // bruto antes de descontos
-        descontosCentavos: 0,
-        liquidoCentavos: s.liquido_cents,
-        cancelamentosCentavos: s.cancelamentos_cents,
-        quantidadeVendas: s.qtd_vendas,
-        quantidadeCancelamentos: s.qtd_cancelamentos,
-        ticketMedioCentavos: s.qtd_vendas > 0 ? Math.round(s.liquido_cents / s.qtd_vendas) : 0,
-        porNatureza: { SERVICO: 0, PRODUTO: 0 },
-        porMeioPagamento: { DINHEIRO: 0, PIX: 0, CREDITO: 0, DEBITO: 0, VOUCHER: 0 },
-      });
+    for (const o of orders) {
+      if (o.status !== "PAGA" && o.status !== "CANCELADA") continue;
+      const saleDate = saleDateByOrderId.get(o.id) || de;
+      let day = daysMap.get(saleDate);
+      if (!day) {
+        day = {
+          data: saleDate,
+          brutoCentavos: 0,
+          descontosCentavos: 0,
+          liquidoCentavos: 0,
+          cancelamentosCentavos: 0,
+          quantidadeVendas: 0,
+          quantidadeCancelamentos: 0,
+          ticketMedioCentavos: 0,
+          porNatureza: { SERVICO: 0, PRODUTO: 0 },
+          porMeioPagamento: { DINHEIRO: 0, PIX: 0, CREDITO: 0, DEBITO: 0, VOUCHER: 0 },
+        };
+        daysMap.set(saleDate, day);
+      }
+
+      if (o.status === "PAGA") {
+        day.brutoCentavos += o.total_cents;
+        day.liquidoCentavos += o.total_cents;
+        day.quantidadeVendas += 1;
+      } else {
+        day.cancelamentosCentavos += o.total_cents;
+        day.quantidadeCancelamentos += 1;
+      }
     }
 
     for (const p of paymentRows) {
-      const dayObj = daysMap.get(p.business_date);
-      if (dayObj && dayObj.porMeioPagamento.hasOwnProperty(p.method)) {
-        dayObj.porMeioPagamento[p.method] += p.total_cents;
+      const saleDate = saleDateByOrderId.get(p.order_id);
+      const day = saleDate ? daysMap.get(saleDate) : undefined;
+      if (day && day.porMeioPagamento.hasOwnProperty(p.method)) {
+        day.porMeioPagamento[p.method] += p.amount_cents;
       }
     }
 
     for (const n of natureRows) {
-      const dayObj = daysMap.get(n.business_date);
-      if (dayObj && dayObj.porNatureza.hasOwnProperty(n.item_nature)) {
-        dayObj.porNatureza[n.item_nature] += n.total_cents;
+      const saleDate = saleDateByOrderId.get(n.order_id);
+      const day = saleDate ? daysMap.get(saleDate) : undefined;
+      if (day && day.porNatureza.hasOwnProperty(n.item_nature)) {
+        day.porNatureza[n.item_nature] += n.total_cents;
       }
+    }
+
+    for (const day of daysMap.values()) {
+      day.ticketMedioCentavos = day.quantidadeVendas > 0 ? Math.round(day.liquidoCentavos / day.quantidadeVendas) : 0;
     }
 
     const diasList = Array.from(daysMap.values()).sort((a, b) => a.data.localeCompare(b.data));
@@ -345,13 +364,38 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
     }
 
     const unitMeta = getShoppingUnitMetadata(ctx, targetUnitId);
+    const deBuf = shiftDateStr(de, -1);
+    const ateBuf = shiftDateStr(ate, 1);
+
+    const rawOrders = ctx.db
+      .prepare(`SELECT id, created_at_ms, total_cents, status FROM orders WHERE unit_id = ? AND business_date BETWEEN ? AND ? ORDER BY created_at_ms ASC`)
+      .all(targetUnitId, deBuf, ateBuf) as unknown as {
+      id: string;
+      created_at_ms: number;
+      total_cents: number;
+      status: string;
+    }[];
+
+    const mappedVendas = rawOrders
+      .map((o) => {
+        const dataHora = formatIsoTimezone(o.created_at_ms, unitMeta.timezone);
+        const saleDate = dataHora.slice(0, 10);
+        return {
+          idVenda: o.id,
+          dataHora,
+          saleDate,
+          valorCentavos: o.total_cents,
+          cancelado: o.status === "CANCELADA",
+          troca: false,
+        };
+      })
+      .filter((v) => v.saleDate >= de && v.saleDate <= ate);
 
     const pageNum = parseInt(pagina || page || "0", 10);
     const pageSize = parseInt(limite || limit || "0", 10);
 
-    let sql = `SELECT id, created_at_ms, total_cents, status FROM orders WHERE unit_id = ? AND business_date BETWEEN ? AND ? ORDER BY created_at_ms ASC`;
-    let sqlParams: any[] = [targetUnitId, de, ate];
-
+    const totalRegistros = mappedVendas.length;
+    let vendas = mappedVendas.map(({ saleDate, ...v }) => v);
     let paginacaoMeta: any = undefined;
 
     if (pageNum > 0 || pageSize > 0) {
@@ -359,14 +403,7 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
       const actualLimit = pageSize > 0 ? pageSize : 1000;
       const offset = (actualPage - 1) * actualLimit;
 
-      const countRow = ctx.db
-        .prepare(`SELECT COUNT(*) as cnt FROM orders WHERE unit_id = ? AND business_date BETWEEN ? AND ?`)
-        .get(targetUnitId, de, ate) as { cnt: number } | undefined;
-
-      const totalRegistros = countRow?.cnt || 0;
-
-      sql += ` LIMIT ? OFFSET ?`;
-      sqlParams.push(actualLimit, offset);
+      vendas = vendas.slice(offset, offset + actualLimit);
 
       paginacaoMeta = {
         pagina: actualPage,
@@ -375,21 +412,6 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
         totalRegistros,
       };
     }
-
-    const orders = ctx.db.prepare(sql).all(...sqlParams) as unknown as {
-      id: string;
-      created_at_ms: number;
-      total_cents: number;
-      status: string;
-    }[];
-
-    const vendas = orders.map((o) => ({
-      idVenda: o.id,
-      dataHora: formatIsoTimezone(o.created_at_ms, unitMeta.timezone),
-      valorCentavos: o.total_cents,
-      cancelado: o.status === "CANCELADA",
-      troca: false,
-    }));
 
     const totalVendas = vendas.filter((v) => !v.cancelado).length;
     const brutoCentavos = vendas.filter((v) => !v.cancelado).reduce((acc, v) => acc + v.valorCentavos, 0);

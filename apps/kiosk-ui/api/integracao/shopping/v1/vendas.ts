@@ -27,82 +27,76 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const pageNum = parseInt(pagina || page || "0", 10);
   const pageSize = parseInt(limite || limit || "0", 10);
 
-  let orders: { id: string; created_at: string; closed_at_ms: number | null; total_cents: number; status: string }[] = [];
-  let totalRegistros = 0;
-  let paginacaoMeta: any = undefined;
+  function shiftDateStr(dateStr: string, days: number): string {
+    const d = new Date(`${dateStr}T00:00:00Z`);
+    if (isNaN(d.getTime())) return dateStr;
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().split("T")[0]!;
+  }
 
-  if (pageNum > 0 || pageSize > 0) {
-    const actualPage = pageNum > 0 ? pageNum : 1;
-    const actualLimit = pageSize > 0 ? pageSize : 1000;
+  const deBuf = shiftDateStr(de, -1);
+  const ateBuf = shiftDateStr(ate, 1);
 
-    const countRes = await supabase
-      .from("fa_kiosk_orders")
-      .select("id", { count: "exact", head: true })
-      .eq("unit_id", targetUnitId)
-      .gte("business_date", de)
-      .lte("business_date", ate)
-      .in("status", ["PAGA", "CANCELADA"]);
-
-    totalRegistros = countRes.count || 0;
-
-    const from = (actualPage - 1) * actualLimit;
-    const to = from + actualLimit - 1;
-
+  let allOrders: { id: string; created_at: string; closed_at_ms: number | null; total_cents: number; status: string }[] = [];
+  let from = 0;
+  const step = 1000;
+  while (true) {
     const { data, error } = await supabase
       .from("fa_kiosk_orders")
       .select("id, created_at, closed_at_ms, total_cents, status")
       .eq("unit_id", targetUnitId)
-      .gte("business_date", de)
-      .lte("business_date", ate)
+      .gte("business_date", deBuf)
+      .lte("business_date", ateBuf)
       .in("status", ["PAGA", "CANCELADA"])
       .order("created_at", { ascending: true })
-      .range(from, to);
+      .range(from, from + step - 1);
 
     if (error) {
       return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar vendas." });
     }
 
-    orders = (data || []) as any[];
+    const chunk = (data || []) as any[];
+    allOrders = allOrders.concat(chunk);
+    if (chunk.length < step) break;
+    from += step;
+  }
 
+  const mappedVendas = allOrders
+    .map((o) => {
+      const dataHora = formatIsoTimezone(o.closed_at_ms ?? o.created_at, unitMeta.timezone);
+      const saleDate = dataHora.slice(0, 10);
+      return {
+        idVenda: o.id,
+        dataHora,
+        saleDate,
+        valorCentavos: o.total_cents,
+        cancelado: o.status === "CANCELADA",
+        troca: false,
+      };
+    })
+    .filter((v) => v.saleDate >= de && v.saleDate <= ate);
+
+  const pageNum = parseInt(pagina || page || "0", 10);
+  const pageSize = parseInt(limite || limit || "0", 10);
+
+  const totalRegistros = mappedVendas.length;
+  let vendas = mappedVendas.map(({ saleDate, ...v }) => v);
+  let paginacaoMeta: any = undefined;
+
+  if (pageNum > 0 || pageSize > 0) {
+    const actualPage = pageNum > 0 ? pageNum : 1;
+    const actualLimit = pageSize > 0 ? pageSize : 1000;
+    const startIdx = (actualPage - 1) * actualLimit;
+    const endIdx = startIdx + actualLimit;
+
+    vendas = vendas.slice(startIdx, endIdx);
     paginacaoMeta = {
       pagina: actualPage,
       limite: actualLimit,
       totalPaginas: Math.ceil(totalRegistros / actualLimit) || 1,
       totalRegistros,
     };
-  } else {
-    // Busca todas as páginas em loop para não truncar em 1.000 registros
-    let from = 0;
-    const step = 1000;
-    while (true) {
-      const { data, error } = await supabase
-        .from("fa_kiosk_orders")
-        .select("id, created_at, closed_at_ms, total_cents, status")
-        .eq("unit_id", targetUnitId)
-        .gte("business_date", de)
-        .lte("business_date", ate)
-        .in("status", ["PAGA", "CANCELADA"])
-        .order("created_at", { ascending: true })
-        .range(from, from + step - 1);
-
-      if (error) {
-        return res.status(500).json({ error: "ERRO_CONSULTA", message: "Falha ao consultar vendas." });
-      }
-
-      const chunk = (data || []) as any[];
-      orders = orders.concat(chunk);
-      if (chunk.length < step) break;
-      from += step;
-    }
   }
-
-  const vendas = orders.map((o) => ({
-    idVenda: o.id,
-    dataHora: formatIsoTimezone(o.closed_at_ms ?? o.created_at, unitMeta.timezone),
-    valorCentavos: o.total_cents,
-    cancelado: o.status === "CANCELADA",
-    troca: false,
-  }));
 
   const totalVendas = vendas.filter((v) => !v.cancelado).length;
   const brutoCentavos = vendas.filter((v) => !v.cancelado).reduce((acc, v) => acc + v.valorCentavos, 0);
