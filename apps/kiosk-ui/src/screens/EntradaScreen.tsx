@@ -1344,41 +1344,71 @@ export function EntradaScreen({
               </Card>
             );
           })}
-          {/* Aluguel avulso de pelúcia: por último e tracejado, porque é
-              esporádico e não deve competir com o plano de brincadeira. */}
-          {peluciaPlan && (
-            <Card
-              onClick={() => {
-                setPlanId(peluciaPlan.id);
-                setCouponCode("");
-                setStartNow(true);
-                const livre = peluciaAssets.filter((a) => a.status === "DISPONIVEL");
-                setAssetId(livre.length === 1 ? livre[0]!.id : null);
-              }}
-              title="Aluguel avulso de pelúcia, cronometrado, com devolução"
-              style={{
-                cursor: "pointer",
-                padding: "14px 18px",
-                minWidth: "180px",
-                borderRadius: "16px",
-                border: isPelucia ? "2px solid #A855F7" : "2px dashed #A855F7",
-                background: isPelucia ? "rgba(168, 85, 247, 0.10)" : "var(--surface-card)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span aria-hidden style={{ fontSize: "48px", lineHeight: 1 }}>🧸</span>
-                <div>
-                  <strong style={{ fontSize: "16px", display: "block", color: "#7E22CE" }}>{peluciaPlan.name}</strong>
-                  <div style={{ fontSize: "18px", color: "#7E22CE", fontWeight: "bold", marginTop: "2px" }}>
-                    {money(peluciaPlan.valueCents)}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                    Aluguel avulso · excedente {money(peluciaPlan.overageCentsPerMinute)}/min
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
+          {/* Aluguel avulso de pelúcia: um card por pelúcia, com a foto,
+              no mesmo formato do seletor de carrinhos do Circuito. Fica por
+              último e tracejado, porque é esporádico e não deve competir
+              com o plano de brincadeira. Tocar escolhe o plano e a pelúcia
+              de uma vez. */}
+          {peluciaPlan &&
+            peluciaAssets
+              .filter((a) => a.status === "DISPONIVEL" || a.status === "EM_USO")
+              .map((asset) => {
+                const livre = asset.status === "DISPONIVEL";
+                const selecionada = isPelucia && assetId === asset.id;
+                return (
+                  <Card
+                    key={asset.id}
+                    onClick={() => {
+                      if (!livre) return;
+                      setPlanId(peluciaPlan.id);
+                      setAssetId(asset.id);
+                      setCouponCode("");
+                      setStartNow(true);
+                    }}
+                    title={livre ? "Aluguel avulso de pelúcia, cronometrado, com devolução" : "Pelúcia alugada agora"}
+                    style={{
+                      cursor: livre ? "pointer" : "not-allowed",
+                      opacity: livre ? 1 : 0.4,
+                      padding: "14px 18px",
+                      borderRadius: "16px",
+                      border: selecionada ? "2px solid #A855F7" : "2px dashed #A855F7",
+                      background: selecionada ? "rgba(168, 85, 247, 0.10)" : "var(--surface-card)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                      {asset.photo_url ? (
+                        <img
+                          src={asset.photo_url}
+                          alt={asset.name}
+                          style={{
+                            width: "96px",
+                            height: "96px",
+                            objectFit: "cover",
+                            borderRadius: "14px",
+                            border: "1px solid var(--border-subtle)",
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <span aria-hidden style={{ fontSize: "60px", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "96px", height: "96px" }}>
+                          {asset.emoji || "🧸"}
+                        </span>
+                      )}
+                      <div>
+                        <strong style={{ fontSize: "15px", display: "block", color: "#7E22CE" }}>{asset.name}</strong>
+                        <div style={{ fontSize: "18px", color: "#7E22CE", fontWeight: "bold", marginTop: "2px" }}>
+                          {money(peluciaPlan.valueCents)} · {planDurationMinutes(peluciaPlan)} min
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                          {livre
+                            ? `Aluguel avulso · excedente ${money(peluciaPlan.overageCentsPerMinute)}/min`
+                            : "Alugada agora"}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
         </div>
 
         {/* Cross-sell rápido: só aparece com plano longo o bastante e
@@ -1443,7 +1473,7 @@ export function EntradaScreen({
         )}
       </section>
 
-      {(activity === "CARRINHO" || isPelucia) && (
+      {activity === "CARRINHO" && (
         <section>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px 0" }}>
             {isPelucia ? "3. Pelúcia" : "3. Carrinho"}

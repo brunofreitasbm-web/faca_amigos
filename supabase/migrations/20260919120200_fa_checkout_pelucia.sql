@@ -142,7 +142,9 @@ begin
     v_total_cents := v_total_cents + v_line_cents;
 
     v_applied_discount := 0;
-    if coalesce(v_session.coupon_discount_cents, 0) > 0 then
+    -- Pelúcia nunca tem desconto: o check-in já recusa cupom, e esta guarda
+    -- garante que nenhum valor gravado na sessão abata o aluguel.
+    if coalesce(v_session.coupon_discount_cents, 0) > 0 and v_session.rental_kind is null then
       if v_session.coupon_kind = 'DESCONTO_PCT' and v_session.activity = 'PLAYGROUND' then
         -- Recalcula sobre o valor real da linha (já com excedente), não
         -- sobre o valor fixo gravado no check-in — é o que garante que o

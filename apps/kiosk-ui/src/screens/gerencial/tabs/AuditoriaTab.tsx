@@ -16,6 +16,7 @@ function endOfDayMs(dateStr: string) {
 // Precisa bater com o p_limit pedido em Api.auditLog e com o teto (least(...,500)) da RPC
 // fa_gerencial_audit_log: se a busca voltar exatamente esse tanto, o corte é real, não coincidência.
 const AUDIT_LOG_LIMIT = 500;
+const ITEMS_PER_PAGE = 100;
 
 function csvEscape(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
@@ -45,6 +46,7 @@ export function AuditoriaTab() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     Api.allEmployees().then(setEmployees).catch(() => {});
@@ -85,12 +87,24 @@ export function AuditoriaTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, employeeId, severity, startDate, endDate]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, employeeId, severity, unitId, startDate, endDate]);
+
   // unidade não vira coluna na tabela: filtra sobre details_json.unitId que os triggers já gravam.
   const entries = useMemo(
     () => (unitId ? rawEntries.filter((e) => e.details_json?.unitId === unitId) : rawEntries),
     [rawEntries, unitId],
   );
   const possiblyTruncated = rawEntries.length >= AUDIT_LOG_LIMIT;
+
+  const totalPages = Math.max(1, Math.ceil(entries.length / ITEMS_PER_PAGE));
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, entries.length);
+  const paginatedEntries = useMemo(
+    () => entries.slice(startIndex, endIndex),
+    [entries, startIndex, endIndex],
+  );
 
   function handleExportCsv() {
     const header = ["Data/Hora", "Ação", "Operador", "Papel", "Severidade", "Detalhes"];
@@ -104,6 +118,43 @@ export function AuditoriaTab() {
     ]);
     downloadCsv(`auditoria_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body]);
   }
+
+  const renderPaginationControls = () => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        margin: "12px 0",
+        padding: "8px 0",
+        flexWrap: "wrap",
+        gap: "12px",
+      }}
+    >
+      <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+        Exibindo {entries.length === 0 ? 0 : startIndex + 1}–{endIndex} de {entries.length} registros (Página {currentPage} de {totalPages})
+      </span>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "auto" }}>
+        <Button
+          variant="secondary"
+          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage <= 1}
+        >
+          ⬅️ Anterior
+        </Button>
+        <span style={{ fontSize: "13px", fontWeight: "bold", padding: "0 8px" }}>
+          {currentPage} / {totalPages}
+        </span>
+        <Button
+          variant="secondary"
+          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          disabled={currentPage >= totalPages}
+        >
+          Próxima ➡️
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -153,19 +204,23 @@ export function AuditoriaTab() {
       {possiblyTruncated && (
         <Card style={{ padding: "12px 16px", marginBottom: "16px", background: "var(--color-warning-bg, rgba(217,119,6,0.1))" }}>
           <p style={{ margin: 0, fontSize: "13px", color: "var(--color-warning-text, #92400e)" }}>
-            ⚠️ Mostrando os {AUDIT_LOG_LIMIT} registros mais recentes para os filtros de operador/severidade/período — pode haver
-            mais. Restrinja o período (De/Até) para ver o restante.
+            ⚠️ Mostrando até {AUDIT_LOG_LIMIT} registros mais recentes para os filtros aplicados. Restrinja o período (De/Até) para ver histórico anterior.
           </p>
         </Card>
       )}
 
       <Card style={{ padding: "20px" }}>
-        <h3 style={{ fontSize: "16px", marginTop: 0 }}>Ações Registradas ({entries.length})</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          <h3 style={{ fontSize: "16px", margin: 0 }}>Ações Registradas ({entries.length})</h3>
+        </div>
+
+        {entries.length > 0 && renderPaginationControls()}
+
         {entries.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Nenhum registro encontrado para os filtros atuais.</p>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px", marginTop: "12px" }}>Nenhum registro encontrado para os filtros atuais.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {entries.map((entry) => {
+            {paginatedEntries.map((entry) => {
               const detailLines = formatAuditDetails(entry.action, entry.details_json, detailCtx);
               const hasTechnicalJson = entry.details_json && Object.keys(entry.details_json).length > 0;
               return (
@@ -243,7 +298,10 @@ export function AuditoriaTab() {
             })}
           </div>
         )}
+
+        {entries.length > 0 && renderPaginationControls()}
       </Card>
     </div>
   );
 }
+
