@@ -399,6 +399,11 @@ export interface Plan {
   overageCentsPerMinute: number;
   color: string;
   active?: boolean;
+  /**
+   * Tipo de ativo que o plano aluga. No Circuito é a régua do carrinho; num
+   * plano PLAYGROUND marca o aluguel avulso de pelúcia (fa_kiosk_sessions.rental_kind).
+   */
+  assetKind?: "CARRO" | "PELUCIA" | null;
   /** Só preenchido por `Api.plansAllUnits()` (Gerencial). */
   unitId?: string;
 }
@@ -412,6 +417,7 @@ export interface Asset {
   status: "DISPONIVEL" | "EM_USO" | "MANUTENCAO";
   odometer_minutes: number;
   photo_url: string | null;
+  kind?: "CARRO" | "PELUCIA" | null;
 }
 
 export interface Product {
@@ -827,6 +833,8 @@ export interface ActiveSessionEntry {
     child_credit_id?: string | null;
     /** Minutos alocados no check-in — a "duração do plano" da sessão de saldo pré-pago. */
     child_credit_allocated_minutes?: number;
+    /** 'PELUCIA' = aluguel avulso de pelúcia no Playground (não é entrada na brincadeira). */
+    rental_kind?: "PELUCIA" | null;
   };
   quote: {
     lines: QuoteLine[];
@@ -1131,6 +1139,7 @@ function planFromRow(row: Record<string, unknown>): Plan {
     overageCentsPerMinute: row.overage_cents_per_minute as number,
     color: row.color as string,
     active: Boolean(row.active),
+    assetKind: (row.asset_kind as Plan["assetKind"]) ?? null,
     unitId: row.unit_id as string | undefined,
   };
 }
@@ -1405,6 +1414,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         uses_child_credit: usesChildCredit,
         child_credit_id: (row.child_credit_id as string | null) ?? undefined,
         child_credit_allocated_minutes: (row.child_credit_allocated_minutes as number | null) ?? undefined,
+        rental_kind: (row.rental_kind as "PELUCIA" | null) ?? null,
       },
       quote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
@@ -1491,7 +1501,7 @@ async function fetchApuracaoDias(
     unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_sessions")
-        .select("unit_id, business_date, checkin_by_employee_id, order_id, plan_id, status")
+        .select("id, unit_id, business_date, checkin_by_employee_id, order_id, plan_id, rental_kind, status")
         .in("unit_id", unitIds)
         .gte("business_date", from)
         .lte("business_date", to),
@@ -1526,16 +1536,18 @@ async function fetchApuracaoDias(
     orderIds.length === 0
       ? Promise.resolve([] as Record<string, unknown>[])
       : unwrap<Record<string, unknown>[]>(
-          supabase().from("fa_kiosk_order_items").select("order_id, item_type, quantity, total_cents, unit_price_cents").in("order_id", orderIds),
+          supabase().from("fa_kiosk_order_items").select("order_id, session_id, item_type, quantity, total_cents, unit_price_cents").in("order_id", orderIds),
         ),
   ]);
 
   const rawSessions: RawSession[] = sessions.map((s) => ({
+    id: s.id as string,
     unit_id: s.unit_id as string,
     business_date: s.business_date as string,
     checkin_by_employee_id: (s.checkin_by_employee_id as string | null) ?? null,
     order_id: (s.order_id as string | null) ?? null,
     plan_id: (s.plan_id as string | null) ?? null,
+    rental_kind: (s.rental_kind as string | null) ?? null,
     canceled: s.status === "CANCELADA",
   }));
   const rawPlans: RawPlan[] = plans.map((p) => ({
@@ -1553,6 +1565,7 @@ async function fetchApuracaoDias(
   }));
   const rawOrderItems: RawOrderItem[] = orderItems.map((i) => ({
     order_id: i.order_id as string,
+    session_id: (i.session_id as string | null) ?? null,
     item_type: i.item_type as string,
     quantity: i.quantity as number,
     total_cents: i.total_cents as number,
@@ -1727,7 +1740,7 @@ export const Api = {
     unwrap<Asset[]>(
       supabase()
         .from("fa_kiosk_assets")
-        .select("id, unit_id, name, emoji, color, status, odometer_minutes, photo_url")
+        .select("id, unit_id, name, emoji, color, status, odometer_minutes, photo_url, kind")
         .eq("unit_id", unitId),
     ),
   products: (unitId: string, onlyActive = true) => {
@@ -3013,6 +3026,16 @@ export const Api = {
   todayRevenue: async (unitId: string, cutoffHour: number) => {
     const totalCents = await unwrap<number>(
       supabase().rpc("fa_kiosk_today_revenue", { p_unit_id: unitId, p_business_date: businessDateFor(Date.now(), cutoffHour) }),
+    );
+    return { totalCents };
+  },
+  /**
+   * Parte do faturamento do dia que é aluguel de pelúcia. O placar de
+   * bonificação desconta isto, igual à apuração oficial.
+   */
+  todayRentalCents: async (unitId: string, cutoffHour: number) => {
+    const totalCents = await unwrap<number>(
+      supabase().rpc("fa_kiosk_today_rental_cents", { p_unit_id: unitId, p_business_date: businessDateFor(Date.now(), cutoffHour) }),
     );
     return { totalCents };
   },

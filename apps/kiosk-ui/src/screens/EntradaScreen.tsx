@@ -228,6 +228,14 @@ export function EntradaScreen({
   const [quickUpsellAccepted, setQuickUpsellAccepted] = useState(false);
   const [crossSellModalOpen, setCrossSellModalOpen] = useState(false);
 
+  // Aluguel avulso de pelúcia no Playground: plano PLAYGROUND com assetKind.
+  // Fica fora do grid normal (tem card próprio) e não recebe cupom,
+  // cross-sell nem venda pré-paga. Ver migrations 20260919120*.
+  const peluciaPlan = activity === "PLAYGROUND" ? plans.find((p) => p.assetKind) : undefined;
+  const regularPlans = activity === "PLAYGROUND" ? plans.filter((p) => !p.assetKind) : plans;
+  const isPelucia = Boolean(peluciaPlan && planId === peluciaPlan.id);
+  const peluciaAssets = assets.filter((a) => a.kind === "PELUCIA");
+
   const [lastGuardianId, setLastGuardianId] = useState<string | null>(null);
   const [siblingMatches, setSiblingMatches] = useState<ChildMatch[]>([]);
   const [siblingCheckinCount, setSiblingCheckinCount] = useState(0);
@@ -267,7 +275,8 @@ export function EntradaScreen({
     Api.packages(unit.id, activity).then(setPackages);
     Api.products(unit.id).then(setProducts);
     Api.coupons(unit.id).then(setCoupons);
-    if (activity === "CARRINHO") Api.assets(unit.id).then(setAssets);
+    // No Playground a lista de ativos é só a pelúcia do aluguel avulso.
+    Api.assets(unit.id).then(setAssets);
     // Só a venda pré-paga exige turno aberto (o dinheiro precisa cair
     // num turno) — o check-in normal nunca exigiu isso.
     Api.currentShift(unit.id).then((shift) => setHasOpenShift(!!shift)).catch(() => setHasOpenShift(null));
@@ -307,6 +316,8 @@ export function EntradaScreen({
   const lastAutoCouponRef = useRef<string | null>(null);
   useEffect(() => {
     if (activity !== "PLAYGROUND") return;
+    // Aluguel de pelúcia: preço cheio, o servidor recusa qualquer cupom.
+    if (isPelucia) return;
     if (couponCode && couponCode !== lastAutoCouponRef.current) return;
 
     let next: string;
@@ -332,7 +343,8 @@ export function EntradaScreen({
     }
     lastAutoCouponRef.current = next;
     setCouponCode(next);
-  }, [activity, isNeurodivergent, coupons]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activity, isNeurodivergent, coupons, isPelucia]);
 
   // Busca única com debounce. Só dígitos quando o operador digitou um número:
   // a coluna de telefone é E.164 ("+5591982501215") e o texto mascarado
@@ -645,6 +657,7 @@ export function EntradaScreen({
     if (!isValidPhoneBr(phone)) return "WhatsApp do responsável inválido";
     if (!planId) return "Escolha o plano de permanência";
     if (activity === "CARRINHO" && !assetId) return "Escolha o carrinho";
+    if (isPelucia && !assetId) return "Escolha a pelúcia";
 
     if (!startNow) {
       // Decisão do dono (2026-09-10): caixa aberto é obrigatório (o
@@ -659,7 +672,7 @@ export function EntradaScreen({
     }
 
     return null;
-  }, [identified, childName, birthDate, guardianName, cpf, phone, planId, activity, assetId, startNow, hasOpenShift]);
+  }, [identified, childName, birthDate, guardianName, cpf, phone, planId, activity, assetId, startNow, hasOpenShift, isPelucia]);
 
   async function submit() {
     if (!unit || !employee || readiness) return;
@@ -686,7 +699,7 @@ export function EntradaScreen({
           cpf: normalizeCpf(cpf),
           phoneE164: normalizePhoneE164(phone),
         },
-        couponCode: usingHourBank || usingChildCredit ? undefined : couponCode || undefined,
+        couponCode: usingHourBank || usingChildCredit || isPelucia ? undefined : couponCode || undefined,
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
         preCheckinId: preCheckinId ?? undefined,
@@ -737,9 +750,10 @@ export function EntradaScreen({
         );
       }
 
+      const rentedAsset = isPelucia;
       resetForNextChild(true);
 
-      if (activity === "CARRINHO") {
+      if (activity === "CARRINHO" || rentedAsset) {
         // Fora do try do check-in de propósito: a entrada já foi gravada, e
         // uma falha só em recarregar a lista de carrinhos não pode virar
         // "erro ao fazer check-in" na tela.
@@ -754,7 +768,16 @@ export function EntradaScreen({
         setAssetId(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao registrar a entrada");
+      const msg = err instanceof Error ? err.message : "Erro ao registrar a entrada";
+      if (msg.includes("CRIANCA_JA_EM_SESSAO")) {
+        setError(isPelucia
+          ? "Esta criança já está numa sessão ativa. Finalize a brincadeira antes de alugar a pelúcia."
+          : "Esta criança já tem uma sessão ativa (brincadeira ou pelúcia alugada). Finalize-a antes de uma nova entrada.");
+      } else if (msg.includes("ASSET_INDISPONIVEL")) {
+        setError(isPelucia ? "Esta pelúcia acabou de ser alugada. Atualize a tela." : msg);
+      } else {
+        setError(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1275,7 +1298,7 @@ export function EntradaScreen({
           {/* Pacotes entram no mesmo grid dos planos, sem seção ou marca
               visual separada — cada um já chegou aqui como um Plan
               sintético (packagePlans). */}
-          {[...plans, ...packagePlans].map((plan) => {
+          {[...regularPlans, ...packagePlans].map((plan) => {
             const minutes = planDurationMinutes(plan);
             const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
             return (
@@ -1321,12 +1344,47 @@ export function EntradaScreen({
               </Card>
             );
           })}
+          {/* Aluguel avulso de pelúcia: por último e tracejado, porque é
+              esporádico e não deve competir com o plano de brincadeira. */}
+          {peluciaPlan && (
+            <Card
+              onClick={() => {
+                setPlanId(peluciaPlan.id);
+                setCouponCode("");
+                setStartNow(true);
+                const livre = peluciaAssets.filter((a) => a.status === "DISPONIVEL");
+                setAssetId(livre.length === 1 ? livre[0]!.id : null);
+              }}
+              title="Aluguel avulso de pelúcia, cronometrado, com devolução"
+              style={{
+                cursor: "pointer",
+                padding: "14px 18px",
+                minWidth: "180px",
+                borderRadius: "16px",
+                border: isPelucia ? "2px solid #A855F7" : "2px dashed #A855F7",
+                background: isPelucia ? "rgba(168, 85, 247, 0.10)" : "var(--surface-card)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span aria-hidden style={{ fontSize: "48px", lineHeight: 1 }}>🧸</span>
+                <div>
+                  <strong style={{ fontSize: "16px", display: "block", color: "#7E22CE" }}>{peluciaPlan.name}</strong>
+                  <div style={{ fontSize: "18px", color: "#7E22CE", fontWeight: "bold", marginTop: "2px" }}>
+                    {money(peluciaPlan.valueCents)}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                    Aluguel avulso · excedente {money(peluciaPlan.overageCentsPerMinute)}/min
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
 
         {/* Cross-sell rápido: só aparece com plano longo o bastante e
             produto configurado. Um toque liga/desliga — o item só entra
             na comanda de fato depois do check-in confirmado. */}
-        {selectedPlan && quickProduct && planDurationMinutes(selectedPlan) >= quickTriggerMinutes && (
+        {selectedPlan && !isPelucia && quickProduct && planDurationMinutes(selectedPlan) >= quickTriggerMinutes && (
           <div
             style={{
               marginTop: "10px",
@@ -1360,7 +1418,7 @@ export function EntradaScreen({
             aparece quando já há um plano escolhido, não é o banco de
             horas (não dá pra pré-pagar um saldo que a criança já tem) e
             é Playground (CARRINHO não pode ser reservado para o futuro). */}
-        {selectedPlan && !usingHourBank && !usingChildCredit && activity === "PLAYGROUND" && (
+        {selectedPlan && !usingHourBank && !usingChildCredit && !isPelucia && activity === "PLAYGROUND" && (
           <IfCan capability="venda.prepago">
             <div
               style={{
@@ -1385,16 +1443,18 @@ export function EntradaScreen({
         )}
       </section>
 
-      {activity === "CARRINHO" && (
+      {(activity === "CARRINHO" || isPelucia) && (
         <section>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px 0" }}>3. Carrinho</h2>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px 0" }}>
+            {isPelucia ? "3. Pelúcia" : "3. Carrinho"}
+          </h2>
           {favoriteAssetId === assetId && assetId && (
             <Tag color="var(--color-teal)" style={{ marginBottom: "8px" }}>
               Carrinho de sempre já reservado
             </Tag>
           )}
           {(() => {
-            const visibleAssets = assets.filter((a) => a.name !== "Fusca Amarelo" && a.name !== "Jipe Rosa" && (a.status as string) !== "DESATIVADO" && (a.status as string) !== "EXCLUIDO" && (a.status as string) !== "INATIVO");
+            const visibleAssets = (isPelucia ? peluciaAssets : assets).filter((a) => a.name !== "Fusca Amarelo" && a.name !== "Jipe Rosa" && (a.status as string) !== "DESATIVADO" && (a.status as string) !== "EXCLUIDO" && (a.status as string) !== "INATIVO");
             return (
               <>
                 {visibleAssets.length > 0 && visibleAssets.every((a) => a.status !== "DISPONIVEL") && (
@@ -1410,7 +1470,9 @@ export function EntradaScreen({
                       marginBottom: "10px",
                     }}
                   >
-                    ⚠️ Lotação máxima atingida: todos os {visibleAssets.length} carrinhos cadastrados estão em uso ou em manutenção.
+                    {isPelucia
+                      ? "⚠️ Nenhuma pelúcia disponível agora: todas estão alugadas ou em manutenção."
+                      : `⚠️ Lotação máxima atingida: todos os ${visibleAssets.length} carrinhos cadastrados estão em uso ou em manutenção.`}
                   </div>
                 )}
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -1519,6 +1581,7 @@ export function EntradaScreen({
       </section>
 
       {/* Cupom fica atrás de um toque ou visualizado automaticamente */}
+      {!isPelucia && (
       <section style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {couponCode && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1543,6 +1606,7 @@ export function EntradaScreen({
           </Select>
         )}
       </section>
+      )}
 
       {error && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{error}</p>}
 

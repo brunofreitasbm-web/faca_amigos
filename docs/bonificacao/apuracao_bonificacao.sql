@@ -15,6 +15,13 @@
 -- número que o operador vê no app é sempre o mesmo que este script apura
 -- para a folha — uma unidade sem nada configurado nessas duas tabelas
 -- simplesmente não gera bônus. Owner/ADMIN fica fora da apuração.
+--
+-- Aluguel avulso de pelúcia no Playground (fa_kiosk_sessions.rental_kind,
+-- migrations 20260919120*): NÃO é sessão para a meta — fica fora de
+-- `sessoes`, `sessoes_1h_mais` e do faturamento (inclusive quando fecha
+-- no mesmo pedido de um irmão). Conta como 1 produto para quem fechou o
+-- pedido, com o bônus baixo de produto (R$ 2) independente do preço, e
+-- soma na meta de itens do mês. O excedente de tempo não vira item.
 
 with params as (
   select date '2026-08-28' as d_from, date '2026-09-02' as d_to
@@ -40,6 +47,7 @@ config as (
 ),
 sess as (
   select s.unit_id, s.business_date, s.checkin_by_employee_id as employee_id, s.id as session_id, s.order_id,
+         s.rental_kind,
          case when p.duration_unit = 'HORA' then p.duration_value * 60 else p.duration_value end as plan_min
   from fa_kiosk_sessions s
   join params pr on s.business_date between pr.d_from and pr.d_to
@@ -47,22 +55,36 @@ sess as (
   where s.unit_id in (select id from units)
     and not exists (select 1 from fa_kiosk_session_events e where e.session_id = s.id and e.kind = 'CANCELADA')
 ),
+sess_real as (
+  -- sessões que contam para a meta: tudo menos aluguel de pelúcia
+  select * from sess where rental_kind is null
+),
+rental_items as (
+  -- valor dos itens de aluguel (plano + excedente) por pedido, para tirar do
+  -- faturamento quando a pelúcia fecha junto com uma sessão de verdade
+  select oi.order_id, sum(oi.total_cents) as cents
+  from fa_kiosk_order_items oi
+  join sess s on s.session_id = oi.session_id and s.rental_kind is not null
+  where oi.item_type = 'SESSAO'
+  group by 1
+),
 sess_orders as (
-  select distinct unit_id, business_date, employee_id, order_id from sess where order_id is not null
+  select distinct unit_id, business_date, employee_id, order_id from sess_real where order_id is not null
 ),
 rev as (
-  select so.unit_id, so.business_date, so.employee_id, sum(o.total_cents) as fat_cents
+  select so.unit_id, so.business_date, so.employee_id, sum(o.total_cents - coalesce(ri.cents, 0)) as fat_cents
   from sess_orders so
   join fa_kiosk_orders o on o.id = so.order_id and o.status = 'PAGA'
+  left join rental_items ri on ri.order_id = o.id
   group by 1, 2, 3
 ),
 sess_agg as (
   select unit_id, business_date, employee_id,
          count(*) as sessoes,
          count(*) filter (where plan_min >= 60) as sessoes_1h_mais
-  from sess group by 1, 2, 3
+  from sess_real group by 1, 2, 3
 ),
-prod as (
+prod_raw as (
   -- Preço de corte/valores do bônus vêm de `config`; unidade sem config
   -- (left join) cai no coalesce(...,0) abaixo e não gera bônus de produto.
   select o.unit_id, o.business_date, o.closed_by_employee_id as employee_id,
@@ -79,6 +101,23 @@ prod as (
   join params pr on o.business_date between pr.d_from and pr.d_to
   left join config cf on cf.unit_id = o.unit_id
   where o.status = 'PAGA' and o.unit_id in (select id from units)
+  group by 1, 2, 3
+  union all
+  -- aluguel de pelúcia: 1 item e bônus baixo fixo por aluguel pago
+  select o.unit_id, o.business_date, o.closed_by_employee_id as employee_id,
+         1 as itens,
+         coalesce((select sum(oi.total_cents) from fa_kiosk_order_items oi
+                    where oi.session_id = s.session_id and oi.item_type = 'SESSAO'), 0) as prod_cents,
+         coalesce(cf.produto_bonus_baixo_cents, 0) as bonus_prod_cents
+  from sess s
+  join fa_kiosk_orders o on o.id = s.order_id and o.status = 'PAGA'
+  left join config cf on cf.unit_id = o.unit_id
+  where s.rental_kind is not null
+),
+prod as (
+  select unit_id, business_date, employee_id,
+         sum(itens) as itens, sum(prod_cents) as prod_cents, sum(bonus_prod_cents) as bonus_prod_cents
+  from prod_raw
   group by 1, 2, 3
 ),
 shift_div as (

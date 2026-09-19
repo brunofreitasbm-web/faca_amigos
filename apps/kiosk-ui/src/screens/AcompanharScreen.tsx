@@ -84,7 +84,11 @@ export function AcompanharScreen({ code }: { code: string }) {
     }
   }, [status, sessao, code]);
 
-  const isCircuito = sessao?.status === "ATIVA" || sessao?.status === "PAUSADA" ? sessao.activity === "CARRINHO" : false;
+  // Pelúcia alugada no Playground segue a régua do Circuito (aviso aos 16 de 20 min).
+  const isCircuito =
+    sessao?.status === "ATIVA" || sessao?.status === "PAUSADA"
+      ? sessao.activity === "CARRINHO" || sessao.plan.assetKind === "PELUCIA"
+      : false;
   const circuitoAssetKind = sessao?.status === "ATIVA" || sessao?.status === "PAUSADA" ? sessao.plan.assetKind : null;
   const circuitoConfig =
     isCircuito && timing ? getCircuitoAlertConfig(circuitoAssetKind, Math.round(timing.durationMs / 60_000)) : null;
@@ -286,7 +290,7 @@ function AcompanharConteudo({
   const phase = isPausada ? "PAUSADA" : timing.phase;
   const color = isPausada ? "var(--color-teal)" : PHASE_COLOR[timing.phase];
   const planDurationMinutes = Math.round(timing.durationMs / 60_000);
-  const isCircuito = activity === "CARRINHO";
+  const isCircuito = activity === "CARRINHO" || assetKind === "PELUCIA";
   const circuitoConfig = isCircuito ? getCircuitoAlertConfig(assetKind, planDurationMinutes) : null;
 
   const elapsedMinutes = Math.floor(timing.elapsedMs / 60_000);
@@ -310,9 +314,9 @@ function AcompanharConteudo({
       childName: childFirstName,
       remainingMinutes: Math.max(0, planDurationMinutes - elapsedMinutes),
       elapsedMinutes,
-      unitName: isCircuito ? "Circuito Parque Shopping" : "Playground Parque Shopping",
+      unitName: activity === "CARRINHO" ? "Circuito Parque Shopping" : "Playground Parque Shopping",
     }).then(setZoeOffers);
-  }, [childFirstName, elapsedMinutes, planDurationMinutes, isCircuito]);
+  }, [childFirstName, elapsedMinutes, planDurationMinutes, activity]);
 
   return (
     <div style={{ width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: "16px" }}>

@@ -65,7 +65,8 @@ export function MobileCheckin({
 
   useEffect(() => {
     Api.plans(unitId, "PLAYGROUND")
-      .then(setPlans)
+      // Aluguel de pelúcia é só no balcão (precisa escolher e entregar a pelúcia).
+      .then((list) => setPlans(list.filter((p) => !p.assetKind)))
       .catch(() => setPlans([]));
   }, [unitId]);
 

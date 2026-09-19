@@ -110,6 +110,8 @@ export function PainelScreen() {
   const [pausingFor, setPausingFor] = useState<string | null>(null);
   const [pendingPauseReason, setPendingPauseReason] = useState<string>("");
   const [todayRevenueCents, setTodayRevenueCents] = useState(0);
+  // Aluguel de pelúcia entra no caixa, mas não na meta de faturamento da bonificação.
+  const [todayRentalCents, setTodayRentalCents] = useState(0);
   const [ticketMedioCents, setTicketMedioCents] = useState(0);
   const [ticketMinCents, setTicketMinCents] = useState(0);
   const [ticketTargetCents, setTicketTargetCents] = useState(0);
@@ -168,7 +170,8 @@ export function PainelScreen() {
   // pacote em vez do plano.
   const PACKAGE_PREFIX = "PKG:";
   const changePlanOptions: Plan[] = [
-    ...planOptions,
+    // Plano de pelúcia do Playground não entra na troca (o servidor recusa com TROCA_PLANO_PELUCIA).
+    ...planOptions.filter((p) => p.activity === "CARRINHO" || !p.assetKind),
     ...packageOptions.map((pkg) => ({
       id: `${PACKAGE_PREFIX}${pkg.id}`,
       activity: pkg.activity,
@@ -279,16 +282,20 @@ export function PainelScreen() {
     let cancelled = false;
     async function poll() {
       try {
-        const [revenueRes, ticketMedioRes, ticketGoalRes, bonusRulesRes, bonusProgramsRes] = await Promise.allSettled([
+        const [revenueRes, ticketMedioRes, ticketGoalRes, bonusRulesRes, bonusProgramsRes, rentalRes] = await Promise.allSettled([
           Api.todayRevenue(unit!.id, unit!.business_day_cutoff_hour),
           Api.todayTicketMedio(unit!.id, unit!.business_day_cutoff_hour),
           Api.ticketGoal(unit!.id),
           Api.bonusRules(unit!.id),
           Api.bonusProgramsByUnit([unit!.id]),
+          Api.todayRentalCents(unit!.id, unit!.business_day_cutoff_hour),
         ]);
         if (!cancelled) {
           if (revenueRes.status === "fulfilled") {
             setTodayRevenueCents(revenueRes.value.totalCents);
+          }
+          if (rentalRes.status === "fulfilled") {
+            setTodayRentalCents(rentalRes.value.totalCents);
           }
           if (ticketMedioRes.status === "fulfilled") {
             setTicketMedioCents(ticketMedioRes.value.avgCents);
@@ -451,7 +458,8 @@ export function PainelScreen() {
   if (!unit) return null;
 
   const maxCapacity = unit.kind === "LOJA" ? 22 : (assets.length > 0 ? assets.length : 12);
-  const currentOccupancy = entries.length;
+  // Pelúcia alugada no Playground não ocupa vaga na brincadeira.
+  const currentOccupancy = entries.filter((e) => !e.session.rental_kind).length;
   const occupancyPercent = Math.min(100, Math.round((currentOccupancy / maxCapacity) * 100));
 
   // capacityColor pinta a barra (preenchimento — a cor de marca serve,
@@ -610,7 +618,7 @@ export function PainelScreen() {
           {unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)) && (() => {
             const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
             const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
-            const atual = tipo === "CIRCUITO" ? todayOrdersCount : todayRevenueCents;
+            const atual = tipo === "CIRCUITO" ? todayOrdersCount : Math.max(0, todayRevenueCents - todayRentalCents);
             const dow = diaSemanaISO(businessDate);
             const goal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
             const b = bonificacaoHoje(tipo, businessDate, atual, goal, bonusProgram?.locacaoExtraBonusCents ?? 0);
@@ -1000,12 +1008,12 @@ export function PainelScreen() {
                       <img
                         src={asset.photo_url}
                         alt={asset.name}
-                        title={`Carrinho: ${asset.name}`}
+                        title={`${session.rental_kind ? "Pelúcia" : "Carrinho"}: ${asset.name}`}
                         className="painel-card-thumb-img"
                         style={{ objectFit: "cover", borderRadius: "12px", border: "1px solid var(--border-subtle)", flexShrink: 0 }}
                       />
                     ) : (
-                      <span title={`Carrinho: ${asset.name}`} className="painel-card-thumb-emoji">
+                      <span title={`${session.rental_kind ? "Pelúcia" : "Carrinho"}: ${asset.name}`} className="painel-card-thumb-emoji">
                         {asset.emoji}
                       </span>
                     )
@@ -1079,7 +1087,16 @@ export function PainelScreen() {
                         <RevealPin pin={session.exit_pin} label="PIN de saída" />
                       </span>
                     )}
-                    {asset && <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Carrinho: {asset.name}</span>}
+                    {asset && (
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>
+                        {session.rental_kind ? "Pelúcia" : "Carrinho"}: {asset.name}
+                      </span>
+                    )}
+                    {session.rental_kind && (
+                      <Badge variant="solid_orange" title="Aluguel avulso de pelúcia — cobrar e recolher a pelúcia na saída">
+                        🧸 Pelúcia · devolver
+                      </Badge>
+                    )}
                     {plan && (
                       <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>
                     )}
@@ -1163,7 +1180,7 @@ export function PainelScreen() {
               {/* Saldo de pacote: o fechamento vai abater estes minutos, então
                   o valor estimado acima não é o que será cobrado. Dizer isso
                   aqui evita o operador contestar o próprio sistema no caixa. */}
-              {(session.package_balance_minutes ?? 0) > 0 && (
+              {!session.rental_kind && (session.package_balance_minutes ?? 0) > 0 && (
                 <Badge variant="solid_orange" title="Este responsável tem pacote pré-pago — o tempo sai do saldo no fechamento">
                   🎟️ Pacote: {session.package_balance_minutes} min de saldo
                 </Badge>
@@ -1279,6 +1296,7 @@ export function PainelScreen() {
                   🪪 Saída manual
                 </Button>
                 <IfCan capability="sessao.change_plan">
+                  {!session.rental_kind && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1292,6 +1310,7 @@ export function PainelScreen() {
                   >
                     <ArrowClockwiseIcon /> Trocar Plano
                   </Button>
+                  )}
                 </IfCan>
                 {isPaused ? (
                   <Button

@@ -9,6 +9,10 @@
 // fa_kiosk_bonus_program_goals/fa_kiosk_bonus_program_config (migration
 // 20260911100000). Uma unidade sem configuração simplesmente não gera bônus
 // (nunca um valor adivinhado) — ver `BonusProgramConfig` abaixo.
+//
+// Aluguel avulso de pelúcia no Playground (`rental_kind`): fica fora de
+// sessões, sessões de 1h+ e faturamento; conta 1 item com o bônus baixo de
+// produto para quem fechou o pedido. Mesma regra do SQL.
 
 export type UnidadeTipo = "PLAYGROUND" | "CIRCUITO";
 
@@ -78,11 +82,14 @@ const ABERTURA_LIMITE_HORA = 10 * 60 + 15; // 10:15 em minutos desde 00:00
 const DIVERGENCIA_SEM_JUSTIFICATIVA_LIMIT_CENTS = 2000; // R$20
 
 export interface RawSession {
+  id: string;
   unit_id: string;
   business_date: string;
   checkin_by_employee_id: string | null;
   order_id: string | null;
   plan_id: string | null;
+  /** 'PELUCIA' = aluguel avulso: não é sessão para a meta, conta como produto. */
+  rental_kind: string | null;
   canceled: boolean;
 }
 export interface RawPlan {
@@ -100,6 +107,7 @@ export interface RawOrder {
 }
 export interface RawOrderItem {
   order_id: string;
+  session_id: string | null;
   item_type: string;
   quantity: number;
   total_cents: number;
@@ -196,11 +204,24 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
   const orderById = new Map(input.orders.map((o) => [o.id, o]));
 
   const validSessions = input.sessions.filter((s) => !s.canceled);
+  // sess_real: o que conta para a meta; o aluguel de pelúcia entra só em `prod`.
+  const realSessions = validSessions.filter((s) => !s.rental_kind);
+  const rentalSessions = validSessions.filter((s) => Boolean(s.rental_kind));
+  const rentalSessionIds = new Set(rentalSessions.map((s) => s.id));
+
+  // rental_items: valor do aluguel (plano + excedente) por sessão e por pedido
+  const rentalCentsBySession = new Map<string, number>();
+  const rentalCentsByOrder = new Map<string, number>();
+  for (const item of input.orderItems) {
+    if (item.item_type !== "SESSAO" || !item.session_id || !rentalSessionIds.has(item.session_id)) continue;
+    rentalCentsBySession.set(item.session_id, (rentalCentsBySession.get(item.session_id) ?? 0) + item.total_cents);
+    rentalCentsByOrder.set(item.order_id, (rentalCentsByOrder.get(item.order_id) ?? 0) + item.total_cents);
+  }
 
   // rev: faturamento (pedidos PAGA distintos das sessões com check-in do operador)
   const revKey = (unitId: string, date: string, empId: string) => `${unitId}|${date}|${empId}`;
   const sessOrders = new Map<string, Set<string>>(); // revKey -> orderIds
-  for (const s of validSessions) {
+  for (const s of realSessions) {
     if (!s.order_id || !s.checkin_by_employee_id) continue;
     const key = revKey(s.unit_id, s.business_date, s.checkin_by_employee_id);
     const set = sessOrders.get(key) ?? new Set<string>();
@@ -212,14 +233,14 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     let total = 0;
     for (const orderId of orderIds) {
       const o = orderById.get(orderId);
-      if (o && o.status === "PAGA") total += o.total_cents;
+      if (o && o.status === "PAGA") total += o.total_cents - (rentalCentsByOrder.get(orderId) ?? 0);
     }
     revByKey.set(key, total);
   }
 
   // sess_agg: contagem de sessões e sessões >= 1h
   const sessAgg = new Map<string, { sessoes: number; sessoes1hMais: number }>();
-  for (const s of validSessions) {
+  for (const s of realSessions) {
     if (!s.checkin_by_employee_id) continue;
     const key = revKey(s.unit_id, s.business_date, s.checkin_by_employee_id);
     const plan = s.plan_id ? planById.get(s.plan_id) : null;
@@ -255,6 +276,16 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
         cur.bonusProdCents += bonusPorItem * item.quantity;
       }
     }
+    prodByKey.set(key, cur);
+  }
+  for (const s of rentalSessions) {
+    const o = s.order_id ? orderById.get(s.order_id) : undefined;
+    if (!o || o.status !== "PAGA" || !o.closed_by_employee_id) continue;
+    const key = revKey(o.unit_id, o.business_date, o.closed_by_employee_id);
+    const cur = prodByKey.get(key) ?? { itens: 0, prodCents: 0, bonusProdCents: 0 };
+    const program = input.programs[o.unit_id] ?? null;
+    // TODO(human): contabilizar o aluguel de pelúcia como produto em `cur`
+    // (itens, prodCents, bonusProdCents) — ver a regra no SQL (prod_raw).
     prodByKey.set(key, cur);
   }
 
