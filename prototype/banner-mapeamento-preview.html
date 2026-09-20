@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview — Banner Mapeamento</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--font-display:'Fredoka One',cursive;--font-body:'Nunito',sans-serif;--teal:#2ECFB5;--muted:#5A636E;--radius-lg:16px;--radius-xl:24px;--radius-full:9999px;--shadow-sm:0 1px 4px rgba(0,0,0,.15);--transition-slow:400ms ease}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-body);background:#eef0f2;color:#1A3F35}
+.layout{display:flex;gap:24px;padding:24px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+/* ── "celular" ── */
+.device{width:375px;max-width:100%;background:linear-gradient(180deg,#FFF7FA 0%,#fff 40%);min-height:700px;border-radius:28px;box-shadow:0 8px 32px rgba(0,0,0,.2);padding:24px 16px 48px;display:flex;flex-direction:column;align-items:center;gap:20px;transition:width .25s}
+.device.wide{width:900px}
+.lockup{font-family:var(--font-display);font-size:24px}.lockup i{font-style:normal;color:#F0196B}
+.col{width:100%;max-width:420px;display:flex;flex-direction:column;gap:16px}
+.card{background:#fff;border-radius:var(--radius-xl);box-shadow:0 4px 16px rgba(0,0,0,.08);padding:20px;text-align:center;border:2px solid var(--teal)}
+.card.warn{border-color:#C99020}.card.red{border-color:#FF7A00}
+.card .head{margin:0 0 8px;font-size:15px;color:var(--muted)}
+.card .big{font-family:var(--font-display);font-size:48px;color:var(--teal);line-height:1}
+.card.warn .big{color:#C99020}.card.red .big{color:#FF7A00}
+.card .foot{margin:12px 0 0;font-size:14px;color:var(--muted)}
+.btn-sec{min-height:48px;border-radius:var(--radius-full);border:2px solid var(--teal);background:#fff;color:#14806f;font:800 15px var(--font-body);width:100%}
+/* ── BANNER (mesmo estilo do MapeamentoBanner.tsx) ── */
+.mapa{position:relative;background:#065264;color:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:16px 48px 16px 18px;opacity:0;transform:translateY(6px);transition:opacity var(--transition-slow),transform var(--transition-slow)}
+.mapa.in{opacity:1;transform:none}
+.mapa[hidden]{display:none}
+.mapa .eyebrow{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#065264;background:#FDC51D;border-radius:var(--radius-full);padding:3px 10px}
+.mapa h2{margin:10px 0 4px;font-family:var(--font-display);font-size:17px;font-weight:400;line-height:1.25;color:#fff}
+.mapa p{margin:0;font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.88)}
+.mapa a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:12px;padding:0 20px;background:#07C5C8;color:#065264;font-size:14px;font-weight:800;text-decoration:none;border-radius:var(--radius-full)}
+.mapa a:focus-visible,.mapa button:focus-visible{outline:3px solid #FDC51D;outline-offset:2px}
+.mapa .x{position:absolute;top:6px;right:6px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:var(--radius-full);color:rgba(255,255,255,.72);font-size:18px;line-height:1;cursor:pointer}
+.reduced .mapa{transition:none;transform:none}
+/* ── painel de controle ── */
+.panel{width:340px;max-width:100%;background:#fff;border-radius:16px;padding:18px;box-shadow:0 4px 16px rgba(0,0,0,.1);font-size:14px}
+.panel h3{margin:0 0 12px;font-size:16px}
+.panel label{display:block;margin:12px 0 4px;font-weight:700}
+.panel input[type=range]{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.panel button{font:700 13px var(--font-body);padding:8px 12px;border-radius:8px;border:1px solid #cdd1d6;background:#f5f6f7;cursor:pointer}
+.status{margin-top:12px;padding:8px 10px;border-radius:8px;background:#f5f6f7;font-size:13px}
+#log{margin-top:12px;font:12px/1.5 ui-monospace,Consolas,monospace;background:#141719;color:#9df3c4;border-radius:8px;padding:10px;min-height:80px;max-height:180px;overflow:auto;white-space:pre-wrap}
+small{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="device" id="device">
+    <div class="lockup">Faça<i>Amigos</i></div>
+    <div class="col">
+      <div class="card" id="timerCard">
+        <p class="head">A Lia está aproveitando bastante! 💛</p>
+        <div class="big" id="clock">--:--</div>
+        <p class="foot">60 min inclusos no pacote — R$ 0,00 adicionais</p>
+      </div>
+      <button class="btn-sec">🔔 Avisar quando faltarem 5 minutos</button>
+
+      <section class="mapa" id="banner" aria-labelledby="mapa-titulo" hidden>
+        <span class="eyebrow">Gratuito · 5 min</span>
+        <h2 id="mapa-titulo">Conhece o comportamento do seu filho?</h2>
+        <p>Responda 5 minutos de perguntas e receba um direcionamento personalizado, gratuito, feito por psicólogas.</p>
+        <a id="cta" href="https://institutofacaamigos.com.br/teste?utm_source=playground-app&amp;utm_medium=qrcode&amp;utm_campaign=mapeamento&amp;utm_content=banner-tempo" target="_blank" rel="noopener">Fazer o mapeamento gratuito</a>
+        <button class="x" id="dismiss" type="button" aria-label="Dispensar sugestão">✕</button>
+      </section>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <h3>Simulador</h3>
+    <label for="rem">Tempo restante: <span id="remLabel">40</span> min</label>
+    <input id="rem" type="range" min="0" max="60" value="40">
+    <small>Abaixo de 5 min o banner some (regra do app).</small>
+    <label><input type="checkbox" id="paused"> Sessão pausada (banner some)</label>
+    <label><input type="checkbox" id="reduced"> Simular prefers-reduced-motion</label>
+    <label><input type="checkbox" id="wide"> Largura desktop (900px)</label>
+    <div class="row">
+      <button id="replay">↻ Recarregar tela (reinicia o atraso)</button>
+      <button id="clear">Limpar dispensa (localStorage)</button>
+    </div>
+    <div class="status" id="status"></div>
+    <b style="display:block;margin-top:14px">Eventos de tracking</b>
+    <div id="log">(nenhum ainda)</div>
+  </aside>
+</div>
+
+<script>
+const KEY = "fa_banner_mapeamento_dismissed_until";
+const DAYS30 = 30 * 24 * 60 * 60 * 1000, DELAY = 1500;
+const $ = id => document.getElementById(id);
+const banner = $("banner");
+let timer = null, io = null, seen = false;
+
+// Espelha window.dataLayer/gtag: aqui os eventos só aparecem no log ao lado.
+window.dataLayer = window.dataLayer || [];
+function track(name) {
+  window.dataLayer.push({ event: name });
+  const l = $("log");
+  if (l.textContent.startsWith("(")) l.textContent = "";
+  l.textContent += new Date().toLocaleTimeString() + "  " + name + "\n";
+  l.scrollTop = l.scrollHeight;
+}
+const isDismissed = () => { try { return Number(localStorage.getItem(KEY)) > Date.now(); } catch (e) { return false; } };
+const eligible = () => Number($("rem").value) >= 5 && !$("paused").checked;
+
+function renderTimer() {
+  const m = Number($("rem").value);
+  $("remLabel").textContent = m;
+  $("clock").textContent = String(m).padStart(2, "0") + ":00";
+  $("timerCard").className = "card" + (m <= 5 ? " red" : m <= 12 ? " warn" : "");
+}
+function updateStatus() {
+  $("status").textContent = isDismissed() ? "Dispensado (30 dias) — banner oculto"
+    : !eligible() ? "Inelegível (menos de 5 min ou pausada) — banner oculto"
+    : "Elegível — aparece " + (DELAY / 1000) + " s após o cronômetro";
+}
+function hideBanner() { banner.hidden = true; banner.classList.remove("in"); }
+function evaluate() {
+  renderTimer(); updateStatus();
+  clearTimeout(timer);
+  if (isDismissed() || !eligible()) { if (io) io.disconnect(); hideBanner(); return; }
+  if (!banner.hidden) return;
+  timer = setTimeout(() => {
+    banner.hidden = false;
+    const go = () => banner.classList.add("in");
+    $("reduced").checked ? go() : requestAnimationFrame(() => requestAnimationFrame(go));
+    if (io) io.disconnect();
+    io = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting && !seen) { seen = true; track("banner_mapeamento_visto"); io.disconnect(); }
+    }), { threshold: 0.5 });
+    io.observe(banner);
+  }, DELAY);
+}
+$("rem").addEventListener("input", evaluate);
+$("paused").addEventListener("change", evaluate);
+$("reduced").addEventListener("change", e => document.body.classList.toggle("reduced", e.target.checked));
+$("wide").addEventListener("change", e => $("device").classList.toggle("wide", e.target.checked));
+$("cta").addEventListener("click", () => track("banner_mapeamento_clique"));
+$("dismiss").addEventListener("click", () => {
+  try { localStorage.setItem(KEY, String(Date.now() + DAYS30)); } catch (e) {}
+  hideBanner(); updateStatus();
+});
+$("replay").addEventListener("click", () => { hideBanner(); seen = false; evaluate(); });
+$("clear").addEventListener("click", () => { try { localStorage.removeItem(KEY); } catch (e) {} $("replay").click(); });
+evaluate();
+</script>
+</body>
+</html>

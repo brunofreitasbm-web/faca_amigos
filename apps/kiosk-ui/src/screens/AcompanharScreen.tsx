@@ -21,6 +21,7 @@ import {
   circuitoAnchorMessage,
   type CircuitoAssetKind,
 } from "./acompanhar/copyCircuito.js";
+import { MapeamentoBanner } from "./acompanhar/MapeamentoBanner.js";
 
 /**
  * Painel público do responsável — aberto sem login pelo QR mostrado no
@@ -394,6 +395,11 @@ function AcompanharConteudo({
         <HelpText>Lembrete ativado — deixe esta página aberta para receber o aviso.</HelpText>
       )}
       {lembreteErro && <HelpText>{lembreteErro}</HelpText>}
+
+      {/* Convite discreto ao Mapeamento Comportamental do Instituto — sempre
+          abaixo do bloco de tempo/lembrete, nunca sobrepondo. Ver
+          MapeamentoBanner: some nos últimos 5 min e lembra a dispensa. */}
+      <MapeamentoBanner timing={timing} isPausada={isPausada} />
 
       {showRenewal && isCircuito && circuitoConfig && (
         <Card>
