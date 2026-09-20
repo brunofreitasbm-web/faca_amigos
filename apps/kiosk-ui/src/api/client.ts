@@ -854,6 +854,8 @@ export interface Shift {
   expected_opening_cash_cents: number | null;
   /** opening_cash_cents − expected_opening_cash_cents (null se não havia fechamento anterior). */
   opening_divergence_cents: number | null;
+  /** Quem abriu — é quem fica obrigado a ler a passagem de turno do dia anterior. */
+  opened_by_employee_id: string | null;
 }
 
 /**
@@ -894,6 +896,34 @@ export interface CloseShiftResult {
   cashBreakCents: number | null;
   nextDayFloatCents: number | null;
   envelopeCents: number | null;
+  /** Passagem de turno gravada junto com o fechamento (mesma transação). */
+  handover: { id: string | null; noChanges: boolean; conteudo: string | null } | null;
+}
+
+/** Uma passagem de turno que o operador ainda precisa ler e dar ciência. */
+export interface PendingHandover {
+  id: string;
+  business_date: string;
+  created_at_ms: number;
+  no_changes: boolean;
+  conteudo: string | null;
+  closed_by_name: string | null;
+}
+
+/** Linha do histórico de passagens (aba Gerencial), com as ciências. */
+export interface HandoverHistoryRow {
+  id: string;
+  unit_id: string;
+  business_date: string;
+  created_at_ms: number;
+  no_changes: boolean;
+  conteudo: string | null;
+  closed_by_employee_id: string | null;
+  fa_kiosk_shift_handover_acks: Array<{
+    employee_id: string;
+    acked_at_ms: number;
+    leitura_ms: number | null;
+  }>;
 }
 
 export interface CashMovement {
@@ -1923,7 +1953,7 @@ export const Api = {
     unwrap<Shift | null>(
       supabase()
         .from("fa_kiosk_shifts")
-        .select("id, unit_id, status, opening_cash_cents, opened_at_ms, expected_opening_cash_cents, opening_divergence_cents")
+        .select("id, unit_id, status, opening_cash_cents, opened_at_ms, expected_opening_cash_cents, opening_divergence_cents, opened_by_employee_id")
         .eq("unit_id", unitId)
         .eq("status", "ABERTO")
         .maybeSingle(),
@@ -2374,6 +2404,10 @@ export const Api = {
       justifications?: Record<string, string>;
       countedCashCents?: number;
       nextDayFloatCents?: number;
+      // Obrigatório de propósito: o campo ser opcional no tipo deixaria um
+      // call site futuro fechar turno sem passagem e só descobrir em
+      // produção, com o servidor recusando (PASSAGEM_TURNO_OBRIGATORIA).
+      handover: { noChanges: boolean; conteudo: string };
     },
   ) =>
     callResilient<CloseShiftResult>("fa_close_shift", {
@@ -2383,7 +2417,35 @@ export const Api = {
       p_justifications: body.justifications ?? {},
       p_counted_cash_cents: body.countedCashCents ?? null,
       p_next_day_float_cents: body.nextDayFloatCents ?? null,
+      p_handover_no_changes: body.handover.noChanges,
+      p_handover_conteudo: body.handover.conteudo || null,
     }),
+  // Passagens de turno que este funcionário ainda não leu nesta unidade
+  // (ver fa_kiosk_pending_handovers — últimos 7 dias, exclui as dele mesmo).
+  pendingHandovers: (unitId: string, employeeId: string) =>
+    unwrap<PendingHandover[]>(
+      supabase().rpc("fa_kiosk_pending_handovers", { p_unit_id: unitId, p_employee_id: employeeId }),
+    ),
+  // Ciência de leitura. `leituraMs` é o tempo entre abrir o modal e
+  // confirmar — é o que o Gerencial usa para distinguir leitura de clique.
+  ackHandover: (handoverId: string, employeeId: string, shiftId: string | null, leituraMs: number | null) =>
+    callResilient("fa_kiosk_ack_handover", {
+      p_handover_id: handoverId,
+      p_employee_id: employeeId,
+      p_shift_id: shiftId,
+      p_leitura_ms: leituraMs,
+    }),
+  // Histórico para a aba Gerencial > Passagem de Turno.
+  handoverHistory: (unitId: string | null) => {
+    let query = supabase()
+      .from("fa_kiosk_shift_handovers")
+      // String literal única: concatenar quebra a inferência do supabase-js.
+      .select("id, unit_id, business_date, created_at_ms, no_changes, conteudo, closed_by_employee_id, fa_kiosk_shift_handover_acks(employee_id, acked_at_ms, leitura_ms)")
+      .order("created_at_ms", { ascending: false })
+      .limit(100);
+    if (unitId) query = query.eq("unit_id", unitId);
+    return unwrap<HandoverHistoryRow[]>(query);
+  },
   // Número do envelope não é mais digitado pelo operador: sequência global
   // (independente da unidade) gerada pelo servidor, 2 dígitos, reiniciando
   // de "00" a cada 100 (ver migration fa_envelope_number_auto_sequencial).

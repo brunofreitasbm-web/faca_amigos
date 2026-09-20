@@ -16,6 +16,7 @@ import { FrequenciaTab } from "./tabs/FrequenciaTab.js";
 import { PermissoesTab } from "./tabs/PermissoesTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
 import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
+import { PassagemTurnoTab } from "./tabs/PassagemTurnoTab.js";
 import { AberturaFechamentoTab } from "./tabs/AberturaFechamentoTab.js";
 import { FotosEnvelopeTab } from "./tabs/FotosEnvelopeTab.js";
 import { SaldoEnvelopesTab } from "./tabs/SaldoEnvelopesTab.js";
@@ -26,7 +27,7 @@ import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "FREQUENCIA" | "OCORRENCIAS" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "BONIFICACAO" | "ABERTURA_FECHAMENTO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
+type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "FREQUENCIA" | "OCORRENCIAS" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "BONIFICACAO" | "ABERTURA_FECHAMENTO" | "PASSAGEM_TURNO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
 
 const TABS: { value: GerencialTab; label: string }[] = [
   { value: "COPILOT_IA", label: "✦ ZoeIA (Copilot)" },
@@ -46,6 +47,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
   { value: "BONIFICACAO", label: "Bonificação" },
   { value: "RELATORIOS", label: "Relatórios" },
   { value: "ABERTURA_FECHAMENTO", label: "Abertura e Fechamento" },
+  { value: "PASSAGEM_TURNO", label: "Passagem de Turno" },
   { value: "FOTOS_ENVELOPE", label: "Fotos de Envelope" },
   { value: "SALDO_ENVELOPES", label: "Saldo em Envelopes" },
   { value: "HISTORICO", label: "Histórico" },
@@ -61,7 +63,7 @@ const TAB_GROUPS: { label: string; values: GerencialTab[] }[] = [
   { label: "Pessoas", values: ["COLABORADORES", "FREQUENCIA", "OCORRENCIAS", "PERMISSOES", "CLIENTES", "TALENTOS", "FOLHA", "BONIFICACAO"] },
   {
     label: "Financeiro & Operações",
-    values: ["RELATORIOS", "ABERTURA_FECHAMENTO", "FOTOS_ENVELOPE", "SALDO_ENVELOPES", "HISTORICO", "AUDITORIA", "CONTRATO"],
+    values: ["RELATORIOS", "ABERTURA_FECHAMENTO", "PASSAGEM_TURNO", "FOTOS_ENVELOPE", "SALDO_ENVELOPES", "HISTORICO", "AUDITORIA", "CONTRATO"],
   },
 ];
 const GROUPED_TAB_VALUES = new Set(TAB_GROUPS.flatMap((g) => g.values));
@@ -85,6 +87,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
   BONIFICACAO: "Saldo de bonificação acumulado por operador no mês, já com o teto de R$200 aplicado — apuração das metas, produtos vendidos e travas de caixa.",
   RELATORIOS: "Vendas, visitas, planos e sessões das 3 unidades juntas, ou filtradas por uma só.",
   ABERTURA_FECHAMENTO: "Horário de abertura e fechamento do caixa de cada loja, quem abriu/fechou e o troco inicial.",
+  PASSAGEM_TURNO: "Livro de registro diário: o que cada operador repassou ao fechar o caixa e quem leu no dia seguinte.",
   FOTOS_ENVELOPE: "Fotos dos envelopes de sangria registrados em cada loja, com valor e operador responsável.",
   SALDO_ENVELOPES: "Quanto cada loja tem guardado em envelopes de sangria ainda não recolhidos, e o que há na gaveta agora.",
   HISTORICO: "Fluxograma visual de onde o dinheiro do turno veio e para onde foi, para facilitar a conferência.",
@@ -186,6 +189,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                   {tab === "BONIFICACAO" && <BonificacaoTab />}
                   {tab === "RELATORIOS" && <GerencialRelatorioTab />}
                   {tab === "ABERTURA_FECHAMENTO" && <AberturaFechamentoTab />}
+                  {tab === "PASSAGEM_TURNO" && <PassagemTurnoTab />}
                   {tab === "FOTOS_ENVELOPE" && <FotosEnvelopeTab />}
                   {tab === "SALDO_ENVELOPES" && <SaldoEnvelopesTab />}
                   {tab === "HISTORICO" && <HistoricoTab />}
