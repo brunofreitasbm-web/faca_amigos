@@ -11,6 +11,10 @@ import { OFFLINE_FLUSH_EVENT, OfflineQueuedError } from "../lib/supabase/offline
 import type { OfflineFlushDetail } from "../lib/supabase/offlineQueue.js";
 import { NfceModal } from "../components/NfceModal.js";
 import { PhotoCapture } from "../components/PhotoCapture.js";
+import { PassagemTurnoForm } from "../components/PassagemTurnoForm.js";
+import { PassagemTurnoGate } from "../components/PassagemTurnoGate.js";
+import { normalizeHandover, validateHandover } from "../lib/passagemTurno.js";
+import type { HandoverDraft } from "../lib/passagemTurno.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
@@ -50,6 +54,14 @@ export function CaixaScreen() {
   const [nfceDocsMap, setNfceDocsMap] = useState<Record<string, FiscalDoc | null>>({});
   const [nfceRetryingMap, setNfceRetryingMap] = useState<Record<string, boolean>>({});
   const [bonusRules, setBonusRules] = useState<BonusRule[]>([]);
+
+  // Passagem de turno escrita no fechamento (obrigatória — ver
+  // migration 20260920100000 e lib/passagemTurno.ts).
+  const [handover, setHandover] = useState<HandoverDraft>({ noChanges: false, conteudo: "" });
+  const [handoverTouched, setHandoverTouched] = useState(false);
+  // Ciência já dada nesta sessão de tela. O portão consulta o servidor
+  // a cada montagem, então isto só evita remontá-lo à toa depois do ack.
+  const [handoverLido, setHandoverLido] = useState(false);
 
   useEffect(() => {
     if (unit?.id) {
@@ -475,6 +487,7 @@ export function CaixaScreen() {
         justifications: justificationsToSend,
         countedCashCents: cm.countedCents,
         nextDayFloatCents: cm.nextDayFloatCents,
+        handover: normalizeHandover(handover),
       });
       setCloseResult(result);
     } catch (err) {
@@ -517,6 +530,14 @@ export function CaixaScreen() {
   }
 
   async function handleConfirmClose() {
+    // Valida a passagem ANTES do diálogo de confirmação: não faz sentido
+    // perguntar "tem certeza?" sobre um fechamento que o banco vai recusar.
+    const passagem = validateHandover(handover);
+    if (!passagem.ok) {
+      setHandoverTouched(true);
+      setError("Preencha a Passagem de Turno antes de fechar o caixa.");
+      return;
+    }
     const ok = await confirm({
       title: "Fechar turno de caixa?",
       message: "Essa ação é irreversível e vai encerrar o turno atual. Confira os valores declarados antes de continuar.",
@@ -908,6 +929,12 @@ export function CaixaScreen() {
             </div>
           )}
         </Card>
+        <PassagemTurnoForm
+          value={handover}
+          onChange={(next) => setHandover(next)}
+          disabled={busy || !!pendingCloseKey}
+          showError={handoverTouched}
+        />
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         {pendingCloseKey && (
           <p style={{ color: "var(--color-amber)" }}>
@@ -919,7 +946,7 @@ export function CaixaScreen() {
           <Button variant="ghost" onClick={() => setClosing(false)} disabled={busy || !!pendingCloseKey}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy || !!pendingCloseKey || !canConfirmClose}>
+          <Button variant="primary" onClick={handleConfirmClose} loading={busy} disabled={busy || !!pendingCloseKey || !canConfirmClose || !validateHandover(handover).ok}>
             {pendingCloseKey ? "Aguardando conexão..." : "Confirmar fechamento"}
           </Button>
         </div>
@@ -1477,6 +1504,24 @@ export function CaixaScreen() {
           </div>
         </Modal>
       )}
+
+      {/* Primeira tela do dia: quem abriu o caixa é obrigado a ler a passagem
+          do turno anterior antes de operar. Montado depois do modal de
+          sucesso da abertura para não competir com ele, e recalculado no
+          servidor a cada montagem (recarregar a página o traz de volta). */}
+      {shift &&
+        shift.status === "ABERTO" &&
+        employee &&
+        shift.opened_by_employee_id === employee.id &&
+        !shiftOpenSuccessModal &&
+        !handoverLido && (
+          <PassagemTurnoGate
+            unitId={shift.unit_id}
+            employeeId={employee.id}
+            shiftId={shift.id}
+            onDone={() => setHandoverLido(true)}
+          />
+        )}
     </div>
   );
 }

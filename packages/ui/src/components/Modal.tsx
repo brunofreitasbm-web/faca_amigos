@@ -22,6 +22,15 @@ export interface ModalProps {
   zIndex?: number;
   /** Padding do painel do diálogo. Default "24px" — zere quando o conteúdo já tem o próprio padding (ex. uma tela inteira embrulhada). */
   padding?: string;
+  /**
+   * Default true. Em `false` o diálogo vira um portão: sem Escape, sem
+   * clique no fundo, sem botão de fechar — a única saída é uma ação do
+   * próprio conteúdo. Use só quando a regra de negócio exige a leitura
+   * (passagem de turno), nunca por conveniência: um modal que não fecha é
+   * hostil e o focus trap, mantido aqui, só é aceitável porque existe uma
+   * saída de verdade dentro dele.
+   */
+  dismissible?: boolean;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -50,6 +59,7 @@ export function Modal({
   bodyStyle,
   zIndex = 200,
   padding = "24px",
+  dismissible = true,
 }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -62,6 +72,9 @@ export function Modal({
   // do diálogo, que rouba o foco de quem está digitando dentro do modal.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // Mesma razão da ref acima: o efeito do teclado roda só no mount.
+  const dismissibleRef = useRef(dismissible);
+  dismissibleRef.current = dismissible;
 
   useEffect(() => {
     previousFocus.current = document.activeElement as HTMLElement | null;
@@ -73,7 +86,7 @@ export function Modal({
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        onCloseRef.current();
+        if (dismissibleRef.current) onCloseRef.current();
         return;
       }
       if (e.key !== "Tab" || !dialogRef.current) return;
@@ -118,7 +131,7 @@ export function Modal({
         overflowY: "auto",
         padding: "24px",
       }}
-      onClick={closeOnBackdrop ? onClose : undefined}
+      onClick={closeOnBackdrop && dismissible ? onClose : undefined}
     >
       <div
         ref={dialogRef}
@@ -141,18 +154,20 @@ export function Modal({
           outline: "none",
         }}
       >
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          aria-label="Fechar"
-          title="Fechar"
-          style={{ position: "absolute", top: "12px", right: "12px", zIndex: 1, fontSize: "18px" }}
-        >
-          <XIcon />
-        </Button>
+        {dismissible && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            aria-label="Fechar"
+            title="Fechar"
+            style={{ position: "absolute", top: "12px", right: "12px", zIndex: 1, fontSize: "18px" }}
+          >
+            <XIcon />
+          </Button>
+        )}
         {title && (
-          <h2 id={titleId} style={{ marginTop: 0, paddingRight: "32px" }}>
+          <h2 id={titleId} style={{ marginTop: 0, paddingRight: dismissible ? "32px" : 0 }}>
             {title}
           </h2>
         )}
