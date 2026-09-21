@@ -50,7 +50,11 @@ function prefersReducedMotion(): boolean {
  * para buscar a criança — qualquer sugestão vira ruído nesse momento.
  */
 export function shouldOfferMapeamento(timing: SessionTiming, isPausada: boolean): boolean {
-  // TODO(human)
+  if (isPausada || timing.isPaused) {
+    return false;
+  }
+  const remainingMs = timing.durationMs - timing.elapsedMs;
+  return remainingMs >= 5 * 60_000;
 }
 
 export function MapeamentoBanner({ timing, isPausada }: { timing: SessionTiming; isPausada: boolean }) {
