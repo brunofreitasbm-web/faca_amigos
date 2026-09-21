@@ -24,9 +24,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const targetUnitId = authUnit.id;
   const unitMeta = getShoppingUnitMetadata(authUnit);
 
-  const pageNum = parseInt(pagina || page || "0", 10);
-  const pageSize = parseInt(limite || limit || "0", 10);
-
   function shiftDateStr(dateStr: string, days: number): string {
     const d = new Date(`${dateStr}T00:00:00Z`);
     if (isNaN(d.getTime())) return dateStr;
