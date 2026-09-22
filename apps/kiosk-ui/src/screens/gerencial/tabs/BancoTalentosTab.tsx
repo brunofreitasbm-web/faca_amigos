@@ -8,6 +8,7 @@ const OPPORTUNITY_LABEL: Record<JobApplication["opportunity_type"], string> = {
   ESTAGIO: "Estágio",
   REMUNERADO: "Vaga remunerada",
   BOLSA: "Bolsa",
+  PJ: "PJ",
 };
 
 const STATUS_LABEL: Record<JobApplication["status"], string> = {
