@@ -1,7 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { jsonResponse, preflight } from "../_shared/http.ts";
 
-const OPPORTUNITY_TYPES = ["ESTAGIO", "REMUNERADO", "BOLSA"];
+const OPPORTUNITY_TYPES = ["ESTAGIO", "REMUNERADO", "BOLSA", "PJ"];
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 
 Deno.serve(async (req) => {
@@ -21,6 +21,7 @@ Deno.serve(async (req) => {
   const phone = String(form.get("phone") ?? "").trim();
   const course = String(form.get("course") ?? "").trim();
   const desiredArea = String(form.get("desired_area") ?? "").trim();
+  const preferredUnit = String(form.get("preferred_unit") ?? "").trim();
   const opportunityType = String(form.get("opportunity_type") ?? "").trim();
   const resume = form.get("resume");
 
@@ -57,6 +58,7 @@ Deno.serve(async (req) => {
     phone,
     course: course || null,
     desired_area: desiredArea,
+    preferred_unit: preferredUnit || null,
     opportunity_type: opportunityType,
     resume_path: resumePath,
   });
