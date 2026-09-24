@@ -201,6 +201,42 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Logout "de verdade" (sessão Supabase + estado local), reaproveitado pelo
+  // valor exposto em `logout` e pelo encerramento automático às 23h abaixo.
+  const doLogout = async () => {
+    await supabase().auth.signOut();
+    clearStepUpCache();
+    setEmployee(null);
+    setUnitId(null);
+    setGerencial(false);
+    autoSelectedForEmployeeId.current = null;
+    setHasFaceEnrolled(null);
+  };
+
+  // Encerra a sessão automaticamente às 23h de cada dia, para que o
+  // colaborador do turno seguinte seja obrigado a fazer login com a própria
+  // conta em vez de continuar usando a sessão de quem operou antes.
+  const employeeRef = useRef(employee);
+  employeeRef.current = employee;
+  const lastAutoLogoutDateRef = useRef<string | null>(null);
+  useEffect(() => {
+    const checkAutoLogout = () => {
+      const now = new Date();
+      const today = now.toDateString();
+      if (now.getHours() < 23) {
+        if (lastAutoLogoutDateRef.current !== today) lastAutoLogoutDateRef.current = null;
+        return;
+      }
+      if (lastAutoLogoutDateRef.current === today) return;
+      lastAutoLogoutDateRef.current = today;
+      if (employeeRef.current) void doLogout();
+    };
+
+    checkAutoLogout();
+    const intervalId = window.setInterval(checkAutoLogout, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const refreshUnits = async () => {
     if (!employee) return;
     try {
@@ -249,18 +285,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         forgetTerminalEmployee(employeeId);
         setTerminalEmployees(listTerminalEmployees());
       },
-      logout: async () => {
-        // Encerra a sessão de verdade, não só o estado do React: deixar o
-        // token válido no navegador depois de "sair" mantém o acesso do
-        // colaborador anterior a um passo de distância.
-        await supabase().auth.signOut();
-        clearStepUpCache();
-        setEmployee(null);
-        setUnitId(null);
-        setGerencial(false);
-        autoSelectedForEmployeeId.current = null;
-        setHasFaceEnrolled(null);
-      },
+      logout: doLogout,
     }),
     [units, unitId, gerencial, employee, terminalEmployees, restoring, hasFaceEnrolled],
   );
