@@ -1,0 +1,672 @@
+<title>Entrevista dos Sócios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#FFF9F1; --surface:#FFFFFF; --surface-2:#FFF1E4; --ink:#1A3F35; --ink-soft:#4C6B62; --line:#EADFD2;
+  --pink:#F0196B; --pink-dark:#C81158; --pink-ink:#FFFFFF; --teal:#2ECFB5; --teal-dark:#1FA893; --yellow:#FFE234;
+  --danger:#B42318; --ok:#1C7C54; --shadow:0 10px 30px rgba(26,63,53,.10);
+  --font-display:"Fredoka","Nunito",system-ui,sans-serif; --font-body:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  color-scheme:dark; --bg:#0F1F1A; --surface:#17302A; --surface-2:#1E3B33; --ink:#F6F1E9; --ink-soft:#A9C2B9; --line:#2A4A41;
+  --pink:#FF4F8B; --pink-dark:#F0196B; --pink-ink:#14110F; --teal:#3EDDC3; --teal-dark:#2ECFB5; --yellow:#FFE85C; --danger:#FF8A80; --ok:#6FD3A3; --shadow:0 10px 30px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark; --bg:#0F1F1A; --surface:#17302A; --surface-2:#1E3B33; --ink:#F6F1E9; --ink-soft:#A9C2B9; --line:#2A4A41;
+  --pink:#FF4F8B; --pink-dark:#F0196B; --pink-ink:#14110F; --teal:#3EDDC3; --teal-dark:#2ECFB5; --yellow:#FFE85C; --danger:#FF8A80; --ok:#6FD3A3; --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;line-height:1.15;margin:0;text-wrap:balance}
+h1{font-size:clamp(1.7rem,4vw,2.4rem)} h2{font-size:clamp(1.25rem,3vw,1.6rem)} h3{font-size:1.05rem}
+p{margin:0}
+.wrap{max-width:680px;margin:0 auto;padding:0 16px 120px}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:14px 0 10px;display:flex;flex-direction:column;gap:8px}
+.topbar .row{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:.82rem;color:var(--ink-soft);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.bar{height:8px;background:var(--surface-2);border-radius:999px;overflow:hidden}
+.bar > i{display:block;height:100%;background:var(--teal);border-radius:999px;transition:width .3s ease}
+.card{background:var(--surface);border-radius:24px;box-shadow:var(--shadow);padding:clamp(20px,4vw,32px);display:flex;flex-direction:column;gap:18px;margin-top:16px}
+.kicker{font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pink)}
+.help{color:var(--ink-soft);font-size:.95rem}
+.help strong{color:var(--ink)}
+.actions{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(to top,var(--bg) 70%,transparent);padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));z-index:6}
+.actions .in{max-width:680px;margin:0 auto;display:flex;gap:10px;justify-content:space-between;align-items:center}
+.btn{border:0;border-radius:999px;min-height:52px;padding:0 22px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:transform .08s ease,background .15s ease}
+.btn:active{transform:scale(.98)}
+.btn:focus-visible,.opt:focus-visible,.chip:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+.btn-primary{background:var(--pink);color:var(--pink-ink)} .btn-primary:hover{background:var(--pink-dark)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--ink-soft)} .btn-ghost:hover{background:var(--surface-2)}
+.btn-soft{background:var(--surface-2);color:var(--ink)}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{text-align:left;border:2px solid var(--line);background:var(--surface);border-radius:16px;padding:14px 16px;cursor:pointer;display:flex;gap:12px;align-items:flex-start;line-height:1.35}
+.opt:hover{border-color:var(--teal)}
+.opt[aria-pressed="true"]{border-color:var(--pink);background:var(--surface-2)}
+.opt .dot{flex:0 0 22px;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);margin-top:2px}
+.opt[aria-pressed="true"] .dot{border-color:var(--pink);background:var(--pink);box-shadow:inset 0 0 0 4px var(--surface)}
+textarea,input[type=text],input[type=number]{width:100%;border:2px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--surface);resize:vertical;min-height:52px}
+textarea{min-height:130px}
+textarea:focus,input:focus{border-color:var(--teal)}
+.counter{font-size:.8rem;color:var(--ink-soft);text-align:right}
+.scale{display:grid;gap:8px}
+.scale .btns{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:6px}
+.scale .btns button{border:2px solid var(--line);background:var(--surface);border-radius:12px;min-height:48px;font-weight:800;cursor:pointer;font-variant-numeric:tabular-nums}
+.scale .btns button:hover{border-color:var(--teal)}
+.scale .btns button[aria-pressed="true"]{background:var(--pink);border-color:var(--pink);color:var(--pink-ink)}
+.scale .ends{display:flex;justify-content:space-between;gap:12px;font-size:.85rem;color:var(--ink-soft)}
+.scale .ends span:last-child{text-align:right}
+.poles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pole{background:var(--surface-2);border-radius:16px;padding:12px 14px;font-size:.95rem;line-height:1.35}
+.pole b{display:block;font-family:var(--font-display);font-weight:600;margin-bottom:4px;color:var(--pink)}
+.pole:last-child b{color:var(--teal-dark)}
+.rows{display:flex;flex-direction:column;gap:12px}
+.mrow{border:2px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.mrow.done{border-color:var(--teal)}
+.mrow .lab{font-weight:700}
+.seg{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:6px}
+.seg button{border:2px solid var(--line);background:var(--surface);border-radius:10px;min-height:42px;padding:4px 6px;font-size:.82rem;font-weight:800;cursor:pointer;line-height:1.15}
+.seg button[aria-pressed="true"]{background:var(--pink);border-color:var(--pink);color:var(--pink-ink)}
+.dual{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;font-size:.82rem;color:var(--ink-soft);font-weight:800}
+.rank{display:flex;flex-direction:column;gap:14px}
+.rank .picked{display:flex;flex-direction:column;gap:8px;min-height:20px}
+.rank .picked .opt{border-color:var(--teal)}
+.rank .num{flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:var(--teal);color:#0F1F1A;font-weight:800;font-size:.85rem;display:inline-flex;align-items:center;justify-content:center}
+.rank .pool{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:2px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:700;font-size:.92rem}
+.chip:hover{border-color:var(--teal)}
+.fields{display:grid;gap:10px}
+.field label{display:block;font-size:.85rem;font-weight:800;color:var(--ink-soft);margin-bottom:4px}
+.numrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.numrow .unit{font-size:.85rem;color:var(--ink-soft);font-weight:700}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:480px){.two,.poles{grid-template-columns:1fr}}
+.range{display:flex;flex-direction:column;gap:8px}
+.range output{font-family:var(--font-display);font-size:2rem;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--pink)}
+.review{display:flex;flex-direction:column;gap:14px}
+.review .it{border-bottom:1px solid var(--line);padding-bottom:12px}
+.review .it .q{font-weight:700;font-size:.95rem}
+.review .it .a{color:var(--ink-soft);white-space:pre-wrap;font-size:.92rem;margin-top:4px}
+.review .it .a.empty{color:var(--danger)}
+.review .it button{margin-top:6px}
+.banner{background:var(--surface-2);border-left:4px solid var(--yellow);border-radius:12px;padding:12px 14px;font-size:.92rem}
+.banner.err{border-left-color:var(--danger)}
+.status{font-size:.8rem;color:var(--ink-soft);display:flex;align-items:center;gap:6px}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--teal);display:inline-block}
+.status.saving i{background:var(--yellow)} .status.err i{background:var(--danger)}
+.pact{display:grid;gap:10px}
+.pact div{display:flex;gap:10px;align-items:flex-start}
+.pact .n{flex:0 0 28px;width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#1A3F35;font-weight:800;display:inline-flex;align-items:center;justify-content:center;font-size:.9rem}
+.who{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.who .opt{justify-content:center;font-family:var(--font-display);font-size:1.15rem;font-weight:600;padding:20px}
+.sec-list{display:grid;gap:8px;font-size:.95rem}
+.sec-list div{display:flex;gap:10px;align-items:baseline}
+.sec-list .k{font-family:var(--font-display);color:var(--pink);font-weight:600;min-width:1.2em}
+.sec-list .t{color:var(--ink-soft);margin-left:auto;font-size:.82rem;white-space:nowrap}
+pre.dump{background:var(--surface-2);border-radius:12px;padding:12px;font-size:.75rem;overflow:auto;max-height:260px;white-space:pre-wrap;word-break:break-all}
+.hidden{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap" id="app" aria-live="polite"></div>
+<div class="actions" id="actions"></div>
+
+<script>
+/* ==== INSTRUMENTO ================================================== */
+const VERSAO = "v1-2026-09";
+const SECTIONS = [{"key": "A", "title": "Propósito", "min": 8, "intro": "Antes de valores e cultura, o que o Faça Amigos é e para que existe. Aqui interessa a sua leitura hoje, não o texto do site."}, {"key": "C", "title": "Valores declarados", "min": 5, "intro": "Primeiro com as suas palavras, depois com uma lista. A distância entre o que você declara aqui e o que você escolhe no bloco seguinte é um dos dados mais importantes desta entrevista."}, {"key": "B", "title": "Escolhas difíceis", "min": 11, "intro": "Cultura se define pelo que se sacrifica. Cada situação abaixo é real ou plausível no Faça Amigos de hoje. Não existe resposta neutra.", "note": "Alguns itens citam números e decisões tirados dos sistemas e documentos da empresa. Quando um dado for novidade para você, marque. Isso também é informação."}, {"key": "D", "title": "Histórias", "min": 12, "intro": "Quatro perguntas abertas. Episódios reais valem mais que princípios. Escreva como contaria em voz alta.", "note": "Bloco mais longo. Se precisar, pare aqui e volte depois. Tudo fica salvo."}, {"key": "E", "title": "Cultura no chão", "min": 5, "intro": "Oito frases sobre como as coisas acontecem hoje nas unidades que já operam. Depois, o que merece prioridade nos próximos 12 meses."}, {"key": "F", "title": "Sociedade e decisão", "min": 10, "intro": "O bloco mais sensível. Quem decide o quê, tempo, dinheiro e o que acontece se algo der errado entre os sócios. Um planejamento que pula isso não sobrevive ao primeiro conflito."}, {"key": "G", "title": "Unidades", "min": 6, "intro": "O que é comum a todas as unidades, o que pode variar, e onde a clínica precisa ser diferente."}, {"key": "H", "title": "Fechamento", "min": 6, "intro": "Últimas cinco. Missão e visão nas suas palavras, e uma aposta sobre o outro sócio."}];
+const ITEMS = [{"id": "a1", "section": "A", "type": "open", "q": "Por que o Faça Amigos existe? Uma frase, sem usar as palavras \"inclusão\", \"inclusivo\" ou \"acolhimento\".", "help": "Essas palavras já estão no site. Quero o que está por baixo delas.", "max": 300, "min": 15}, {"id": "a2", "section": "A", "type": "matrix", "q": "A missão escrita em janeiro de 2026 diz: \"Ser o lugar onde nenhuma família precisa pedir desculpas e onde brincar é a linguagem universal.\" Quanto essa frase serve para cada unidade?", "help": "1 = não serve · 5 = serve inteira", "rows": [{"id": "ps", "label": "Playground Parque Shopping"}, {"id": "circuito", "label": "Circuito"}, {"id": "graopara", "label": "Playground Grão-Pará"}, {"id": "clinica", "label": "Clínica (Centro de Terapia Comportamental)"}, {"id": "instituto", "label": "Instituto (triagem gratuita e e-books)"}], "cols": [{"value": 1, "label": "1"}, {"value": 2, "label": "2"}, {"value": 3, "label": "3"}, {"value": 4, "label": "4"}, {"value": 5, "label": "5"}]}, {"id": "a3", "section": "A", "type": "open", "q": "Nessa missão, o que sobra e o que falta? Cite uma palavra que você tiraria e uma que acrescentaria, e diga por quê.", "max": 600}, {"id": "a4", "section": "A", "type": "open", "q": "Se o Faça Amigos fechasse amanhã, o que Belém perderia que nenhum outro lugar entrega?", "help": "Se a resposta valer para qualquer brinquedoteca ou clínica da cidade, ela não conta.", "max": 600}, {"id": "a5", "section": "A", "type": "single", "q": "Hoje, o Faça Amigos É:", "options": [{"value": "clinica_pg", "label": "Uma clínica que tem playgrounds"}, {"value": "pg_clinica", "label": "Um playground que tem uma clínica"}, {"value": "marca", "label": "Uma marca de infância atípica com várias portas de entrada"}, {"value": "separadas", "label": "Empresas separadas que dividem um nome"}, {"value": "outro", "label": "Outro"}]}, {"id": "a6", "section": "A", "type": "single", "q": "O cenário de 2031 que você mais quer:", "options": [{"value": "rede", "label": "Rede de 5 ou mais playgrounds em shoppings do Norte"}, {"value": "clinica_ref", "label": "Clínica referência regional (2 a 3 unidades), com playgrounds como porta de entrada"}, {"value": "franquia", "label": "Modelo de franquia vendido para terceiros"}, {"value": "instituto", "label": "Instituto (formação, conteúdo, e-books) como receita principal"}, {"value": "tamanho_atual", "label": "Do tamanho de hoje mais a clínica, lucrativo, com folga para a família"}, {"value": "outro", "label": "Outro"}]}, {"id": "a7", "section": "A", "type": "open", "q": "Descreva um dia comum de 2031 no Faça Amigos, como se contasse a alguém que não conhece o negócio. Quatro a seis linhas.", "max": 1200, "min": 80}, {"id": "c0", "section": "C", "type": "multi", "count": 3, "q": "Sem olhar lista nenhuma: três valores que você quer que definam o Faça Amigos, nas suas palavras.", "placeholders": ["ex.: coragem de dizer não", "", ""]}, {"id": "c1", "section": "C", "type": "rank", "pick": 5, "q": "Agora com uma lista. Ordene os cinco mais importantes.", "options": [{"value": "acolhimento", "label": "Acolhimento sem julgamento"}, {"value": "ciencia", "label": "Ciência e evidência"}, {"value": "seguranca", "label": "Segurança"}, {"value": "alegria", "label": "Alegria e brincar"}, {"value": "excelencia", "label": "Excelência operacional"}, {"value": "financeiro", "label": "Sustentabilidade financeira"}, {"value": "transparencia", "label": "Transparência"}, {"value": "pioneirismo", "label": "Pioneirismo e coragem"}]}, {"id": "c2", "section": "C", "type": "single", "q": "Se tivesse que tirar um desses oito da lista para sempre, qual sai?", "options": [{"value": "acolhimento", "label": "Acolhimento sem julgamento"}, {"value": "ciencia", "label": "Ciência e evidência"}, {"value": "seguranca", "label": "Segurança"}, {"value": "alegria", "label": "Alegria e brincar"}, {"value": "excelencia", "label": "Excelência operacional"}, {"value": "financeiro", "label": "Sustentabilidade financeira"}, {"value": "transparencia", "label": "Transparência"}, {"value": "pioneirismo", "label": "Pioneirismo e coragem"}]}, {"id": "c3", "section": "C", "type": "single", "q": "Qual desses oito o outro sócio colocaria em primeiro lugar?", "options": [{"value": "acolhimento", "label": "Acolhimento sem julgamento"}, {"value": "ciencia", "label": "Ciência e evidência"}, {"value": "seguranca", "label": "Segurança"}, {"value": "alegria", "label": "Alegria e brincar"}, {"value": "excelencia", "label": "Excelência operacional"}, {"value": "financeiro", "label": "Sustentabilidade financeira"}, {"value": "transparencia", "label": "Transparência"}, {"value": "pioneirismo", "label": "Pioneirismo e coragem"}]}, {"id": "b1", "section": "B", "type": "slider7", "q": "Sábado, 16h. Fila na porta, 22 crianças dentro, três delas autistas e tranquilas no momento.", "a": "Entra mais. Fila é receita e o time dá conta.", "b": "Fecha a porta. Ambiente regulado vale mais que a fila."}, {"id": "b2", "section": "B", "type": "slider7", "fact": true, "q": "98% das sessões do playground saem com desconto. A tabela de R$120 quase não é praticada. Se só uma coisa puder mudar:", "a": "A tabela cai para o que as pessoas de fato pagam.", "b": "O desconto por laudo deixa de ser automático e vira exceção justificada."}, {"id": "b3", "section": "B", "type": "slider7", "fact": true, "q": "Hoje o operador do playground e do circuito ganha bônus pelo faturamento do turno (piloto set/out 2026, teto de R$200 por mês).", "a": "O bônus continua pelo que o turno fatura.", "b": "O bônus passa a ser por qualidade: incidentes, retorno de famílias, avaliação de pais."}, {"id": "b4", "section": "B", "type": "slider7", "q": "Grão-Pará abre. Depois dele:", "a": "Próxima unidade no ano seguinte. Crescer enquanto há janela.", "b": "Nada novo por 24 meses. Consolidar antes de multiplicar."}, {"id": "b5", "section": "B", "type": "slider7", "q": "Manual, kiosk e checklist definem como o turno roda.", "a": "Padrão é sagrado. Quem improvisa erra.", "b": "Padrão é piso. O time ajusta ao que a criança precisa."}, {"id": "b6", "section": "B", "type": "slider7", "q": "Na clínica, o protocolo diz uma coisa e a terapeuta experiente sente outra.", "a": "Segue o protocolo. Se estiver errado, muda-se o protocolo depois.", "b": "Segue a terapeuta. O protocolo se ajusta ao caso."}, {"id": "b7", "section": "B", "type": "single", "q": "A clínica vai transcrever os itens do VB-MAPP, ABLLS-R e ESDM para o sistema próprio sem autorização escrita das editoras. A decisão de risco está registrada no PRD em 04/09/2026, assinada pelo gestor.", "options": [{"value": "sabia_concordo", "label": "Sabia e concordo"}, {"value": "sabia_discordo", "label": "Sabia e discordo"}, {"value": "nao_sabia_ok", "label": "Não sabia, e acho aceitável"}, {"value": "nao_sabia_rever", "label": "Não sabia, e quero rever"}, {"value": "entender", "label": "Preciso entender melhor antes de opinar"}]}, {"id": "b8", "section": "B", "type": "single", "q": "Sábado. Pai de uma criança típica reclama que uma criança autista \"está atrapalhando\" e ameaça avaliação negativa no Google. O operador deve:", "options": [{"value": "reembolso", "label": "Devolver o dinheiro ao pai e manter a criança"}, {"value": "sensorial", "label": "Sugerir à família da criança atípica a sala sensorial por um tempo"}, {"value": "regra", "label": "Explicar a regra da casa ao pai e manter tudo como está, mesmo perdendo o cliente"}, {"value": "gestor", "label": "Chamar o gestor e não decidir sozinho"}, {"value": "outro", "label": "Outro"}]}, {"id": "b9", "section": "B", "type": "slider7", "q": "Números do negócio (faturamento, margem, retirada dos sócios):", "a": "Abertos para toda a equipe, todo mês.", "b": "Ficam com os sócios. O time vê só a própria meta."}, {"id": "b10", "section": "B", "type": "slider7", "q": "Chega um investidor ou sócio externo com capital para acelerar.", "a": "Entra, mesmo diluindo controle.", "b": "Não entra. Crescimento no ritmo do caixa e da família."}, {"id": "b11", "section": "B", "type": "slider7", "fact": true, "q": "O plano de negócio previa R$103 mil por mês. Playground e circuito juntos fazem cerca de R$58 mil. Qual erro você prefere cometer?", "a": "Errar mirando alto: meta ambiciosa, mesmo que falhe.", "b": "Errar mirando baixo: meta que bate, mesmo que limite."}, {"id": "b12", "section": "B", "type": "slider7", "q": "A triagem comportamental gratuita do Instituto existe para:", "a": "Alimentar a agenda da clínica. É funil.", "b": "Atender quem nunca vai pagar a clínica, mesmo que custe."}, {"id": "d1", "section": "D", "type": "open", "q": "Conte um episódio real de orgulho no Faça Amigos. Depois, escreva o que um pai ou mãe contaria a um amigo sobre esse episódio.", "max": 1500, "min": 60}, {"id": "d2", "section": "D", "type": "open", "q": "Conte um episódio em que o Faça Amigos traiu o que diz ser. Pode ser pequeno. O que aconteceu e por quê?", "help": "Exemplos possíveis: um desconto dado por pressão, um turno sem monitor preparado, uma promessa do site que não aconteceu.", "max": 1500, "min": 60}, {"id": "d3", "section": "D", "type": "open", "q": "Uma decisão em que vocês dois discordaram. Qual era, como foi resolvida e quem cedeu?", "max": 1500, "min": 60}, {"id": "d4", "section": "D", "type": "open", "q": "Um comportamento de colaborador que você demitiria na hora mesmo com números bons. E um que você promoveria mesmo com números fracos.", "max": 1500, "min": 60}, {"id": "e1", "section": "E", "type": "prio", "q": "Como as coisas acontecem hoje, e o que é prioridade para os próximos 12 meses.", "rows": [{"id": "porque", "label": "A equipe sabe explicar por que fazemos o que fazemos."}, {"id": "erro", "label": "Erro é reportado sem medo."}, {"id": "decisoes", "label": "Decisões dos sócios chegam ao time com o porquê."}, {"id": "turno", "label": "A inclusão aparece no turno, não só no discurso."}, {"id": "tipica", "label": "A criança típica é tão bem-vinda quanto a atípica."}, {"id": "alinhados", "label": "Os sócios aparecem alinhados na frente da equipe."}, {"id": "circuito", "label": "A equipe do Circuito se sente Faça Amigos."}, {"id": "site", "label": "O que o site promete (Horário Inclusivo 10h às 16h) acontece no chão."}]}, {"id": "f1", "section": "F", "type": "matrix", "q": "Quem decide HOJE?", "rows": [{"id": "preco", "label": "Preço e descontos"}, {"id": "pessoas", "label": "Contratar e demitir"}, {"id": "expansao", "label": "Abrir ou fechar unidade"}, {"id": "clinica", "label": "Modelo e equipe da clínica"}, {"id": "marca", "label": "Marca e comunicação"}, {"id": "sistemas", "label": "Sistemas e dados"}, {"id": "caixa", "label": "Caixa, retiradas e investimentos"}], "cols": [{"value": "bruno", "label": "Bruno"}, {"value": "isabella", "label": "Isabella"}, {"value": "ambos", "label": "Os dois"}, {"value": "ninguem", "label": "Ninguém claro"}]}, {"id": "f2", "section": "F", "type": "matrix", "q": "Quem DEVERIA decidir?", "rows": [{"id": "preco", "label": "Preço e descontos"}, {"id": "pessoas", "label": "Contratar e demitir"}, {"id": "expansao", "label": "Abrir ou fechar unidade"}, {"id": "clinica", "label": "Modelo e equipe da clínica"}, {"id": "marca", "label": "Marca e comunicação"}, {"id": "sistemas", "label": "Sistemas e dados"}, {"id": "caixa", "label": "Caixa, retiradas e investimentos"}], "cols": [{"value": "bruno", "label": "Bruno"}, {"value": "isabella", "label": "Isabella"}, {"value": "ambos", "label": "Os dois"}, {"value": "ninguem", "label": "Ninguém claro"}]}, {"id": "f3", "section": "F", "type": "single", "fact": true, "q": "No papel, a Isabella tem 100% das cotas e é a única administradora das empresas do playground. Na prática, o Bruno comanda operação, sistemas e preço. Isso é:", "options": [{"value": "confortavel", "label": "Combinado e confortável"}, {"value": "desconfortavel", "label": "Combinado, mas desconfortável"}, {"value": "transitorio", "label": "Transitório: precisa formalizar"}, {"value": "tensao", "label": "Fonte de tensão"}, {"value": "nunca", "label": "Nunca conversamos sobre isso"}]}, {"id": "f4", "section": "F", "type": "number", "q": "Horas por semana dedicadas ao Faça Amigos (todas as unidades):", "fields": [{"id": "bruno_hoje", "label": "Bruno, hoje", "unit": "h/semana"}, {"id": "bruno_12", "label": "Bruno, daqui a 12 meses", "unit": "h/semana"}, {"id": "isa_hoje", "label": "Isabella, hoje", "unit": "h/semana"}, {"id": "isa_12", "label": "Isabella, daqui a 12 meses", "unit": "h/semana"}]}, {"id": "f5", "section": "F", "type": "open", "q": "Se o Corpo de Bombeiros, a Cacau Show ou a clínica exigirem mais tempo nos próximos 12 meses, o que o Faça Amigos perde primeiro?", "max": 800}, {"id": "f6", "section": "F", "type": "open", "q": "Em 12 meses, quem além do Bruno precisa conseguir precificar, fechar caixa e abrir uma unidade? E quem além da Isabella precisa conseguir decidir uma questão clínica?", "max": 800}, {"id": "f7", "section": "F", "type": "single", "q": "Quando vocês discordam e não há consenso:", "options": [{"value": "expertise", "label": "Quem tem mais expertise no tema decide, tema a tema"}, {"value": "cotas", "label": "Quem tem as cotas decide"}, {"value": "veto", "label": "Sem consenso, não se faz"}, {"value": "terceiro", "label": "Um terceiro de confiança desempata"}, {"value": "indefinido", "label": "Nunca definimos"}]}, {"id": "f8", "section": "F", "type": "single", "q": "Pró-labore e retiradas de cada sócio hoje: estão justos em relação ao trabalho de cada um?", "options": [{"value": "sim", "label": "Sim"}, {"value": "nao", "label": "Não, e sabemos disso"}, {"value": "nunca", "label": "Nunca conversamos com números na mesa"}, {"value": "nao_responder", "label": "Prefiro não responder aqui"}]}, {"id": "f9", "section": "F", "type": "single", "q": "Se a sociedade acabar por qualquer motivo (saída, morte, divórcio, briga), o que está combinado sobre quem fica com o quê?", "options": [{"value": "nada", "label": "Nada"}, {"value": "verbal", "label": "Combinado verbalmente"}, {"value": "escrito", "label": "Por escrito"}, {"value": "nao_sei", "label": "Não sei"}]}, {"id": "f10", "section": "F", "type": "open", "q": "Se um de vocês sumir por seis meses, o que quebra primeiro? Seja específico.", "max": 800}, {"id": "g1", "section": "G", "type": "matrix", "q": "Para cada unidade, ela é:", "rows": [{"id": "ps", "label": "Playground Parque Shopping"}, {"id": "circuito", "label": "Circuito"}, {"id": "graopara", "label": "Playground Grão-Pará"}, {"id": "clinica", "label": "Clínica (Centro de Terapia Comportamental)"}, {"id": "instituto", "label": "Instituto (triagem gratuita e e-books)"}], "cols": [{"value": "nucleo", "label": "Núcleo"}, {"value": "periferica", "label": "Periférica"}, {"value": "sair", "label": "Deveria sair"}, {"value": "nao_sei", "label": "Não sei"}]}, {"id": "g2", "section": "G", "type": "multi", "count": 3, "q": "Três coisas inegociáveis em QUALQUER unidade do Faça Amigos, inclusive as que ainda não existem.", "placeholders": ["ex.: ninguém é recusado por comportamento", "", ""]}, {"id": "g3", "section": "G", "type": "openpair", "q": "O Circuito (carrinhos elétricos a R$48 a volta) expressa a missão?", "ends": ["não expressa", "expressa inteira"], "textLabel": "Por quê?", "max": 600}, {"id": "g4", "section": "G", "type": "multi", "count": 2, "minFilled": 2, "max": 300, "q": "O que da cultura do playground NÃO deve entrar na clínica? E o que da clínica NÃO deve entrar no playground?", "labels": ["Do playground, fica fora da clínica:", "Da clínica, fica fora do playground:"]}, {"id": "g5", "section": "G", "type": "single", "q": "Na clínica, a palavra final clínica (alta, protocolo, frequência de sessões) é de quem?", "options": [{"value": "isabella", "label": "Isabella"}, {"value": "bruno", "label": "Bruno"}, {"value": "rt", "label": "Responsável técnico contratado"}, {"value": "supervisor", "label": "Supervisor clínico da equipe"}, {"value": "indefinido", "label": "Não definido"}]}, {"id": "h1", "section": "H", "type": "open", "q": "Sua missão do Faça Amigos, em uma frase. Pode manter a atual, mudar ou reescrever do zero.", "max": 300, "min": 15}, {"id": "h2", "section": "H", "type": "open", "q": "Sua visão para 2031, em uma frase.", "max": 300, "min": 15}, {"id": "h3", "section": "H", "type": "words", "q": "Três palavras que você quer ouvir da equipe descrevendo a cultura. Três que você não quer ouvir."}, {"id": "h4", "section": "H", "type": "percent", "q": "Que chance suas respostas têm de bater com as do outro sócio?"}, {"id": "h5", "section": "H", "type": "open", "optional": true, "q": "Que pergunta faltou? (opcional)", "max": 600}];
+/* ==================================================================== */
+
+const $app = document.getElementById("app");
+const $actions = document.getElementById("actions");
+const state = {
+  screen: "boot",   // boot | intro | section | item | review | done
+  pos: 0,
+  doc: null,        // {respondente, versao, status, answers, iniciado_em, atualizado_em, enviado_em}
+  db: null, uid: null, dbTried: false, saveState: "ok", saveMsg: "",
+};
+let saveTimer = null, saving = false, dirty = false;
+
+const nowIso = () => new Date().toISOString();
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return n;
+};
+const draftKey = () => "fa_entrevista_socios_" + VERSAO + "_" + (state.uid || "anon");
+const lsGet = () => { try { const r = localStorage.getItem(draftKey()); return r ? JSON.parse(r) : null; } catch { return null; } };
+const lsSet = (d) => { try { localStorage.setItem(draftKey(), JSON.stringify(d)); } catch {} };
+
+function newDoc(respondente) {
+  return { respondente, versao: VERSAO, status: "rascunho", answers: {}, pos: 0, iniciado_em: nowIso(), atualizado_em: nowIso(), enviado_em: null };
+}
+
+/* ---- persistência ---- */
+async function initStorage() {
+  const use = window.claude && typeof window.claude.use === "function" ? window.claude.use.bind(window.claude) : null;
+  if (use) {
+    try {
+      const [db, user] = await Promise.all([use("db"), use("user")]);
+      state.db = db || null;
+      state.uid = user ? await user.id() : null;
+    } catch { state.db = null; }
+  }
+  state.dbTried = true;
+  let remote = null;
+  if (state.db && state.uid) {
+    try {
+      const snap = await state.db.doc("respostas/" + state.uid).get();
+      if (snap.exists) remote = snap.data();
+    } catch (e) { state.saveState = "err"; state.saveMsg = "Não consegui ler o banco (" + (e && e.code || "erro") + ")."; }
+  }
+  const local = lsGet();
+  // preferir o mais recente entre remoto e local
+  let doc = remote;
+  if (local && (!remote || (local.atualizado_em || "") > (remote.atualizado_em || ""))) doc = local;
+  if (doc && doc.versao !== VERSAO) doc = null;
+  state.doc = doc;
+  if (doc) {
+    state.pos = Math.min(doc.pos || 0, ITEMS.length - 1);
+    state.screen = doc.status === "enviado" ? "done" : "item";
+  } else state.screen = "intro";
+  render();
+}
+function scheduleSave() {
+  if (!state.doc) return;
+  state.doc.atualizado_em = nowIso();
+  state.doc.pos = state.pos;
+  lsSet(state.doc);
+  clearTimeout(saveTimer);
+  state.saveState = "saving"; renderStatus();
+  saveTimer = setTimeout(saveNow, 800);
+}
+async function saveNow() {
+  clearTimeout(saveTimer);
+  if (!state.doc) return;
+  lsSet(state.doc);
+  if (!state.db || !state.uid) { state.saveState = "local"; renderStatus(); return; }
+  if (saving) { dirty = true; return; }
+  saving = true; dirty = false;
+  try {
+    state.doc.uid = state.uid;
+    await state.db.doc("respostas/" + state.uid).set(JSON.parse(JSON.stringify(state.doc)));
+    state.saveState = "ok"; state.saveMsg = "";
+    saving = false;
+    if (dirty) return saveNow();
+  } catch (e) {
+    saving = false;
+    state.saveState = "err";
+    state.saveMsg = e && e.code === "invalid_argument"
+      ? "Sem permissão de escrita no banco. Suas respostas ficam só neste navegador."
+      : "Falha ao salvar no banco (" + (e && e.code || "erro") + "). Vou tentar de novo.";
+    if (e && e.code === "unavailable") setTimeout(saveNow, 1500 + Math.random() * 1500);
+  }
+  renderStatus();
+}
+
+/* ---- respostas ---- */
+const ans = (id) => state.doc ? state.doc.answers[id] : undefined;
+function setAns(id, v) { if (!state.doc) return; state.doc.answers[id] = v; scheduleSave(); refreshNav(); }
+
+function isAnswered(item, v = ans(item.id)) {
+  if (item.optional) return true;
+  if (item.fact && !ans(item.id + "_novidade")) return false;
+  if (v === undefined || v === null) return false;
+  switch (item.type) {
+    case "open": return typeof v === "string" && v.trim().length >= (item.min || 8);
+    case "single": return typeof v === "object" ? !!v.value && (v.value !== "outro" || (v.text || "").trim().length > 1) : !!v;
+    case "likert": case "slider7": case "percent": return typeof v === "number";
+    case "matrix": return item.rows.every(r => v && v[r.id] !== undefined);
+    case "dual": return item.rows.every(r => v && v[r.id] && typeof v[r.id].hoje === "number" && typeof v[r.id].meta === "number");
+    case "prio": { if (!v) return false; const pr = item.rows.filter(r => v[r.id] && v[r.id].prio).length; return item.rows.every(r => v[r.id] && typeof v[r.id].hoje === "number") && pr >= 1 && pr <= 3; }
+    case "rank": return Array.isArray(v) && v.length >= item.pick;
+    case "number": return item.fields.every(f => v && typeof v[f.id] === "number" && !Number.isNaN(v[f.id]));
+    case "multi": return Array.isArray(v) && v.filter(s => (s || "").trim().length > 1).length >= (item.minFilled || item.count);
+    case "words": return v && ["quero", "nao_quero"].every(k => Array.isArray(v[k]) && v[k].filter(s => (s || "").trim()).length >= 3);
+    case "openpair": return v && typeof v.escala === "number" && (v.texto || "").trim().length >= 8;
+    default: return true;
+  }
+}
+function answeredCount() { return ITEMS.filter(it => isAnswered(it)).length; }
+
+/* ---- render ---- */
+function render() {
+  $app.innerHTML = ""; $actions.innerHTML = "";
+  window.scrollTo({ top: 0 });
+  switch (state.screen) {
+    case "boot": return renderBoot();
+    case "intro": return renderIntro();
+    case "section": return renderSection();
+    case "item": return renderItem();
+    case "review": return renderReview();
+    case "done": return renderDone();
+  }
+}
+function topbar(label, right) {
+  const pct = Math.round((answeredCount() / ITEMS.length) * 100);
+  return el("div", { class: "topbar" },
+    el("div", { class: "row" }, el("span", {}, label), el("span", {}, right ?? (pct + "% respondido"))),
+    el("div", { class: "bar" }, el("i", { style: "width:" + pct + "%" })),
+    statusEl());
+}
+function statusEl() {
+  const s = el("div", { class: "status " + (state.saveState === "err" ? "err" : state.saveState === "saving" ? "saving" : ""), id: "status" });
+  s.append(el("i"), el("span", {}, statusText()));
+  return s;
+}
+function statusText() {
+  if (!state.dbTried) return "Conectando…";
+  if (state.saveState === "saving") return "Salvando…";
+  if (state.saveState === "err") return state.saveMsg || "Falha ao salvar";
+  if (state.saveState === "local" || !state.db) return "Salvo só neste navegador";
+  return "Salvo";
+}
+function renderStatus() { const s = document.getElementById("status"); if (s) s.replaceWith(statusEl()); }
+
+function renderBoot() {
+  $app.append(el("div", { class: "card" }, el("div", { class: "kicker" }, "Faça Amigos · Planejamento Estratégico"), el("h1", {}, "Entrevista dos Sócios"), el("p", { class: "help" }, "Carregando suas respostas…")));
+}
+
+function renderIntro() {
+  const dbNote = state.db ? null : el("div", { class: "banner" }, "Sem conexão com o banco do artefato: as respostas ficam salvas só neste navegador. Ao terminar, você verá um bloco de texto para copiar e enviar.");
+  const total = SECTIONS.reduce((a, s) => a + (s.min || 0), 0);
+  const who = el("div", { class: "who" },
+    ...["Bruno", "Isabella"].map(n => el("button", { class: "opt", type: "button", "aria-pressed": "false", onclick: () => start(n.toLowerCase()) }, n)));
+  $app.append(
+    el("div", { class: "topbar" }, el("div", { class: "row" }, el("span", {}, "Faça Amigos · Planejamento Estratégico"), el("span", {}, "~" + total + " min")), statusEl()),
+    el("div", { class: "card" },
+      el("div", { class: "kicker" }, "Rodada 1 · Individual e às cegas"),
+      el("h1", {}, "Entrevista dos Sócios"),
+      el("p", {}, "Este é o ponto de partida do planejamento estratégico de cultura do ecossistema Faça Amigos: clínica, playgrounds, circuito e o que vier. As mesmas perguntas vão para os dois sócios. O valor está em descobrir onde vocês concordam sem saber e onde divergem sem saber."),
+      dbNote,
+      el("h3", {}, "O pacto"),
+      el("div", { class: "pact" },
+        el("div", {}, el("span", { class: "n" }, "1"), el("span", {}, "Responda sozinho. Não conversem sobre as perguntas antes que os dois tenham enviado.")),
+        el("div", {}, el("span", { class: "n" }, "2"), el("span", {}, "Responda o que você pensa hoje, não o que soaria bem. Divergência aqui é informação, não briga.")),
+        el("div", {}, el("span", { class: "n" }, "3"), el("span", {}, "Seja concreto. Uma história real vale mais que um adjetivo. Não existe resposta errada, existe resposta vaga.")),
+        el("div", {}, el("span", { class: "n" }, "4"), el("span", {}, "Pode pausar e voltar. Cada resposta é salva na hora."))),
+      el("h3", {}, "Os blocos"),
+      el("div", { class: "sec-list" }, ...SECTIONS.map(s => el("div", {}, el("span", { class: "k" }, s.key), el("span", {}, s.title), el("span", { class: "t" }, s.min + " min")))),
+      el("h3", {}, "Quem está respondendo?"),
+      who));
+}
+function start(respondente) {
+  state.doc = newDoc(respondente);
+  state.pos = 0;
+  state.screen = "section";
+  scheduleSave();
+  render();
+}
+
+function sectionOf(item) { return SECTIONS.find(s => s.key === item.section); }
+function firstIndexOfSection(key) { return ITEMS.findIndex(i => i.section === key); }
+
+function renderSection() {
+  const item = ITEMS[state.pos];
+  const sec = sectionOf(item);
+  const n = ITEMS.filter(i => i.section === sec.key).length;
+  $app.append(topbar("Bloco " + sec.key + " · " + sec.title),
+    el("div", { class: "card" },
+      el("div", { class: "kicker" }, "Bloco " + sec.key + " · " + n + " perguntas · ~" + sec.min + " min"),
+      el("h1", {}, sec.title),
+      el("p", {}, sec.intro),
+      sec.note ? el("div", { class: "banner" }, sec.note) : null));
+  $actions.append(el("div", { class: "in" },
+    el("button", { class: "btn btn-ghost", type: "button", onclick: () => goBack() }, "Voltar"),
+    el("button", { class: "btn btn-primary", type: "button", onclick: () => { state.screen = "item"; render(); } }, "Começar bloco " + sec.key)));
+}
+
+function renderItem() {
+  const item = ITEMS[state.pos];
+  const sec = sectionOf(item);
+  const idx = ITEMS.filter(i => i.section === sec.key).indexOf(item) + 1;
+  const n = ITEMS.filter(i => i.section === sec.key).length;
+  const card = el("div", { class: "card" },
+    el("div", { class: "kicker" }, "Bloco " + sec.key + " · " + idx + " de " + n),
+    el("h2", {}, item.q),
+    item.help ? el("p", { class: "help", html: item.help }) : null,
+    renderInput(item),
+    item.fact ? factBlock(item) : null);
+  $app.append(topbar(sec.title, "Bloco " + (SECTIONS.indexOf(sec) + 1) + " de " + SECTIONS.length), card);
+  const nav = el("div", { class: "in" },
+    el("button", { class: "btn btn-ghost", type: "button", onclick: () => goBack() }, "Voltar"),
+    el("button", { class: "btn btn-primary", type: "button", id: "next", onclick: () => goNext() }, state.pos === ITEMS.length - 1 ? "Revisar" : "Continuar"));
+  $actions.append(nav);
+  refreshNav();
+}
+function refreshNav() {
+  const b = document.getElementById("next");
+  if (!b || state.screen !== "item") return;
+  const item = ITEMS[state.pos];
+  const ok = isAnswered(item);
+  b.disabled = !ok;
+  b.title = ok ? "" : "Responda para continuar";
+}
+function goBack() {
+  if (state.screen === "section") { if (state.pos === 0) { state.screen = "intro"; return render(); } state.pos--; state.screen = "item"; return render(); }
+  if (state.screen === "item") {
+    if (state.pos === 0) { state.screen = "section"; return render(); }
+    const cur = ITEMS[state.pos], prev = ITEMS[state.pos - 1];
+    if (cur.section !== prev.section) { state.screen = "section"; return render(); }
+    state.pos--; return render();
+  }
+  if (state.screen === "review") { state.pos = ITEMS.length - 1; state.screen = "item"; return render(); }
+}
+function goNext() {
+  const item = ITEMS[state.pos];
+  if (!isAnswered(item)) return;
+  if (state.pos === ITEMS.length - 1) { state.screen = "review"; scheduleSave(); return render(); }
+  state.pos++;
+  const nxt = ITEMS[state.pos];
+  state.screen = nxt.section !== item.section ? "section" : "item";
+  scheduleSave();
+  render();
+}
+
+function factBlock(item) {
+  const key = item.id + "_novidade";
+  return el("div", { class: "mrow" + (ans(key) ? " done" : "") },
+    el("div", { class: "lab" }, "Esse dado era novidade para você?"),
+    scaleButtons(3, ["sim", "em_parte", "nao"].indexOf(ans(key)) + 1 || undefined, null,
+      i => setAns(key, ["sim", "em_parte", "nao"][i - 1]), ["Sim", "Em parte", "Não"]));
+}
+/* ---- inputs por tipo ---- */
+function renderInput(item) {
+  switch (item.type) {
+    case "open": return inputOpen(item);
+    case "single": return inputSingle(item);
+    case "likert": return inputScale(item, item.n || 5, item.ends);
+    case "slider7": return inputSlider7(item);
+    case "matrix": return inputMatrix(item);
+    case "dual": return inputDual(item);
+    case "prio": return inputPrio(item);
+    case "rank": return inputRank(item);
+    case "number": return inputNumber(item);
+    case "multi": return inputMulti(item);
+    case "words": return inputWords(item);
+    case "percent": return inputPercent(item);
+    case "openpair": return inputOpenPair(item);
+  }
+  return el("p", {}, "Tipo de pergunta desconhecido: " + item.type);
+}
+function textarea(id, value, placeholder, max, onInput) {
+  const ta = el("textarea", { id, placeholder: placeholder || "", maxlength: max || 1500 });
+  ta.value = value || "";
+  const c = el("div", { class: "counter" }, ta.value.length + " / " + (max || 1500));
+  ta.addEventListener("input", () => { c.textContent = ta.value.length + " / " + (max || 1500); onInput(ta.value); });
+  return el("div", {}, ta, c);
+}
+function inputOpen(item) {
+  return textarea(item.id, ans(item.id), item.placeholder, item.max, v => setAns(item.id, v));
+}
+function inputOpenPair(item) {
+  const v = ans(item.id) || {};
+  const wrap = el("div", { class: "rows" });
+  wrap.append(scaleButtons(item.n || 5, v.escala, item.ends, n => setAns(item.id, { ...(ans(item.id) || {}), escala: n })));
+  wrap.append(el("div", { class: "field" }, el("label", { for: item.id + "_t" }, item.textLabel || "Por quê?"),
+    textarea(item.id + "_t", v.texto, item.placeholder, item.max || 800, t => setAns(item.id, { ...(ans(item.id) || {}), texto: t }))));
+  return wrap;
+}
+function inputSingle(item) {
+  const cur = ans(item.id);
+  const curVal = typeof cur === "object" && cur ? cur.value : cur;
+  const box = el("div", { class: "opts" });
+  const paint = () => box.querySelectorAll(".opt").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === ((typeof ans(item.id) === "object" && ans(item.id)) ? ans(item.id).value : ans(item.id)))));
+  for (const o of item.options) {
+    const b = el("button", { class: "opt", type: "button", "data-v": o.value, "aria-pressed": String(o.value === curVal), onclick: () => {
+      const prev = ans(item.id);
+      setAns(item.id, { value: o.value, text: (prev && prev.text) || "" });
+      paint(); other.classList.toggle("hidden", o.value !== "outro");
+      if (o.value === "outro") other.querySelector("input").focus();
+    } }, el("span", { class: "dot" }), el("span", {}, o.label));
+    box.append(b);
+  }
+  const inp = el("input", { type: "text", id: item.id + "_outro", placeholder: "Descreva", maxlength: 300 });
+  inp.value = (cur && cur.text) || "";
+  inp.addEventListener("input", () => setAns(item.id, { value: "outro", text: inp.value }));
+  const other = el("div", { class: "field " + (curVal === "outro" ? "" : "hidden") }, inp);
+  box.append(other);
+  return box;
+}
+function scaleButtons(n, cur, ends, onPick, labels) {
+  const btns = el("div", { class: "btns", style: "--n:" + n });
+  for (let i = 1; i <= n; i++) {
+    const b = el("button", { type: "button", "aria-pressed": String(cur === i), onclick: () => { onPick(i); btns.querySelectorAll("button").forEach((x, k) => x.setAttribute("aria-pressed", String(k + 1 === i))); } }, labels ? labels[i - 1] : String(i));
+    btns.append(b);
+  }
+  const s = el("div", { class: "scale" }, btns);
+  if (ends) s.append(el("div", { class: "ends" }, el("span", {}, ends[0]), el("span", {}, ends[1])));
+  return s;
+}
+function inputScale(item, n, ends) {
+  return scaleButtons(n, ans(item.id), ends, v => setAns(item.id, v));
+}
+function inputSlider7(item) {
+  const wrap = el("div", { class: "rows" });
+  wrap.append(el("div", { class: "poles" },
+    el("div", { class: "pole" }, el("b", {}, "A"), item.a),
+    el("div", { class: "pole" }, el("b", {}, "B"), item.b)));
+  wrap.append(scaleButtons(6, ans(item.id), ["Totalmente A", "Totalmente B"], v => setAns(item.id, v)));
+  wrap.append(el("p", { class: "help" }, "Não existe meio. 3 e 4 já são uma escolha, só menos convicta."));
+  return wrap;
+}
+function inputMatrix(item) {
+  const v = ans(item.id) || {};
+  const rows = el("div", { class: "rows" });
+  for (const r of item.rows) {
+    const row = el("div", { class: "mrow " + (v[r.id] !== undefined ? "done" : "") }, el("div", { class: "lab" }, r.label));
+    const seg = el("div", { class: "seg", style: "--n:" + item.cols.length });
+    for (const c of item.cols) {
+      seg.append(el("button", { type: "button", "data-v": String(c.value), "aria-pressed": String(v[r.id] === c.value), onclick: () => {
+        const cur = { ...(ans(item.id) || {}) }; cur[r.id] = c.value; setAns(item.id, cur);
+        seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === String(c.value))));
+        row.classList.add("done");
+      } }, c.label));
+    }
+    row.append(seg); rows.append(row);
+  }
+  return rows;
+}
+function inputDual(item) {
+  const v = ans(item.id) || {};
+  const rows = el("div", { class: "rows" });
+  for (const r of item.rows) {
+    const cur = v[r.id] || {};
+    const row = el("div", { class: "mrow " + (typeof cur.hoje === "number" && typeof cur.meta === "number" ? "done" : "") }, el("div", { class: "lab" }, r.label));
+    const grid = el("div", { class: "dual" });
+    for (const k of ["hoje", "meta"]) {
+      grid.append(el("span", {}, k === "hoje" ? "Hoje" : "Em 12 meses"));
+      grid.append(scaleButtons(5, cur[k], null, n => {
+        const all = { ...(ans(item.id) || {}) }; all[r.id] = { ...(all[r.id] || {}), [k]: n }; setAns(item.id, all);
+        const c2 = all[r.id]; if (typeof c2.hoje === "number" && typeof c2.meta === "number") row.classList.add("done");
+      }));
+    }
+    row.append(grid); rows.append(row);
+  }
+  rows.append(el("p", { class: "help" }, "1 = nunca acontece · 5 = acontece sempre"));
+  return rows;
+}
+function inputPrio(item) {
+  const box = el("div", { class: "rows" });
+  const draw = () => {
+    box.innerHTML = "";
+    const v = ans(item.id) || {};
+    const npr = item.rows.filter(r => v[r.id] && v[r.id].prio).length;
+    box.append(el("p", { class: "help" }, "Para cada frase: quanto isso acontece hoje (1 = nunca, 5 = sempre). Depois marque no máximo 3 frases como prioridade para os próximos 12 meses. Prioridades marcadas: " + npr + " / 3."));
+    for (const r of item.rows) {
+      const cur = v[r.id] || {};
+      const row = el("div", { class: "mrow " + (typeof cur.hoje === "number" ? "done" : "") }, el("div", { class: "lab" }, r.label));
+      row.append(scaleButtons(5, cur.hoje, ["nunca", "sempre"], n => { const all = { ...(ans(item.id) || {}) }; all[r.id] = { ...(all[r.id] || {}), hoje: n }; setAns(item.id, all); row.classList.add("done"); }));
+      const on = !!cur.prio;
+      row.append(el("button", { class: "chip", type: "button", "aria-pressed": String(on), style: on ? "border-color:var(--pink);background:var(--surface-2)" : "", disabled: !on && npr >= 3,
+        onclick: () => { const all = { ...(ans(item.id) || {}) }; all[r.id] = { ...(all[r.id] || {}), prio: !on }; setAns(item.id, all); draw(); } }, on ? "★ Prioridade 12 meses" : "☆ Marcar como prioridade 12 meses"));
+      box.append(row);
+    }
+  };
+  draw();
+  return box;
+}
+function inputRank(item) {
+  const box = el("div", { class: "rank" });
+  const draw = () => {
+    box.innerHTML = "";
+    const picked = ans(item.id) || [];
+    box.append(el("p", { class: "help" }, "Toque nas opções na ordem de importância. Toque em uma escolhida para removê-la. Escolha " + item.pick + " de " + item.options.length + "."));
+    const pk = el("div", { class: "picked" });
+    picked.forEach((val, i) => {
+      const o = item.options.find(x => x.value === val);
+      pk.append(el("button", { class: "opt", type: "button", onclick: () => { setAns(item.id, picked.filter(x => x !== val)); draw(); } }, el("span", { class: "num" }, String(i + 1)), el("span", {}, o ? o.label : val)));
+    });
+    box.append(pk);
+    const pool = el("div", { class: "pool" });
+    for (const o of item.options) if (!picked.includes(o.value)) pool.append(el("button", { class: "chip", type: "button", disabled: picked.length >= item.pick, onclick: () => { setAns(item.id, [...picked, o.value]); draw(); } }, o.label));
+    box.append(pool);
+  };
+  draw();
+  return box;
+}
+function inputNumber(item) {
+  const v = ans(item.id) || {};
+  const wrap = el("div", { class: "fields" });
+  for (const f of item.fields) {
+    const inp = el("input", { type: "number", id: item.id + "_" + f.id, inputmode: "numeric", min: f.min ?? 0, max: f.max ?? 168, step: 1, placeholder: f.placeholder || "" });
+    if (typeof v[f.id] === "number") inp.value = v[f.id];
+    inp.addEventListener("input", () => { const cur = { ...(ans(item.id) || {}) }; cur[f.id] = inp.value === "" ? undefined : Number(inp.value); setAns(item.id, cur); });
+    wrap.append(el("div", { class: "field" }, el("label", { for: inp.id }, f.label), el("div", { class: "numrow" }, inp, el("span", { class: "unit" }, f.unit || ""))));
+  }
+  return wrap;
+}
+function inputMulti(item) {
+  const v = ans(item.id) || [];
+  const wrap = el("div", { class: "fields" });
+  for (let i = 0; i < item.count; i++) {
+    const inp = el("input", { type: "text", id: item.id + "_" + i, placeholder: (item.placeholders && item.placeholders[i]) || "", maxlength: item.max || 200 });
+    inp.value = v[i] || "";
+    inp.addEventListener("input", () => { const cur = [...(ans(item.id) || [])]; cur[i] = inp.value; setAns(item.id, cur); });
+    wrap.append(el("div", { class: "field" }, el("label", { for: inp.id }, (item.labels && item.labels[i]) || (i + 1) + "."), inp));
+  }
+  return wrap;
+}
+function inputWords(item) {
+  const v = ans(item.id) || { quero: [], nao_quero: [] };
+  const col = (key, title) => {
+    const c = el("div", { class: "fields" }, el("h3", {}, title));
+    for (let i = 0; i < 3; i++) {
+      const inp = el("input", { type: "text", id: item.id + "_" + key + i, maxlength: 40, placeholder: "palavra " + (i + 1) });
+      inp.value = (v[key] || [])[i] || "";
+      inp.addEventListener("input", () => { const cur = { quero: [...((ans(item.id) || {}).quero || [])], nao_quero: [...((ans(item.id) || {}).nao_quero || [])] }; cur[key][i] = inp.value; setAns(item.id, cur); });
+      c.append(inp);
+    }
+    return c;
+  };
+  return el("div", { class: "two" }, col("quero", "Quero ouvir"), col("nao_quero", "Não quero ouvir"));
+}
+function inputPercent(item) {
+  const cur = typeof ans(item.id) === "number" ? ans(item.id) : 50;
+  const out = el("output", {}, cur + "%");
+  const r = el("input", { type: "range", min: 0, max: 100, step: 5, id: item.id });
+  r.value = cur;
+  r.addEventListener("input", () => { out.textContent = r.value + "%"; setAns(item.id, Number(r.value)); });
+  if (typeof ans(item.id) !== "number") setTimeout(() => setAns(item.id, cur), 0);
+  return el("div", { class: "range" }, out, r, el("div", { class: "ends", style: "display:flex;justify-content:space-between;font-size:.85rem;color:var(--ink-soft)" }, el("span", {}, "0% · vamos divergir em tudo"), el("span", {}, "100% · vamos bater em tudo")));
+}
+
+/* ---- revisão e envio ---- */
+function fmtAnswer(item, v) {
+  if (v === undefined || v === null) return "";
+  const lab = (opts, val) => { const o = (opts || []).find(x => x.value === val); return o ? o.label : String(val); };
+  switch (item.type) {
+    case "open": return v;
+    case "openpair": return (v.escala ?? "—") + "/" + (item.n || 5) + " · " + (v.texto || "");
+    case "single": return typeof v === "object" ? lab(item.options, v.value) + (v.value === "outro" && v.text ? ": " + v.text : "") : lab(item.options, v);
+    case "likert": return v + "/" + (item.n || 5);
+    case "slider7": return v <= 3 ? v + "/6 · tende a A" : v + "/6 · tende a B";
+    case "matrix": return item.rows.map(r => r.label + ": " + lab(item.cols, v[r.id])).join("\n");
+    case "dual": return item.rows.map(r => r.label + ": hoje " + (v[r.id]?.hoje ?? "—") + " → 12m " + (v[r.id]?.meta ?? "—")).join("\n");
+    case "prio": return item.rows.map(r => r.label + ": hoje " + (v[r.id]?.hoje ?? "—") + (v[r.id]?.prio ? " · PRIORIDADE 12m" : "")).join("\n");
+    case "rank": return v.map((x, i) => (i + 1) + ". " + lab(item.options, x)).join("\n");
+    case "number": return item.fields.map(f => f.label + ": " + (v[f.id] ?? "—") + " " + (f.unit || "")).join("\n");
+    case "multi": return v.map((s, i) => (i + 1) + ". " + (s || "")).join("\n");
+    case "words": return "Quero: " + (v.quero || []).filter(Boolean).join(", ") + "\nNão quero: " + (v.nao_quero || []).filter(Boolean).join(", ");
+    case "percent": return v + "%";
+  }
+  return JSON.stringify(v);
+}
+function renderReview() {
+  const missing = ITEMS.filter(it => !isAnswered(it));
+  const list = el("div", { class: "review" });
+  for (const it of ITEMS) {
+    const ok = isAnswered(it);
+    list.append(el("div", { class: "it" },
+      el("div", { class: "q" }, it.section + " · " + it.q),
+      el("div", { class: "a " + (ok ? "" : "empty") }, ok ? fmtAnswer(it, ans(it.id)) : "Sem resposta"),
+      el("button", { class: "btn btn-soft", type: "button", style: "min-height:38px;padding:0 14px;font-size:.85rem", onclick: () => { state.pos = ITEMS.indexOf(it); state.screen = "item"; render(); } }, "Editar")));
+  }
+  $app.append(topbar("Revisão"),
+    el("div", { class: "card" },
+      el("div", { class: "kicker" }, "Antes de enviar"),
+      el("h1", {}, "Revise suas respostas"),
+      el("p", {}, "Depois do envio o questionário trava. Isso protege o pacto: ninguém ajusta resposta depois de conversar com o outro."),
+      missing.length ? el("div", { class: "banner err" }, missing.length + " pergunta(s) sem resposta.") : el("div", { class: "banner" }, "Tudo respondido. Ao enviar, avise o outro sócio que terminou, sem comentar o conteúdo."),
+      list));
+  $actions.append(el("div", { class: "in" },
+    el("button", { class: "btn btn-ghost", type: "button", onclick: () => goBack() }, "Voltar"),
+    el("button", { class: "btn btn-primary", type: "button", disabled: missing.length > 0, onclick: () => submit() }, "Enviar respostas")));
+}
+async function submit() {
+  if (!state.doc) return;
+  state.doc.status = "enviado"; state.doc.enviado_em = nowIso();
+  await saveNow();
+  state.screen = "done"; render();
+}
+function exportText() {
+  return "FAÇA AMIGOS · ENTREVISTA DOS SÓCIOS · " + VERSAO + "\n" + JSON.stringify(state.doc);
+}
+function renderDone() {
+  const d = state.doc;
+  const name = d.respondente === "isabella" ? "Isabella" : "Bruno";
+  const card = el("div", { class: "card" },
+    el("div", { class: "kicker" }, "Enviado"),
+    el("h1", {}, "Obrigado, " + name + "."),
+    el("p", {}, "Suas respostas foram registradas em " + new Date(d.enviado_em || d.atualizado_em).toLocaleString("pt-BR") + ". Quando os dois tiverem enviado, a próxima etapa é o mapa de convergências e divergências, e só depois a conversa entre vocês."),
+    el("p", { class: "help" }, "Não comente o conteúdo com o outro sócio até que ele também tenha enviado."));
+  if (!state.db || state.saveState === "err" || state.saveState === "local") {
+    const pre = el("pre", { class: "dump" }, exportText());
+    const copy = el("button", { class: "btn btn-soft", type: "button", onclick: async () => {
+      try { await navigator.clipboard.writeText(exportText()); copy.textContent = "Copiado"; } catch { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); copy.textContent = "Selecionado: use copiar"; }
+    } }, "Copiar respostas");
+    card.append(el("div", { class: "banner err" }, "As respostas não chegaram ao banco do artefato. Copie o bloco abaixo e envie para o Bruno colar no Claude."), copy, pre);
+  }
+  card.append(el("button", { class: "btn btn-soft", type: "button", onclick: () => { state.screen = "review_ro"; renderReadOnly(); } }, "Ver minhas respostas"));
+  $app.append(topbar("Concluído", "100%"), card);
+}
+function renderReadOnly() {
+  $app.innerHTML = ""; $actions.innerHTML = "";
+  const list = el("div", { class: "review" });
+  for (const it of ITEMS) list.append(el("div", { class: "it" }, el("div", { class: "q" }, it.section + " · " + it.q), el("div", { class: "a" }, fmtAnswer(it, ans(it.id)))));
+  $app.append(topbar("Suas respostas", "enviado"), el("div", { class: "card" }, el("h1", {}, "Suas respostas"), list));
+  $actions.append(el("div", { class: "in" }, el("button", { class: "btn btn-ghost", type: "button", onclick: () => { state.screen = "done"; render(); } }, "Voltar")));
+}
+
+/* ---- boot ---- */
+function boot() {
+  render();
+  initStorage();
+  if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === "function") {
+    try { window.claude.hot.snapshot(() => ({ doc: state.doc, pos: state.pos, screen: state.screen })); } catch {}
+  }
+  window.addEventListener("beforeunload", () => { if (state.doc) lsSet(state.doc); });
+}
+if (window.claude && window.claude.hot && typeof window.claude.hot.ready === "function") {
+  window.claude.hot.ready((data) => { if (data && data.doc) { state.doc = data.doc; state.pos = data.pos || 0; } boot(); });
+} else boot();
+</script>
