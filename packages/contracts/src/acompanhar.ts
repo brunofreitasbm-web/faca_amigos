@@ -44,5 +44,11 @@ export const acompanharSessaoSchema = z.discriminatedUnion("status", [
 export type AcompanharSessao = z.infer<typeof acompanharSessaoSchema>;
 
 /** Tipos de evento que o painel do responsável pode gravar via fa_acompanhar_evento. */
-export const acompanharEventoKindSchema = z.enum(["QR_ABERTO", "LEMBRETE_ATIVADO", "RENOVACAO_SOLICITADA"]);
+export const acompanharEventoKindSchema = z.enum([
+  "QR_ABERTO",
+  "LEMBRETE_ATIVADO",
+  "RENOVACAO_SOLICITADA",
+  "AVALIACAO_NPS",
+]);
 export type AcompanharEventoKind = z.infer<typeof acompanharEventoKindSchema>;
+

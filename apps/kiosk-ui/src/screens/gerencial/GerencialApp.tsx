@@ -25,11 +25,13 @@ import { AuditoriaTab } from "./tabs/AuditoriaTab.js";
 import { ContratoTab } from "./tabs/ContratoTab.js";
 import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
+import { OwnerAcompanhamentoTab } from "./tabs/OwnerAcompanhamentoTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
-type GerencialTab = "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "FREQUENCIA" | "OCORRENCIAS" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "BONIFICACAO" | "ABERTURA_FECHAMENTO" | "PASSAGEM_TURNO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
+type GerencialTab = "ACOMPANHAMENTO_OWNER" | "PLANOS" | "PACOTES" | "PRODUTOS" | "CUPONS" | "FIDELIDADE" | "METAS" | "COLABORADORES" | "FREQUENCIA" | "OCORRENCIAS" | "PERMISSOES" | "CLIENTES" | "RELATORIOS" | "FOLHA" | "BONIFICACAO" | "ABERTURA_FECHAMENTO" | "PASSAGEM_TURNO" | "FOTOS_ENVELOPE" | "SALDO_ENVELOPES" | "HISTORICO" | "AUDITORIA" | "CONTRATO" | "TALENTOS" | "COPILOT_IA";
 
 const TABS: { value: GerencialTab; label: string }[] = [
+  { value: "ACOMPANHAMENTO_OWNER", label: "👑 Acompanhamento Owner" },
   { value: "COPILOT_IA", label: "✦ ZoeIA (Copilot)" },
   { value: "PLANOS", label: "Planos de Preços" },
   { value: "PACOTES", label: "Pacotes" },
@@ -59,6 +61,7 @@ const TABS: { value: GerencialTab; label: string }[] = [
 // numa coluna só (Lei de Hick) — cada grupo vira seu próprio tablist,
 // então a seta do teclado circula dentro do grupo, não pelos 21 juntos.
 const TAB_GROUPS: { label: string; values: GerencialTab[] }[] = [
+  { label: "👑 Owner", values: ["ACOMPANHAMENTO_OWNER"] },
   { label: "Comercial", values: ["PLANOS", "PACOTES", "PRODUTOS", "CUPONS", "FIDELIDADE", "METAS"] },
   { label: "Pessoas", values: ["COLABORADORES", "FREQUENCIA", "OCORRENCIAS", "PERMISSOES", "CLIENTES", "TALENTOS", "FOLHA", "BONIFICACAO"] },
   {
@@ -70,6 +73,7 @@ const GROUPED_TAB_VALUES = new Set(TAB_GROUPS.flatMap((g) => g.values));
 const UNGROUPED_TABS = TABS.filter((t) => !GROUPED_TAB_VALUES.has(t.value));
 
 const TAB_HELP: Record<GerencialTab, string> = {
+  ACOMPANHAMENTO_OWNER: "Visão Geral Owner: monitoramento em tempo real do faturamento vs meta, sessões ativas/excedentes e avaliações NPS enviadas pelos responsáveis.",
   COPILOT_IA: "ZoeIA: assistente comercial humana para sugestões automáticas de vendas, aumento de ticket médio e consultoria gerencial em tempo real.",
   PLANOS: "Cadastre um plano e escolha em quais unidades ele vale — cada unidade marcada vira sua própria linha, editável depois de forma independente.",
   PACOTES: "Catálogo de pacotes de horas oferecidos como upgrade VIP. Regras do motor VIP continuam em Configurações, dentro de cada unidade.",
@@ -98,7 +102,7 @@ const TAB_HELP: Record<GerencialTab, string> = {
 
 export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogout: () => void | Promise<void> }) {
   const { employee } = useAppState();
-  const [tab, setTab] = useState<GerencialTab>("PLANOS");
+  const [tab, setTab] = useState<GerencialTab>("ACOMPANHAMENTO_OWNER");
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -172,6 +176,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                 <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
 
                 <div role="tabpanel">
+                  {tab === "ACOMPANHAMENTO_OWNER" && <OwnerAcompanhamentoTab />}
                   {tab === "COPILOT_IA" && <GeminiGerencialCopilot />}
                   {tab === "PLANOS" && <PlanosTab />}
                   {tab === "PACOTES" && <PacotesTab />}

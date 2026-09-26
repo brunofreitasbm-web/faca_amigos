@@ -22,6 +22,8 @@ import {
   type CircuitoAssetKind,
 } from "./acompanhar/copyCircuito.js";
 import { MapeamentoBanner } from "./acompanhar/MapeamentoBanner.js";
+import { NpsSurveyCard } from "./acompanhar/NpsSurveyCard.js";
+
 
 /**
  * Painel público do responsável — aberto sem login pelo QR mostrado no
@@ -229,13 +231,17 @@ export function AcompanharScreen({ code }: { code: string }) {
       )}
 
       {status === "ready" && sessao?.status === "FINALIZADA" && (
-        <Card style={{ maxWidth: 420, width: "100%" }} title={sessao.childFirstName}>
-          <p style={{ margin: 0 }}>A visita já foi encerrada. Até a próxima! 💛</p>
-        </Card>
+        <>
+          <Card style={{ maxWidth: 420, width: "100%" }} title={sessao.childFirstName}>
+            <p style={{ margin: 0 }}>A visita já foi encerrada. Até a próxima! 💛</p>
+          </Card>
+          <NpsSurveyCard code={code} childFirstName={sessao.childFirstName} />
+        </>
       )}
 
       {status === "ready" && sessao && (sessao.status === "ATIVA" || sessao.status === "PAUSADA") && timing && (
         <AcompanharConteudo
+          code={code}
           childFirstName={sessao.childFirstName}
           sensoryTags={sessao.sensoryTags}
           activity={sessao.activity}
@@ -262,6 +268,7 @@ const PHASE_COLOR: Record<string, string> = {
 };
 
 function AcompanharConteudo({
+  code,
   childFirstName,
   sensoryTags,
   activity,
@@ -275,6 +282,7 @@ function AcompanharConteudo({
   renovacaoPedida,
   onPedirRenovacao,
 }: {
+  code: string;
   childFirstName: string;
   sensoryTags: string[];
   activity: "PLAYGROUND" | "CARRINHO";
@@ -489,6 +497,10 @@ function AcompanharConteudo({
             valor combinado. O valor é acertado com a equipe no balcão, sem cobrança automática pelo celular.
           </p>
         </Card>
+      )}
+
+      {(timing.phase === "EXCEDENTE" || timing.overMinutes > 0) && (
+        <NpsSurveyCard code={code} childFirstName={childFirstName} activity={activity} />
       )}
     </div>
   );
