@@ -154,7 +154,7 @@ export interface JobApplication {
   phone: string;
   course: string | null;
   desired_area: string;
-  opportunity_type: "ESTAGIO" | "REMUNERADO" | "BOLSA";
+  opportunity_type: "ESTAGIO" | "REMUNERADO" | "BOLSA" | "PJ";
   resume_path: string;
   status: "NOVO" | "LIDO" | "ESPERA" | "ENTREVISTA" | "EM_ANALISE" | "CONTATADO" | "ARQUIVADO";
   created_at_ms: number;
