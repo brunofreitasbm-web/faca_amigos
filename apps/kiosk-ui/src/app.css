@@ -215,7 +215,8 @@ body {
    `flex-wrap`/`justify-content`/`white-space` via style inline. */
 @media (min-width: 1024px) {
   .gerencial-shell {
-    max-width: min(1400px, 96vw) !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   .gerencial-body {
