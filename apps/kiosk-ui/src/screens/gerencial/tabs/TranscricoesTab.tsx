@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
+import { Button, Card, DateInput, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
 import type { SalesCompendiumRow, VoiceTranscript } from "../../../api/client.js";
 import { RequireCapability } from "../../../auth/RequireCapability.js";
@@ -19,6 +19,32 @@ function formatDuration(ms: number): string {
 
 function monthLabel(startMs: number): string {
   return new Date(startMs).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+}
+
+/** Data de hoje em ISO (AAAA-MM-DD), no fuso do navegador do balcão. */
+function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+/** Desloca uma data ISO em N dias (aceita negativo) — usado para "dia anterior"/"próximo dia". */
+function shiftDayIso(iso: string, deltaDays: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y!, m! - 1, d! + deltaDays);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+/** Início/fim (ms, meia-noite a meia-noite no fuso local) do dia calendário informado — para filtrar dia a dia, um por um. */
+function dayRangeMs(iso: string): { fromMs: number; toMs: number } {
+  const [y, m, d] = iso.split("-").map(Number);
+  const fromMs = new Date(y!, m! - 1, d!).getTime();
+  const toMs = new Date(y!, m! - 1, d! + 1).getTime();
+  return { fromMs, toMs };
+}
+
+function dayLabel(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y!, m! - 1, d!).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
 }
 
 /** Início/fim (ms) do mês corrente e dos 5 anteriores, mais recente primeiro — opções do seletor de período do compêndio sob demanda. */
@@ -55,6 +81,10 @@ function TranscricoesTabContent() {
   const [unitFilter, setUnitFilter] = useState<string>(units[0]?.id ?? "");
   const [momentoFilter, setMomentoFilter] = useState<"" | "CHECKIN" | "CHECKOUT">("");
   const [query, setQuery] = useState("");
+  // Navegação dia a dia, um por um — em vez de rolar uma lista longa, o
+  // gestor caminha pelo calendário e revisa cada dia isoladamente.
+  const [dayFilter, setDayFilter] = useState<string>(todayIso());
+  const isToday = dayFilter >= todayIso();
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState<VoiceTranscript[]>([]);
   const [count, setCount] = useState(0);
@@ -78,16 +108,19 @@ function TranscricoesTabContent() {
 
   useEffect(() => {
     setPage(0);
-  }, [unitFilter, momentoFilter, query]);
+  }, [unitFilter, momentoFilter, query, dayFilter]);
 
   useEffect(() => {
     if (!unitFilter) return;
     setLoading(true);
+    const { fromMs, toMs } = dayRangeMs(dayFilter);
     const handle = setTimeout(() => {
       Api.voiceTranscripts({
         unitId: unitFilter,
         momento: momentoFilter || undefined,
         query: query.trim() || undefined,
+        fromMs,
+        toMs,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -102,7 +135,7 @@ function TranscricoesTabContent() {
         .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(handle);
-  }, [unitFilter, momentoFilter, query, page]);
+  }, [unitFilter, momentoFilter, query, dayFilter, page]);
 
   function loadCompendiums() {
     setLoadingCompendium(true);
@@ -209,6 +242,22 @@ function TranscricoesTabContent() {
       )}
 
       <Card style={{ padding: "12px", marginBottom: "16px", display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ display: "flex", gap: "6px", alignItems: "flex-end" }}>
+          <Button variant="ghost" size="sm" onClick={() => setDayFilter((d) => shiftDayIso(d, -1))} title="Dia anterior" aria-label="Dia anterior">
+            ← Dia anterior
+          </Button>
+          <div style={{ width: "170px" }}>
+            <DateInput label="Dia" value={dayFilter} onChange={(iso) => iso && setDayFilter(iso)} />
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setDayFilter((d) => shiftDayIso(d, 1))} disabled={isToday} title="Próximo dia" aria-label="Próximo dia">
+            Próximo dia →
+          </Button>
+          {!isToday && (
+            <Button variant="secondary" size="sm" onClick={() => setDayFilter(todayIso())}>
+              Hoje
+            </Button>
+          )}
+        </div>
         <div style={{ width: "180px" }}>
           <Select label="Momento" value={momentoFilter} onChange={(e) => setMomentoFilter(e.target.value as "" | "CHECKIN" | "CHECKOUT")}>
             <option value="">Todos</option>
@@ -222,6 +271,9 @@ function TranscricoesTabContent() {
       </Card>
 
       <Card style={{ padding: "8px", overflowX: "auto" }}>
+        <div style={{ padding: "8px 8px 0", fontSize: "13px", color: "var(--text-muted)", textTransform: "capitalize" }}>
+          {dayLabel(dayFilter)} {isToday && "· hoje"} — {loading ? "carregando…" : `${count} atendimento(s)`}
+        </div>
         <table className="report-table">
           <thead>
             <tr>
@@ -253,7 +305,9 @@ function TranscricoesTabContent() {
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={6} style={{ textAlign: "center", padding: "24px", color: "var(--text-muted)" }}>
-                  Nenhum atendimento gravado ainda. Ligue a gravação em Configurações &gt; Impressoras &gt; "Gravação de atendimentos".
+                  {isToday
+                    ? 'Nenhum atendimento gravado ainda. Ligue a gravação em Configurações > Impressoras > "Gravação de atendimentos".'
+                    : "Nenhum atendimento gravado neste dia para os filtros escolhidos."}
                 </td>
               </tr>
             )}
