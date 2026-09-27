@@ -93,15 +93,23 @@ function pickMimeType(): string {
   return "";
 }
 
+/**
+ * Ligada por padrão assim que este build chega ao terminal — não depende
+ * de o gestor entrar em Configurações e marcar a caixinha em cada
+ * unidade. Só some se alguém desligar explicitamente ('0'); ausência da
+ * configuração (unidade nova, ou linha nunca gravada) e falha de rede
+ * também contam como "ligada", porque a intenção é a gravação já nascer
+ * ativa na atualização, não escondida atrás de um opt-in silencioso.
+ */
 async function isRecordingEnabled(unitId: string): Promise<boolean> {
   const nowMs = Date.now();
   if (gateCache && gateCache.unitId === unitId && gateCache.expiresAtMs > nowMs) return gateCache.enabled;
-  let enabled = false;
+  let enabled = true;
   try {
     const row = await Api.unitSetting(unitId, "voice_recording_enabled");
-    enabled = row?.value === "1";
+    enabled = row?.value !== "0";
   } catch {
-    enabled = false;
+    enabled = true;
   }
   gateCache = { unitId, enabled, expiresAtMs: nowMs + GATE_CACHE_MS };
   return enabled;

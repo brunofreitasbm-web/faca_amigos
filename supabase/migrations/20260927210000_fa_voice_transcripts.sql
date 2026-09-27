@@ -106,7 +106,10 @@ insert into fa_kiosk_role_capabilities (role, capability) values
 on conflict do nothing;
 
 -- Flags por unidade lidas pela SPA e pelo worker (fa_kiosk_app_settings):
---   voice_recording_enabled  '1' | '0'   (padrão desligado)
+--   voice_recording_enabled  '1' | '0'   (padrão LIGADO — ver voiceRecorder.ts:
+--                            ausência da linha ou '1' grava; só '0' explícito desliga)
 --   voice_whisper_model      'ggml-small' | 'ggml-base' | 'ggml-medium-q5_0'
 --   voice_transcribe_hours   'always' | 'closed'
--- Nenhuma linha semeada: a gravação nasce desligada em toda unidade.
+-- Nenhuma linha semeada: o default fica no código do cliente (opt-out, não
+-- opt-in), de propósito — a gravação já nasce ativa assim que este build
+-- chega ao terminal, sem depender de o gestor entrar em Configurações.

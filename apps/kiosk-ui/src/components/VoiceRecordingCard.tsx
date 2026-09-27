@@ -23,7 +23,10 @@ const HOURS_OPTIONS = [
  */
 export function VoiceRecordingCard({ unitId }: { unitId: string }) {
   const toast = useToast();
-  const [enabled, setEnabled] = useState(false);
+  // Ligada por padrão (mesmo raciocínio de voiceRecorder.ts): a intenção é
+  // a gravação já nascer ativa assim que este build chega ao terminal, sem
+  // depender do gestor entrar aqui e marcar a caixinha em cada unidade.
+  const [enabled, setEnabled] = useState(true);
   const [model, setModel] = useState("ggml-small");
   const [hours, setHours] = useState("always");
   const [loading, setLoading] = useState(true);
@@ -38,7 +41,7 @@ export function VoiceRecordingCard({ unitId }: { unitId: string }) {
       Api.unitSetting(unitId, "voice_transcribe_hours"),
     ])
       .then(([enabledRow, modelRow, hoursRow]) => {
-        setEnabled(enabledRow.value === "1");
+        setEnabled(enabledRow.value !== "0");
         setModel(modelRow.value || "ggml-small");
         setHours(hoursRow.value || "always");
       })
