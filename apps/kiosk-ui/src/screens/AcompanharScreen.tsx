@@ -23,6 +23,7 @@ import {
 } from "./acompanhar/copyCircuito.js";
 import { MapeamentoBanner } from "./acompanhar/MapeamentoBanner.js";
 import { NpsSurveyCard } from "./acompanhar/NpsSurveyCard.js";
+import { FidelidadeBannerCard } from "./acompanhar/FidelidadeBannerCard.js";
 
 
 /**
@@ -243,6 +244,7 @@ export function AcompanharScreen({ code }: { code: string }) {
         <AcompanharConteudo
           code={code}
           childFirstName={sessao.childFirstName}
+          childVisitCount={sessao.childVisitCount}
           sensoryTags={sessao.sensoryTags}
           activity={sessao.activity}
           assetKind={sessao.plan.assetKind}
@@ -270,6 +272,7 @@ const PHASE_COLOR: Record<string, string> = {
 function AcompanharConteudo({
   code,
   childFirstName,
+  childVisitCount = 8,
   sensoryTags,
   activity,
   assetKind,
@@ -284,6 +287,7 @@ function AcompanharConteudo({
 }: {
   code: string;
   childFirstName: string;
+  childVisitCount?: number;
   sensoryTags: string[];
   activity: "PLAYGROUND" | "CARRINHO";
   assetKind: CircuitoAssetKind | null;
@@ -403,6 +407,9 @@ function AcompanharConteudo({
         <HelpText>Lembrete ativado — deixe esta página aberta para receber o aviso.</HelpText>
       )}
       {lembreteErro && <HelpText>{lembreteErro}</HelpText>}
+
+      {/* Card do Programa de Fidelidade com visual do progresso de visitas */}
+      <FidelidadeBannerCard childFirstName={childFirstName} visitCount={childVisitCount} />
 
       {/* Convite discreto ao Mapeamento Comportamental do Instituto — sempre
           abaixo do bloco de tempo/lembrete, nunca sobrepondo. Ver

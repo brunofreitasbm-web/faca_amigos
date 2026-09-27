@@ -39,6 +39,8 @@ export const acompanharSessaoSchema = z.discriminatedUnion("status", [
     serverNowMs: z.number().int().nonnegative(),
     sensoryTags: z.array(z.string()),
     plan: acompanharPlanoSchema,
+    /** Contagem total de visitas acumuladas da criança no programa de fidelidade. */
+    childVisitCount: z.number().int().nonnegative().optional().default(1).catch(1),
   }),
 ]);
 export type AcompanharSessao = z.infer<typeof acompanharSessaoSchema>;
