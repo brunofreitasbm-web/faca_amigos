@@ -87,6 +87,14 @@ create trigger trg_fa_kiosk_voice_transcripts_guard
   before update on fa_kiosk_voice_transcripts
   for each row execute function fa_kiosk_voice_transcripts_guard_update();
 
+-- Só o gatilho acima chama esta função — nunca precisa de EXECUTE
+-- concedido a ninguém. Sem este revoke, o linter de segurança do Supabase
+-- acusa (corretamente) que anon/authenticated podiam invocar
+-- /rest/v1/rpc/fa_kiosk_voice_transcripts_guard_update, uma função
+-- SECURITY DEFINER — mesmo padrão já usado em fa_kiosk_enroll_face
+-- (migration fa_kiosk_employees_face_enrollment).
+revoke execute on function fa_kiosk_voice_transcripts_guard_update() from public, anon, authenticated;
+
 -- Capacidades: leitura para Líder (GERENTE) e Owner (ADMIN); anotação/análise
 -- só Owner. Declarar em GERENTE já propaga a ADMIN por herança de rank
 -- (ver 20260807000002_fa_rbac_capabilities.sql), mas a linha explícita de
