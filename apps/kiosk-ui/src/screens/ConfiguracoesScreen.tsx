@@ -29,6 +29,7 @@ import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/W
 import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
 import { money } from "../format.js";
 import { AutoUpdateCard } from "../components/AutoUpdateCard.js";
+import { VoiceRecordingCard } from "../components/VoiceRecordingCard.js";
 import { getPublicAppUrl } from "../lib/appUrl.js";
 
 type Tab =
@@ -1585,6 +1586,8 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {/* ATUALIZAÇÕES DO SISTEMA (AUTO UPDATE) */}
       <AutoUpdateCard />
+
+      <VoiceRecordingCard unitId={unitId} />
 
       {bridgeStatus && !bridgeStatus.hasServiceRoleKey && (
         <HelpText icon="🛑" style={{ background: "#fff0f0", borderColor: "#f5c6cb", color: "#721c24", fontWeight: "bold" }}>

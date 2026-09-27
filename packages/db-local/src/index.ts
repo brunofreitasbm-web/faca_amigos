@@ -19,3 +19,4 @@ export * from "./repositories/bonus-rules.js";
 export * from "./repositories/terminal.js";
 export * from "./repositories/prepaid.js";
 
+export * from "./repositories/voice-jobs.js";

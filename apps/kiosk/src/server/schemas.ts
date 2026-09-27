@@ -173,3 +173,23 @@ export const pontoBodySchema = z.object({
   kind: z.enum(["ENTRADA", "SAIDA", "INTERVALO_INICIO", "INTERVALO_FIM"]),
   registeredByEmployeeId: z.string().uuid().optional(),
 });
+
+/**
+ * Metadados de uma gravação de voz enviados no header `X-Voz-Meta` do
+ * POST /api/voz/recordings (ver routes/voz.ts). `sessionIds` cobre irmãos
+ * (check-in) ou várias sessões fechadas no mesmo pedido (check-out);
+ * limitado a 20 por segurança de payload, bem acima do caso real.
+ */
+export const voiceRecordingMetaSchema = z.object({
+  recordingId: z.string().uuid(),
+  unitId: z.string().uuid(),
+  employeeId: z.string().uuid(),
+  momento: z.enum(["CHECKIN", "CHECKOUT"]),
+  startedAtMs: z.number().int().nonnegative(),
+  endedAtMs: z.number().int().nonnegative(),
+  durationMs: z.number().int().nonnegative(),
+  sessionIds: z.array(z.string().uuid()).max(20).default([]),
+  orderId: z.string().uuid().optional(),
+  outcome: z.enum(["SUCCESS", "ABANDONED", "CAPPED"]).optional(),
+  clientLabel: z.string().max(200).optional(),
+});
