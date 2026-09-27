@@ -57,3 +57,9 @@ verify_jwt = false
 # ou à chave do worker; nada de sessão de usuário.
 [functions.nfse-certificate-fetch]
 verify_jwt = false
+
+# Compêndio mensal de vendas (reunião de alinhamento): disparada 1x/dia
+# pelo pg_cron/pg_net, nunca por um navegador — mesma razão de
+# ponto-photo-retention-dispatch/owner-report-dispatch acima.
+[functions.sales-compendium-dispatch]
+verify_jwt = false

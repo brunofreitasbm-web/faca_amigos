@@ -9,8 +9,9 @@
     "dev:server": "tsx watch src/server/start.ts",
     "build": "tsc -p tsconfig.json",
     "bundle": "node scripts/bundle.mjs",
-    "start:electron": "pnpm run bundle && electron .",
-    "dist": "pnpm run bundle && electron-builder --win",
+    "fetch:whisper": "node scripts/fetch-whisper.mjs",
+    "start:electron": "pnpm run fetch:whisper && pnpm run bundle && electron .",
+    "dist": "pnpm run fetch:whisper && pnpm run bundle && electron-builder --win",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"

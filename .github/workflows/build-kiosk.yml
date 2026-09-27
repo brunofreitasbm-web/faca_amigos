@@ -117,6 +117,23 @@ jobs:
           }
           Write-Host 'OK: nenhuma credencial no artefato.'
 
+      # whisper-cli.exe precisa estar no artefato (sem ele o worker de voz
+      # nunca transcreve nada, silenciosamente); o modelo .bin NUNCA pode
+      # estar (ver comentário em electron-builder.yml — o bucket público de
+      # updates tem limite de 100MB/arquivo, e o modelo sozinho passa disso).
+      - name: Conferir empacotamento do whisper.cpp
+        shell: pwsh
+        run: |
+          $whisperDir = 'apps/kiosk/release/win-unpacked/resources/whisper'
+          if (-not (Test-Path "$whisperDir/whisper-cli.exe")) {
+            throw 'whisper-cli.exe não está no artefato — rode scripts/fetch-whisper.mjs antes de empacotar.'
+          }
+          $modelos = Get-ChildItem -Path $whisperDir -Filter '*.bin' -ErrorAction SilentlyContinue
+          if ($modelos) {
+            throw "Modelo(s) .bin embutido(s) no instalador: $($modelos.Name -join ', '). O modelo é baixado em runtime, nunca vai no instalador."
+          }
+          Write-Host 'OK: whisper-cli.exe presente, nenhum modelo embutido.'
+
       - uses: actions/upload-artifact@v4
         with:
           name: FacaAmigos-Setup

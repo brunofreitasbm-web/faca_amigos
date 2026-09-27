@@ -12,6 +12,7 @@ import { MetasTab } from "./tabs/MetasTab.js";
 import { BonificacaoTab } from "./tabs/BonificacaoTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
 import { OcorrenciasTab } from "./tabs/OcorrenciasTab.js";
+import { TranscricoesTab } from "./tabs/TranscricoesTab.js";
 import { FrequenciaTab } from "./tabs/FrequenciaTab.js";
 import { PermissoesTab } from "./tabs/PermissoesTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
@@ -39,6 +40,7 @@ export type GerencialTab =
   | "COLABORADORES"
   | "FREQUENCIA"
   | "OCORRENCIAS"
+  | "TRANSCRICOES"
   | "PERMISSOES"
   | "CLIENTES"
   | "RELATORIOS"
@@ -121,6 +123,7 @@ const CATEGORIES: ModuleCategory[] = [
       { value: "COLABORADORES", label: "Equipe & Operadores", icon: "👤", description: "Cadastro unificado da equipe e permissões por unidade." },
       { value: "FREQUENCIA", label: "Ponto & Frequência", icon: "⏱️", tag: "Ao Vivo", description: "Marcação legal de ponto com foto em tempo real para CLT e Estagiários." },
       { value: "OCORRENCIAS", label: "Atestados & Ocorrências", icon: "📋", description: "Lançamento de atestados médicos, faltas e justificativas do RH." },
+      { value: "TRANSCRICOES", label: "Atendimentos Gravados", icon: "🎙️", tag: "Treinamento", description: "Transcrições de check-in/check-out e o Compêndio de Vendas para a Reunião de Alinhamento Mensal." },
       { value: "TALENTOS", label: "Banco de Talentos", icon: "💼", description: "Triagem de currículos recebidos na landing page do site." },
       { value: "CLIENTES", label: "Base de Clientes", icon: "🧑‍🤝‍🧑", description: "Consulta e histórico centralizado de responsáveis e crianças da rede." },
       { value: "PERMISSOES", label: "Permissões de Acesso", icon: "🔒", description: "Nível de acesso (Operador, Líder ou Owner) exigido por ação." },
@@ -504,6 +507,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "COLABORADORES" && <ColaboradoresTab />}
               {tab === "FREQUENCIA" && <FrequenciaTab />}
               {tab === "OCORRENCIAS" && <OcorrenciasTab />}
+              {tab === "TRANSCRICOES" && <TranscricoesTab />}
               {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}
               {tab === "TALENTOS" && <BancoTalentosTab />}

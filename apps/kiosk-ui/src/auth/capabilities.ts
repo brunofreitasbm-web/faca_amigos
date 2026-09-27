@@ -41,6 +41,9 @@ export const CAPABILITIES = [
   "metas.ticket.write",
   "clientes.write",
   "bonificacao.self",
+  "treinamento.transcricoes.read",
+  "treinamento.transcricoes.write",
+  "treinamento.compendio.gerar",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -80,6 +83,9 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "metas.ticket.write": "Configurar meta de Ticket Médio (mínimo e alvo) de cada unidade",
   "clientes.write": "Editar dados de clientes (responsável e crianças vinculadas)",
   "bonificacao.self": "Ver a própria bonificação (menu Minha Bonificação)",
+  "treinamento.transcricoes.read": "Ver transcrições dos atendimentos gravados (treinamento de venda)",
+  "treinamento.transcricoes.write": "Anotar/analisar transcrições dos atendimentos gravados",
+  "treinamento.compendio.gerar": "Gerar o Compêndio de Vendas com IA para a Reunião de Alinhamento Mensal",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
@@ -134,7 +140,9 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
           c !== "sessao.cancel" &&
           c !== "config.rbac.write" &&
           c !== "notificacoes.owner_push" &&
-          c !== "talentos.write"
+          c !== "talentos.write" &&
+          c !== "treinamento.transcricoes.write" &&
+          c !== "treinamento.compendio.gerar"
       )
     );
   }
