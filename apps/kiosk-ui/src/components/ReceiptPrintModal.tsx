@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { generateEscPosReceipt } from "@facaamigos/domain";
+import { generateEscPosReceipt, generateEscPosCircuitoTermo } from "@facaamigos/domain";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 import { Api, systemStatus } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
@@ -18,7 +18,17 @@ interface ReceiptPrintModalProps {
  */
 export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
   const { unit } = useAppState();
-  const { text } = generateEscPosReceipt(data);
+  const isCircuito =
+    Boolean(data.accessCode) &&
+    data.activity !== "PLAYGROUND" &&
+    (data.activity === "CARRINHO" ||
+      Boolean(data.assetName) ||
+      /circuito/i.test(data.unitName || "") ||
+      unit?.kind === "QUIOSQUE");
+
+  const receiptObj = generateEscPosReceipt(data);
+  const termoObj = isCircuito ? generateEscPosCircuitoTermo(data) : null;
+  const text = termoObj ? `${receiptObj.text}\n\n${termoObj.text}` : receiptObj.text;
 
   function handleBrowserPrint() {
     let iframe = document.getElementById("fa-receipt-print-iframe") as HTMLIFrameElement | null;
