@@ -44,6 +44,7 @@ export const CAPABILITIES = [
   "treinamento.transcricoes.read",
   "treinamento.transcricoes.write",
   "treinamento.compendio.gerar",
+  "config.terminais.read",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -86,6 +87,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "treinamento.transcricoes.read": "Ver transcrições dos atendimentos gravados (treinamento de venda)",
   "treinamento.transcricoes.write": "Anotar/analisar transcrições dos atendimentos gravados",
   "treinamento.compendio.gerar": "Gerar o Compêndio de Vendas com IA para a Reunião de Alinhamento Mensal",
+  "config.terminais.read": "Ver o painel central de saúde dos terminais (whisper.cpp, modelo, fila de transcrição) de toda a rede",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
@@ -142,7 +144,8 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
           c !== "notificacoes.owner_push" &&
           c !== "talentos.write" &&
           c !== "treinamento.transcricoes.write" &&
-          c !== "treinamento.compendio.gerar"
+          c !== "treinamento.compendio.gerar" &&
+          c !== "config.terminais.read"
       )
     );
   }

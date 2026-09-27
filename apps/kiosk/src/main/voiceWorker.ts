@@ -15,11 +15,12 @@ import {
   markVoiceJobUploaded,
   purgeUploadedVoiceJobs,
   resetStaleVoiceProcessing,
+  voiceQueueStats,
   type Db,
   type VoiceJobRow,
 } from "@facaamigos/db-local";
 import { resolveTerminalSupabaseKey } from "../config/supabaseTerminalKey.js";
-import { onVoiceJobEnqueued, setVoiceWorkerStatus } from "./voiceWorkerControl.js";
+import { getVoiceWorkerStatus, onVoiceJobEnqueued, setVoiceWorkerStatus } from "./voiceWorkerControl.js";
 import { buildWhisperArgs, maskPiiInTranscript, parseWhisperJson, whisperTimeoutMs } from "./voiceWorkerPolicy.js";
 
 /**
@@ -37,6 +38,7 @@ import { buildWhisperArgs, maskPiiInTranscript, parseWhisperJson, whisperTimeout
 
 const DEFAULT_MODEL = "ggml-small";
 const POLL_INTERVAL_MS = 15_000;
+const HEARTBEAT_INTERVAL_MS = 30_000; // painel central de terminais (Gerencial > Caixa & Auditoria > Terminais)
 const CLEANUP_INTERVAL_MS = 60 * 60_000; // 1x/hora: expurga UPLOADED antigos e WAVs órfãos
 const UPLOADED_RETENTION_MS = 30 * 24 * 60 * 60_000; // 30 dias — só a linha do SQLite, o texto já está no Supabase
 const MODEL_DOWNLOAD_RETRY_MS = 10 * 60_000;
@@ -355,13 +357,52 @@ export function startVoiceWorker(db: Db, userDataPath: string, deviceId: string 
     }
   }
 
+  /**
+   * Reporta o estado deste terminal para o Supabase — é o que alimenta o
+   * painel central (Gerencial > Caixa & Auditoria > Terminais), pra não
+   * depender de abrir Configurações em cada PC do balcão pra saber se o
+   * whisper.cpp já está de pé e o modelo já baixou. Sem chave de serviço
+   * não escreve nada (a RLS bloquearia mesmo, mas evita a chamada à toa).
+   */
+  async function sendHeartbeat(): Promise<void> {
+    if (!hasServiceRoleKey || !deviceId) return;
+    const status = getVoiceWorkerStatus();
+    const queue = voiceQueueStats(db);
+    try {
+      const { error } = await supabase.from("fa_kiosk_voice_terminal_status").upsert({
+        terminal_id: deviceId,
+        unit_id: getTerminalUnitId(db) ?? null,
+        worker_version: "1.0.0",
+        has_service_role_key: status.hasServiceRoleKey,
+        whisper_cli_found: status.whisperCliFound,
+        model_name: status.model.name || null,
+        model_state: status.model.state,
+        model_progress_pct: status.model.progressPct ?? null,
+        model_error: status.model.error ?? null,
+        queue_pending: queue.pending,
+        queue_processing: queue.processing,
+        queue_transcribed: queue.transcribed,
+        queue_uploaded: queue.uploaded,
+        queue_failed: queue.failed,
+        last_error: status.lastError ?? null,
+        last_heartbeat_ms: Date.now(),
+      });
+      if (error) log.warn("[voz] heartbeat do terminal falhou:", error.message);
+    } catch (err) {
+      log.warn("[voz] heartbeat do terminal falhou:", err);
+    }
+  }
+
   onVoiceJobEnqueued(() => void drain());
   const pollTimer = setInterval(() => void drain(), POLL_INTERVAL_MS);
+  const heartbeatTimer = setInterval(() => void sendHeartbeat(), HEARTBEAT_INTERVAL_MS);
   const cleanupTimer = setInterval(cleanup, CLEANUP_INTERVAL_MS);
   pollTimer.unref?.();
+  heartbeatTimer.unref?.();
   cleanupTimer.unref?.();
 
   void drain();
   void resolveModel();
+  void sendHeartbeat();
 }
 

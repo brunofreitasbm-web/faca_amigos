@@ -1695,6 +1695,27 @@ export interface SalesCompendiumRow {
   created_at_ms: number;
 }
 
+/** Uma linha de fa_kiosk_voice_terminal_status — heartbeat do worker de voz de UM terminal (painel central, Gerencial > Terminais). */
+export interface VoiceTerminalStatus {
+  terminal_id: string;
+  unit_id: string | null;
+  worker_version: string | null;
+  has_service_role_key: boolean;
+  whisper_cli_found: boolean;
+  model_name: string | null;
+  model_state: "ready" | "downloading" | "missing" | "error" | null;
+  model_progress_pct: number | null;
+  model_error: string | null;
+  queue_pending: number;
+  queue_processing: number;
+  queue_transcribed: number;
+  queue_uploaded: number;
+  queue_failed: number;
+  last_error: string | null;
+  last_heartbeat_ms: number;
+  fa_kiosk_units: { name: string } | null;
+}
+
 export const Api = {
   /** Unidade amarrada a ESTE computador (Configurações > Impressoras > Este terminal). */
   terminalUnit: () => getTerminalUnit(),
@@ -3077,6 +3098,21 @@ export const Api = {
   generateSalesCompendium: (unitId: string | null, periodStartMs: number, periodEndMs: number) =>
     unwrap<SalesCompendiumRow>(
       supabase().functions.invoke("sales-compendium-generate", { body: { unitId, periodStartMs, periodEndMs } }),
+    ),
+
+  /**
+   * Painel central de terminais (Gerencial > Caixa & Auditoria > Terminais):
+   * status do worker de voz (whisper.cpp) de cada PC/tablet da rede, vindo
+   * do heartbeat que apps/kiosk/src/main/voiceWorker.ts manda a cada 30s.
+   * Exige 'config.terminais.read' (RLS) — visão de infraestrutura da rede
+   * inteira, não de conteúdo de uma unidade só.
+   */
+  voiceTerminals: () =>
+    unwrap<VoiceTerminalStatus[]>(
+      supabase()
+        .from("fa_kiosk_voice_terminal_status")
+        .select("*, fa_kiosk_units(name)")
+        .order("last_heartbeat_ms", { ascending: false }),
     ),
 
   /**

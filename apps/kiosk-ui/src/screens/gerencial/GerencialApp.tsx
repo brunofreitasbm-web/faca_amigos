@@ -13,6 +13,7 @@ import { BonificacaoTab } from "./tabs/BonificacaoTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
 import { OcorrenciasTab } from "./tabs/OcorrenciasTab.js";
 import { TranscricoesTab } from "./tabs/TranscricoesTab.js";
+import { TerminaisVozTab } from "./tabs/TerminaisVozTab.js";
 import { FrequenciaTab } from "./tabs/FrequenciaTab.js";
 import { PermissoesTab } from "./tabs/PermissoesTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
@@ -41,6 +42,7 @@ export type GerencialTab =
   | "FREQUENCIA"
   | "OCORRENCIAS"
   | "TRANSCRICOES"
+  | "TERMINAIS_VOZ"
   | "PERMISSOES"
   | "CLIENTES"
   | "RELATORIOS"
@@ -142,6 +144,7 @@ const CATEGORIES: ModuleCategory[] = [
       { value: "FOTOS_ENVELOPE", label: "Fotos de Sangria", icon: "📸", description: "Comprovantes visuais das sangrias registradas nos PDVs." },
       { value: "HISTORICO", label: "Fluxograma de Caixa", icon: "🔄", description: "Rastreabilidade do fluxo de caixa e movimentação por turno." },
       { value: "AUDITORIA", label: "Log de Auditoria", icon: "🛡️", description: "Histórico de ações sensíveis, logins e alterações de dados." },
+      { value: "TERMINAIS_VOZ", label: "Terminais", icon: "🖥️", tag: "Infra", description: "Painel central: status do whisper.cpp (transcrição de voz) em cada PC/tablet da rede." },
     ],
   },
 ];
@@ -508,6 +511,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "FREQUENCIA" && <FrequenciaTab />}
               {tab === "OCORRENCIAS" && <OcorrenciasTab />}
               {tab === "TRANSCRICOES" && <TranscricoesTab />}
+              {tab === "TERMINAIS_VOZ" && <TerminaisVozTab />}
               {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}
               {tab === "TALENTOS" && <BancoTalentosTab />}
