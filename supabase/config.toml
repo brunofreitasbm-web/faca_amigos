@@ -70,3 +70,10 @@ verify_jwt = false
 # entra aqui: quem envia está logado e a function exige 'crm.write'.
 [functions.crm-whatsapp-webhook]
 verify_jwt = false
+
+# NPS automático pós-visita: disparada só pelo pg_cron/pg_net (a cada 15 min),
+# nunca por navegador — mesma razão de sales-compendium-dispatch. Desligada por
+# padrão em cada unidade (app_settings crm_nps_auto) e idempotente (janela de
+# checkout fixa + cooldown de 30 dias por contato).
+[functions.crm-nps-auto-dispatch]
+verify_jwt = false
