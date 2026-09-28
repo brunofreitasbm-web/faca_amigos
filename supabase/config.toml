@@ -63,3 +63,10 @@ verify_jwt = false
 # ponto-photo-retention-dispatch/owner-report-dispatch acima.
 [functions.sales-compendium-dispatch]
 verify_jwt = false
+
+# Webhook do WhatsApp do CRM: quem chama é a Twilio, que não manda JWT. A
+# autorização real é a assinatura X-Twilio-Signature (HMAC-SHA1 com o Auth
+# Token da subconta), conferida dentro da function. crm-whatsapp-send NÃO
+# entra aqui: quem envia está logado e a function exige 'crm.write'.
+[functions.crm-whatsapp-webhook]
+verify_jwt = false

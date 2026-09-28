@@ -1696,6 +1696,43 @@ export interface SalesCompendiumRow {
 }
 
 /** Uma linha de fa_kiosk_voice_terminal_status — heartbeat do worker de voz de UM terminal (painel central, Gerencial > Terminais). */
+export type CrmStage = "NOVO" | "EM_CONVERSA" | "INTERESSADO" | "CLIENTE" | "INATIVO";
+
+export interface CrmContact {
+  id: string;
+  channel_id: string;
+  phone_e164: string;
+  name: string | null;
+  guardian_id: string | null;
+  stage: CrmStage;
+  tags: string[];
+  notes: string | null;
+  opt_in: boolean;
+  unread_count: number;
+  last_inbound_ms: number | null;
+  last_message_ms: number | null;
+  last_message_preview: string | null;
+  fa_crm_channels?: { label: string } | null;
+}
+
+export interface CrmMessage {
+  id: string;
+  contact_id: string;
+  direction: "IN" | "OUT";
+  body: string;
+  media: { url: string; contentType?: string }[];
+  status: "received" | "queued" | "sent" | "delivered" | "read" | "failed" | "undelivered";
+  error: string | null;
+  created_at_ms: number;
+}
+
+export interface CrmTemplate {
+  id: string;
+  name: string;
+  preview: string;
+  variable_count: number;
+}
+
 export interface VoiceTerminalStatus {
   terminal_id: string;
   unit_id: string | null;
@@ -3107,6 +3144,35 @@ export const Api = {
    * Exige 'config.terminais.read' (RLS) — visão de infraestrutura da rede
    * inteira, não de conteúdo de uma unidade só.
    */
+  // ── CRM de WhatsApp (Gerencial > CRM WhatsApp) ──
+  crmContacts: () =>
+    unwrap<CrmContact[]>(
+      supabase()
+        .from("fa_crm_contacts")
+        .select("*, fa_crm_channels(label)")
+        .order("last_message_ms", { ascending: false, nullsFirst: false })
+        .limit(500),
+    ),
+  crmMessages: (contactId: string) =>
+    unwrap<CrmMessage[]>(
+      supabase().from("fa_crm_messages").select("*").eq("contact_id", contactId).order("created_at_ms", { ascending: true }).limit(500),
+    ),
+  crmTemplates: () =>
+    unwrap<CrmTemplate[]>(supabase().from("fa_crm_templates").select("id, name, preview, variable_count").eq("active", true).eq("purpose", "GERAL").order("name")),
+  crmUpdateContact: (id: string, patch: Partial<Pick<CrmContact, "name" | "stage" | "tags" | "notes">>) =>
+    unwrap<null>(supabase().from("fa_crm_contacts").update(patch).eq("id", id)),
+  crmSendNps: (contactIds: string[]) =>
+    unwrap<{ ok: boolean; sent: number; skippedOptOut: number; skippedRecent: number; failed: number }>(
+      supabase().functions.invoke("crm-nps-send", { body: { contactIds } }),
+    ),
+  crmNpsFeed: (limit = 20) =>
+    unwrap<{ id: string; brand: string; score: number; feedback: string | null; scored_at_ms: number }[]>(
+      supabase().rpc("fa_crm_nps_feed", { p_limit: limit }),
+    ),
+  crmMarkRead: (contactId: string) => unwrap<null>(supabase().rpc("fa_crm_mark_read", { p_contact_id: contactId })),
+  crmSend: (body: { contactId: string; body?: string; templateId?: string; variables?: Record<string, string> }) =>
+    unwrap<{ ok: boolean; sid: string }>(supabase().functions.invoke("crm-whatsapp-send", { body })),
+
   voiceTerminals: () =>
     unwrap<VoiceTerminalStatus[]>(
       supabase()

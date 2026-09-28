@@ -27,6 +27,7 @@ import { AuditoriaTab } from "./tabs/AuditoriaTab.js";
 import { ContratoTab } from "./tabs/ContratoTab.js";
 import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
+import { CrmWhatsappTab } from "./tabs/CrmWhatsappTab.js";
 import { OwnerAcompanhamentoTab } from "./tabs/OwnerAcompanhamentoTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
@@ -45,6 +46,7 @@ export type GerencialTab =
   | "TERMINAIS_VOZ"
   | "PERMISSOES"
   | "CLIENTES"
+  | "CRM_WHATSAPP"
   | "RELATORIOS"
   | "FOLHA"
   | "BONIFICACAO"
@@ -128,6 +130,7 @@ const CATEGORIES: ModuleCategory[] = [
       { value: "TRANSCRICOES", label: "Atendimentos Gravados", icon: "🎙️", tag: "Treinamento", description: "Transcrições de check-in/check-out e o Compêndio de Vendas para a Reunião de Alinhamento Mensal." },
       { value: "TALENTOS", label: "Banco de Talentos", icon: "💼", description: "Triagem de currículos recebidos na landing page do site." },
       { value: "CLIENTES", label: "Base de Clientes", icon: "🧑‍🤝‍🧑", description: "Consulta e histórico centralizado de responsáveis e crianças da rede." },
+      { value: "CRM_WHATSAPP", label: "CRM WhatsApp", icon: "💬", tag: "Novo", description: "Conversas e funil de clientes do Playground e do Circuito pelo WhatsApp." },
       { value: "PERMISSOES", label: "Permissões de Acesso", icon: "🔒", description: "Nível de acesso (Operador, Líder ou Owner) exigido por ação." },
     ],
   },
@@ -514,6 +517,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "TERMINAIS_VOZ" && <TerminaisVozTab />}
               {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}
+              {tab === "CRM_WHATSAPP" && <CrmWhatsappTab />}
               {tab === "TALENTOS" && <BancoTalentosTab />}
               {tab === "FOLHA" && <FolhaPagamentoTab />}
               {tab === "BONIFICACAO" && <BonificacaoTab />}

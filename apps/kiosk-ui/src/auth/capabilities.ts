@@ -45,6 +45,9 @@ export const CAPABILITIES = [
   "treinamento.transcricoes.write",
   "treinamento.compendio.gerar",
   "config.terminais.read",
+  "crm.read",
+  "crm.write",
+  "crm.admin",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -88,6 +91,9 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "treinamento.transcricoes.write": "Anotar/analisar transcrições dos atendimentos gravados",
   "treinamento.compendio.gerar": "Gerar o Compêndio de Vendas com IA para a Reunião de Alinhamento Mensal",
   "config.terminais.read": "Ver o painel central de saúde dos terminais (whisper.cpp, modelo, fila de transcrição) de toda a rede",
+  "crm.read": "Ver o CRM de WhatsApp (conversas e contatos do Playground e do Circuito)",
+  "crm.write": "Responder clientes e editar a ficha no CRM de WhatsApp",
+  "crm.admin": "Gerenciar números (canais) e templates do CRM de WhatsApp",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */

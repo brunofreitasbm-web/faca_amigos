@@ -109,6 +109,29 @@ export function OwnerAcompanhamentoTab() {
       } catch {
         // Tabela/RPC pode não ter permissão anon ou estar vazia
       }
+
+      // 3. NPS respondido por WhatsApp (CRM) — a pesquisa saiu da tela de
+      // acompanhamento do responsável, então as notas novas chegam por aqui.
+      try {
+        const crm = await Api.crmNpsFeed(20);
+        const fromCrm: NpsLogItem[] = crm.map((r) => {
+          const circuito = r.brand.toLowerCase().includes("circuito");
+          return {
+            id: `crm-${r.id}`,
+            code: `WhatsApp · ${r.brand}`,
+            playgroundScore: circuito ? null : r.score,
+            circuitoScore: circuito ? r.score : null,
+            feedback: r.feedback ?? "",
+            activity: circuito ? "CARRINHO" : "PLAYGROUND",
+            createdAt: new Date(Number(r.scored_at_ms)).toISOString(),
+          };
+        });
+        setNpsLogs((prev) =>
+          [...prev, ...fromCrm].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 30),
+        );
+      } catch {
+        // sem permissão de CRM ou migration ainda não aplicada: mantém só o histórico antigo
+      }
     } catch (err) {
       console.error("Erro ao carregar dados do painel do Owner:", err);
     } finally {
@@ -358,7 +381,7 @@ export function OwnerAcompanhamentoTab() {
 
         {npsLogs.length === 0 ? (
           <HelpText style={{ textAlign: "center", padding: "24px 0" }}>
-            Nenhuma avaliação NPS registrada hoje ainda. As notas enviadas pelos responsáveis no painel de acompanhamento aparecerão aqui em tempo real. 🌟
+            Nenhuma avaliação NPS registrada hoje ainda. As notas respondidas pelos clientes na pesquisa de NPS do WhatsApp (CRM) aparecerão aqui. 🌟
           </HelpText>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>

@@ -22,7 +22,6 @@ import {
   type CircuitoAssetKind,
 } from "./acompanhar/copyCircuito.js";
 import { MapeamentoBanner } from "./acompanhar/MapeamentoBanner.js";
-import { NpsSurveyCard } from "./acompanhar/NpsSurveyCard.js";
 import { FidelidadeBannerCard } from "./acompanhar/FidelidadeBannerCard.js";
 
 
@@ -232,12 +231,9 @@ export function AcompanharScreen({ code }: { code: string }) {
       )}
 
       {status === "ready" && sessao?.status === "FINALIZADA" && (
-        <>
-          <Card style={{ maxWidth: 420, width: "100%" }} title={sessao.childFirstName}>
-            <p style={{ margin: 0 }}>A visita já foi encerrada. Até a próxima! 💛</p>
-          </Card>
-          <NpsSurveyCard code={code} childFirstName={sessao.childFirstName} />
-        </>
+        <Card style={{ maxWidth: 420, width: "100%" }} title={sessao.childFirstName}>
+          <p style={{ margin: 0 }}>A visita já foi encerrada. Até a próxima! 💛</p>
+        </Card>
       )}
 
       {status === "ready" && sessao && (sessao.status === "ATIVA" || sessao.status === "PAUSADA") && timing && (
@@ -506,9 +502,6 @@ function AcompanharConteudo({
         </Card>
       )}
 
-      {(timing.phase === "EXCEDENTE" || timing.overMinutes > 0) && (
-        <NpsSurveyCard code={code} childFirstName={childFirstName} activity={activity} />
-      )}
     </div>
   );
 }
