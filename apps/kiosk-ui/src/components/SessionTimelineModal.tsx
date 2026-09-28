@@ -39,6 +39,13 @@ function stepFor(event: SessionEvent): TimelineStep {
     }
     case "RETOMADA":
       return { atMs: event.at_ms, label: "▶ Cobrança retomada", color: "var(--color-teal)", employeeName: event.employee_name };
+    case "RELATORIO_SESSAO":
+      return {
+        atMs: event.at_ms,
+        label: `📝 Relatório de sessão preenchido${event.payload?.late === true ? " (fora do prazo de 40 min)" : ""}`,
+        color: "var(--color-teal)",
+        employeeName: event.employee_name,
+      };
     case "TROCA_PLANO":
       return { atMs: event.at_ms, label: "🔄 Plano alterado", color: "var(--color-primary)", employeeName: event.employee_name };
     case "NOTIFICACAO_WHATSAPP":

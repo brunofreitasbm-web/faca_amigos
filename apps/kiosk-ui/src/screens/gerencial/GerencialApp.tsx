@@ -28,6 +28,7 @@ import { ContratoTab } from "./tabs/ContratoTab.js";
 import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
 import { CrmWhatsappTab } from "./tabs/CrmWhatsappTab.js";
+import { RelatoriosSessaoTab } from "./tabs/RelatoriosSessaoTab.js";
 import { OwnerAcompanhamentoTab } from "./tabs/OwnerAcompanhamentoTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
@@ -47,6 +48,7 @@ export type GerencialTab =
   | "PERMISSOES"
   | "CLIENTES"
   | "CRM_WHATSAPP"
+  | "RELATORIOS_SESSAO"
   | "RELATORIOS"
   | "FOLHA"
   | "BONIFICACAO"
@@ -131,6 +133,7 @@ const CATEGORIES: ModuleCategory[] = [
       { value: "TALENTOS", label: "Banco de Talentos", icon: "💼", description: "Triagem de currículos recebidos na landing page do site." },
       { value: "CLIENTES", label: "Base de Clientes", icon: "🧑‍🤝‍🧑", description: "Consulta e histórico centralizado de responsáveis e crianças da rede." },
       { value: "CRM_WHATSAPP", label: "CRM WhatsApp", icon: "💬", tag: "Novo", description: "Conversas e funil de clientes do Playground e do Circuito pelo WhatsApp." },
+      { value: "RELATORIOS_SESSAO", label: "Relatórios de Sessão", icon: "📝", tag: "Novo", description: "Mapa de observação por sessão de 1h+, quem preencheu, prazo de 40 min e a mensagem enviada ao responsável." },
       { value: "PERMISSOES", label: "Permissões de Acesso", icon: "🔒", description: "Nível de acesso (Operador, Líder ou Owner) exigido por ação." },
     ],
   },
@@ -518,6 +521,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}
               {tab === "CRM_WHATSAPP" && <CrmWhatsappTab />}
+              {tab === "RELATORIOS_SESSAO" && <RelatoriosSessaoTab />}
               {tab === "TALENTOS" && <BancoTalentosTab />}
               {tab === "FOLHA" && <FolhaPagamentoTab />}
               {tab === "BONIFICACAO" && <BonificacaoTab />}

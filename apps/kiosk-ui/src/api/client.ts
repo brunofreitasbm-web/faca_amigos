@@ -1,4 +1,5 @@
 import { quoteForSession, normalizeCpf, normalizePhoneE164 } from "@facaamigos/domain";
+import type { EmployeeSector, SessionReportAnswers } from "@facaamigos/domain";
 import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
@@ -177,6 +178,81 @@ export interface Employee {
   unitIds?: string[];
   /** Path no bucket `ponto-fotos` da última foto de cadastro do rosto — não confundir com o descriptor (ver `Api.myFaceDescriptor`). */
   face_enrolled_photo_path?: string | null;
+  /** Setor de atuação (Relatório de Sessão). Editável em Gerencial > Colaboradores. */
+  sector?: EmployeeSector | null;
+}
+
+export type SessionReportWhatsappStatus =
+  | "PENDING" | "SENT" | "SKIPPED_NO_CONSENT" | "SKIPPED_OPT_OUT" | "SKIPPED_NO_PHONE"
+  | "SKIPPED_NO_CHANNEL" | "SKIPPED_NO_TEMPLATE" | "FAILED";
+
+/** Sessão finalizada (plano >= 1h) ainda sem Relatório de Sessão. Sem telefone, de propósito. */
+export interface PendingSessionReport {
+  session_id: string;
+  child_id: string;
+  child_name: string | null;
+  guardian_name: string | null;
+  guardian_phone_present: boolean;
+  checkin_at_ms: number;
+  checkout_at_ms: number;
+  eligible_minutes: number;
+  plan_name: string | null;
+  deadline_ms: number;
+}
+
+export interface RecentSessionReport {
+  id: string;
+  session_id: string;
+  child_name_snapshot: string;
+  filled_at_ms: number;
+  late: boolean;
+  whatsapp_status: SessionReportWhatsappStatus;
+  whatsapp_error: string | null;
+  ai_message: string | null;
+  filled_by_name: string;
+}
+
+export interface SessionReportSubmitResult {
+  id: string;
+  late: boolean;
+  already_existed: boolean;
+  whatsapp_status: SessionReportWhatsappStatus;
+}
+
+export interface SessionReportDispatchResult {
+  ok: boolean;
+  status?: SessionReportWhatsappStatus;
+  alreadySent?: boolean;
+  aiMessage?: string | null;
+  sendMode?: "TEMPLATE" | "FREEFORM" | null;
+  error?: string | null;
+}
+
+/** Linha completa do histórico (Gerencial). */
+export interface SessionReportRow {
+  id: string;
+  session_id: string;
+  unit_id: string;
+  child_id: string;
+  child_name_snapshot: string;
+  filled_by_employee_id: string;
+  filled_by_sector_snapshot: EmployeeSector | null;
+  device_id: string | null;
+  catalog_version: number;
+  answers: SessionReportAnswers;
+  observacao: string | null;
+  session_checkout_at_ms: number;
+  eligible_minutes: number;
+  filled_at_ms: number;
+  late: boolean;
+  whatsapp_status: SessionReportWhatsappStatus;
+  whatsapp_error: string | null;
+  send_mode: "TEMPLATE" | "FREEFORM" | null;
+  ai_message: string | null;
+  ai_fallback: boolean;
+  sent_at_ms: number | null;
+  dispatch_attempts: number;
+  employee?: { full_name: string } | null;
 }
 
 export interface FolhaPagamentoEmployee {
@@ -827,6 +903,8 @@ export interface ActiveSessionEntry {
     sensory_tags?: string[];
     paused_at_ms: number | null;
     paused_ms_total: number;
+    /** Cortesia de fidelidade (10ª visita): minutos que o relógio da sessão "anda a menos". */
+    loyalty_courtesy_minutes?: number;
     /** Minutos de pacote pré-pago ainda válidos do responsável, se houver. */
     package_balance_minutes?: number;
     /** Entrada feita pelo banco de horas da criança (sem plano vendido). */
@@ -1417,6 +1495,8 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         freeFromLoyalty: Boolean(row.free_from_loyalty),
         pausedAtMs: (row.paused_at_ms as number | null) ?? null,
         pausedMsTotal: (row.paused_ms_total as number) ?? 0,
+        loyaltyCourtesyMinutes: (row.loyalty_courtesy_minutes as number | null) ?? 0,
+        courtesyZeroesPlan: !usesHourBank && !usesPackage && !usesChildCredit && !row.rental_kind,
       },
       effectiveNowMs,
     );
@@ -1445,6 +1525,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         sensory_tags: (row.sensory_tags as string[] | null) ?? undefined,
         paused_at_ms: (row.paused_at_ms as number | null) ?? null,
         paused_ms_total: (row.paused_ms_total as number) ?? 0,
+        loyalty_courtesy_minutes: (row.loyalty_courtesy_minutes as number | null) ?? 0,
         package_balance_minutes: raw.packageBalanceByGuardian.get(row.guardian_id as string),
         uses_hour_bank: usesHourBank,
         hour_bank_allocated_minutes: (row.hour_bank_allocated_minutes as number | null) ?? undefined,
@@ -1794,7 +1875,7 @@ export const Api = {
       supabase()
         .from("fa_kiosk_employees")
         .select(
-          "id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active, face_enrolled_photo_path",
+          "id, full_name, role, cpf, email, phone, birth_date, admission_date, position, contract_type, weekly_hours_contracted, active, face_enrolled_photo_path, sector",
         )
         .eq("active", true)
         .order("full_name"),
@@ -3615,6 +3696,42 @@ export const Api = {
     unwrap(supabase().rpc("fa_config_set_employee_active", { p_employee_id: id, p_active: active })),
   setEmployeeRole: (id: string, role: Employee["role"]) =>
     unwrap(supabase().rpc("fa_config_set_employee_role", { p_employee_id: id, p_role: role })),
+  setEmployeeSector: (id: string, sector: EmployeeSector | null) =>
+    unwrap(supabase().rpc("fa_config_set_employee_sector", { p_employee_id: id, p_sector: sector })),
+
+  // ── Relatório de Sessão (planos >= 1h) ──
+  sessionReportsPending: (unitId: string) =>
+    unwrap<PendingSessionReport[]>(supabase().rpc("fa_session_reports_pending", { p_unit_id: unitId })),
+  sessionReportsRecent: (unitId: string, sinceMs: number) =>
+    unwrap<RecentSessionReport[]>(supabase().rpc("fa_session_reports_recent", { p_unit_id: unitId, p_since_ms: sinceMs })),
+  /**
+   * Grava o relatório (idempotente por sessão). Sem rede lança OfflineQueuedError:
+   * o formulário fica salvo na fila local e o envio ao responsável é reenviado pelo botão "Reenviar".
+   */
+  sessionReportSubmit: (body: { sessionId: string; catalogVersion: number; answers: SessionReportAnswers; observacao: string | null }) =>
+    localDeviceId().then((deviceId) =>
+      callResilient<SessionReportSubmitResult>("fa_session_report_submit", {
+        p_session_id: body.sessionId,
+        p_catalog_version: body.catalogVersion,
+        p_answers: body.answers,
+        p_observacao: body.observacao,
+        p_device_id: deviceId,
+      }),
+    ),
+  sessionReportDispatch: (reportId: string) =>
+    unwrap<SessionReportDispatchResult>(supabase().functions.invoke("session-report-dispatch", { body: { reportId } })),
+  /** Histórico do Gerencial. A RLS já limita a quem tem 'relatorio_sessao.read'. */
+  sessionReportsList: (filters: { unitId?: string | null; sinceMs: number; untilMs: number }) => {
+    let q = supabase()
+      .from("fa_kiosk_session_reports")
+      .select("*, employee:fa_kiosk_employees!filled_by_employee_id(full_name)")
+      .gte("filled_at_ms", filters.sinceMs)
+      .lt("filled_at_ms", filters.untilMs)
+      .order("filled_at_ms", { ascending: false })
+      .limit(500);
+    if (filters.unitId) q = q.eq("unit_id", filters.unitId);
+    return unwrap<SessionReportRow[]>(q);
+  },
   // Redefinição de PIN (ex.: colaborador esqueceu) — mesma exigência de
   // chamador ADMIN autenticado, resolvida do lado do servidor.
   setEmployeePin: (employeeId: string, pin: string) =>
@@ -3669,14 +3786,14 @@ export const Api = {
    * que o app descobre "quem está operando" ao restaurar uma sessão salva —
    * nunca do que o cliente afirma ser.
    */
-  currentEmployee: async (): Promise<{ id: string; full_name: string; role: Employee["role"] }> => {
+  currentEmployee: async (): Promise<{ id: string; full_name: string; role: Employee["role"]; sector: EmployeeSector | null }> => {
     const { data: userData } = await supabase().auth.getUser();
     const authUserId = userData.user?.id;
     if (!authUserId) throw new Error("sem sessão");
-    return unwrap<{ id: string; full_name: string; role: Employee["role"] }>(
+    return unwrap<{ id: string; full_name: string; role: Employee["role"]; sector: EmployeeSector | null }>(
       supabase()
         .from("fa_kiosk_employees")
-        .select("id, full_name, role")
+        .select("id, full_name, role, sector")
         .eq("auth_user_id", authUserId)
         .eq("active", true)
         .single(),

@@ -77,3 +77,23 @@ describe("quoteForSession", () => {
     expect(q.lines).toHaveLength(2);
   });
 });
+
+describe("cortesia de fidelidade (10ª visita)", () => {
+  const cortesia = { loyaltyCourtesyMinutes: 30, courtesyZeroesPlan: true };
+
+  it("permanência dentro da cortesia: plano avulso sai de graça", () => {
+    const q = quoteForSession(plan, session(cortesia), 20 * 60_000);
+    expect(q.totalCents).toBe(0);
+  });
+
+  it("passou da cortesia: paga o plano, e o excedente só conta 30 min depois do teto", () => {
+    expect(quoteForSession(plan, session(cortesia), 40 * 60_000).totalCents).toBe(3000);
+    // teto 15 min + 30 de cortesia = 45; 49 min - 1 de tolerância = 3 min cobrados
+    expect(quoteForSession(plan, session(cortesia), 49 * 60_000).totalCents).toBe(3000 + 300);
+  });
+
+  it("sem courtesyZeroesPlan (pacote/saldo/banco) só encurta o tempo, não zera a linha", () => {
+    const q = quoteForSession(plan, session({ loyaltyCourtesyMinutes: 30 }), 20 * 60_000);
+    expect(q.totalCents).toBe(3000);
+  });
+});

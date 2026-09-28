@@ -9,7 +9,7 @@ import { ROLE_LABEL, ROLE_DESCRIPTION, ROLE_OPTIONS, type Role } from "../../../
 import { EspelhoPontoModal } from "../../../components/EspelhoPontoModal.js";
 import { FaceEnrollmentModal } from "../../../components/FaceEnrollmentModal.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
-import { dateBrFromIso } from "@facaamigos/domain";
+import { dateBrFromIso, EMPLOYEE_SECTORS, EMPLOYEE_SECTOR_LABEL, type EmployeeSector } from "@facaamigos/domain";
 import { getPublicAppUrl } from "../../../lib/appUrl.js";
 
 export function ColaboradoresTab() {
@@ -253,6 +253,18 @@ export function ColaboradoresTab() {
       load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível alterar o nível de acesso");
+      load();
+    }
+  }
+
+  async function changeSector(emp: Employee, next: EmployeeSector | null) {
+    if (next === (emp.sector ?? null)) return;
+    try {
+      await Api.setEmployeeSector(emp.id, next);
+      toast.success(next ? `${emp.full_name} agora atua em ${EMPLOYEE_SECTOR_LABEL[next]}.` : `${emp.full_name} ficou sem setor.`);
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível alterar o setor");
       load();
     }
   }
@@ -698,6 +710,7 @@ export function ColaboradoresTab() {
                     </div>
                     <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>
                       Permissão: {ROLE_LABEL[e.role]}
+                      {e.sector ? ` · Setor: ${EMPLOYEE_SECTOR_LABEL[e.sector]}` : ""}
                       {e.cpf ? ` · CPF: ${e.cpf}` : ""}
                       {e.phone ? ` · Tel: ${e.phone}` : ""}
                       {e.admission_date ? ` · Admitido: ${dateBrFromIso(e.admission_date)}` : ""}
@@ -719,6 +732,21 @@ export function ColaboradoresTab() {
                     {ROLE_OPTIONS.map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABEL[r]}
+                      </option>
+                    ))}
+                  </Select>
+
+                  <Select
+                    aria-label={`Setor de ${e.full_name}`}
+                    title="Setor de atuação: define qual bloco do Relatório de Sessão abre primeiro para este colaborador"
+                    value={e.sector ?? ""}
+                    onChange={(ev) => void changeSector(e, (ev.target.value || null) as EmployeeSector | null)}
+                    style={{ minWidth: "120px", fontSize: "13px" }}
+                  >
+                    <option value="">Sem setor</option>
+                    {EMPLOYEE_SECTORS.map((s) => (
+                      <option key={s} value={s}>
+                        {EMPLOYEE_SECTOR_LABEL[s]}
                       </option>
                     ))}
                   </Select>

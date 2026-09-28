@@ -19,3 +19,4 @@ export * from "./utils/accessCode.js";
 
 
 
+export * from "./session-report/catalog.js";

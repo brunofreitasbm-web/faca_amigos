@@ -84,7 +84,7 @@ export function CheckoutModal({
   // novo, o congelamento acima já carrega essa informação embutida.
   const [closedAtMs] = useState(() => {
     const first = entries[0];
-    return first ? first.session.checkin_at_ms + first.session.paused_ms_total + first.quote.timing.elapsedMs : Date.now();
+    return first ? first.session.checkin_at_ms + first.session.paused_ms_total + (first.session.loyalty_courtesy_minutes ?? 0) * 60_000 + first.quote.timing.elapsedMs : Date.now();
   });
 
   // "Iniciar se ainda não estiver gravando esta mesma conversa" — cobre o

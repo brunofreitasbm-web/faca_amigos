@@ -32,6 +32,14 @@ export interface SessionForQuote {
   pausedAtMs: number | null;
   /** Soma de todos os períodos pausados já encerrados (não inclui a pausa em curso). */
   pausedMsTotal: number;
+  /** Minutos de cortesia de fidelidade (10ª visita): o relógio da sessão começa esse tanto depois. */
+  loyaltyCourtesyMinutes?: number;
+  /**
+   * A cortesia zera a linha inteira quando a permanência cabe nela. Só vale
+   * para plano avulso: pacote (compra no ato), saldo pré-pago e banco de
+   * horas não têm "preço do plano" a zerar — nesses, a cortesia só encurta o tempo.
+   */
+  courtesyZeroesPlan?: boolean;
 }
 
 export type SessionPhase = "VERDE" | "AMARELO" | "VERMELHO" | "EXCEDENTE";

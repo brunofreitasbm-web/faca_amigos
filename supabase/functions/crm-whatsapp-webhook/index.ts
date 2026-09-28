@@ -18,6 +18,9 @@ const DEFAULT_PUBLIC_URL = "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v
 // (exigência de boa prática do WhatsApp e LGPD art. 18, IX).
 const OPT_OUT_WORDS = new Set(["parar", "pare", "sair", "stop", "cancelar", "descadastrar"]);
 const OPT_IN_WORDS = new Set(["voltar", "start", "iniciar"]);
+// Aceite do pedido de autorização (campanha de opt-in). "quero" vale mesmo sem
+// pedido pendente (QR code do balcão); "sim" só responde a um pedido nosso.
+const ACCEPT_WORDS = new Set(["sim", "quero", "aceito", "aceitar"]);
 
 const twiml = (body = "") =>
   new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`, {
@@ -126,7 +129,7 @@ Deno.serve(async (req) => {
 
   let { data: contact } = await admin
     .from("fa_crm_contacts")
-    .select("id, unread_count, stage, opt_in")
+    .select("id, unread_count, stage, opt_in, guardian_id")
     .eq("channel_id", channel.id)
     .eq("phone_e164", from)
     .maybeSingle();
@@ -135,7 +138,7 @@ Deno.serve(async (req) => {
     const { data: created, error } = await admin
       .from("fa_crm_contacts")
       .insert({ channel_id: channel.id, phone_e164: from, name: params.ProfileName || null })
-      .select("id, unread_count, stage, opt_in")
+      .select("id, unread_count, stage, opt_in, guardian_id")
       .single();
     if (error) {
       console.error("erro ao criar contato:", error);
@@ -147,6 +150,22 @@ Deno.serve(async (req) => {
   const word = body.toLowerCase().replace(/[^a-zà-ú]/g, "");
   const optOut = OPT_OUT_WORDS.has(word);
   const optIn = OPT_IN_WORDS.has(word);
+
+  if (optOut) {
+    // PARAR encerra pedido de autorização pendente e revoga o aceite do responsável.
+    await admin
+      .from("fa_crm_optin_requests")
+      .update({ status: "DECLINED", answered_at_ms: now })
+      .eq("contact_id", contact!.id)
+      .eq("status", "SENT");
+    const guardianId = contact!.guardian_id ?? (await guardianByPhone(admin, from));
+    if (guardianId) {
+      await admin
+        .from("fa_kiosk_guardians")
+        .update({ whatsapp_consent_at_ms: null, whatsapp_consent_by_employee_id: null })
+        .eq("id", guardianId);
+    }
+  }
 
   const { error: msgError } = await admin.from("fa_crm_messages").insert({
     contact_id: contact!.id,
@@ -178,7 +197,13 @@ Deno.serve(async (req) => {
   let reply: string | null = null;
   if (optOut) reply = "Tudo certo, você não receberá mais mensagens nossas. Para voltar, responda VOLTAR.";
   else if (optIn) reply = "Que bom ter você de volta! 💛";
-  else reply = await handleNps(admin, contact!.id, body, now);
+  else if (ACCEPT_WORDS.has(word) && (await handleOptinAccept(admin, contact!, from, word, now))) {
+    reply = "Combinado! 💛 Vamos te avisar por aqui sobre suas visitas e, às vezes, pedir sua opinião. Para parar, é só responder PARAR.";
+  } else {
+    const choice = renewalChoice(params.ButtonPayload, body);
+    reply = choice ? await handleRenewal(admin, contact!.id, choice, now) : null;
+    reply ??= await handleNps(admin, contact!.id, body, now);
+  }
 
   if (!reply) return twiml();
 
@@ -197,7 +222,49 @@ Deno.serve(async (req) => {
   return twiml(`<Message>${reply.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</Message>`);
 });
 
-const NPS_REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // nota: até 7 dias após o envio
+/**
+ * Opção escolhida (1-3) na oferta de renovação: botão de resposta rápida do
+ * template (payload RENOVAR_1..3) ou o cliente digitando só "1", "2" ou "3".
+ * Digitar só vale se houver aviso em aberto — handleRenewal devolve null e a
+ * mensagem segue como conversa/NPS quando não houver.
+ */
+function renewalChoice(buttonPayload: string | undefined, body: string): number | null {
+  const fromButton = buttonPayload?.match(/^RENOVAR_([1-3])$/);
+  if (fromButton) return Number(fromButton[1]);
+  const typed = body.match(/^\s*([1-3])\s*[).]?\s*$/);
+  return typed ? Number(typed[1]) : null;
+}
+
+type RenewalResult =
+  | { status: "OK"; minutes: number; cents: number }
+  | { status: "ALREADY" | "EXPIRED" | "NONE" };
+
+/** Pedido gravado como RENOVACAO_SOLICITADA (o balcão já consome); devolve a resposta automática ou null. */
+async function handleRenewal(admin: ReturnType<typeof createClient>, contactId: string, choice: number, now: number): Promise<string | null> {
+  const { data, error } = await admin.rpc("fa_crm_renewal_choose", { p_contact_id: contactId, p_choice: choice, p_now_ms: now });
+  if (error) {
+    console.error("renovação:", error);
+    return null;
+  }
+  const result = data as RenewalResult;
+  return result.status === "NONE" ? null : renewalReplyText(result);
+}
+
+const brl = (cents: number) => `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
+
+function renewalReplyText(result: RenewalResult): string {
+  // TODO(human): tom de voz de cada desfecho do pedido de renovação.
+  switch (result.status) {
+    case "OK":
+      return `Combinado! Avisamos a recepção: +${result.minutes} min por ${brl(result.cents)}. O valor é acertado no balcão. 💛`;
+    case "ALREADY":
+      return "Já avisamos a recepção sobre o seu pedido. 💛";
+    default:
+      return "Essa visita já foi encerrada. Até a próxima! 💛";
+  }
+}
+
+const NPS_REPLY_WINDOW_MS =7 * 24 * 60 * 60 * 1000; // nota: até 7 dias após o envio
 const NPS_FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000; // comentário: até 24h após a nota
 
 /**
@@ -243,4 +310,41 @@ async function handleNps(admin: ReturnType<typeof createClient>, contactId: stri
   if (!body) return null; // só mídia: espera o texto
   await admin.from("fa_crm_nps_surveys").update({ status: "DONE", feedback: body.slice(0, 1000), done_at_ms: now }).eq("id", survey.id);
   return "Muito obrigado pelo seu retorno! Ele ajuda a melhorar cada visita. 💛";
+}
+
+async function guardianByPhone(admin: ReturnType<typeof createClient>, phone: string): Promise<string | null> {
+  const { data } = await admin.from("fa_kiosk_guardians").select("id").eq("phone_e164", phone).limit(1).maybeSingle();
+  return (data?.id as string | undefined) ?? null;
+}
+
+/**
+ * Registra o aceite de contato quando o cliente responde SIM/QUERO. Devolve
+ * true se gravou (aí a resposta automática confirma); false se "sim" não
+ * respondia a nenhum pedido nosso — segue como conversa normal.
+ */
+async function handleOptinAccept(
+  admin: ReturnType<typeof createClient>,
+  contact: { id: string; guardian_id: string | null },
+  phone: string,
+  word: string,
+  now: number,
+): Promise<boolean> {
+  const { data: pending } = await admin
+    .from("fa_crm_optin_requests")
+    .select("id")
+    .eq("contact_id", contact.id)
+    .eq("status", "SENT")
+    .limit(1)
+    .maybeSingle();
+  if (!pending && word !== "quero") return false;
+
+  const guardianId = contact.guardian_id ?? (await guardianByPhone(admin, phone));
+  if (!guardianId) return false; // sem cadastro no kiosk não há onde gravar o aceite
+
+  await admin.from("fa_kiosk_guardians").update({ whatsapp_consent_at_ms: now }).eq("id", guardianId);
+  if (pending) {
+    await admin.from("fa_crm_optin_requests").update({ status: "ACCEPTED", answered_at_ms: now }).eq("id", pending.id);
+  }
+  if (!contact.guardian_id) await admin.from("fa_crm_contacts").update({ guardian_id: guardianId }).eq("id", contact.id);
+  return true;
 }

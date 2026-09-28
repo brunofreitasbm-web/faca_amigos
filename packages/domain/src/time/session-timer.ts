@@ -20,7 +20,7 @@ export const VERMELHO_WINDOW_MS = 5 * 60_000;
  */
 export function computeSessionTiming(
   plan: Plan,
-  session: Pick<SessionForQuote, "checkinAtMs" | "pausedAtMs" | "pausedMsTotal">,
+  session: Pick<SessionForQuote, "checkinAtMs" | "pausedAtMs" | "pausedMsTotal"> & { loyaltyCourtesyMinutes?: number },
   nowMs: number,
 ): SessionTiming {
   const isPaused = session.pausedAtMs != null;
@@ -28,7 +28,8 @@ export function computeSessionTiming(
   // pausedAtMs no lugar de nowMs faz o elapsed parar de crescer sem
   // precisar de um branch separado depois.
   const clockMs = session.pausedAtMs ?? nowMs;
-  const elapsedMs = Math.max(0, clockMs - session.checkinAtMs - session.pausedMsTotal);
+  const courtesyMs = (session.loyaltyCourtesyMinutes ?? 0) * 60_000;
+  const elapsedMs = Math.max(0, clockMs - session.checkinAtMs - session.pausedMsTotal - courtesyMs);
   const pausedForMs = isPaused ? Math.max(0, nowMs - session.pausedAtMs!) : 0;
   const durationMs = planDurationMinutes(plan) * 60_000;
   const overMs = Math.max(0, elapsedMs - durationMs - OVERAGE_GRACE_PERIOD_MS);

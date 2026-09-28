@@ -48,6 +48,8 @@ export const CAPABILITIES = [
   "crm.read",
   "crm.write",
   "crm.admin",
+  "relatorio_sessao.write",
+  "relatorio_sessao.read",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -94,6 +96,8 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "crm.read": "Ver o CRM de WhatsApp (conversas e contatos do Playground e do Circuito)",
   "crm.write": "Responder clientes e editar a ficha no CRM de WhatsApp",
   "crm.admin": "Gerenciar números (canais) e templates do CRM de WhatsApp",
+  "relatorio_sessao.write": "Preencher o Relatório de Sessão (crianças com plano de 1h ou mais)",
+  "relatorio_sessao.read": "Ver o histórico de Relatórios de Sessão no Gerencial",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
@@ -178,15 +182,16 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
       "clientes.write",
       "nfse.emit",
       "nfce.retry",
+      "relatorio_sessao.write",
     ]);
   }
 
   if (role === "ESTAGIARIO") {
-    return new Set(["ponto.self", "bonificacao.self"]);
+    return new Set(["ponto.self", "bonificacao.self", "relatorio_sessao.write"]);
   }
 
   if (role === "PRESTADOR_PJ") {
-    return new Set(["ponto.self", "sessao.checkin", "sessao.checkout"]);
+    return new Set(["ponto.self", "sessao.checkin", "sessao.checkout", "relatorio_sessao.write"]);
   }
 
   return new Set(CAPABILITIES);

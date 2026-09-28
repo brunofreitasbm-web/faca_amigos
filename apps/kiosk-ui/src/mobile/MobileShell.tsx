@@ -14,7 +14,7 @@ import { MobilePainel } from "./MobilePainel.js";
 import { MobilePedidosTempo } from "./MobilePedidosTempo.js";
 import "./mobile.css";
 
-export type EscapeScreen = "ENTRADA" | "SAIDA" | "PAINEL" | "CAIXA" | "PONTO" | "PDV" | "MINHA_BONIFICACAO" | "RELATORIO" | "CONFIGURACOES";
+export type EscapeScreen = "ENTRADA" | "SAIDA" | "PAINEL" | "RELATORIO_SESSAO" | "CAIXA" | "PONTO" | "PDV" | "MINHA_BONIFICACAO" | "RELATORIO" | "CONFIGURACOES";
 
 type Tab = "TURNO" | "PAINEL" | "MAIS";
 type View = Tab | "CHECKIN" | "PEDIDOS";
@@ -190,6 +190,7 @@ function MobileMais({
   const telas: Array<{ screen: EscapeScreen; titulo: string; ajuda: string; show: boolean }> = [
     { screen: "ENTRADA", titulo: "Entrada completa", ajuda: "criança nova, cupom, pacote, carrinho, contrato", show: can("sessao.checkin") },
     { screen: "SAIDA", titulo: "Saída", ajuda: "cobrar o excedente, emitir nota e liberar", show: can("sessao.checkout") },
+    { screen: "RELATORIO_SESSAO", titulo: "Relatórios de Sessão", ajuda: "mapa de observação e resumo pro responsável", show: can("relatorio_sessao.write") },
     { screen: "PDV", titulo: "PDV", ajuda: "vender produto avulso", show: can("pdv.sell") },
     { screen: "CAIXA", titulo: "Caixa", ajuda: "abrir turno, sangria, fechar", show: can("caixa.open_close") },
     { screen: "MINHA_BONIFICACAO", titulo: "Minha Bonificação", ajuda: "seu ticket médio e o acumulado do mês, só seu", show: can("bonificacao.self") },

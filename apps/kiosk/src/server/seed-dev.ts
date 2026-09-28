@@ -70,6 +70,6 @@ export function seedDevData(db: Db, nowMs: number): void {
   insertCoupon(db, { id: uuidv7(nowMs), unit_id: playgroundId, code: "AMIGO10", kind: "MINUTOS_EXTRA", value: 10, max_uses: 0, description: "10 minutos extras — avaliação no Google" }, nowMs);
   insertCoupon(db, { id: uuidv7(nowMs), unit_id: graoParaId, code: "GRAOPARA10", kind: "MINUTOS_EXTRA", value: 10, max_uses: 0, description: "10 minutos extras — inauguração Grão-Pará" }, nowMs);
   
-  insertLoyaltyRule(db, { id: uuidv7(nowMs), unit_id: playgroundId, activity: "PLAYGROUND", trigger_visits: 10, reward_kind: "ENTRADA_GRATIS", reward_value: 1 }, nowMs);
-  insertLoyaltyRule(db, { id: uuidv7(nowMs), unit_id: graoParaId, activity: "PLAYGROUND", trigger_visits: 10, reward_kind: "ENTRADA_GRATIS", reward_value: 1 }, nowMs);
+  insertLoyaltyRule(db, { id: uuidv7(nowMs), unit_id: playgroundId, activity: "PLAYGROUND", trigger_visits: 10, reward_kind: "MINUTOS_EXTRA", reward_value: 30 }, nowMs);
+  insertLoyaltyRule(db, { id: uuidv7(nowMs), unit_id: graoParaId, activity: "PLAYGROUND", trigger_visits: 10, reward_kind: "MINUTOS_EXTRA", reward_value: 30 }, nowMs);
 }

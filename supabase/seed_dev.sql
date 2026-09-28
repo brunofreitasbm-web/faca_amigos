@@ -126,9 +126,9 @@ with
   ),
   loyalty_seed as (
     insert into fa_kiosk_loyalty_rules (unit_id, activity, trigger_visits, reward_kind, reward_value)
-    select id, 'PLAYGROUND', 10, 'ENTRADA_GRATIS', 1 from playground
+    select id, 'PLAYGROUND', 10, 'MINUTOS_EXTRA', 30 from playground
     union all
-    select id, 'PLAYGROUND', 10, 'ENTRADA_GRATIS', 1 from grao_para
+    select id, 'PLAYGROUND', 10, 'MINUTOS_EXTRA', 30 from grao_para
     returning 1
   ),
   -- Pacotes de upgrade (motor de cross-selling). Os valores foram

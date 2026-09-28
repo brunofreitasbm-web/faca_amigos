@@ -229,7 +229,15 @@ async function callGemini(prompt: string, systemInstruction?: string): Promise<s
 /**
  * Gera ofertas de Check-in (Up-sell / Cross-sell)
  */
+/**
+ * Interruptor das sugestões de venda da ZoeIA na tela do operador
+ * (Entrada e Saída). Desligado: nenhuma chamada ao Gemini e nenhum card.
+ * Não afeta o copiloto gerencial nem as sugestões do app mobile.
+ */
+export const OPERATOR_SALES_SUGGESTIONS_ENABLED = false;
+
 export async function generateCheckinSuggestions(ctx: CheckinContext): Promise<CheckinOffer[]> {
+  if (!OPERATOR_SALES_SUGGESTIONS_ENABLED) return [];
   const systemInstruction = `Você é a ZoeIA, a especialista humana de acolhimento e vendas do FaçaAmigos.
 REGRA ABSOLUTA E INEGOCIÁVEL:
 1. NUNCA invente planos de tempo, preços fictícios, cupons inexistentes ou valores que não estejam cadastrados no sistema.
@@ -368,6 +376,7 @@ function getLocalCheckinFallback(ctx: CheckinContext): CheckinOffer[] {
  * Gera ofertas de Check-out (Retenção / Conversão)
  */
 export async function generateCheckoutSuggestions(ctx: CheckoutContext): Promise<CheckoutOffer[]> {
+  if (!OPERATOR_SALES_SUGGESTIONS_ENABLED) return [];
   const systemInstruction = `Você é a ZoeIA, a especialista em fidelização e retenção do FaçaAmigos.
 REGRA ABSOLUTA E INEGOCIÁVEL:
 1. NUNCA invente pacotes, cupons ou promoções que não estejam cadastrados no sistema.

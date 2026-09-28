@@ -1,0 +1,270 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Badge, Button, Card, HelpText, Modal, Select } from "@facaamigos/ui";
+import {
+  EMPLOYEE_SECTORS,
+  EMPLOYEE_SECTOR_LABEL,
+  SESSION_REPORT_CATALOG,
+  sessionReportProgress,
+  type EmployeeSector,
+} from "@facaamigos/domain";
+import { Api, type SessionReportRow, type SessionReportWhatsappStatus } from "../../../api/client.js";
+import { useAppState } from "../../../state/AppState.js";
+import { useToast } from "../../../state/ToastContext.js";
+import { RequireCapability } from "../../../auth/RequireCapability.js";
+import { LevelSegmented } from "../../../components/session-report/LevelSegmented.js";
+
+const STATUS_LABEL: Record<SessionReportWhatsappStatus, string> = {
+  PENDING: "Aguardando envio",
+  SENT: "Enviado",
+  SKIPPED_NO_CONSENT: "Sem autorização de WhatsApp",
+  SKIPPED_OPT_OUT: "Pediu para não receber",
+  SKIPPED_NO_PHONE: "Sem telefone",
+  SKIPPED_NO_CHANNEL: "Sem número da unidade",
+  SKIPPED_NO_TEMPLATE: "Sem modelo aprovado",
+  FAILED: "Falha no envio",
+};
+
+const RETRYABLE: ReadonlySet<SessionReportWhatsappStatus> = new Set([
+  "PENDING", "FAILED", "SKIPPED_NO_TEMPLATE", "SKIPPED_NO_CHANNEL", "SKIPPED_NO_CONSENT",
+]);
+
+const DAY_MS = 86_400_000;
+const PERIODS = [
+  { value: "7", label: "Últimos 7 dias" },
+  { value: "30", label: "Últimos 30 dias" },
+  { value: "90", label: "Últimos 90 dias" },
+];
+
+const dt = (ms: number) =>
+  new Date(ms).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+export function RelatoriosSessaoTab() {
+  return (
+    <RequireCapability capability="relatorio_sessao.read">
+      <Content />
+    </RequireCapability>
+  );
+}
+
+function Content() {
+  const { units } = useAppState();
+  const toast = useToast();
+  const [unitId, setUnitId] = useState("");
+  const [days, setDays] = useState("30");
+  const [sector, setSector] = useState<"" | EmployeeSector>("");
+  const [status, setStatus] = useState<"" | SessionReportWhatsappStatus>("");
+  const [rows, setRows] = useState<SessionReportRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<SessionReportRow | null>(null);
+  const [resending, setResending] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const until = Date.now() + 60_000;
+      setRows(await Api.sessionReportsList({ unitId: unitId || null, sinceMs: until - Number(days) * DAY_MS, untilMs: until }));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao carregar os relatórios");
+    } finally {
+      setLoading(false);
+    }
+  }, [unitId, days]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filtered = useMemo(
+    () =>
+      rows.filter(
+        (r) => (!sector || r.filled_by_sector_snapshot === sector) && (!status || r.whatsapp_status === status),
+      ),
+    [rows, sector, status],
+  );
+
+  const kpi = useMemo(() => {
+    const total = filtered.length;
+    const onTime = filtered.filter((r) => !r.late).length;
+    const sent = filtered.filter((r) => r.whatsapp_status === "SENT").length;
+    const pct = (n: number) => (total ? `${Math.round((n / total) * 100)}%` : "—");
+    return { total, onTime: pct(onTime), sent: pct(sent) };
+  }, [filtered]);
+
+  const resend = async (r: SessionReportRow) => {
+    setResending(true);
+    try {
+      const res = await Api.sessionReportDispatch(r.id);
+      if (res.status === "SENT" || res.alreadySent) toast.success("Mensagem enviada ao responsável.");
+      else toast.error(res.error ?? "Não foi possível enviar.");
+      await load();
+      setDetail(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível enviar.");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const unitName = (id: string) => units.find((u) => u.id === id)?.name ?? "—";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Relatórios de Sessão</h2>
+        <HelpText>
+          Mapa de observação de cada sessão de 1h ou mais: quem preencheu, em qual setor, se foi no prazo de 40 minutos e a mensagem enviada ao responsável.
+        </HelpText>
+      </div>
+
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <Select aria-label="Unidade" value={unitId} onChange={(e) => setUnitId(e.target.value)}>
+          <option value="">Todas as unidades</option>
+          {units.map((u) => (
+            <option key={u.id} value={u.id}>{u.name}</option>
+          ))}
+        </Select>
+        <Select aria-label="Período" value={days} onChange={(e) => setDays(e.target.value)}>
+          {PERIODS.map((p) => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </Select>
+        <Select aria-label="Setor de quem preencheu" value={sector} onChange={(e) => setSector(e.target.value as "" | EmployeeSector)}>
+          <option value="">Todos os setores</option>
+          {EMPLOYEE_SECTORS.map((s) => (
+            <option key={s} value={s}>{EMPLOYEE_SECTOR_LABEL[s]}</option>
+          ))}
+        </Select>
+        <Select aria-label="Situação do envio" value={status} onChange={(e) => setStatus(e.target.value as "" | SessionReportWhatsappStatus)}>
+          <option value="">Todos os envios</option>
+          {(Object.keys(STATUS_LABEL) as SessionReportWhatsappStatus[]).map((s) => (
+            <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+          ))}
+        </Select>
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        {[
+          { label: "Relatórios", value: String(kpi.total) },
+          { label: "Dentro do prazo (40 min)", value: kpi.onTime },
+          { label: "Enviados ao responsável", value: kpi.sent },
+        ].map((k) => (
+          <Card key={k.label} style={{ flex: "1 1 160px" }}>
+            <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{k.label}</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: "26px" }}>{k.value}</div>
+          </Card>
+        ))}
+      </div>
+
+      {error && (
+        <div role="alert" style={{ color: "var(--color-error-text)", fontSize: "14px" }}>{error}</div>
+      )}
+
+      <div style={{ overflowX: "auto" }}>
+        <table className="report-table" style={{ width: "100%" }}>
+          <thead>
+            <tr>
+              <th>Criança</th>
+              <th>Unidade</th>
+              <th>Saída</th>
+              <th>Preenchido por</th>
+              <th>Prazo</th>
+              <th>Itens</th>
+              <th>WhatsApp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ color: "var(--text-muted)" }}>Nenhum relatório neste filtro.</td>
+              </tr>
+            )}
+            {filtered.map((r) => (
+              <tr key={r.id} onClick={() => setDetail(r)} style={{ cursor: "pointer" }}>
+                <td>{r.child_name_snapshot}</td>
+                <td>{unitName(r.unit_id)}</td>
+                <td>{dt(r.session_checkout_at_ms)}</td>
+                <td>
+                  {r.employee?.full_name ?? "—"}
+                  {r.filled_by_sector_snapshot ? ` · ${EMPLOYEE_SECTOR_LABEL[r.filled_by_sector_snapshot]}` : ""}
+                </td>
+                <td>{r.late ? <Badge variant="amber">Atrasado</Badge> : <Badge variant="teal">No prazo</Badge>}</td>
+                <td>{sessionReportProgress(r.answers).answered}/{sessionReportProgress(r.answers).total}</td>
+                <td>{STATUS_LABEL[r.whatsapp_status]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {detail && (
+        <Modal title={`📝 ${detail.child_name_snapshot}`} onClose={() => setDetail(null)} maxWidth="720px">
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.6 }}>
+              Sessão de {detail.eligible_minutes} min · saída {dt(detail.session_checkout_at_ms)} · preenchido {dt(detail.filled_at_ms)}
+              {detail.late ? " (fora do prazo)" : ""}
+              <br />
+              Por {detail.employee?.full_name ?? "—"}
+              {detail.filled_by_sector_snapshot ? ` (${EMPLOYEE_SECTOR_LABEL[detail.filled_by_sector_snapshot]})` : ""}
+              {detail.device_id ? ` · terminal ${detail.device_id.slice(0, 8)}` : ""} · catálogo v{detail.catalog_version}
+            </div>
+
+            {SESSION_REPORT_CATALOG.map((sec) => {
+              const answered = sec.items.filter((i) => detail.answers[i.key] != null);
+              if (answered.length === 0) return null;
+              return (
+                <div key={sec.sector} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: "15px" }}>{sec.emoji} {sec.label}</div>
+                  {answered.map((i) => (
+                    <div key={i.key} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: 600 }}>{i.label}</div>
+                      <LevelSegmented label={i.label} value={detail.answers[i.key]} readOnly />
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+
+            {detail.observacao && (
+              <div>
+                <div style={{ fontWeight: 600, fontSize: "14px" }}>Observação</div>
+                <div style={{ fontSize: "14px" }}>{detail.observacao}</div>
+              </div>
+            )}
+
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "14px" }}>
+                Mensagem ao responsável — {STATUS_LABEL[detail.whatsapp_status]}
+                {detail.send_mode ? ` (${detail.send_mode === "TEMPLATE" ? "modelo aprovado" : "texto livre"})` : ""}
+              </div>
+              {detail.ai_message ? (
+                <div style={{ fontSize: "14px", marginTop: "4px" }}>
+                  {detail.ai_message}
+                  {detail.ai_fallback && (
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
+                      Texto padrão do sistema (a IA não respondeu ou usou termo não permitido).
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Mensagem ainda não gerada.</div>
+              )}
+              {detail.whatsapp_error && (
+                <div style={{ fontSize: "13px", color: "var(--color-error-text)", marginTop: "4px" }}>{detail.whatsapp_error}</div>
+              )}
+            </div>
+
+            {RETRYABLE.has(detail.whatsapp_status) && (
+              <div>
+                <Button variant="secondary" loading={resending} onClick={() => void resend(detail)}>
+                  Reenviar ao responsável
+                </Button>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}

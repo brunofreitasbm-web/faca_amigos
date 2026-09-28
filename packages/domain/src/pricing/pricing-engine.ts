@@ -25,6 +25,20 @@ export function quoteForSession(plan: Plan, session: SessionForQuote, nowMs: num
 
   let totalCents = timing.liveTotalCents;
 
+  // Cortesia de fidelidade (10ª visita): o relógio já andou N min a menos
+  // (computeSessionTiming). Se a permanência inteira cabe na cortesia, o
+  // plano avulso sai de graça — espelha fa_checkout.
+  const courtesyMinutes = session.loyaltyCourtesyMinutes ?? 0;
+  if (courtesyMinutes > 0) {
+    lines.push({ label: `Cortesia de fidelidade — ${courtesyMinutes} min grátis`, cents: 0 });
+    const clockMs = session.pausedAtMs ?? nowMs;
+    const stayedMs = Math.max(0, clockMs - session.checkinAtMs - session.pausedMsTotal);
+    if (session.courtesyZeroesPlan && stayedMs <= courtesyMinutes * 60_000) {
+      lines.push({ label: `Plano coberto pela cortesia`, cents: -totalCents });
+      totalCents = 0;
+    }
+  }
+
   // Cupom percentual (o par 50% inclusivo / 40% padrão) recalcula sobre o
   // valor total ao vivo — que já inclui o excedente — em vez de reusar o
   // valor fixo travado no check-in, e só vale para Playground. Cupom de
@@ -34,7 +48,7 @@ export function quoteForSession(plan: Plan, session: SessionForQuote, nowMs: num
       ? Math.round((totalCents * session.couponPct) / 100)
       : session.couponDiscountCents;
 
-  if (discountCents > 0) {
+  if (discountCents > 0 && totalCents > 0) {
     const applied = Math.min(discountCents, totalCents);
     lines.push({ label: `Cupom ${session.couponCode ?? ""}`.trim(), cents: -applied });
     totalCents -= applied;

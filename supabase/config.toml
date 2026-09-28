@@ -77,3 +77,28 @@ verify_jwt = false
 # checkout fixa + cooldown de 30 dias por contato).
 [functions.crm-nps-auto-dispatch]
 verify_jwt = false
+
+# Campanha de opt-in da base atual (máx. 20/dia, nasce pausada, freio
+# automático): disparada só pelo pg_cron de hora em hora, nunca por navegador.
+[functions.crm-optin-dispatch]
+verify_jwt = false
+
+# Aviso de fim de plano + oferta de renovação por WhatsApp: só o pg_cron/pg_net
+# chama (a cada minuto). Desligada por padrão em cada unidade (app_settings
+# crm_renewal_alert) e idempotente (fa_crm_renewal_alerts.session_id unique).
+[functions.crm-renewal-alert-dispatch]
+verify_jwt = false
+
+# Avisos da visita por WhatsApp (boas-vindas, fim do plano, renovação aplicada,
+# fidelidade): só o pg_cron/pg_net chama (a cada minuto). Cada tipo desligado por
+# padrão em cada unidade (app_settings crm_notify_<tipo>) e idempotente
+# (fa_crm_visit_notifications unique por sessão+tipo+ref).
+[functions.crm-visit-notify-dispatch]
+verify_jwt = false
+
+# Convite ao Mapeamento Comportamental 1 semana após a visita (uma vez por
+# responsável): só o pg_cron/pg_net chama (de hora em hora). Desligada por
+# padrão em cada unidade (app_settings crm_mapeamento_followup) e idempotente
+# (fa_crm_mapeamento_invites.guardian_id unique, gravada antes do envio).
+[functions.crm-mapeamento-dispatch]
+verify_jwt = false

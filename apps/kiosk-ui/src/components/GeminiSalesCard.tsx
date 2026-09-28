@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Badge } from "@facaamigos/ui";
-import type { CheckinOffer, CheckoutOffer } from "../lib/geminiAgent.js";
+import { OPERATOR_SALES_SUGGESTIONS_ENABLED, type CheckinOffer, type CheckoutOffer } from "../lib/geminiAgent.js";
 import { money } from "../format.js";
 
 interface GeminiCheckinSalesCardProps {
@@ -25,7 +25,7 @@ export function GeminiSalesCard(props: GeminiSalesCardProps) {
   const { type, offers, loading, onDismiss } = props;
   const [dismissed, setDismissed] = useState(false);
 
-  if (dismissed || (!loading && offers.length === 0)) {
+  if (!OPERATOR_SALES_SUGGESTIONS_ENABLED || dismissed || (!loading && offers.length === 0)) {
     return null;
   }
 

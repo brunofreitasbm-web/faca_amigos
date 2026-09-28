@@ -3,6 +3,7 @@ import { Api } from "../api/client.js";
 import type { Unit } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { money } from "../format.js";
+import { usePendingSessionReports } from "../api/useSessionReports.js";
 
 function initials(name: string): string {
   return name
@@ -35,7 +36,7 @@ export function MobileHome({
   employeeName: string;
   activeCount: number | null;
   onNovaEntrada: () => void;
-  onAbrirTela: (screen: "SAIDA" | "CAIXA" | "PONTO") => void;
+  onAbrirTela: (screen: "SAIDA" | "CAIXA" | "PONTO" | "RELATORIO_SESSAO") => void;
   pendingRenewalsCount: number;
   onAbrirPedidos: () => void;
 }) {
@@ -43,6 +44,9 @@ export function MobileHome({
   const [pendentes, setPendentes] = useState<number | null>(null);
   const [revenueCents, setRevenueCents] = useState<number | null>(null);
   const [shiftOpen, setShiftOpen] = useState<boolean | null>(null);
+  // Só consulta a fila quem pode preencher: a RPC nega o resto com 42501.
+  const podeRelatorio = can("relatorio_sessao.write");
+  const relatorios = usePendingSessionReports(podeRelatorio ? unit.id : null);
 
   useEffect(() => {
     let alive = true;
@@ -149,6 +153,34 @@ export function MobileHome({
               {pendingRenewalsCount === 1 ? "1 pedido de mais tempo" : `${pendingRenewalsCount} pedidos de mais tempo`}
             </span>
             <span style={{ fontSize: 13, fontWeight: 800, color: "#1D8273", flex: "none" }}>Ver</span>
+          </button>
+        )}
+
+        {podeRelatorio && relatorios.pending.length > 0 && (
+          <button
+            type="button"
+            className="m-tap"
+            onClick={() => onAbrirTela("RELATORIO_SESSAO")}
+            style={{
+              marginTop: 10,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "var(--surface-card)",
+              border: `2px solid ${relatorios.overdueCount > 0 ? "var(--color-primary)" : "var(--color-amber)"}`,
+              borderRadius: 20,
+              padding: "14px 16px",
+              font: "inherit",
+              textAlign: "left",
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 20 }}>📝</span>
+            <span className="m-grow" style={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.35 }}>
+              {relatorios.pending.length === 1 ? "1 relatório de sessão pendente" : `${relatorios.pending.length} relatórios de sessão pendentes`}
+              {relatorios.overdueCount > 0 ? ` · ${relatorios.overdueCount} atrasado${relatorios.overdueCount > 1 ? "s" : ""}` : ""}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 800, flex: "none" }}>Preencher</span>
           </button>
         )}
 

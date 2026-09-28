@@ -14,7 +14,7 @@ export interface EarnedReward {
 export function describeLoyaltyReward(rule: LoyaltyRule): string {
   if (rule.rewardKind === "ENTRADA_GRATIS") return "Entrada grátis";
   if (rule.rewardKind === "DESCONTO_PCT") return `${rule.rewardValue}% de desconto`;
-  return `${rule.rewardValue} minutos extras`;
+  return `${rule.rewardValue} minutos grátis`;
 }
 
 /**

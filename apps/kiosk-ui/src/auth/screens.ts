@@ -4,6 +4,7 @@ export type Screen =
   | "ENTRADA"
   | "SAIDA"
   | "PAINEL"
+  | "RELATORIO_SESSAO"
   | "PDV"
   | "CAIXA"
   | "ANIVERSARIOS"
@@ -24,6 +25,7 @@ export const SCREEN_CAPABILITY: Record<Screen, Capability> = {
   ENTRADA: "sessao.checkin",
   SAIDA: "sessao.checkout",
   PAINEL: "sessao.checkout",
+  RELATORIO_SESSAO: "relatorio_sessao.write",
   PDV: "pdv.sell",
   CAIXA: "caixa.open_close",
   ANIVERSARIOS: "relatorio.read",

@@ -47,3 +47,61 @@ insert into fa_crm_templates (name, content_sid, preview, variable_count, purpos
 values ('NPS pós-visita', 'HX...', 'Olá {{1}}! Como foi sua visita ao FaçaAmigos? De 0 a 10, o quanto você nos recomendaria a um amigo? Responda só com o número. 💛', 1, 'NPS');
 ```
 Proteções: máx. 100 contatos por envio; pula quem pediu PARAR e quem recebeu NPS nos últimos 30 dias.
+
+## Aviso de fim de plano + renovação por WhatsApp
+Substitui o "avisar 5 min antes" (Web Push), o bloco de renovação e o card da ZoeIA da tela pública de acompanhamento. `crm-renewal-alert-dispatch` roda a cada minuto (pg_cron), avisa quem deu aceite de contato no check-in e oferece 3 opções de +min/R$ por botão de resposta rápida. O toque vira `RENOVACAO_SOLICITADA` (mesmo pedido pendente que o balcão já vê); sem cobrança automática.
+
+1. Aplicar `migrations/20260928160000_fa_crm_renewal_alert.sql` e `supabase functions deploy crm-renewal-alert-dispatch crm-whatsapp-webhook`.
+2. Template `twilio/quick-reply` aprovado pela Meta (categoria Utility), 3 botões com ID `RENOVAR_1`, `RENOVAR_2`, `RENOVAR_3` (títulos "Opção 1/2/3"). Variáveis: {{1}} responsável, {{2}} criança, {{3}} opções (ex.: `1) +15 min por R$ 30,00 · 2) +30 min por R$ 48,00 · 3) +60 min por R$ 96,00`):
+```sql
+insert into fa_crm_templates (name, content_sid, preview, variable_count, purpose)
+values ('Aviso fim de plano', 'HX...', 'Oi {{1}}! O tempo de {{2}} termina em poucos minutos. Para continuar sem pressa: {{3}}. Toque na opção desejada.', 3, 'RENOVACAO');
+```
+3. Ligar por unidade (desligado por padrão):
+```sql
+insert into fa_kiosk_app_settings (unit_id, key, value) values ('<uuid da unidade>', 'crm_renewal_alert', '1');
+```
+Preços: `PLAYGROUND_OPTIONS`/`CIRCUITO_OPTIONS` na function espelham `copy.ts`/`copyCircuito.ts`; o valor enviado fica congelado em `fa_crm_renewal_alerts.options`. Push já inscrito continua disparando até a sessão acabar (a tela não inscreve mais).
+
+## Avisos da visita (boas-vindas, fim do plano, renovação aplicada, fidelidade)
+`crm-visit-notify-dispatch` roda a cada minuto (pg_cron) e leva para o WhatsApp o que a tela pública de acompanhamento já mostra. Só quem deu aceite de contato no check-in recebe; cada tipo é ligado separadamente por unidade e nasce desligado.
+
+| Tipo | Quando sai | Flag | `purpose` do template | {{3}} |
+|---|---|---|---|---|
+| WELCOME | até 20 min após o check-in (plano avulso; banco de horas/pacote ficam de fora) | `crm_notify_welcome` | `VISITA_BOAS_VINDAS` | link `?acompanhar=<code>` |
+| OVERAGE | teto do plano passou há até 45 min, sessão ativa, sem pedido de renovação pendente | `crm_notify_overage` | `VISITA_EXCEDENTE` | valor do minuto adicional (`R$ 3,00`) |
+| RENEWAL_OK | balcão marcou `RENOVACAO_APLICADA` nos últimos 30 min | `crm_notify_renewal_ok` | `VISITA_RENOVACAO_OK` | `+30 min` |
+| LOYALTY | checkout na última hora, 8ª/9ª/10ª visita do ciclo | `crm_notify_loyalty` | `VISITA_FIDELIDADE` | texto de `loyaltyMessage()` |
+
+Variáveis comuns: {{1}} primeiro nome do responsável, {{2}} primeiro nome da criança. A Meta não aceita variável no começo nem no fim do corpo — termine o texto com uma frase fixa.
+
+1. Aplicar `migrations/20260928180000_fa_crm_visit_notifications.sql` e `supabase functions deploy crm-visit-notify-dispatch`. Opcional: secret `PUBLIC_APP_URL` (padrão `https://app.institutofacaamigos.com.br`).
+2. Cadastrar os templates aprovados (Utility para os três primeiros; fidelidade tende a ser classificada como Marketing):
+```sql
+insert into fa_crm_templates (name, content_sid, preview, variable_count, purpose) values
+ ('Visita boas-vindas', 'HX...', 'Oi {{1}}! {{2}} já está brincando com a gente 💛 Acompanhe o tempo por aqui: {{3}} Qualquer coisa, é só chamar.', 3, 'VISITA_BOAS_VINDAS'),
+ ('Visita fim do plano', 'HX...', 'Oi {{1}}! O tempo do plano de {{2}} terminou. Se quiser que ela(e) continue brincando, cada minuto adicional custa {{3}}. Fale com a nossa equipe no balcão. 💛', 3, 'VISITA_EXCEDENTE'),
+ ('Visita renovação aplicada', 'HX...', 'Oi {{1}}! Tudo certo: acrescentamos {{3}} ao tempo de {{2}}. Boa diversão! 💛', 3, 'VISITA_RENOVACAO_OK');
+```
+3. Ligar o que quiser, por unidade:
+```sql
+insert into fa_kiosk_app_settings (unit_id, key, value) values ('<uuid da unidade>', 'crm_notify_welcome', '1');
+```
+Fidelidade: além de ligar `crm_notify_loyalty` e cadastrar o template `VISITA_FIDELIDADE`, o texto vem de `loyaltyMessage()` em `functions/crm-visit-notify-dispatch/index.ts` — enquanto ela devolver `null`, nada sai.
+
+## Convite ao Mapeamento Comportamental (1 semana após a visita)
+`crm-mapeamento-dispatch` roda de hora em hora (9h-20h de Belém) e convida o responsável, **uma única vez** (`fa_crm_mapeamento_invites.guardian_id` unique), a fazer o Mapeamento Comportamental gratuito do Instituto: o mesmo convite do banner da tela pública, agora no WhatsApp. Sai entre 7 e 9 dias depois do checkout; só quem deu aceite de contato no check-in recebe. Nasce desligado por unidade.
+
+Variáveis: {{1}} primeiro nome do responsável · {{2}} primeiro nome da criança · {{3}} a "dor" por faixa etária (`painHook()` em `functions/crm-mapeamento-dispatch/index.ts`; enquanto devolver `null`, nada sai) · {{4}} link do teste (utm `whatsapp/crm/mapeamento/followup-7d`; secret opcional `MAPEAMENTO_URL`). A promessa do FaçaAmigos fica no texto fixo do template. A Meta não aceita variável no começo nem no fim do corpo: termine com uma frase fixa.
+
+1. Aplicar `migrations/20260928200000_fa_crm_mapeamento_followup.sql` e `supabase functions deploy crm-mapeamento-dispatch`.
+2. Cadastrar o template aprovado (categoria Marketing). Sugestão de corpo:
+```sql
+insert into fa_crm_templates (name, content_sid, preview, variable_count, purpose) values
+ ('Convite Mapeamento 7d', 'HX...', 'Oi {{1}}! Faz uma semana que {{2}} brincou com a gente 💛 {{3}} O FaçaAmigos existe para que toda criança aprenda a fazer amigos, se expressar e crescer com segurança. E isso começa por entender como ela é. Por isso criamos o Mapeamento Comportamental: 5 minutos de perguntas e um direcionamento gratuito, feito por psicólogas. Faça aqui: {{4}} Se quiser conversar sobre o resultado, é só responder esta mensagem.', 4, 'MAPEAMENTO');
+```
+3. Ligar por unidade:
+```sql
+insert into fa_kiosk_app_settings (unit_id, key, value) values ('<uuid da unidade>', 'crm_mapeamento_followup', '1');
+```
+Quem respondeu PARAR continua fora (opt_in = false pula antes da trava). Recusa definitiva da Twilio marca o convite com `error` e não reenvia.
