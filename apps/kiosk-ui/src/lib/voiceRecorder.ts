@@ -39,6 +39,8 @@ export interface VoiceRecorderPublicState {
   startedAtMs?: number;
 }
 
+const VOICE_RECORDING_DISABLED = true;
+
 const MAX_DURATION_MS = 10 * 60_000;
 const MIN_DURATION_MS = 4_000;
 const MIN_BYTES = 8_000;
@@ -290,6 +292,12 @@ export const voiceRecorder = {
 
   /** Inicia (ou é no-op se já ativo no mesmo momento). Se ativo num momento diferente, fecha o anterior como ABANDONED antes. */
   async start(meta: VoiceStartMeta): Promise<void> {
+    // Função de gravação/transcrição de voz desativada em toda a rede —
+    // não pede microfone nem chama o servidor local. Ver também o gate
+    // server-side (ctx.voiceDir) em apps/kiosk/src/server/start.ts e
+    // apps/kiosk/src/main/main.ts.
+    if (VOICE_RECORDING_DISABLED) return;
+
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
 
     if (current) {

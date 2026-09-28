@@ -192,7 +192,9 @@ async function startLocalServer() {
   // Tablets da LAN precisam de HTTPS (câmera exige contexto seguro); o
   // próprio Electron carrega de 127.0.0.1 e pode continuar em HTTP.
   const tls = process.env.FACAAMIGOS_TLS === "true" ? loadOrCreateTls(`${app.getPath("userData")}/certs`) : undefined;
-  const voiceDir = process.env.FACAAMIGOS_VOZ_DISABLED === "true" ? undefined : join(app.getPath("userData"), "voz");
+  // Função de gravação/transcrição de voz desativada por padrão em toda a
+  // rede — só liga se alguém setar FACAAMIGOS_VOZ_ENABLED=true explicitamente.
+  const voiceDir = process.env.FACAAMIGOS_VOZ_ENABLED === "true" ? join(app.getPath("userData"), "voz") : undefined;
   const server = await buildApp({ db, hmacKey, nowMs: () => Date.now(), voiceDir }, { tls, uiDist: resolveUiDist() });
   await server.listen({ port: PORT, host: "0.0.0.0" });
   return { tls, db, voiceDir };

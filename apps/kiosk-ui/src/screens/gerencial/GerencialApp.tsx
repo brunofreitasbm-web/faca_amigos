@@ -12,8 +12,6 @@ import { MetasTab } from "./tabs/MetasTab.js";
 import { BonificacaoTab } from "./tabs/BonificacaoTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
 import { OcorrenciasTab } from "./tabs/OcorrenciasTab.js";
-import { TranscricoesTab } from "./tabs/TranscricoesTab.js";
-import { TerminaisVozTab } from "./tabs/TerminaisVozTab.js";
 import { FrequenciaTab } from "./tabs/FrequenciaTab.js";
 import { PermissoesTab } from "./tabs/PermissoesTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
@@ -43,8 +41,6 @@ export type GerencialTab =
   | "COLABORADORES"
   | "FREQUENCIA"
   | "OCORRENCIAS"
-  | "TRANSCRICOES"
-  | "TERMINAIS_VOZ"
   | "PERMISSOES"
   | "CLIENTES"
   | "CRM_WHATSAPP"
@@ -129,7 +125,6 @@ const CATEGORIES: ModuleCategory[] = [
       { value: "COLABORADORES", label: "Equipe & Operadores", icon: "👤", description: "Cadastro unificado da equipe e permissões por unidade." },
       { value: "FREQUENCIA", label: "Ponto & Frequência", icon: "⏱️", tag: "Ao Vivo", description: "Marcação legal de ponto com foto em tempo real para CLT e Estagiários." },
       { value: "OCORRENCIAS", label: "Atestados & Ocorrências", icon: "📋", description: "Lançamento de atestados médicos, faltas e justificativas do RH." },
-      { value: "TRANSCRICOES", label: "Atendimentos Gravados", icon: "🎙️", tag: "Treinamento", description: "Transcrições de check-in/check-out e o Compêndio de Vendas para a Reunião de Alinhamento Mensal." },
       { value: "TALENTOS", label: "Banco de Talentos", icon: "💼", description: "Triagem de currículos recebidos na landing page do site." },
       { value: "CLIENTES", label: "Base de Clientes", icon: "🧑‍🤝‍🧑", description: "Consulta e histórico centralizado de responsáveis e crianças da rede." },
       { value: "CRM_WHATSAPP", label: "CRM WhatsApp", icon: "💬", tag: "Novo", description: "Conversas e funil de clientes do Playground e do Circuito pelo WhatsApp." },
@@ -150,7 +145,6 @@ const CATEGORIES: ModuleCategory[] = [
       { value: "FOTOS_ENVELOPE", label: "Fotos de Sangria", icon: "📸", description: "Comprovantes visuais das sangrias registradas nos PDVs." },
       { value: "HISTORICO", label: "Fluxograma de Caixa", icon: "🔄", description: "Rastreabilidade do fluxo de caixa e movimentação por turno." },
       { value: "AUDITORIA", label: "Log de Auditoria", icon: "🛡️", description: "Histórico de ações sensíveis, logins e alterações de dados." },
-      { value: "TERMINAIS_VOZ", label: "Terminais", icon: "🖥️", tag: "Infra", description: "Painel central: status do whisper.cpp (transcrição de voz) em cada PC/tablet da rede." },
     ],
   },
 ];
@@ -516,8 +510,6 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "COLABORADORES" && <ColaboradoresTab />}
               {tab === "FREQUENCIA" && <FrequenciaTab />}
               {tab === "OCORRENCIAS" && <OcorrenciasTab />}
-              {tab === "TRANSCRICOES" && <TranscricoesTab />}
-              {tab === "TERMINAIS_VOZ" && <TerminaisVozTab />}
               {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}
               {tab === "CRM_WHATSAPP" && <CrmWhatsappTab />}
