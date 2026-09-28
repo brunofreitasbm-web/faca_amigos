@@ -7,6 +7,7 @@ import { RequireCapability } from "../../../auth/RequireCapability.js";
 import { useAuth } from "../../../auth/AuthContext.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { useConfirm } from "../../../state/ConfirmContext.js";
+import { supabase } from "../../../lib/supabase/client.js";
 
 const POLL_MS = 10_000;
 /** Mesma janela aplicada no servidor (crm-whatsapp-send); aqui só desabilita o botão. */
@@ -56,6 +57,84 @@ export function CrmWhatsappTab() {
     <RequireCapability capability="crm.read">
       <CrmContent />
     </RequireCapability>
+  );
+}
+
+interface OptinStats {
+  status: "PAUSED" | "RUNNING";
+  dailyCap: number;
+  pausedReason: string | null;
+  sentToday: number;
+  sent: number;
+  accepted: number;
+  declined: number;
+  pending: number;
+  withConsent: number;
+}
+
+/**
+ * Campanha de opt-in da base atual (só Owner, crm.admin): um pedido de
+ * autorização por responsável, no máximo `dailyCap` (20) por dia, das 10h às
+ * 20h. Nasce pausada; pausa sozinha se >3% pedirem PARAR. Ver migration
+ * fa_crm_optin_campaign e a Edge Function crm-optin-dispatch.
+ */
+function OptinCampaignCard() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [stats, setStats] = useState<OptinStats | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data, error } = await supabase().rpc("fa_crm_optin_stats");
+    if (!error) setStats(data as OptinStats);
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => void load(), 30_000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  async function setStatus(next: "RUNNING" | "PAUSED") {
+    if (next === "RUNNING") {
+      const ok = await confirm({
+        title: "Iniciar a campanha de autorização?",
+        message: `Serão enviadas mensagens pelo WhatsApp a responsáveis que ainda não autorizaram contato: no máximo ${stats?.dailyCap ?? 20} por dia, das 10h às 20h, dos que visitaram mais recentemente. Pausa sozinha se muita gente pedir PARAR.`,
+        confirmLabel: "Iniciar",
+      });
+      if (!ok) return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase().rpc("fa_crm_optin_set_status", { p_status: next });
+      if (error) throw new Error(error.message);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao alterar a campanha");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!stats) return null;
+  const running = stats.status === "RUNNING";
+  return (
+    <Card style={{ padding: "12px", marginBottom: "12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div>
+          <strong>🤝 Campanha de autorização (base atual)</strong>{" "}
+          <Tag color={running ? "var(--color-success)" : "var(--border-subtle)"}>{running ? "Em andamento" : "Pausada"}</Tag>
+          <HelpText style={{ margin: 0 }}>
+            Hoje: {stats.sentToday}/{stats.dailyCap} · enviados {stats.sent} · aceitaram {stats.accepted} · pediram PARAR {stats.declined} · na fila{" "}
+            {stats.pending} · com autorização {stats.withConsent}
+          </HelpText>
+          {stats.pausedReason && !running && <HelpText style={{ margin: 0, color: "var(--color-error)" }}>⚠️ {stats.pausedReason}</HelpText>}
+        </div>
+        <Button size="sm" variant={running ? "secondary" : "primary"} loading={busy} onClick={() => void setStatus(running ? "PAUSED" : "RUNNING")}>
+          {running ? "Pausar" : "Iniciar"}
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -209,6 +288,8 @@ function CrmContent() {
           Conversas do Playground e do Circuito. {loading ? "carregando…" : `${contacts.length} contato(s) · ${unreadTotal} não lida(s)`}
         </HelpText>
       </div>
+
+      {can("crm.admin") && <OptinCampaignCard />}
 
       {/* Funil: contagem por etapa, também serve de filtro */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
