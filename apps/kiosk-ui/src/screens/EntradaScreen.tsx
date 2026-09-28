@@ -159,6 +159,8 @@ export function EntradaScreen({
   const [birthDate, setBirthDate] = useState("");
   const [guardianName, setGuardianName] = useState("");
   const [phone, setPhone] = useState("");
+  // Aceite de contato por WhatsApp (avisos + pesquisa de NPS). Começa desmarcado: só vale se o responsável autorizar.
+  const [whatsappConsent, setWhatsappConsent] = useState(false);
   const [favoriteAssetId, setFavoriteAssetId] = useState<string | null>(null);
 
   const [isNeurodivergent, setIsNeurodivergent] = useState(false);
@@ -481,6 +483,7 @@ export function EntradaScreen({
   }
 
   function resetForNextChild(keepGuardian: boolean) {
+    if (!keepGuardian) setWhatsappConsent(false);
     setQuery("");
     setMatches([]);
     setMatchedChild(null);
@@ -758,6 +761,15 @@ export function EntradaScreen({
         // não algo que pode reverter um check-in já concluído.
         Api.addSessionExtra(res.sessionId, quickProduct.id, employee.id).catch(() =>
           toast.error(`Entrada registrada, mas não foi possível adicionar "${quickProduct.name}" à comanda. Adicione manualmente no fechamento.`),
+        );
+      }
+
+      if (whatsappConsent) {
+        // Fora do try do check-in de propósito, mesma lógica da foto: o aceite
+        // é gravado depois da entrada. Se falhar, o caminho seguro é não
+        // enviar nada (sem registro, sem NPS) — nunca derrubar o check-in.
+        Api.setWhatsappConsent(res.guardianId, true, employee.id).catch(() =>
+          toast.error("Entrada registrada, mas o aceite de WhatsApp não foi salvo. Peça de novo na próxima visita."),
         );
       }
 
@@ -1678,6 +1690,14 @@ export function EntradaScreen({
         }}
       >
         {readiness && <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>{readiness}</span>}
+        {startNow && (
+          <Checkbox
+            checked={whatsappConsent}
+            onChange={setWhatsappConsent}
+            label="O responsável autoriza contato por WhatsApp (avisos da visita e pesquisa de satisfação)"
+            helpText="Pergunte ao responsável e marque só se ele aceitar. Pode pedir para parar a qualquer momento respondendo PARAR."
+          />
+        )}
         <Button
           variant="primary"
           size="lg"

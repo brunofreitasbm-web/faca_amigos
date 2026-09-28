@@ -1997,6 +1997,11 @@ export const Api = {
    * upgrade de pacote (upsellVenderPacote) — aqui não há cobrança
    * imediata nem ancoragem, é só um item extra que entra na conta.
    */
+  /** Registra (ou revoga) o aceite de contato por WhatsApp/NPS do responsável — ver migration fa_guardian_whatsapp_consent. */
+  setWhatsappConsent: (guardianId: string, consent: boolean, employeeId: string) =>
+    unwrap<void>(
+      supabase().rpc("fa_kiosk_set_whatsapp_consent", { p_guardian_id: guardianId, p_consent: consent, p_employee_id: employeeId }),
+    ),
   addSessionExtra: (sessionId: string, productId: string, employeeId: string, quantity = 1) =>
     unwrap<void>(
       supabase().rpc("fa_kiosk_add_session_extra", {
