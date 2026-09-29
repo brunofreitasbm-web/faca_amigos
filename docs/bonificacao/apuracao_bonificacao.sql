@@ -186,7 +186,7 @@ calc as (
 ),
 bonus as (
   select c.*,
-         coalesce(c.abertura::time <= time '10:15', false) as trava_abertura_ok,
+         coalesce(c.abertura::time <= case when extract(isodow from c.business_date)::int = 7 then time '12:15' else time '10:15' end, false) as trava_abertura_ok,
          (coalesce(c.fechado, false) and not coalesce(c.diverg_sem_justificativa, false)) as trava_caixa_ok,
          case
            -- sem meta configurada pra esse dia/unidade: zero, nunca um valor adivinhado

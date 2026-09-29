@@ -143,6 +143,72 @@ describe("apurarBonificacaoPorDia", () => {
     expect(dias[0]?.bonusMetaCents).toBe(0);
     expect(dias[0]?.bonusDiaCents).toBe(0);
   });
+
+  it("aceita abertura até 12h15 no domingo e exige 10h15 nos demais dias", () => {
+    // 2026-09-06 é domingo (dow=7), abertura às 11h30 está dentro do limite de 12h15
+    const domingoDate = "2026-09-06";
+    const shiftDomingo: RawShift = {
+      ...fechamentoOk(UNIT_PLAYGROUND.id, domingoDate),
+      opened_at_ms: Date.parse(`${domingoDate}T11:30:00-03:00`),
+    };
+    const orderDomingo: RawOrder = {
+      id: "oDom",
+      unit_id: UNIT_PLAYGROUND.id,
+      business_date: domingoDate,
+      status: "PAGA",
+      total_cents: 95_000,
+      closed_by_employee_id: EMP.id,
+    };
+    const programDomingo: BonusProgramsByUnit = {
+      [UNIT_PLAYGROUND.id]: {
+        ...PROGRAM_PLAYGROUND,
+        goals: [{ weekday: 7, metaValor: 90_000, superValor: 110_000, metaBonusCents: 800, superBonusCents: 1200 }],
+      },
+    };
+
+    const diasDom = apurarBonificacaoPorDia({
+      from: domingoDate,
+      to: domingoDate,
+      sessions: [{ unit_id: UNIT_PLAYGROUND.id, business_date: domingoDate, checkin_by_employee_id: EMP.id, order_id: orderDomingo.id, plan_id: null, canceled: false }],
+      plans: [],
+      orders: [orderDomingo],
+      orderItems: [],
+      shifts: [shiftDomingo],
+      employees: [EMP],
+      units: [UNIT_PLAYGROUND],
+      programs: programDomingo,
+    });
+    expect(diasDom[0]?.travaAberturaOk).toBe(true);
+
+    // 2026-09-08 é terça-feira (dow=2), abertura às 11h30 estoura o limite de 10h15
+    const tercaDate = "2026-09-08";
+    const shiftTerca: RawShift = {
+      ...fechamentoOk(UNIT_PLAYGROUND.id, tercaDate),
+      opened_at_ms: Date.parse(`${tercaDate}T11:30:00-03:00`),
+    };
+    const orderTerca: RawOrder = {
+      id: "oTerca",
+      unit_id: UNIT_PLAYGROUND.id,
+      business_date: tercaDate,
+      status: "PAGA",
+      total_cents: 95_000,
+      closed_by_employee_id: EMP.id,
+    };
+
+    const diasTerca = apurarBonificacaoPorDia({
+      from: tercaDate,
+      to: tercaDate,
+      sessions: [{ unit_id: UNIT_PLAYGROUND.id, business_date: tercaDate, checkin_by_employee_id: EMP.id, order_id: orderTerca.id, plan_id: null, canceled: false }],
+      plans: [],
+      orders: [orderTerca],
+      orderItems: [],
+      shifts: [shiftTerca],
+      employees: [EMP],
+      units: [UNIT_PLAYGROUND],
+      programs: PROGRAMS,
+    });
+    expect(diasTerca[0]?.travaAberturaOk).toBe(false);
+  });
 });
 
 describe("agregarPorOperador", () => {
