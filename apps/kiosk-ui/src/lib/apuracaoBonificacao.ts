@@ -78,7 +78,10 @@ export function diaSemanaISO(businessDate: string): number {
   return jsDow === 0 ? 7 : jsDow;
 }
 
-const ABERTURA_LIMITE_HORA = 10 * 60 + 15; // 10:15 em minutos desde 00:00
+/** Retorna o limite em minutos desde 00:00 para abertura do caixa (10:15 seg-sáb, 12:15 domingo). */
+export function getAberturaLimiteMin(dow: number): number {
+  return dow === 7 ? 12 * 60 + 15 : 10 * 60 + 15;
+}
 const DIVERGENCIA_SEM_JUSTIFICATIVA_LIMIT_CENTS = 2000; // R$20
 
 export interface RawSession {
@@ -347,7 +350,8 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     const prod = prodByKey.get(key) ?? { itens: 0, prodCents: 0, bonusProdCents: 0 };
     const sd = shiftsDia.get(shiftUnitDateKey(unitId, businessDate));
 
-    const travaAberturaOk = sd?.aberturaMin !== null && sd?.aberturaMin !== undefined && sd.aberturaMin <= ABERTURA_LIMITE_HORA;
+    const limiteAberturaMin = getAberturaLimiteMin(dow);
+    const travaAberturaOk = sd?.aberturaMin !== null && sd?.aberturaMin !== undefined && sd.aberturaMin <= limiteAberturaMin;
     const travaCaixaOk = Boolean(sd?.fechado) && !sd?.divergSemJustificativa;
 
     // Sem meta configurada para este dia/unidade, o bônus do dia é zero —

@@ -18,7 +18,7 @@ Cliente pagou no sistema, com seu check-in? Conta. Formulário de papel, WhatsAp
 
 ### 3. Duas coisas zeram o bônus do dia inteiro
 
-- **Abrir o caixa depois das 10h15.** Chegou atrasado, esqueceu de abrir, só lembrou depois do almoço — zerou.
+- **Abrir o caixa depois das 10h15 (segunda a sábado) ou 12h15 (aos domingos).** Chegou atrasado, esqueceu de abrir, só lembrou depois do almoço — zerou.
 - **Fechar com diferença maior que R$ 20 sem explicar.** Contou errado, sobrou ou faltou dinheiro na gaveta e não escreveu o motivo no fechamento — zerou.
 
 Isso vale mesmo se você bateu supermeta. Confira o caixa com calma no fechamento — vale mais que correr.
