@@ -64,29 +64,29 @@ export function FidelidadeBannerCard({ childFirstName, visitCount = 8 }: Fidelid
           {isEighthVisit
             ? `🌟 ${childFirstName} está na 8ª visita!`
             : isNinthVisit
-            ? `🔥 Falta apenas 1 visita para o prêmio!`
+            ? `🔥 Falta apenas 1 visita para os 30 min de cortesia!`
             : isTenthVisit
-            ? `🎉 Parabéns! Esta 10ª visita é por nossa conta!`
+            ? `🎉 Parabéns! Esta é a 10ª visita do ciclo!`
             : `💛 Cartão Fidelidade de ${childFirstName}`}
         </strong>
 
         <p style={{ margin: 0, fontSize: "14px", color: "#C2410C", lineHeight: 1.5, fontWeight: isEighthVisit ? 600 : 400 }}>
           {isEighthVisit ? (
             <>
-              Depois da próxima sessão (9ª), a sua <strong>10ª visita será 100% GRATUITA!</strong> 🎁✨
+              Depois da próxima sessão (9ª), a 10ª visita traz <strong>30 min de cortesia</strong> para {childFirstName}! 🎁✨
             </>
           ) : isNinthVisit ? (
             <>
-              Na próxima visita (10ª), <strong>a entrada é totalmente GRATUITA!</strong> 🎉
+              Na próxima visita (10ª), {childFirstName} ganha <strong>30 min de cortesia</strong>! 🎉
             </>
           ) : isTenthVisit ? (
             <>
-              Você atingiu a 10ª visita! O benefício gratuito do Programa de Fidelidade está liberado! 🎁
+              Você completou o ciclo! Os <strong>30 min de cortesia</strong> já saíram nesta visita. 🎁
             </>
           ) : (
             <>
-              A cada 10 visitas, a 10ª sessão é por nossa conta. Faltam apenas{" "}
-              <strong>{10 - cycleVisits} visita(s)</strong> para a próxima sessão gratuita!
+              A cada 10 visitas, a 10ª sessão dá 30 min de cortesia. Faltam apenas{" "}
+              <strong>{10 - cycleVisits} visita(s)</strong> para o benefício!
             </>
           )}
         </p>
@@ -99,7 +99,7 @@ export function FidelidadeBannerCard({ childFirstName, visitCount = 8 }: Fidelid
             Progresso de Selos ({cycleVisits}/10)
           </span>
           <span style={{ fontSize: "11px", fontWeight: "bold", color: "#EA580C" }}>
-            Meta: 10ª Grátis
+            Meta: 30 min de cortesia
           </span>
         </div>
 
@@ -147,7 +147,7 @@ export function FidelidadeBannerCard({ childFirstName, visitCount = 8 }: Fidelid
                   <span>{stepNum}</span>
                 )}
                 <span style={{ fontSize: "9px", opacity: 0.8, marginTop: "-2px" }}>
-                  {isTarget ? "GRÁTIS" : `${stepNum}ª`}
+                  {isTarget ? "30 MIN" : `${stepNum}ª`}
                 </span>
               </div>
             );

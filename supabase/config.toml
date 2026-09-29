@@ -83,6 +83,13 @@ verify_jwt = false
 [functions.crm-optin-dispatch]
 verify_jwt = false
 
+# Campanha de opt-in de MARKETING (pergunta separada, só para quem já aceitou
+# contato geral): nasce pausada, máx. 20/dia, freio automático igual à
+# campanha geral. Alimenta fa_kiosk_guardians.marketing_consent_at_ms, exigido
+# pelos kinds MARKETING do catálogo (crm-lifecycle-dispatch).
+[functions.crm-optin-marketing-dispatch]
+verify_jwt = false
+
 # Aviso de fim de plano + oferta de renovação por WhatsApp: só o pg_cron/pg_net
 # chama (a cada minuto). Desligada por padrão em cada unidade (app_settings
 # crm_renewal_alert) e idempotente (fa_crm_renewal_alerts.session_id unique).
@@ -101,4 +108,11 @@ verify_jwt = false
 # padrão em cada unidade (app_settings crm_mapeamento_followup) e idempotente
 # (fa_crm_mapeamento_invites.guardian_id unique, gravada antes do envio).
 [functions.crm-mapeamento-dispatch]
+verify_jwt = false
+
+# Catálogo de upsell/cross-sell/LTV/retenção (10 ações), um dispatcher só: só
+# o pg_cron/pg_net chama (a cada 15 min, 10h-20h Belém). Cada kind desligado
+# por padrão em cada unidade (app_settings crm_lc_<kind>) e idempotente
+# (fa_crm_automation_sends unique kind+ref_key, gravada antes do envio).
+[functions.crm-lifecycle-dispatch]
 verify_jwt = false

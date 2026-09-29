@@ -52,15 +52,17 @@ const brl = (cents: number) => `R$ ${(cents / 100).toFixed(2).replace(".", ",")}
 
 /**
  * Texto do cartão fidelidade (variável {{3}} do template VISITA_FIDELIDADE).
- * `cycle` é a posição da visita no ciclo de 10 (8, 9 ou 10); a 10ª sessão é
- * gratuita, como no FidelidadeBannerCard da tela pública. Devolver null pula o
- * aviso daquela visita. Sem quebra de linha (o WhatsApp não aceita em variável).
+ * `cycle` é a posição da visita no ciclo de 10 (8, 9 ou 10). Sem quebra de
+ * linha (o WhatsApp não aceita em variável).
  *
- * TODO(human): decidir em quais visitas avisar (só a 9ª? 8ª e 9ª? também a 10ª?)
- * e escrever o texto de cada uma. Enquanto devolver null, nenhum aviso de
- * fidelidade sai — é o estado seguro.
+ * TEXTO PROVISÓRIO — publicado para destravar o envio, mas é conteúdo
+ * voltado ao cliente e merece revisão/aprovação antes do template real ir
+ * ao ar no Twilio (o template ainda não existe, então nada sai por ora).
  */
-function loyaltyMessage(_cycle: number, _childFirst: string): string | null {
+function loyaltyMessage(cycle: number, childFirst: string): string | null {
+  if (cycle === 8) return `${childFirst} está a só 2 visitas de ganhar 30 min de cortesia! Continue vindo brincar.`;
+  if (cycle === 9) return `${childFirst} está a 1 visita de ganhar 30 min de cortesia na próxima! Já pode aparecer.`;
+  if (cycle === 10) return `Parabéns! ${childFirst} completou o ciclo — os 30 min de cortesia já saíram nesta visita.`;
   return null;
 }
 

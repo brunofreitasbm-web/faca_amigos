@@ -45,9 +45,10 @@ grant execute on function fa_config_set_employee_sector(uuid, text) to authentic
 --    ESTAGIARIO tem rank 0 no fa_kiosk_can: uma linha nele vale para todos
 --    os papéis. PRESTADOR_PJ fica explícito só para deixar a intenção clara.
 -- ---------------------------------------------------------------------
+-- PRESTADOR_PJ não existe como role nesta instalação (só ESTAGIARIO, OPERADOR,
+-- GERENTE, ADMIN) — quem presta serviço PJ hoje registra ponto como ESTAGIARIO.
 insert into fa_kiosk_role_capabilities (role, capability) values
   ('ESTAGIARIO',   'relatorio_sessao.write'),
-  ('PRESTADOR_PJ', 'relatorio_sessao.write'),
   ('GERENTE',      'relatorio_sessao.read')
 on conflict do nothing;
 
@@ -60,7 +61,7 @@ on conflict do nothing;
 -- aqui, ela tem que repetir a lista completa.
 alter table fa_crm_templates drop constraint if exists fa_crm_templates_purpose_check;
 alter table fa_crm_templates add constraint fa_crm_templates_purpose_check
-  check (purpose in ('GERAL', 'NPS', 'RENOVACAO', 'RELATORIO_SESSAO'));
+  check (purpose in ('GERAL', 'NPS', 'OPTIN', 'RENOVACAO', 'RELATORIO_SESSAO'));
 
 -- ---------------------------------------------------------------------
 -- 4. Tabela: 1 relatório por sessão

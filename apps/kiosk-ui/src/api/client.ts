@@ -752,7 +752,23 @@ export type UnitSettingKey =
   | "voice_whisper_model"
   // 'always' transcreve assim que a fila chega; 'closed' só fora do
   // horário de funcionamento (menos disputa de CPU com o balcão).
-  | "voice_transcribe_hours";
+  | "voice_transcribe_hours"
+  // Catálogo de ciclo de vida (upsell/cross-sell/LTV/retenção): um kind por
+  // ação, '1' liga em todas as unidades. Ver crm-lifecycle-dispatch e
+  // migration fa_crm_lifecycle_campaigns. Cada um só dispara de verdade
+  // quando o template correspondente estiver aprovado e ativo.
+  | "crm_lc_expiracao"
+  | "crm_lc_relatorio_cupom"
+  | "crm_lc_premio_fidelidade"
+  | "crm_lc_nps_promotor"
+  | "crm_lc_nps_detrator"
+  | "crm_lc_upsell_pacote"
+  | "crm_lc_cross_atividade"
+  | "crm_lc_cross_irmao"
+  | "crm_lc_aniversario"
+  | "crm_lc_vip"
+  | "crm_lc_winback_1"
+  | "crm_lc_winback_2";
 
 export interface VipFlag {
   child_id: string;
@@ -2082,6 +2098,11 @@ export const Api = {
   setWhatsappConsent: (guardianId: string, consent: boolean, employeeId: string) =>
     unwrap<void>(
       supabase().rpc("fa_kiosk_set_whatsapp_consent", { p_guardian_id: guardianId, p_consent: consent, p_employee_id: employeeId }),
+    ),
+  /** Registra (ou revoga) o aceite de MARKETING (ofertas/novidades), separado do aceite geral acima — ver migration fa_crm_lifecycle_campaigns. */
+  setMarketingConsent: (guardianId: string, consent: boolean, employeeId: string) =>
+    unwrap<void>(
+      supabase().rpc("fa_kiosk_set_marketing_consent", { p_guardian_id: guardianId, p_consent: consent, p_employee_id: employeeId }),
     ),
   addSessionExtra: (sessionId: string, productId: string, employeeId: string, quantity = 1) =>
     unwrap<void>(

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, HelpText, Input, Tag } from "@facaamigos/ui";
+import { Button, Card, Checkbox, HelpText, Input, Tag } from "@facaamigos/ui";
 import { formatPhoneBr } from "@facaamigos/domain";
 import { Api } from "../../../api/client.js";
-import type { CrmContact, CrmMessage, CrmStage, CrmTemplate } from "../../../api/client.js";
+import type { CrmContact, CrmMessage, CrmStage, CrmTemplate, UnitSettingKey } from "../../../api/client.js";
 import { RequireCapability } from "../../../auth/RequireCapability.js";
 import { useAuth } from "../../../auth/AuthContext.js";
 import { useToast } from "../../../state/ToastContext.js";
@@ -133,6 +133,205 @@ function OptinCampaignCard() {
         <Button size="sm" variant={running ? "secondary" : "primary"} loading={busy} onClick={() => void setStatus(running ? "PAUSED" : "RUNNING")}>
           {running ? "Pausar" : "Iniciar"}
         </Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Campanha de opt-in de MARKETING (só Owner, crm.admin): pergunta separada da
+ * autorização geral, só para quem já autorizou contato — alimenta
+ * fa_kiosk_guardians.marketing_consent_at_ms, exigido pelas ações de
+ * upsell/cross-sell/aniversário/VIP/winback do catálogo. Mesmo desenho da
+ * campanha geral: nasce pausada, máx. 20/dia, freio automático.
+ */
+function MarketingOptinCampaignCard() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [stats, setStats] = useState<OptinStats | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data, error } = await supabase().rpc("fa_crm_marketing_optin_stats");
+    if (!error) setStats(data as OptinStats);
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => void load(), 30_000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  async function setStatus(next: "RUNNING" | "PAUSED") {
+    if (next === "RUNNING") {
+      const ok = await confirm({
+        title: "Iniciar a campanha de opt-in de marketing?",
+        message: `Serão enviadas mensagens pelo WhatsApp a quem já autorizou contato, perguntando se aceita receber ofertas: no máximo ${stats?.dailyCap ?? 20} por dia, das 10h às 20h. Pausa sozinha se muita gente pedir PARAR.`,
+        confirmLabel: "Iniciar",
+      });
+      if (!ok) return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase().rpc("fa_crm_marketing_optin_set_status", { p_status: next });
+      if (error) throw new Error(error.message);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao alterar a campanha");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!stats) return null;
+  const running = stats.status === "RUNNING";
+  return (
+    <Card style={{ padding: "12px", marginBottom: "12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div>
+          <strong>🛍️ Campanha de opt-in de marketing</strong>{" "}
+          <Tag color={running ? "var(--color-success)" : "var(--border-subtle)"}>{running ? "Em andamento" : "Pausada"}</Tag>
+          <HelpText style={{ margin: 0 }}>
+            Hoje: {stats.sentToday}/{stats.dailyCap} · enviados {stats.sent} · aceitaram {stats.accepted} · pediram PARAR {stats.declined} · na fila{" "}
+            {stats.pending} · com consentimento de marketing {stats.withConsent}
+          </HelpText>
+          {stats.pausedReason && !running && <HelpText style={{ margin: 0, color: "var(--color-error)" }}>⚠️ {stats.pausedReason}</HelpText>}
+        </div>
+        <Button size="sm" variant={running ? "secondary" : "primary"} loading={busy} onClick={() => void setStatus(running ? "PAUSED" : "RUNNING")}>
+          {running ? "Pausar" : "Iniciar"}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+interface LifecycleStatRow {
+  kind: string;
+  sent: number;
+  replied: number;
+  converted: number;
+  converted_cents: number;
+}
+
+interface LifecycleKindDef {
+  kind: string;
+  settingKey: UnitSettingKey;
+  label: string;
+  category: "Utility" | "Marketing";
+}
+
+/**
+ * As 10 ações do catálogo de upsell/cross-sell/LTV/retenção (12 kinds, winback
+ * tem 2 toques). Cada uma só dispara de verdade quando: (1) o template
+ * aprovado existir no Twilio para o purpose, e (2) para as de categoria
+ * Marketing, o responsável tiver marketing_consent_at_ms (campanha de opt-in
+ * de marketing acima). O toggle aqui liga/desliga em todas as unidades juntas
+ * — mais simples que gerenciar unidade por unidade e como a Meta cobra por
+ * categoria, não por unidade.
+ */
+const LIFECYCLE_KINDS: LifecycleKindDef[] = [
+  { kind: "EXPIRACAO", settingKey: "crm_lc_expiracao", label: "Recarga antes de acabar (pacote/saldo/banco de horas)", category: "Utility" },
+  { kind: "RELATORIO_CUPOM", settingKey: "crm_lc_relatorio_cupom", label: "Cupom de retorno no relatório de sessão", category: "Utility" },
+  { kind: "PREMIO_FIDELIDADE", settingKey: "crm_lc_premio_fidelidade", label: "Lembrete de prêmio de fidelidade não resgatado", category: "Utility" },
+  { kind: "NPS_PROMOTOR", settingKey: "crm_lc_nps_promotor", label: "NPS nota alta → convite de avaliação no Google", category: "Utility" },
+  { kind: "NPS_DETRATOR", settingKey: "crm_lc_nps_detrator", label: "NPS nota baixa → aviso de contato humano", category: "Utility" },
+  { kind: "UPSELL_PACOTE", settingKey: "crm_lc_upsell_pacote", label: "Oferta de pacote pós-visita avulsa", category: "Marketing" },
+  { kind: "CROSS_ATIVIDADE", settingKey: "crm_lc_cross_atividade", label: "Convite Playground ↔ Circuito", category: "Marketing" },
+  { kind: "CROSS_IRMAO", settingKey: "crm_lc_cross_irmao", label: "Convite para o irmão que não frequenta", category: "Marketing" },
+  { kind: "ANIVERSARIO", settingKey: "crm_lc_aniversario", label: "Mensagem de aniversário automática", category: "Marketing" },
+  { kind: "VIP", settingKey: "crm_lc_vip", label: "Reconhecimento de status VIP", category: "Marketing" },
+  { kind: "WINBACK_1", settingKey: "crm_lc_winback_1", label: "Winback — 1º toque (30-90 dias sem visitar)", category: "Marketing" },
+  { kind: "WINBACK_2", settingKey: "crm_lc_winback_2", label: "Winback — 2º toque (com cupom)", category: "Marketing" },
+];
+
+function LifecycleCampaignsCard() {
+  const toast = useToast();
+  const [units, setUnits] = useState<{ id: string }[]>([]);
+  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [stats, setStats] = useState<Record<string, LifecycleStatRow>>({});
+  const [busyKind, setBusyKind] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const [unitList, statRows] = await Promise.all([
+        Api.units(),
+        supabase().rpc("fa_crm_automation_stats", { p_days: 30 }),
+      ]);
+      setUnits(unitList);
+      const statsByKind: Record<string, LifecycleStatRow> = {};
+      for (const row of (statRows.data ?? []) as LifecycleStatRow[]) statsByKind[row.kind] = row;
+      setStats(statsByKind);
+
+      if (unitList.length) {
+        const flagEntries = await Promise.all(
+          LIFECYCLE_KINDS.map(async (def) => {
+            const row = await Api.unitSetting(unitList[0]!.id, def.settingKey);
+            return [def.kind, row.value === "1"] as const;
+          }),
+        );
+        setFlags(Object.fromEntries(flagEntries));
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao carregar automações");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function toggle(def: LifecycleKindDef, next: boolean) {
+    setBusyKind(def.kind);
+    try {
+      // Liga/desliga em todas as unidades juntas.
+      await Promise.all(units.map((u) => Api.setUnitSetting(u.id, def.settingKey, next ? "1" : "0")));
+      setFlags((prev) => ({ ...prev, [def.kind]: next }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao alterar a automação");
+    } finally {
+      setBusyKind(null);
+    }
+  }
+
+  if (loading) return null;
+  return (
+    <Card style={{ padding: "12px", marginBottom: "12px" }}>
+      <strong>🚀 Automações de ciclo de vida (upsell, cross-sell, LTV, retenção)</strong>
+      <HelpText style={{ margin: "4px 0 12px" }}>
+        Últimos 30 dias. Cada uma só envia quando o template correspondente estiver aprovado no Twilio; as de categoria Marketing também exigem o
+        aceite de ofertas do responsável (campanha de opt-in de marketing acima).
+      </HelpText>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {LIFECYCLE_KINDS.map((def) => {
+          const s = stats[def.kind];
+          return (
+            <div
+              key={def.kind}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap",
+                padding: "6px 0", borderBottom: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div style={{ minWidth: "260px" }}>
+                <Checkbox
+                  checked={Boolean(flags[def.kind])}
+                  onChange={(v) => void toggle(def, v)}
+                  label={def.label}
+                  disabled={busyKind === def.kind}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Tag color="var(--border-subtle)">{def.category}</Tag>
+                <HelpText style={{ margin: 0 }}>
+                  {s ? `enviados ${s.sent} · responderam ${s.replied} · converteram ${s.converted} (R$ ${(s.converted_cents / 100).toFixed(2)})` : "sem envios ainda"}
+                </HelpText>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
@@ -290,6 +489,8 @@ function CrmContent() {
       </div>
 
       {can("crm.admin") && <OptinCampaignCard />}
+      {can("crm.admin") && <MarketingOptinCampaignCard />}
+      {can("crm.admin") && <LifecycleCampaignsCard />}
 
       {/* Funil: contagem por etapa, também serve de filtro */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>

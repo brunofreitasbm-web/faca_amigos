@@ -105,3 +105,38 @@ insert into fa_crm_templates (name, content_sid, preview, variable_count, purpos
 insert into fa_kiosk_app_settings (unit_id, key, value) values ('<uuid da unidade>', 'crm_mapeamento_followup', '1');
 ```
 Quem respondeu PARAR continua fora (opt_in = false pula antes da trava). Recusa definitiva da Twilio marca o convite com `error` e não reenvia.
+
+## Catálogo de upsell/cross-sell/LTV/retenção (10 ações, 1 dispatcher)
+`crm-lifecycle-dispatch` roda a cada 15 min (pg_cron), só das 10h às 20h de Belém. Todas as automações abaixo compartilham a mesma tabela de envio (`fa_crm_automation_sends`) e a mesma trava de frequência (`fa_crm_can_send`: no máx. 1 marketing a cada 7 dias, 3 em 30 dias por contato — não vale para os kinds UTILITY).
+
+**Pré-requisito que ainda falta, por produto/decisão de negócio**: os kinds MARKETING exigem `fa_kiosk_guardians.marketing_consent_at_ms` (campo novo, migration `20260929000000`), separado do aceite de avisos/pesquisa já existente. Nenhum fluxo do app preenche esse campo ainda — enquanto isso, os kinds MARKETING abaixo nunca encontram candidato. A RPC `fa_kiosk_set_marketing_consent(guardian_id, consent, employee_id)` existe e pode ser plugada num checkbox de check-in ou na campanha de opt-in quando o produto decidir como pedir esse aceite.
+
+| Kind | Ação do catálogo | Categoria | Flag (`fa_kiosk_app_settings`) | Variáveis |
+|---|---|---|---|---|
+| `EXPIRACAO` | U2/R4 — recarga antes de acabar | Utility | `crm_lc_expiracao` | {{1}} responsável · {{2}} nome do saldo · {{3}} minutos restantes/validade |
+| `RELATORIO_CUPOM` | C4 — cupom no relatório de sessão | Utility | `crm_lc_relatorio_cupom` | {{1}} responsável · {{2}} criança · {{3}} texto do cupom |
+| `PREMIO_FIDELIDADE` | L2 — prêmio não resgatado | Utility | `crm_lc_premio_fidelidade` | {{1}} responsável · {{2}} criança |
+| `NPS_PROMOTOR` | R2 — NPS ≥9 → avaliação Google | Utility | `crm_lc_nps_promotor` | {{1}} responsável · {{2}} link (secret `GOOGLE_REVIEW_URL`) |
+| `NPS_DETRATOR` | R3 — NPS ≤6 → contato humano | Utility | `crm_lc_nps_detrator` | {{1}} responsável |
+| `UPSELL_PACOTE` | U1 — pacote pós-visita | Marketing | `crm_lc_upsell_pacote` | {{1}} responsável · {{2}} criança |
+| `CROSS_ATIVIDADE` | C1 — Playground ↔ Circuito | Marketing | `crm_lc_cross_atividade` | {{1}} responsável · {{2}} criança · {{3}} atividade convidada |
+| `CROSS_IRMAO` | C2 — irmão que não vem | Marketing | `crm_lc_cross_irmao` | {{1}} responsável · {{2}} criança que frequenta |
+| `ANIVERSARIO` | L3 — aniversário automático | Marketing | `crm_lc_aniversario` | {{1}} responsável · {{2}} criança |
+| `VIP` | L4 — reconhecimento VIP | Marketing | `crm_lc_vip` | {{1}} responsável · {{2}} criança |
+| `WINBACK` (`WINBACK_1`/`WINBACK_2`) | R1 — winback em 2 toques | Marketing | `crm_lc_winback_1` / `crm_lc_winback_2` | {{1}} responsável |
+
+1. Aplicar `migrations/20260929000000_fa_crm_lifecycle_campaigns.sql` e `supabase functions deploy crm-lifecycle-dispatch`.
+2. Cadastrar os templates aprovados (um por purpose da tabela acima):
+```sql
+insert into fa_crm_templates (name, content_sid, preview, variable_count, purpose) values
+ ('Saldo acabando', 'HX...', 'Oi {{1}}! O saldo de {{2}} de {{3}}(a) {{4}}. Passa aqui pra garantir mais diversão! 💛', 3, 'EXPIRACAO');
+ -- repetir para RELATORIO_CUPOM, PREMIO_FIDELIDADE, NPS_PROMOTOR, NPS_DETRATOR,
+ -- UPSELL_PACOTE, CROSS_ATIVIDADE, CROSS_IRMAO, ANIVERSARIO, VIP, WINBACK
+```
+3. Ligar só o que quiser, por unidade:
+```sql
+insert into fa_kiosk_app_settings (unit_id, key, value) values ('<uuid da unidade>', 'crm_lc_expiracao', '1');
+```
+4. Para os kinds Marketing, decidir e implementar a coleta de `marketing_consent_at_ms` antes de ligar a flag — sem isso, `crm_lc_upsell_pacote` etc. nunca encontram candidato (estado seguro, mas também inútil).
+
+Regra Meta de sempre: variável não pode abrir nem fechar o corpo do template.

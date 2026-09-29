@@ -17,7 +17,7 @@
 
 alter table fa_crm_templates drop constraint if exists fa_crm_templates_purpose_check;
 alter table fa_crm_templates add constraint fa_crm_templates_purpose_check
-  check (purpose in ('GERAL', 'NPS', 'RENOVACAO'));
+  check (purpose in ('GERAL', 'NPS', 'OPTIN', 'RENOVACAO'));
 
 -- Um aviso por sessão (unique) — é também a trava de idempotência do cron.
 create table if not exists fa_crm_renewal_alerts (

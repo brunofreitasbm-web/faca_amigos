@@ -152,9 +152,15 @@ Deno.serve(async (req) => {
   const optIn = OPT_IN_WORDS.has(word);
 
   if (optOut) {
-    // PARAR encerra pedido de autorização pendente e revoga o aceite do responsável.
+    // PARAR encerra qualquer pedido de autorização pendente (geral ou de
+    // marketing) e revoga os dois consentimentos do responsável.
     await admin
       .from("fa_crm_optin_requests")
+      .update({ status: "DECLINED", answered_at_ms: now })
+      .eq("contact_id", contact!.id)
+      .eq("status", "SENT");
+    await admin
+      .from("fa_crm_marketing_optin_requests")
       .update({ status: "DECLINED", answered_at_ms: now })
       .eq("contact_id", contact!.id)
       .eq("status", "SENT");
@@ -162,7 +168,10 @@ Deno.serve(async (req) => {
     if (guardianId) {
       await admin
         .from("fa_kiosk_guardians")
-        .update({ whatsapp_consent_at_ms: null, whatsapp_consent_by_employee_id: null })
+        .update({
+          whatsapp_consent_at_ms: null, whatsapp_consent_by_employee_id: null,
+          marketing_consent_at_ms: null, marketing_consent_by_employee_id: null,
+        })
         .eq("id", guardianId);
     }
   }
@@ -197,8 +206,20 @@ Deno.serve(async (req) => {
   let reply: string | null = null;
   if (optOut) reply = "Tudo certo, você não receberá mais mensagens nossas. Para voltar, responda VOLTAR.";
   else if (optIn) reply = "Que bom ter você de volta! 💛";
-  else if (ACCEPT_WORDS.has(word) && (await handleOptinAccept(admin, contact!, from, word, now))) {
-    reply = "Combinado! 💛 Vamos te avisar por aqui sobre suas visitas e, às vezes, pedir sua opinião. Para parar, é só responder PARAR.";
+  else if (ACCEPT_WORDS.has(word)) {
+    // Um "SIM"/"QUERO" pode responder aos dois pedidos ao mesmo tempo, se
+    // ambos estiverem em aberto para este contato (geral + marketing).
+    const acceptedGeneral = await handleOptinAccept(admin, contact!, from, word, now);
+    const acceptedMarketing = await handleMarketingOptinAccept(admin, contact!, from, now);
+    if (acceptedGeneral || acceptedMarketing) {
+      reply = acceptedMarketing
+        ? "Combinado! 💛 Você também vai receber, de vez em quando, nossas ofertas e novidades. Para parar, é só responder PARAR."
+        : "Combinado! 💛 Vamos te avisar por aqui sobre suas visitas e, às vezes, pedir sua opinião. Para parar, é só responder PARAR.";
+    } else {
+      const choice = renewalChoice(params.ButtonPayload, body);
+      reply = choice ? await handleRenewal(admin, contact!.id, choice, now) : null;
+      reply ??= await handleNps(admin, contact!.id, body, now);
+    }
   } else {
     const choice = renewalChoice(params.ButtonPayload, body);
     reply = choice ? await handleRenewal(admin, contact!.id, choice, now) : null;
@@ -345,6 +366,36 @@ async function handleOptinAccept(
   if (pending) {
     await admin.from("fa_crm_optin_requests").update({ status: "ACCEPTED", answered_at_ms: now }).eq("id", pending.id);
   }
+  if (!contact.guardian_id) await admin.from("fa_crm_contacts").update({ guardian_id: guardianId }).eq("id", contact.id);
+  return true;
+}
+
+/**
+ * Registra o aceite de MARKETING quando o cliente responde SIM/QUERO a um
+ * pedido de fa_crm_marketing_optin_requests em aberto. Ao contrário do aceite
+ * geral, "quero" sozinho (sem pedido pendente) NÃO basta aqui — não existe
+ * QR code de balcão para marketing, só a campanha. Devolve true se gravou.
+ */
+async function handleMarketingOptinAccept(
+  admin: ReturnType<typeof createClient>,
+  contact: { id: string; guardian_id: string | null },
+  phone: string,
+  now: number,
+): Promise<boolean> {
+  const { data: pending } = await admin
+    .from("fa_crm_marketing_optin_requests")
+    .select("id")
+    .eq("contact_id", contact.id)
+    .eq("status", "SENT")
+    .limit(1)
+    .maybeSingle();
+  if (!pending) return false;
+
+  const guardianId = contact.guardian_id ?? (await guardianByPhone(admin, phone));
+  if (!guardianId) return false;
+
+  await admin.from("fa_kiosk_guardians").update({ marketing_consent_at_ms: now }).eq("id", guardianId);
+  await admin.from("fa_crm_marketing_optin_requests").update({ status: "ACCEPTED", answered_at_ms: now }).eq("id", pending.id);
   if (!contact.guardian_id) await admin.from("fa_crm_contacts").update({ guardian_id: guardianId }).eq("id", contact.id);
   return true;
 }

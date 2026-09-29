@@ -33,17 +33,19 @@ interface Candidate {
 
 /**
  * A "dor" ({{3}} do template MAPEAMENTO): uma frase curta, por faixa etária da
- * criança, que nomeia o que costuma preocupar a família nessa idade — a ponte
- * entre a visita e o convite ao Mapeamento. Sem quebra de linha (o WhatsApp não
- * aceita em variável) e sem linguagem clínica (mesma regra do relatório de
- * sessão: nada de transtorno, déficit, diagnóstico). Devolver null pula o
- * convite daquela família — enquanto devolver null para tudo, nada sai.
+ * criança, sem linguagem clínica. `ageYears` pode ser null (sessão sem
+ * criança cadastrada) — nesse caso usa uma frase genérica.
  *
- * TODO(human): definir as faixas e escrever a frase de cada uma.
- * `ageYears` pode ser null (sessão sem criança cadastrada).
+ * TEXTO PROVISÓRIO — publicado para destravar o envio, mas é conteúdo
+ * voltado ao cliente e merece revisão/aprovação antes do template real ir
+ * ao ar no Twilio (o template ainda não existe, então nada sai por ora).
  */
-function painHook(_ageYears: number | null, _childFirst: string): string | null {
-  return null;
+function painHook(ageYears: number | null, childFirst: string): string | null {
+  if (ageYears == null) return `Toda criança tem um jeito próprio de se expressar, aprender e fazer amigos.`;
+  if (ageYears <= 3) return `Nessa fase, entender como ${childFirst} se comunica e reage ao mundo faz toda diferença.`;
+  if (ageYears <= 6) return `É a fase em que ${childFirst} está aprendendo a dividir, esperar a vez e fazer amigos.`;
+  if (ageYears <= 9) return `Nessa idade, autoestima e como ${childFirst} lida com frustração pesam muito no dia a dia.`;
+  return `Entender como ${childFirst} se relaciona e lida com desafios ajuda a apoiar essa fase.`;
 }
 
 /** Variáveis do template: {{1}} responsável, {{2}} criança, {{3}} dor, {{4}} link; null = pula. */
