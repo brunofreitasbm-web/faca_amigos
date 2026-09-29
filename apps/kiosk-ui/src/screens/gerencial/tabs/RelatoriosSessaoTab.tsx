@@ -215,7 +215,6 @@ function Content() {
               if (answered.length === 0) return null;
               return (
                 <div key={sec.sector} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={{ fontFamily: "var(--font-display)", fontSize: "15px" }}>{sec.emoji} {sec.label}</div>
                   {answered.map((i) => (
                     <div key={i.key} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <div style={{ fontSize: "13px", fontWeight: 600 }}>{i.label}</div>
