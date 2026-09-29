@@ -20,6 +20,7 @@ void flushOfflineQueue();
 
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { SecretVaultReader } from "./screens/SecretVaultReader.js";
+import { consumeHubSsoTicket } from "./lib/supabase/hubSso.js";
 
 const container = document.getElementById("root");
 if (!container) throw new Error("#root não encontrado");
@@ -28,7 +29,8 @@ const pathname = window.location.pathname;
 const isSecretRoute = pathname.startsWith("/segredo/");
 const secretId = isSecretRoute ? pathname.split("/segredo/")[1]?.split("?")[0] : null;
 
-createRoot(container).render(
+// /sso (entrada pelo Hub de Gestão) troca o ticket por sessão antes do primeiro render.
+void consumeHubSsoTicket().finally(() => createRoot(container).render(
   <StrictMode>
     <ErrorBoundary>
       <ToastProvider>
@@ -48,5 +50,5 @@ createRoot(container).render(
       </ToastProvider>
     </ErrorBoundary>
   </StrictMode>,
-);
+));
 
