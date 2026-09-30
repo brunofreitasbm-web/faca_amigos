@@ -101,7 +101,7 @@ function goalsFromForm(form: UnitForm, isCircuito: boolean): BonusProgramGoal[] 
   });
 }
 
-function configFromForm(form: UnitForm): Omit<BonusProgramConfig, "goals"> {
+function configFromForm(form: UnitForm): Omit<BonusProgramConfig, "goals" | "planRules" | "planosTetoMesCents"> {
   return {
     tetoMesCents: centsFrom(form.tetoMesReais),
     produtoPrecoCorteCents: centsFrom(form.produtoPrecoCorteReais),

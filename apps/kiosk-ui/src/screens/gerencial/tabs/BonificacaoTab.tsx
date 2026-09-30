@@ -43,7 +43,7 @@ export function BonificacaoTab() {
     };
   }, [units, from, to]);
 
-  const totalGeralCents = rows.reduce((sum, r) => sum + r.acumuladoMesCents, 0);
+  const totalGeralCents = rows.reduce((sum, r) => sum + r.totalMesCents, 0);
 
   return (
     <div>
@@ -52,7 +52,8 @@ export function BonificacaoTab() {
         <HelpText style={{ marginBottom: "12px" }}>
           Acumulado do mês por operador, já com o teto de R$200 aplicado — meta de faturamento/locações batida, produtos
           vendidos e a trava de abertura/fechamento de caixa (mesmas regras de docs/bonificacao/apuracao_bonificacao.sql).
-          Owner/Admin não entra na apuração.
+          O Bônus de Planos Longos (2 horas, Day Use, Porto Seguro) tem teto próprio e não depende das travas de caixa; a
+          coluna "Acumulado no mês" soma os dois. Owner/Admin não entra na apuração.
         </HelpText>
         <label style={{ display: "flex", flexDirection: "column", gap: "4px", width: "180px", fontSize: "13px" }}>
           Mês
@@ -81,6 +82,8 @@ export function BonificacaoTab() {
               <th title="Produtos vendidos no mês (leva ao bônus de +R$10 ao bater 10)">Produtos no mês</th>
               <th>Bônus meta</th>
               <th>Bônus produtos</th>
+              <th title="Unidades vendidas no mês (🪜 = bateu a escada)">Planos longos</th>
+              <th>Bônus planos</th>
               <th>Acumulado no mês</th>
             </tr>
           </thead>
@@ -95,8 +98,17 @@ export function BonificacaoTab() {
                 <td style={{ textAlign: "center" }}>{r.itensMes}</td>
                 <td style={{ textAlign: "right" }}>{money(r.bonusMetaMesCents)}</td>
                 <td style={{ textAlign: "right" }}>{money(r.bonusProdutosMesCents)}</td>
+                <td>{r.planosMes.length === 0 ? "—" : r.planosMes.map((p) => `${p.label}: ${p.qtd}${p.escadaBatida ? " 🪜" : ""}`).join(" · ")}</td>
+                <td style={{ textAlign: "right" }}>
+                  {money(r.acumuladoPlanosMesCents)}
+                  {r.atingiuTetoPlanos && (
+                    <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--text-muted)" }} title="Teto do Bônus de Planos Longos atingido">
+                      🔒 teto
+                    </span>
+                  )}
+                </td>
                 <td style={{ textAlign: "right", fontWeight: "bold" }}>
-                  {money(r.acumuladoMesCents)}
+                  {money(r.totalMesCents)}
                   {r.atingiuTeto && (
                     <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--text-muted)" }} title={`Teto de ${money(TETO_MES_CENTS)}/mês atingido`}>
                       🔒 teto
@@ -107,7 +119,7 @@ export function BonificacaoTab() {
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
+                <td colSpan={9} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
                   Nenhuma bonificação apurada para o mês selecionado.
                 </td>
               </tr>
@@ -116,7 +128,7 @@ export function BonificacaoTab() {
           {rows.length > 0 && (
             <tfoot>
               <tr>
-                <td colSpan={6} style={{ textAlign: "right", fontWeight: "bold" }}>
+                <td colSpan={8} style={{ textAlign: "right", fontWeight: "bold" }}>
                   Total geral do mês
                 </td>
                 <td style={{ textAlign: "right", fontWeight: "bold" }}>{money(totalGeralCents)}</td>

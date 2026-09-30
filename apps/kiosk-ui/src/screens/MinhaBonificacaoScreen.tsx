@@ -101,6 +101,10 @@ export function MinhaBonificacaoScreen() {
   const diasComBonus = mes.reduce((sum, m) => sum + m.diasComBonus, 0);
   const diasTrabalhados = mes.reduce((sum, m) => sum + m.diasTrabalhados, 0);
   const itensMes = mes.reduce((sum, m) => sum + m.itensMes, 0);
+  // Bônus de Planos Longos: teto próprio por unidade, separado do de metas/produtos.
+  const planosTetoMesCents = unitIds.reduce((sum, id) => sum + (programs[id]?.planosTetoMesCents ?? 0), 0);
+  const acumuladoPlanosCents = mes.reduce((sum, m) => sum + m.acumuladoPlanosMesCents, 0);
+  const temPlanos = mes.some((m) => m.planosMes.length > 0);
   const faturamentoMesCents = dias.reduce((sum, d) => sum + d.faturamentoCents, 0);
   const pedidosMes = dias.reduce((sum, d) => sum + d.pedidos, 0);
   const ticketMedioMesCents = pedidosMes > 0 ? Math.round(faturamentoMesCents / pedidosMes) : 0;
@@ -227,6 +231,59 @@ export function MinhaBonificacaoScreen() {
           })()}
         </div>
       </Card>
+
+      {temPlanos && (
+        <Card style={{ padding: "16px", marginBottom: "16px" }}>
+          <h3 style={{ fontSize: "15px", margin: "0 0 12px" }}>📦 Planos longos do mês</h3>
+          {mes
+            .filter((m) => m.planosMes.length > 0)
+            .map((m) => (
+              <div key={`${m.unitId}|${m.employeeId}`} style={{ marginBottom: "12px" }}>
+                {escopo === "TODAS" && <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>{m.unitName}</div>}
+                {m.planosMes.map((p) => (
+                  <div key={p.key} style={{ display: "flex", justifyContent: "space-between", gap: "12px", fontSize: "14px", padding: "4px 0" }}>
+                    <span>
+                      {p.label}: <strong>{p.qtd}</strong> vendido{p.qtd === 1 ? "" : "s"}
+                      {p.escadaMeta > 0 && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {" "}
+                          · escada {Math.min(p.qtd, p.escadaMeta)}/{p.escadaMeta}
+                          {p.escadaBatida ? ` ✅ +${money(p.escadaBonusCents)}` : ` (+${money(p.escadaBonusCents)})`}
+                        </span>
+                      )}
+                    </span>
+                    <span>{money(p.bonusCents + (p.escadaBatida ? p.escadaBonusCents : 0))}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: "8px" }}>
+            <span style={{ fontSize: "20px", fontWeight: "bold" }}>{money(acumuladoPlanosCents)}</span>
+            {planosTetoMesCents > 0 && (
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                de até {money(planosTetoMesCents)} no mês{mes.some((m) => m.atingiuTetoPlanos) ? " · 🔒 teto" : ""}
+              </span>
+            )}
+          </div>
+          {planosTetoMesCents > 0 && (
+            <div
+              className="capacity-bar-track"
+              role="progressbar"
+              aria-valuenow={Math.min(100, Math.round((acumuladoPlanosCents / planosTetoMesCents) * 100))}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className="capacity-bar-fill"
+                style={{ width: `${Math.min(100, Math.round((acumuladoPlanosCents / planosTetoMesCents) * 100))}%`, backgroundColor: "var(--color-amber)" }}
+              />
+            </div>
+          )}
+          <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "8px" }}>
+            Este bônus não depende das travas de caixa. Total do mês (metas + produtos + planos): {money(acumuladoMesCents + acumuladoPlanosCents)}
+          </div>
+        </Card>
+      )}
 
       {streak >= 2 && (
         <Card style={{ padding: "16px", marginBottom: "16px", border: "1px solid var(--color-amber)" }}>

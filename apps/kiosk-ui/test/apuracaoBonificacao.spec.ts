@@ -27,6 +27,8 @@ const PROGRAM_PLAYGROUND: BonusProgramConfig = {
   sessao1hPercentualMin: 45,
   sessao1hBonusCents: 200,
   locacaoExtraBonusCents: 0,
+  planosTetoMesCents: 0,
+  planRules: [],
 };
 const PROGRAMS: BonusProgramsByUnit = { [UNIT_PLAYGROUND.id]: PROGRAM_PLAYGROUND };
 
@@ -214,8 +216,8 @@ describe("apurarBonificacaoPorDia", () => {
 describe("agregarPorOperador", () => {
   it("aplica o teto configurado somando os dias do operador", () => {
     const dias = [
-      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 12, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600 },
-      { unitId: "u1", businessDate: "2026-09-09", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600 },
+      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 12, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600, planosVendidos: {}, bonusPlanosCents: 0 },
+      { unitId: "u1", businessDate: "2026-09-09", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600, planosVendidos: {}, bonusPlanosCents: 0 },
     ];
     const [op] = agregarPorOperador(dias, [UNIT_PLAYGROUND], [EMP], PROGRAMS);
     // 1600 + 1600 + 1000 (bônus de 10+ produtos no mês) = 4200, bem abaixo do teto de R$200
@@ -226,7 +228,7 @@ describe("agregarPorOperador", () => {
 
   it("sem programa configurado, não aplica bônus de itens do mês nem teto", () => {
     const dias = [
-      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 12, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600 },
+      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 12, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 1600, bonusDiaCents: 1600, planosVendidos: {}, bonusPlanosCents: 0 },
     ];
     const [op] = agregarPorOperador(dias, [UNIT_PLAYGROUND], [EMP], {});
     expect(op?.acumuladoMesCents).toBe(1600); // sem o +R$10 de itens, sem teto aplicado
@@ -235,8 +237,8 @@ describe("agregarPorOperador", () => {
 
   it("calcula o ticket médio do mês (faturamento ÷ pedidos)", () => {
     const dias = [
-      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 30_000, pedidos: 3, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0 },
-      { unitId: "u1", businessDate: "2026-09-09", employeeId: "e1", faturamentoCents: 20_000, pedidos: 1, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0 },
+      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 30_000, pedidos: 3, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0, planosVendidos: {}, bonusPlanosCents: 0 },
+      { unitId: "u1", businessDate: "2026-09-09", employeeId: "e1", faturamentoCents: 20_000, pedidos: 1, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0, planosVendidos: {}, bonusPlanosCents: 0 },
     ];
     const [op] = agregarPorOperador(dias, [UNIT_PLAYGROUND], [EMP], PROGRAMS);
     expect(op?.pedidosMes).toBe(4);
@@ -246,7 +248,7 @@ describe("agregarPorOperador", () => {
 
   it("ticket médio do mês é zero quando não houve nenhum pedido", () => {
     const dias = [
-      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0 },
+      { unitId: "u1", businessDate: "2026-09-08", employeeId: "e1", faturamentoCents: 0, pedidos: 0, sessoes: 0, sessoes1hMais: 0, itens: 0, produtosCents: 0, bonusProdutosCents: 0, travaAberturaOk: true, travaCaixaOk: true, bonusMetaCents: 0, bonusDiaCents: 0, planosVendidos: {}, bonusPlanosCents: 0 },
     ];
     const [op] = agregarPorOperador(dias, [UNIT_PLAYGROUND], [EMP], PROGRAMS);
     expect(op?.ticketMedioMesCents).toBe(0);

@@ -10,12 +10,14 @@ import {
   type ApuracaoDia,
   type ApuracaoOperador,
   type BonusProgramConfig,
+  type BonusPlanRule,
   type BonusProgramGoal,
   type BonusProgramsByUnit,
   type RawEmployee,
   type RawOrder,
   type RawOrderItem,
   type RawPlan,
+  type RawGuardianPackage,
   type RawSession,
   type RawShift,
   type RawUnit,
@@ -1580,7 +1582,7 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
  */
 async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgramsByUnit> {
   if (unitIds.length === 0) return {};
-  const [goalRows, configRows] = await Promise.all([
+  const [goalRows, configRows, ruleRows] = await Promise.all([
     unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_bonus_program_goals")
@@ -1588,7 +1590,30 @@ async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgram
         .in("unit_id", unitIds),
     ),
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_bonus_program_config").select("*").in("unit_id", unitIds)),
+    unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_bonus_plan_rules")
+        .select("unit_id, kind, ref_id, label, bonus_cents, escada_meta, escada_bonus_cents, active, sort_order")
+        .in("unit_id", unitIds),
+    ),
   ]);
+
+  const rulesByUnit = new Map<string, BonusPlanRule[]>();
+  for (const row of ruleRows) {
+    const unitId = row.unit_id as string;
+    const list = rulesByUnit.get(unitId) ?? [];
+    list.push({
+      kind: row.kind as BonusPlanRule["kind"],
+      refId: row.ref_id as string,
+      label: row.label as string,
+      bonusCents: row.bonus_cents as number,
+      escadaMeta: row.escada_meta as number,
+      escadaBonusCents: row.escada_bonus_cents as number,
+      active: Boolean(row.active),
+      sortOrder: row.sort_order as number,
+    });
+    rulesByUnit.set(unitId, list);
+  }
 
   const goalsByUnit = new Map<string, BonusProgramGoal[]>();
   for (const row of goalRows) {
@@ -1618,6 +1643,8 @@ async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgram
       sessao1hPercentualMin: row.sessao_1h_percentual_min as number,
       sessao1hBonusCents: row.sessao_1h_bonus_cents as number,
       locacaoExtraBonusCents: row.locacao_extra_bonus_cents as number,
+      planosTetoMesCents: (row.planos_teto_mes_cents as number | null) ?? 0,
+      planRules: rulesByUnit.get(unitId) ?? [],
     };
   }
   return result;
@@ -1634,11 +1661,11 @@ async function fetchApuracaoDias(
   from: string,
   to: string,
 ): Promise<{ dias: ApuracaoDia[]; units: RawUnit[]; employees: RawEmployee[]; programs: BonusProgramsByUnit }> {
-  const [sessions, orders, shifts, employees, units, programs] = await Promise.all([
+  const [sessions, orders, shifts, employees, units, programs, guardianPackages] = await Promise.all([
     unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_sessions")
-        .select("id, unit_id, business_date, checkin_by_employee_id, order_id, plan_id, rental_kind, status")
+        .select("id, unit_id, business_date, checkin_by_employee_id, order_id, plan_id, rental_kind, status, uses_package")
         .in("unit_id", unitIds)
         .gte("business_date", from)
         .lte("business_date", to),
@@ -1662,6 +1689,15 @@ async function fetchApuracaoDias(
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_employees").select("id, full_name, role")),
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_units").select("id, name, kind").in("id", unitIds)),
     fetchBonusProgramsByUnit(unitIds),
+    // Pacotes vendidos no período (Day Use, Porto Seguro…): base do Bônus de Planos Longos.
+    unwrap<Record<string, unknown>[]>(
+      supabase()
+        .from("fa_kiosk_guardian_packages")
+        .select("id, unit_id, business_date, package_id, sold_by_employee_id, order_id")
+        .in("unit_id", unitIds)
+        .gte("business_date", from)
+        .lte("business_date", to),
+    ),
   ]);
 
   const planIds = [...new Set(sessions.map((s) => s.plan_id as string | null).filter((id): id is string => Boolean(id)))];
@@ -1686,6 +1722,15 @@ async function fetchApuracaoDias(
     plan_id: (s.plan_id as string | null) ?? null,
     rental_kind: (s.rental_kind as string | null) ?? null,
     canceled: s.status === "CANCELADA",
+    uses_package: Boolean(s.uses_package),
+  }));
+  const rawGuardianPackages: RawGuardianPackage[] = guardianPackages.map((g) => ({
+    id: g.id as string,
+    unit_id: g.unit_id as string,
+    business_date: g.business_date as string,
+    package_id: g.package_id as string,
+    sold_by_employee_id: (g.sold_by_employee_id as string | null) ?? null,
+    order_id: (g.order_id as string | null) ?? null,
   }));
   const rawPlans: RawPlan[] = plans.map((p) => ({
     id: p.id as string,
@@ -1732,6 +1777,7 @@ async function fetchApuracaoDias(
     employees: rawEmployees,
     units: rawUnits,
     programs,
+    guardianPackages: rawGuardianPackages,
   });
   return { dias, units: rawUnits, employees: rawEmployees, programs };
 }
@@ -4286,7 +4332,7 @@ export const Api = {
   setBonusProgram: async (
     unitId: string,
     goals: BonusProgramGoal[],
-    config: Omit<BonusProgramConfig, "goals">,
+    config: Omit<BonusProgramConfig, "goals" | "planRules" | "planosTetoMesCents">,
   ): Promise<void> => {
     const now = Date.now();
     await Promise.all([
@@ -4327,6 +4373,40 @@ export const Api = {
           ),
       ),
     ]);
+  },
+  /**
+   * Bônus de Planos Longos de UMA unidade: regras por plano/pacote + teto mensal
+   * próprio (0 = sem teto). Plano desmarcado é gravado com `active = false` em
+   * vez de apagado, para o histórico e para regravar sem perder os valores.
+   * Dois upserts, não atômicos, como `setBonusProgram`.
+   */
+  setBonusPlanRules: async (unitId: string, rules: BonusPlanRule[], planosTetoMesCents: number): Promise<void> => {
+    const now = Date.now();
+    await unwrap(
+      supabase()
+        .from("fa_kiosk_bonus_program_config")
+        .upsert({ unit_id: unitId, planos_teto_mes_cents: planosTetoMesCents, updated_at_ms: now }, { onConflict: "unit_id" }),
+    );
+    if (rules.length === 0) return;
+    await unwrap(
+      supabase()
+        .from("fa_kiosk_bonus_plan_rules")
+        .upsert(
+          rules.map((r) => ({
+            unit_id: unitId,
+            kind: r.kind,
+            ref_id: r.refId,
+            label: r.label,
+            bonus_cents: r.bonusCents,
+            escada_meta: r.escadaMeta,
+            escada_bonus_cents: r.escadaBonusCents,
+            active: r.active,
+            sort_order: r.sortOrder,
+            updated_at_ms: now,
+          })),
+          { onConflict: "unit_id,kind,ref_id" },
+        ),
+    );
   },
   reportSessions: async (unitId: string | null, from: string, to: string) => {
     let sessionsQuery = supabase()
