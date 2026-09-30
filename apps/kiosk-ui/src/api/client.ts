@@ -1618,6 +1618,10 @@ async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgram
       sessao1hPercentualMin: row.sessao_1h_percentual_min as number,
       sessao1hBonusCents: row.sessao_1h_bonus_cents as number,
       locacaoExtraBonusCents: row.locacao_extra_bonus_cents as number,
+      // Bônus de Planos Longos: ainda não lido do banco (depende da migration
+      // de fa_kiosk_bonus_plan_rules). Neutro = nenhum bônus de plano.
+      planosTetoMesCents: 0,
+      planRules: [],
     };
   }
   return result;
@@ -4286,7 +4290,7 @@ export const Api = {
   setBonusProgram: async (
     unitId: string,
     goals: BonusProgramGoal[],
-    config: Omit<BonusProgramConfig, "goals">,
+    config: Omit<BonusProgramConfig, "goals" | "planRules" | "planosTetoMesCents">,
   ): Promise<void> => {
     const now = Date.now();
     await Promise.all([

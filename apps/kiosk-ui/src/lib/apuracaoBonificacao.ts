@@ -10,6 +10,12 @@
 // 20260911100000). Uma unidade sem configuração simplesmente não gera bônus
 // (nunca um valor adivinhado) — ver `BonusProgramConfig` abaixo.
 //
+// Bônus de Planos Longos (2 horas, Day Use, Porto Seguro): bônus fixo por
+// UNIDADE vendida + "escada" mensal, com teto próprio (`planosTetoMesCents`)
+// e SEM as travas de caixa. Regras em `BonusProgramConfig.planRules`
+// (fa_kiosk_bonus_plan_rules); docs/bonificacao/programa-planos-longos-out-2026.md.
+// Mantenha em sincronia com docs/bonificacao/apuracao_bonificacao.sql.
+//
 // Aluguel avulso de pelúcia no Playground (`rental_kind`): fica fora de
 // sessões, sessões de 1h+ e faturamento; conta 1 item com o bônus baixo de
 // produto para quem fechou o pedido. Mesma regra do SQL.
@@ -24,6 +30,25 @@ export interface BonusProgramGoal {
   superValor: number;
   metaBonusCents: number;
   superBonusCents: number;
+}
+
+/** Plano (fa_kiosk_plans) ou pacote (fa_kiosk_packages) que paga bônus por unidade vendida. */
+export interface BonusPlanRule {
+  kind: "PLANO" | "PACOTE";
+  /** id do plano ou do pacote, conforme `kind`. */
+  refId: string;
+  label: string;
+  /** Bônus por unidade vendida (uma criança / um pacote). */
+  bonusCents: number;
+  /** Bater N unidades no mês paga `escadaBonusCents` uma vez. 0 = sem escada. */
+  escadaMeta: number;
+  escadaBonusCents: number;
+  active: boolean;
+  sortOrder: number;
+}
+
+export function planRuleKey(kind: BonusPlanRule["kind"], refId: string): string {
+  return `${kind}:${refId}`;
 }
 
 /** Configuração do programa de bonificação de UMA unidade, editável em Gerencial > Metas. */
@@ -42,6 +67,9 @@ export interface BonusProgramConfig {
   sessao1hBonusCents: number;
   /** Só Circuito: bônus por locação acima da meta do dia. */
   locacaoExtraBonusCents: number;
+  /** Teto mensal do Bônus de Planos Longos, separado de `tetoMesCents`; 0 = sem teto. */
+  planosTetoMesCents: number;
+  planRules: BonusPlanRule[];
 }
 
 /** unitId -> configuração; uma unidade ausente do mapa está "não configurada" (zero bônus). */
@@ -94,6 +122,17 @@ export interface RawSession {
   /** 'PELUCIA' = aluguel avulso: não é sessão para a meta, conta como produto. */
   rental_kind: string | null;
   canceled: boolean;
+  /** Sessão paga por saldo de pacote: não conta como venda de plano (o pacote já contou). */
+  uses_package?: boolean;
+}
+/** Pacote vendido a um responsável (fa_kiosk_guardian_packages). */
+export interface RawGuardianPackage {
+  id: string;
+  unit_id: string;
+  business_date: string;
+  package_id: string;
+  sold_by_employee_id: string | null;
+  order_id: string | null;
 }
 export interface RawPlan {
   id: string;
@@ -149,6 +188,8 @@ export interface ApuracaoInput {
   units: RawUnit[];
   /** Configuração do programa por unidade — unidade ausente aqui não gera bônus. */
   programs: BonusProgramsByUnit;
+  /** Pacotes vendidos no período; ausente = nenhuma venda de pacote a contar. */
+  guardianPackages?: RawGuardianPackage[];
 }
 
 export interface ApuracaoDia {
@@ -167,6 +208,22 @@ export interface ApuracaoDia {
   travaCaixaOk: boolean;
   bonusMetaCents: number;
   bonusDiaCents: number;
+  /** Unidades vendidas no dia por regra (`planRuleKey`). */
+  planosVendidos: Record<string, number>;
+  /** qtd × bônus do dia. Não passa pelas travas de caixa e não entra em `bonusDiaCents`. */
+  bonusPlanosCents: number;
+}
+
+export interface PlanoMes {
+  key: string;
+  kind: BonusPlanRule["kind"];
+  label: string;
+  qtd: number;
+  /** qtd × bônus unitário (sem a escada). */
+  bonusCents: number;
+  escadaMeta: number;
+  escadaBonusCents: number;
+  escadaBatida: boolean;
 }
 
 export interface ApuracaoOperador {
@@ -185,6 +242,15 @@ export interface ApuracaoOperador {
   bonusMetaMesCents: number;
   acumuladoMesCents: number; // já com o teto configurado da unidade aplicado
   atingiuTeto: boolean;
+  /** Bônus de Planos Longos do mês, por regra ativa da unidade. */
+  planosMes: PlanoMes[];
+  /** Unitário + escadas, antes do teto próprio. */
+  bonusPlanosMesCents: number;
+  /** Com `planosTetoMesCents` aplicado. */
+  acumuladoPlanosMesCents: number;
+  atingiuTetoPlanos: boolean;
+  /** Metas + produtos + planos longos, cada bloco com o seu teto. */
+  totalMesCents: number;
 }
 
 function tipoDaUnidade(kind: string): UnidadeTipo {
@@ -252,6 +318,45 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     cur.sessoes += 1;
     if (planMin >= 60) cur.sessoes1hMais += 1;
     sessAgg.set(key, cur);
+  }
+
+  // planos longos: unidades vendidas por operador/dia. Não depende das travas de
+  // caixa. Uma criança = uma unidade (irmãos no mesmo pedido contam cada um).
+  const rulesByUnit = new Map<string, Map<string, BonusPlanRule>>();
+  for (const [unitId, program] of Object.entries(input.programs)) {
+    const map = new Map<string, BonusPlanRule>();
+    for (const rule of program.planRules ?? []) {
+      if (rule.active) map.set(planRuleKey(rule.kind, rule.refId), rule);
+    }
+    rulesByUnit.set(unitId, map);
+  }
+  const planosByKey = new Map<string, { qtd: Record<string, number>; bonusCents: number }>();
+  const addPlano = (key: string, ruleKey: string, rule: BonusPlanRule) => {
+    const cur = planosByKey.get(key) ?? { qtd: {}, bonusCents: 0 };
+    cur.qtd[ruleKey] = (cur.qtd[ruleKey] ?? 0) + 1;
+    cur.bonusCents += rule.bonusCents;
+    planosByKey.set(key, cur);
+  };
+  for (const s of realSessions) {
+    if (!s.checkin_by_employee_id || s.uses_package || !s.plan_id || !s.order_id) continue;
+    const ruleKey = planRuleKey("PLANO", s.plan_id);
+    const rule = rulesByUnit.get(s.unit_id)?.get(ruleKey);
+    if (!rule) continue;
+    const o = orderById.get(s.order_id);
+    if (!o || o.status !== "PAGA") continue;
+    addPlano(revKey(s.unit_id, s.business_date, s.checkin_by_employee_id), ruleKey, rule);
+  }
+  for (const gp of input.guardianPackages ?? []) {
+    const ruleKey = planRuleKey("PACOTE", gp.package_id);
+    const rule = rulesByUnit.get(gp.unit_id)?.get(ruleKey);
+    if (!rule) continue;
+    if (gp.business_date < input.from || gp.business_date > input.to) continue;
+    const o = gp.order_id ? orderById.get(gp.order_id) : undefined;
+    // pacote vendido pelo upsell tem pedido próprio: estornado, sai do placar
+    if (gp.order_id && (!o || o.status !== "PAGA")) continue;
+    const seller = gp.sold_by_employee_id ?? o?.closed_by_employee_id ?? null;
+    if (!seller) continue;
+    addPlano(revKey(gp.unit_id, gp.business_date, seller), ruleKey, rule);
   }
 
   // prod: itens/produtos por pedido fechado pelo operador
@@ -329,7 +434,7 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
   }
 
   // dias: união de todas as chaves unidade/data/operador com algum dado
-  const allKeys = new Set<string>([...revByKey.keys(), ...sessAgg.keys(), ...prodByKey.keys()]);
+  const allKeys = new Set<string>([...revByKey.keys(), ...sessAgg.keys(), ...prodByKey.keys(), ...planosByKey.keys()]);
   const result: ApuracaoDia[] = [];
   for (const key of allKeys) {
     const [unitId, businessDate, employeeId] = key.split("|");
@@ -349,6 +454,7 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     const agg = sessAgg.get(key) ?? { sessoes: 0, sessoes1hMais: 0 };
     const prod = prodByKey.get(key) ?? { itens: 0, prodCents: 0, bonusProdCents: 0 };
     const sd = shiftsDia.get(shiftUnitDateKey(unitId, businessDate));
+    const planos = planosByKey.get(key) ?? { qtd: {}, bonusCents: 0 };
 
     const limiteAberturaMin = getAberturaLimiteMin(dow);
     const travaAberturaOk = sd?.aberturaMin !== null && sd?.aberturaMin !== undefined && sd.aberturaMin <= limiteAberturaMin;
@@ -386,6 +492,8 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
       travaCaixaOk,
       bonusMetaCents,
       bonusDiaCents,
+      planosVendidos: planos.qtd,
+      bonusPlanosCents: planos.bonusCents,
     });
   }
   return result.sort((a, b) => a.businessDate.localeCompare(b.businessDate));
@@ -427,6 +535,27 @@ export function agregarPorOperador(
     const faturamentoMesCents = list.reduce((sum, d) => sum + d.faturamentoCents, 0);
     const pedidosMes = list.reduce((sum, d) => sum + d.pedidos, 0);
 
+    const planosMes: PlanoMes[] = (program?.planRules ?? [])
+      .filter((r) => r.active)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((r) => {
+        const key = planRuleKey(r.kind, r.refId);
+        const qtd = list.reduce((sum, d) => sum + (d.planosVendidos[key] ?? 0), 0);
+        return {
+          key,
+          kind: r.kind,
+          label: r.label,
+          qtd,
+          bonusCents: qtd * r.bonusCents,
+          escadaMeta: r.escadaMeta,
+          escadaBonusCents: r.escadaBonusCents,
+          escadaBatida: r.escadaMeta > 0 && qtd >= r.escadaMeta,
+        };
+      });
+    const bonusPlanosMesCents = planosMes.reduce((sum, p) => sum + p.bonusCents + (p.escadaBatida ? p.escadaBonusCents : 0), 0);
+    const planosTetoMesCents = program?.planosTetoMesCents ?? 0;
+    const acumuladoPlanosMesCents = planosTetoMesCents > 0 ? Math.min(bonusPlanosMesCents, planosTetoMesCents) : bonusPlanosMesCents;
+
     result.push({
       unitId,
       unitName: unit.name,
@@ -442,6 +571,11 @@ export function agregarPorOperador(
       bonusMetaMesCents: list.reduce((sum, d) => sum + d.bonusMetaCents, 0),
       acumuladoMesCents,
       atingiuTeto: tetoMesCents > 0 && totalAntesDoTeto >= tetoMesCents,
+      planosMes,
+      bonusPlanosMesCents,
+      acumuladoPlanosMesCents,
+      atingiuTetoPlanos: planosTetoMesCents > 0 && bonusPlanosMesCents >= planosTetoMesCents,
+      totalMesCents: acumuladoMesCents + acumuladoPlanosMesCents,
     });
   }
   return result.sort((a, b) => b.acumuladoMesCents - a.acumuladoMesCents);
