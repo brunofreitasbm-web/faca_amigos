@@ -1,7 +1,7 @@
 import { Button } from "@facaamigos/ui";
 import { money } from "../format.js";
 
-interface RelatorioUpsellCardProps {
+interface OlharUpsellCardProps {
   /** Nome do plano que o operador acabou de tocar (ex.: "30 minutos"). */
   currentName: string;
   /** Nome do plano de 1 hora oferecido. */
@@ -18,9 +18,9 @@ interface RelatorioUpsellCardProps {
 
 /**
  * Lembrete de venda: quem escolhe 30 min ouve a oferta do plano de 1 hora
- * com o Relatório da Sessão de cortesia.
+ * com o Olhar FaçaAmigos (o resumo da brincadeira, por WhatsApp) de cortesia.
  *
- * O relatório só existe a partir de SESSION_REPORT_MIN_MINUTES (60), então a
+ * O Olhar só existe a partir de SESSION_REPORT_MIN_MINUTES (60), então a
  * promessa "é só no plano de 1 hora" é verdadeira — não é isca.
  *
  * O argumento de preço é o que a família enxerga no balcão: criança de 30 min
@@ -31,7 +31,7 @@ interface RelatorioUpsellCardProps {
  * Mesmo padrão do UpsellOfferCard: script grande para ler em voz alta e as
  * duas ações com o mesmo peso — recusar tem que ser tão fácil quanto aceitar.
  */
-export function RelatorioUpsellCard({
+export function OlharUpsellCard({
   currentName,
   targetName,
   extraMinutes,
@@ -39,10 +39,10 @@ export function RelatorioUpsellCard({
   targetCents,
   onSwitch,
   onDismiss,
-}: RelatorioUpsellCardProps) {
+}: OlharUpsellCardProps) {
   return (
     <section
-      aria-label="Oferta de plano de 1 hora com relatório da sessão"
+      aria-label="Oferta de plano de 1 hora com o Olhar FaçaAmigos"
       style={{
         marginTop: "10px",
         border: "2px solid var(--color-orange)",
@@ -55,7 +55,7 @@ export function RelatorioUpsellCard({
       }}
     >
       <strong style={{ fontFamily: "var(--font-display)", fontSize: "16px", color: "var(--color-orange-text)" }}>
-        📋 Ofereça a 1 hora + relatório da sessão
+        📋 Ofereça a 1 hora + Olhar FaçaAmigos
       </strong>
 
       <blockquote
@@ -69,15 +69,15 @@ export function RelatorioUpsellCard({
           maxWidth: "60ch",
         }}
       >
-        “Posso sugerir 1 hora? No plano de 1 hora a nossa equipe acompanha a brincadeira e manda no seu WhatsApp um
-        relatório da sessão: como ele(a) brincou, interagiu e se virou nas atividades. É cortesia, só no plano de 1
-        hora. E se ele(a) ficar {extraMinutes} minutos além dos {currentName.toLowerCase()}, sai {money(stayCents)};
+        “Posso sugerir 1 hora? No plano de 1 hora a nossa equipe acompanha a brincadeira e manda no seu WhatsApp o
+        Olhar FaçaAmigos: o resumo de como ele(a) brincou, interagiu e se virou nas atividades. É cortesia, só no
+        plano de 1 hora. E se ele(a) ficar {extraMinutes} minutos além dos {currentName.toLowerCase()}, sai {money(stayCents)};
         na de 1 hora são {money(targetCents)}.”
       </blockquote>
 
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <Figure label={`${currentName} + ${extraMinutes} min extra`} value={money(stayCents)} strike />
-        <Figure label={`${targetName} + relatório`} value={money(targetCents)} emphasis />
+        <Figure label={`${targetName} + Olhar FaçaAmigos`} value={money(targetCents)} emphasis />
       </div>
 
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
