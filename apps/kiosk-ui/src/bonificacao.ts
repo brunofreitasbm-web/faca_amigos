@@ -67,7 +67,7 @@ export function bonificacaoHoje(
 }
 
 export const PILOTO_INICIO = "2026-09-08";
-export const PILOTO_FIM = "2026-10-05";
+export const PILOTO_FIM = "2026-11-05";
 
 /** true enquanto o business_date de hoje estiver dentro da janela do piloto. */
 export function dentroDoPiloto(businessDate: string): boolean {

@@ -8,6 +8,7 @@ import { money } from "../../../format.js";
 import { IfCan } from "../../../auth/RequireCapability.js";
 import { useAuth } from "../../../auth/AuthContext.js";
 import { supabase } from "../../../lib/supabase/client.js";
+import { PlanosLongosSection } from "./PlanosLongosSection.js";
 
 interface WeekdayGoal {
   dayLabel: string;
@@ -876,7 +877,8 @@ export function MetasTab() {
           );
         })}
       </Card>
+
+      {activeUnit && <PlanosLongosSection key={activeUnit.id} unit={activeUnit} />}
     </div>
   );
 }
-

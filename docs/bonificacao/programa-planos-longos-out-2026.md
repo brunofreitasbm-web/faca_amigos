@@ -115,13 +115,15 @@ Dias-operador em que a meta de faturamento foi batida: **6 de 22 (27%)**. Meta b
 
 ## Como apurar
 
-**No aplicativo:** Gerencial > Bonificação e Minha Bonificação, depois que a configuração e a apuração estiverem publicadas (ver Pendências).
+- **No aplicativo:** Gerencial > Metas configura as regras (seção "Bônus de Planos Longos"). Gerencial > Bonificação mostra por operador as unidades vendidas, o bônus de planos e o total do mês. Minha Bonificação mostra o placar ao operador.
+- **No Supabase:** `apuracao_bonificacao.sql` traz as colunas `planos_2h`, `pacotes` e `bonus_planos` por dia e, ao final, o "Resumo mensal — planos longos" com escada e teto próprio. Ajuste o período em `params` de cada consulta.
+- **A lógica** está em `apps/kiosk-ui/src/lib/apuracaoBonificacao.ts` (`apurarBonificacaoPorDia` e `agregarPorOperador`), com testes em `apuracaoBonificacao.test.ts`. O SQL e o TypeScript precisam ficar em sincronia.
 
-**A lógica** está em `apps/kiosk-ui/src/lib/apuracaoBonificacao.ts`: `apurarBonificacaoPorDia` conta as unidades por operador e dia, e `agregarPorOperador` soma o mês, aplica a escada e o teto próprio. Ela tem testes em `apuracaoBonificacao.test.ts`.
+## Como publicar
 
-## Pendências de implementação
+1. Aplicar as duas migrations de `supabase/migrations/20260930100000_fa_bonus_plan_rules.sql` e `20260930100001_fa_bonus_plan_rules_seed.sql`. A segunda semeia o Playground do Parque Shopping com os valores da Parte 1.
+2. Publicar o aplicativo. **Nesta ordem:** o aplicativo novo lê a tabela de regras e a coluna de vendedor, e falha nas telas de bonificação se elas ainda não existirem.
+3. Conferir em Gerencial > Metas > "Bônus de Planos Longos" se as três regras e o teto de R$ 100 aparecem.
+4. Fazer um check-in com pacote e conferir `sold_by_employee_id` e `business_date` em `fa_kiosk_guardian_packages`.
 
-- Migration com a tabela de regras, o teto próprio e os campos de vendedor e data em `fa_kiosk_guardian_packages`. Ela altera o esquema do banco compartilhado e ainda não foi criada nem aplicada.
-- Leitura das regras e dos pacotes em `client.ts`, tela de configuração no Gerencial > Metas, card "Planos longos do mês" em Minha Bonificação e colunas novas em Gerencial > Bonificação.
-- Extensão de `apuracao_bonificacao.sql` com o mesmo cálculo.
-- PDF do manual do operador.
+Reverter é seguro: desmarcar as regras em Gerencial > Metas zera o bônus sem apagar nada.

@@ -656,7 +656,7 @@ export function PainelScreen() {
 
             return (
               <span
-                title={`Piloto de Bonificação (08/09 a 05/10): ${atualLabel} (meta ${metaLabel} / super ${superLabel}) — bônus estimado ${money(b.bonusCents)}`}
+                title={`Programa de Bonificação (piloto de 08/09, 2º ciclo até 05/11): ${atualLabel} (meta ${metaLabel} / super ${superLabel}) — bônus estimado ${money(b.bonusCents)}`}
                 className="metric-progress-chip"
               >
                 <div

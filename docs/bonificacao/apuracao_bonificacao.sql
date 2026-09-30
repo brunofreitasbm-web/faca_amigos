@@ -16,6 +16,14 @@
 -- para a folha — uma unidade sem nada configurado nessas duas tabelas
 -- simplesmente não gera bônus. Owner/ADMIN fica fora da apuração.
 --
+-- Bônus de Planos Longos (2 horas, Day Use, Porto Seguro): bônus fixo por unidade
+-- vendida, escada mensal e teto próprio (fa_kiosk_bonus_program_config.planos_teto_mes_cents),
+-- SEM as travas de caixa. Regras em fa_kiosk_bonus_plan_rules. Aparece nas colunas
+-- planos_2h / pacotes / bonus_planos desta consulta (por dia, sem escada nem teto)
+-- e, com escada e teto do mês, na segunda consulta ao final do arquivo
+-- ("Resumo mensal — planos longos"). Mesma lógica de
+-- apps/kiosk-ui/src/lib/apuracaoBonificacao.ts.
+--
 -- Aluguel avulso de pelúcia no Playground (fa_kiosk_sessions.rental_kind,
 -- migrations 20260919120*): NÃO é sessão para a meta — fica fora de
 -- `sessoes`, `sessoes_1h_mais` e do faturamento (inclusive quando fecha
@@ -47,7 +55,7 @@ config as (
 ),
 sess as (
   select s.unit_id, s.business_date, s.checkin_by_employee_id as employee_id, s.id as session_id, s.order_id,
-         s.rental_kind,
+         s.rental_kind, s.plan_id, s.uses_package,
          case when p.duration_unit = 'HORA' then p.duration_value * 60 else p.duration_value end as plan_min
   from fa_kiosk_sessions s
   join params pr on s.business_date between pr.d_from and pr.d_to
@@ -120,6 +128,37 @@ prod as (
   from prod_raw
   group by 1, 2, 3
 ),
+plan_rules as (
+  select r.unit_id, r.kind, r.ref_id, r.label, r.bonus_cents
+  from fa_kiosk_bonus_plan_rules r
+  where r.active and r.unit_id in (select id from units)
+),
+planos_venda as (
+  -- 2 horas: uma unidade por criança (sessão), pedido PAGA, sem saldo de pacote,
+  -- para o operador do check-in.
+  select s.unit_id, s.business_date, s.employee_id, r.kind, r.ref_id, r.bonus_cents
+  from sess_real s
+  join fa_kiosk_orders o on o.id = s.order_id and o.status = 'PAGA'
+  join plan_rules r on r.unit_id = s.unit_id and r.kind = 'PLANO' and r.ref_id = s.plan_id
+  where s.uses_package is not true and s.employee_id is not null
+  union all
+  -- Pacotes (Day Use, Porto Seguro): uma unidade por linha de guardian_packages,
+  -- para quem vendeu (sold_by) ou, sem isso, quem fechou o pedido. Pedido estornado sai.
+  select gp.unit_id, gp.business_date, coalesce(gp.sold_by_employee_id, o.closed_by_employee_id), r.kind, r.ref_id, r.bonus_cents
+  from fa_kiosk_guardian_packages gp
+  join params pr on gp.business_date between pr.d_from and pr.d_to
+  join plan_rules r on r.unit_id = gp.unit_id and r.kind = 'PACOTE' and r.ref_id = gp.package_id
+  left join fa_kiosk_orders o on o.id = gp.order_id
+  where (gp.order_id is null or o.status = 'PAGA')
+    and coalesce(gp.sold_by_employee_id, o.closed_by_employee_id) is not null
+),
+planos_dia as (
+  select unit_id, business_date, employee_id,
+         count(*) filter (where kind = 'PLANO') as planos_2h,
+         count(*) filter (where kind = 'PACOTE') as pacotes,
+         sum(bonus_cents) as bonus_planos_cents
+  from planos_venda group by 1, 2, 3
+),
 shift_div as (
   -- divergência por meio de pagamento no fechamento e se cada diferença > R$ 20 tem justificativa
   select sh.id as shift_id, sh.unit_id, sh.business_date, sh.status, sh.opened_at_ms, sh.opened_by_employee_id,
@@ -149,19 +188,24 @@ shifts_dia as (
   group by 1, 2
 ),
 dias as (
-  select coalesce(r.unit_id, sa.unit_id, p.unit_id) as unit_id,
-         coalesce(r.business_date, sa.business_date, p.business_date) as business_date,
-         coalesce(r.employee_id, sa.employee_id, p.employee_id) as employee_id,
+  select coalesce(r.unit_id, sa.unit_id, p.unit_id, pl.unit_id) as unit_id,
+         coalesce(r.business_date, sa.business_date, p.business_date, pl.business_date) as business_date,
+         coalesce(r.employee_id, sa.employee_id, p.employee_id, pl.employee_id) as employee_id,
          coalesce(r.fat_cents, 0) as fat_cents,
          coalesce(sa.sessoes, 0) as sessoes,
          coalesce(sa.sessoes_1h_mais, 0) as sessoes_1h_mais,
          coalesce(p.itens, 0) as itens,
          coalesce(p.prod_cents, 0) as prod_cents,
-         coalesce(p.bonus_prod_cents, 0) as bonus_prod_cents
+         coalesce(p.bonus_prod_cents, 0) as bonus_prod_cents,
+         coalesce(pl.planos_2h, 0) as planos_2h,
+         coalesce(pl.pacotes, 0) as pacotes,
+         coalesce(pl.bonus_planos_cents, 0) as bonus_planos_cents
   from rev r
   full join sess_agg sa on sa.unit_id = r.unit_id and sa.business_date = r.business_date and sa.employee_id = r.employee_id
   full join prod p on p.unit_id = coalesce(r.unit_id, sa.unit_id) and p.business_date = coalesce(r.business_date, sa.business_date)
                   and p.employee_id = coalesce(r.employee_id, sa.employee_id)
+  full join planos_dia pl on pl.unit_id = coalesce(r.unit_id, sa.unit_id, p.unit_id) and pl.business_date = coalesce(r.business_date, sa.business_date, p.business_date)
+                  and pl.employee_id = coalesce(r.employee_id, sa.employee_id, p.employee_id)
 ),
 calc as (
   select d.*, u.tipo, u.name as unidade, e.full_name as operador, e.role,
@@ -222,6 +266,7 @@ select unidade, operador, business_date as dia, to_char(business_date, 'Dy') as 
        trava_abertura_ok, trava_caixa_ok,
        round(bonus_meta_cents / 100.0, 2) as bonus_meta,
        round(bonus_prod_cents / 100.0, 2) as bonus_produtos,
+       planos_2h, pacotes, round(bonus_planos_cents / 100.0, 2) as bonus_planos,
        round(bonus_dia_cents / 100.0, 2) as bonus_dia,
        -- acumulado do mês com o teto configurado (fa_kiosk_bonus_program_config),
        -- incluindo o bônus de bater a meta de itens vendidos no mês. Sem teto
@@ -233,4 +278,65 @@ select unidade, operador, business_date as dia, to_char(business_date, 'Dy') as 
          case when coalesce(teto_mes_cents, 0) > 0 then teto_mes_cents else 999999999 end
        ) / 100.0, 2) as acumulado_mes_com_teto
 from final
-order by unidade, business_date, operador;
+order by unidade, business_date, operador
+;
+
+-- ---------------------------------------------------------------------------
+-- Resumo mensal — planos longos (escada e teto próprio, por operador e regra)
+-- Rode com o mesmo período da consulta acima, ajustando as datas em `params`.
+-- O bônus dos planos NÃO passa pelas travas de caixa e NÃO entra no teto de
+-- metas/produtos (fa_kiosk_bonus_program_config.teto_mes_cents): tem teto
+-- próprio (planos_teto_mes_cents; 0/null = sem teto).
+-- ---------------------------------------------------------------------------
+with params as (
+  select date '2026-10-06' as d_from, date '2026-11-05' as d_to
+),
+units as (
+  select id from fa_kiosk_units
+  where id in ('11111111-1111-1111-1111-111111111111', 'e43ba7a8-bd5f-47ad-b81d-dae7ea19d504')
+),
+plan_rules as (
+  select r.* from fa_kiosk_bonus_plan_rules r where r.active and r.unit_id in (select id from units)
+),
+vendas as (
+  select s.unit_id, s.checkin_by_employee_id as employee_id, r.kind, r.ref_id
+  from fa_kiosk_sessions s
+  join params pr on s.business_date between pr.d_from and pr.d_to
+  join fa_kiosk_orders o on o.id = s.order_id and o.status = 'PAGA'
+  join plan_rules r on r.unit_id = s.unit_id and r.kind = 'PLANO' and r.ref_id = s.plan_id
+  where s.rental_kind is null and s.uses_package is not true and s.checkin_by_employee_id is not null
+    and not exists (select 1 from fa_kiosk_session_events e where e.session_id = s.id and e.kind = 'CANCELADA')
+  union all
+  select gp.unit_id, coalesce(gp.sold_by_employee_id, o.closed_by_employee_id), r.kind, r.ref_id
+  from fa_kiosk_guardian_packages gp
+  join params pr on gp.business_date between pr.d_from and pr.d_to
+  join plan_rules r on r.unit_id = gp.unit_id and r.kind = 'PACOTE' and r.ref_id = gp.package_id
+  left join fa_kiosk_orders o on o.id = gp.order_id
+  where (gp.order_id is null or o.status = 'PAGA')
+    and coalesce(gp.sold_by_employee_id, o.closed_by_employee_id) is not null
+),
+por_regra as (
+  select v.unit_id, v.employee_id, r.label, r.bonus_cents, r.escada_meta, r.escada_bonus_cents, r.sort_order,
+         count(*) as qtd
+  from vendas v
+  join plan_rules r on r.unit_id = v.unit_id and r.kind = v.kind and r.ref_id = v.ref_id
+  group by 1, 2, 3, 4, 5, 6, 7
+),
+calc as (
+  select pr.*, pr.qtd * pr.bonus_cents as unitario_cents,
+         case when pr.escada_meta > 0 and pr.qtd >= pr.escada_meta then pr.escada_bonus_cents else 0 end as escada_cents
+  from por_regra pr
+)
+select u.name as unidade, e.full_name as operador, c.label as regra, c.qtd,
+       round(c.unitario_cents / 100.0, 2) as bonus_unitario,
+       c.escada_meta, round(c.escada_cents / 100.0, 2) as bonus_escada,
+       round(sum(c.unitario_cents + c.escada_cents) over (partition by c.unit_id, c.employee_id) / 100.0, 2) as total_antes_do_teto,
+       round(least(
+         sum(c.unitario_cents + c.escada_cents) over (partition by c.unit_id, c.employee_id),
+         case when coalesce(cf.planos_teto_mes_cents, 0) > 0 then cf.planos_teto_mes_cents else 999999999 end
+       ) / 100.0, 2) as total_planos_com_teto
+from calc c
+join fa_kiosk_units u on u.id = c.unit_id
+join fa_kiosk_employees e on e.id = c.employee_id and e.role <> 'ADMIN'
+left join fa_kiosk_bonus_program_config cf on cf.unit_id = c.unit_id
+order by unidade, operador, c.sort_order;
