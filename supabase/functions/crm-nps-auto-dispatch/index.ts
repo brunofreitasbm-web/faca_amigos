@@ -44,7 +44,9 @@ Deno.serve(async () => {
   if (!channels?.length) return json({ ok: true, skipped: "sem canal ativo" });
   // Uma marca por número: o label decide (Circuito = carrinhos, o resto = Playground).
   const channelFor = (activity: string) =>
-    channels.find((c) => c.label.toLowerCase().includes("circuito") === (activity === "CARRINHO"));
+    channels.find((c) => c.label.toLowerCase().includes("circuito") === (activity === "CARRINHO")) ??
+    // Circuito e Playground compartilham o mesmo número: com um único canal, ele atende qualquer atividade.
+    (channels.length === 1 ? channels[0] : undefined);
 
   const now = Date.now();
   const { data: candidates, error } = await admin.rpc("fa_crm_nps_candidates", {

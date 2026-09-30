@@ -95,7 +95,9 @@ Deno.serve(async () => {
     .eq("is_sandbox", false);
   if (!channels?.length) return json({ ok: true, skipped: "sem canal ativo" });
   const channelFor = (activity: string) =>
-    channels.find((c) => c.label.toLowerCase().includes("circuito") === (activity === "CARRINHO"));
+    channels.find((c) => c.label.toLowerCase().includes("circuito") === (activity === "CARRINHO")) ??
+    // Circuito e Playground compartilham o mesmo número: com um único canal, ele atende qualquer atividade.
+    (channels.length === 1 ? channels[0] : undefined);
 
   const { data: candidates, error } = await admin.rpc("fa_crm_optin_candidates", { p_limit: Math.min(PER_RUN, room) });
   if (error) {
