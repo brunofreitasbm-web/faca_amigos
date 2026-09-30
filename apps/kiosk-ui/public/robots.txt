@@ -1,0 +1,3 @@
+# Sistema interno (caixa/quiosque): não indexar.
+User-agent: *
+Disallow: /
