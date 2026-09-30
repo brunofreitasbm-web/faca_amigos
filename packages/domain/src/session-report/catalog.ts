@@ -9,7 +9,7 @@
  * guardam a versão com que foram preenchidos.
  */
 
-export const SESSION_REPORT_CATALOG_VERSION = 1;
+export const SESSION_REPORT_CATALOG_VERSION = 2;
 /** Prazo para preencher, contado do checkout. Passou disso = "atrasado" (não bloqueia). */
 export const SESSION_REPORT_DEADLINE_MS = 40 * 60_000;
 /** Só sessões com pelo menos esta duração contratada geram relatório. */
@@ -54,10 +54,10 @@ export const SESSION_REPORT_CATALOG: readonly SessionReportSector[] = [
     label: "Educação Física",
     emoji: "🏃",
     items: [
-      { key: "ef.coordenacao_ampla", label: "Coordenação motora ampla", hint: "correr, pular, escalar, arremessar" },
-      { key: "ef.equilibrio", label: "Equilíbrio", hint: "andar em linha, ficar num pé só, subir e descer" },
-      { key: "ef.resistencia", label: "Resistência e ritmo", hint: "manteve a energia na atividade, não desistiu logo" },
-      { key: "ef.planejamento_motor", label: "Planejamento motor", hint: "organiza o corpo em tarefa nova (circuito, obstáculo)" },
+      { key: "ef.coordenacao_ampla", label: "Correr, pular e escalar", hint: "correr, pular, escalar, arremessar" },
+      { key: "ef.equilibrio", label: "Manter o equilíbrio", hint: "andar em linha, ficar num pé só, subir e descer" },
+      { key: "ef.resistencia", label: "Manter a energia na brincadeira", hint: "não desistiu logo, seguiu no ritmo da atividade" },
+      { key: "ef.planejamento_motor", label: "Se virar em circuitos e obstáculos", hint: "descobriu como passar em tarefa nova (circuito, obstáculo)" },
     ],
   },
   {
@@ -65,10 +65,10 @@ export const SESSION_REPORT_CATALOG: readonly SessionReportSector[] = [
     label: "Psicologia",
     emoji: "💛",
     items: [
-      { key: "psi.regulacao_emocional", label: "Regulação emocional", hint: "voltou à calma sozinha ou com ajuda após algo difícil" },
-      { key: "psi.interacao_social", label: "Interação social", hint: "aproximou-se, brincou e conversou com outras crianças" },
-      { key: "psi.tolerancia_frustracao", label: "Tolerância à frustração", hint: "lidou com espera, perda ou o \"não\"" },
-      { key: "psi.brincar_compartilhado", label: "Brincar compartilhado e imaginativo", hint: "dividiu brinquedos, propôs ou entrou em faz de conta" },
+      { key: "psi.regulacao_emocional", label: "Se acalmar depois de algo difícil", hint: "voltou à calma sozinha ou com ajuda após algo difícil" },
+      { key: "psi.interacao_social", label: "Brincar com outras crianças", hint: "aproximou-se, brincou e conversou com outras crianças" },
+      { key: "psi.tolerancia_frustracao", label: "Esperar a vez e lidar com o \"não\"", hint: "lidou com espera, perda ou o \"não\"" },
+      { key: "psi.brincar_compartilhado", label: "Dividir brinquedos e entrar no faz de conta", hint: "dividiu brinquedos, propôs ou entrou em faz de conta" },
     ],
   },
   {
@@ -76,10 +76,10 @@ export const SESSION_REPORT_CATALOG: readonly SessionReportSector[] = [
     label: "Terapia Ocupacional",
     emoji: "✋",
     items: [
-      { key: "to.motricidade_fina", label: "Motricidade fina", hint: "pegar, encaixar, manipular objetos pequenos" },
-      { key: "to.processamento_sensorial", label: "Processamento sensorial", hint: "reação a barulho, toque, movimento e texturas" },
-      { key: "to.autonomia_atividades", label: "Autonomia nas atividades", hint: "iniciou e conduziu a brincadeira sem ajuda" },
-      { key: "to.transicoes", label: "Transições entre atividades", hint: "trocou de brinquedo ou espaço sem grande desconforto" },
+      { key: "to.motricidade_fina", label: "Usar as mãos em coisas pequenas", hint: "pegar, encaixar, manipular objetos pequenos" },
+      { key: "to.processamento_sensorial", label: "Lidar com barulho, toque e texturas", hint: "reação a barulho, toque, movimento e texturas" },
+      { key: "to.autonomia_atividades", label: "Conduzir a brincadeira por conta própria", hint: "começou e levou a brincadeira sem ajuda" },
+      { key: "to.transicoes", label: "Trocar de brinquedo ou espaço com tranquilidade", hint: "trocou sem grande desconforto" },
     ],
   },
   {
@@ -87,10 +87,10 @@ export const SESSION_REPORT_CATALOG: readonly SessionReportSector[] = [
     label: "Pedagogia",
     emoji: "📚",
     items: [
-      { key: "ped.atencao_foco", label: "Atenção e foco", hint: "permaneceu na atividade até concluir" },
-      { key: "ped.seguir_instrucoes", label: "Seguir instruções", hint: "compreendeu e executou combinados e regras" },
-      { key: "ped.linguagem_comunicacao", label: "Linguagem e comunicação", hint: "pediu, explicou e respondeu (fala, gesto ou figura)" },
-      { key: "ped.resolucao_problemas", label: "Resolução de problemas e curiosidade", hint: "explorou, testou hipóteses, tentou de outro jeito" },
+      { key: "ped.atencao_foco", label: "Ficar na atividade até o fim", hint: "permaneceu na atividade até concluir" },
+      { key: "ped.seguir_instrucoes", label: "Entender e seguir combinados", hint: "compreendeu e cumpriu os combinados e as regras" },
+      { key: "ped.linguagem_comunicacao", label: "Se comunicar do seu jeito", hint: "pediu, explicou e respondeu (por fala, gesto ou figura)" },
+      { key: "ped.resolucao_problemas", label: "Explorar e tentar de outro jeito", hint: "testou ideias e tentou por outro caminho" },
     ],
   },
 ];
