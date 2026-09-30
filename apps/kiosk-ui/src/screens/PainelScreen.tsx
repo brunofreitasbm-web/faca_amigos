@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon, Tooltip, ClockIcon, ArrowClockwiseIcon } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
-import type { ActiveSessionEntry, Plan, Package, Asset, BonusRule } from "../api/client.js";
+import type { ActiveSessionEntry, Plan, Package, Asset, BonusRule, VipFlag } from "../api/client.js";
 import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO } from "../bonificacao.js";
 import type { BonusProgramConfig } from "../lib/apuracaoBonificacao.js";
 import { useActiveSessions } from "../api/useTick.js";
@@ -131,6 +131,7 @@ export function PainelScreen() {
   // do documento antes de cair no mesmo fechamento financeiro de sempre.
   const [manualExitFor, setManualExitFor] = useState<ActiveSessionEntry | null>(null);
   const [vipChildIds, setVipChildIds] = useState<Set<string>>(new Set());
+  const [vipFlagsMap, setVipFlagsMap] = useState<Map<string, VipFlag>>(new Map());
   const [assets, setAssets] = useState<Asset[]>([]);
   // Retrátil: começa fechada mostrando só a descrição (quantos saldos e
   // resumo), porque essa fila pode ficar aberta o turno inteiro e comia
@@ -262,12 +263,14 @@ export function PainelScreen() {
   useEffect(() => {
     if (!unit || childIdsKey === "") {
       setVipChildIds(new Set());
+      setVipFlagsMap(new Map());
       return;
     }
     let cancelled = false;
     Api.vipFlags(unit.id, childIdsKey.split(","))
       .then((flags) => {
         if (cancelled) return;
+        setVipFlagsMap(flags);
         setVipChildIds(new Set([...flags.values()].filter((f) => f.is_vip).map((f) => f.child_id)));
       })
       .catch(() => {});
@@ -1039,11 +1042,40 @@ export function PainelScreen() {
                           <span>Neurodivergente</span>
                         </Badge>
                       )}
-                      {vipChildIds.has(session.child_id) && (
-                        <Badge variant="vip" title="Cliente VIP — 4 ou mais visitas nos últimos 30 dias">
-                          ★ VIP
-                        </Badge>
-                      )}
+                      {(() => {
+                        const vipFlag = vipFlagsMap.get(session.child_id);
+                        const visits = vipFlag?.visits_in_window;
+                        if (vipChildIds.has(session.child_id)) {
+                          return (
+                            <Badge variant="vip" title={`Cliente VIP — ${visits ?? 4} visitas nos últimos 30 dias`}>
+                              ★ VIP ({visits ?? 4} visitas)
+                            </Badge>
+                          );
+                        }
+                        if (visits !== undefined && visits > 0) {
+                          return (
+                            <Badge
+                              variant="neutral"
+                              title={`${visits} visita(s) nos últimos 30 dias`}
+                              style={{
+                                fontSize: "11px",
+                                padding: "2px 7px",
+                                background: "rgba(0, 0, 0, 0.05)",
+                                border: "1px solid var(--border-subtle)",
+                                color: "var(--text-muted)",
+                                borderRadius: "6px",
+                                fontWeight: "600",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "3px",
+                              }}
+                            >
+                              <span>📍 {visits} {visits === 1 ? "visita" : "visitas"}</span>
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
                       {session.child_name_snapshot}{isNeurodivergent && !session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
                       {session.child_birth_date && (
                         <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}>· {formatAge(session.child_birth_date)}</span>
