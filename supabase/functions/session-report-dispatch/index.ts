@@ -25,7 +25,6 @@ import {
   upsertCrmContact,
 } from "../_shared/twilioWhatsapp.ts";
 import {
-  EMPLOYEE_SECTOR_LABEL,
   SESSION_REPORT_CATALOG,
   SESSION_REPORT_LEVEL_LABEL,
   summarizeAnswersForMessage,
@@ -37,7 +36,16 @@ const GEMINI_MODEL = "gemini-flash-latest";
 const MAX_ATTEMPTS = 5;
 const MAX_MESSAGE_CHARS = 700;
 // Termos que não podem chegar à família num texto sem revisão.
-const FORBIDDEN = /\b(transtorno|d[eé]ficit|atraso|laudo|diagn[oó]stic\w*|sintoma\w*|TEA|TDAH|autis\w*|patolog\w*|avalia[cç][aã]o cl[ií]nica)\b/i;
+const FORBIDDEN = /\b(transtorno|d[eé]ficit|atraso|laudo|diagn[oó]stic\w*|sintoma\w*|TEA|TDAH|autis\w*|patolog\w*|avalia[cç][aã]o cl[ií]nica|regula[cç][aã]o emocional|processamento sensorial|planejamento motor|terap\w*)\b/i;
+
+// Nomes das áreas para a IA: nunca o setor profissional de quem preencheu (Psicologia, Terapia Ocupacional...),
+// senão a mensagem pode acabar dizendo "nossa psicóloga observou".
+const GROUP_NAME: Record<EmployeeSector, string> = {
+  EDUCACAO_FISICA: "Movimento",
+  PSICOLOGIA: "Convivência e emoções",
+  TERAPIA_OCUPACIONAL: "Autonomia e mãos",
+  PEDAGOGIA: "Atenção e comunicação",
+};
 
 type Status =
   | "SENT" | "SKIPPED_NO_CONSENT" | "SKIPPED_OPT_OUT" | "SKIPPED_NO_PHONE"
@@ -65,19 +73,19 @@ function buildFallbackMessage(child: string, minutes: number, answers: SessionRe
   const parts = [`Hoje ${child} passou ${minutes} minutos com a gente.`];
   if (s.autonomo.length) parts.push(`Brilhou em ${list(s.autonomo.slice(0, 3).map((x) => x.toLowerCase()))}, fazendo com autonomia.`);
   const growing = [...s.desenvolvendo, ...s.apoio].slice(0, 2).map((x) => x.toLowerCase());
-  if (growing.length) parts.push(`Seguimos incentivando com carinho ${list(growing)}.`);
+  if (growing.length) parts.push(`Seguimos praticando juntos, com carinho: ${list(growing)}.`);
   if (observacao) parts.push(observacao.replace(/[.!?\s]+$/, "") + ".");
   parts.push("Foi uma alegria receber vocês!");
   return sanitize(parts.join(" "));
 }
 
-function buildPrompt(child: string, minutes: number, sectorLabel: string, answers: SessionReportAnswers, observacao: string | null) {
-  const system = `Você é a equipe do FaçaAmigos, um playground inclusivo em Belém do Pará. Escreva uma mensagem de WhatsApp para o responsável de uma criança sobre como foi a sessão dela hoje.
+function buildPrompt(child: string, minutes: number, answers: SessionReportAnswers, observacao: string | null) {
+  const system = `Você é a equipe do FaçaAmigos, um playground inclusivo em Belém do Pará. Escreva uma mensagem de WhatsApp para o responsável de uma criança sobre como foi a brincadeira dela hoje.
 REGRAS ABSOLUTAS:
 1. Português do Brasil, tom caloroso e leve, de quem gosta da criança. Use o primeiro nome da criança.
-2. Comece celebrando 2 a 3 pontos em que a criança "fez com autonomia". Depois mencione no máximo 1 ou 2 itens "em desenvolvimento" ou "com apoio" de forma positiva, como algo que estamos acompanhando juntos (ex.: "está ganhando confiança em...", "seguimos incentivando...").
+2. Comece celebrando 2 a 3 pontos em que a criança "fez com autonomia". Depois mencione no máximo 1 ou 2 itens "em desenvolvimento" ou "com apoio" de forma positiva, como algo que estamos acompanhando juntos (ex.: "está ganhando confiança em...", "seguimos praticando juntos...").
 3. Se houver observação da equipe sobre o que a criança fez, inclua como uma cena concreta.
-4. PROIBIDO: linguagem clínica ou diagnóstica (transtorno, déficit, atraso, laudo, diagnóstico, sintoma, TEA, TDAH), notas ou pontuações, comparação com outras crianças, promessas terapêuticas. Baseie-se SOMENTE nos dados fornecidos, sem inventar.
+4. PROIBIDO: linguagem clínica ou diagnóstica (regulação, processamento, planejamento motor, terapia, transtorno, déficit, atraso, laudo, diagnóstico, sintoma, TEA, TDAH), notas ou pontuações, comparação com outras crianças, promessas terapêuticas. Baseie-se SOMENTE nos dados fornecidos, sem inventar.
 5. NÃO comece com "Olá" ou "Oi" e NÃO assine: a saudação e a assinatura já vêm no modelo da mensagem. No máximo 2 emojis.
 6. Um único parágrafo, SEM quebras de linha, entre 400 e 600 caracteres.
 Responda EXCLUSIVAMENTE em JSON: { "mensagem": "string" }`;
@@ -87,9 +95,9 @@ Responda EXCLUSIVAMENTE em JSON: { "mensagem": "string" }`;
     const rows = sec.items
       .filter((i) => answers[i.key] != null)
       .map((i) => `  - ${i.label}: ${SESSION_REPORT_LEVEL_LABEL[answers[i.key]!].long}`);
-    if (rows.length) lines.push(`${sec.label}:`, ...rows);
+    if (rows.length) lines.push(`${GROUP_NAME[sec.sector]}:`, ...rows);
   }
-  const prompt = `Criança: ${child}\nTempo de sessão: ${minutes} minutos\nSetor de quem observou: ${sectorLabel}\nObservações por área:\n${lines.join("\n") || "  (nenhum item marcado)"}\nObservação livre da equipe: ${observacao ?? "(nenhuma)"}`;
+  const prompt = `Criança: ${child}\nTempo de brincadeira: ${minutes} minutos\nO que a equipe reparou, por área:\n${lines.join("\n") || "  (nenhum item marcado)"}\nObservação livre da equipe: ${observacao ?? "(nenhuma)"}`;
   return { system, prompt };
 }
 
@@ -210,10 +218,7 @@ Deno.serve(async (req) => {
     const key = Deno.env.get("GEMINI_API_KEY");
     let generated: string | null = null;
     if (key) {
-      const sectorLabel = report.filled_by_sector_snapshot
-        ? EMPLOYEE_SECTOR_LABEL[report.filled_by_sector_snapshot as EmployeeSector] ?? "Equipe"
-        : "Equipe";
-      const { system, prompt } = buildPrompt(childFirst, report.eligible_minutes, sectorLabel, answers, observacao);
+      const { system, prompt } = buildPrompt(childFirst, report.eligible_minutes, answers, observacao);
       generated = await callGemini(key, system, prompt);
     }
     const clean = generated ? sanitize(generated) : null;

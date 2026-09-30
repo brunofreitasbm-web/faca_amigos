@@ -12,7 +12,7 @@ import {
   summarizeAnswersForMessage,
 } from "../src/session-report/catalog.js";
 
-describe("catálogo do Relatório de Sessão", () => {
+describe("catálogo do Olhar FaçaAmigos", () => {
   it("cobre os 4 setores com 3-4 itens cada", () => {
     expect(SESSION_REPORT_CATALOG.map((s) => s.sector)).toEqual([...EMPLOYEE_SECTORS]);
     for (const s of SESSION_REPORT_CATALOG) expect(s.items.length).toBeGreaterThanOrEqual(3);
@@ -44,9 +44,9 @@ describe("progresso e resumo", () => {
 
   it("agrupa rótulos por nível", () => {
     const s = summarizeAnswersForMessage({ "ef.equilibrio": "AUTONOMO", "to.transicoes": "DESENVOLVENDO", "ped.atencao_foco": "APOIO" });
-    expect(s.autonomo).toEqual(["Equilíbrio"]);
-    expect(s.desenvolvendo).toEqual(["Transições entre atividades"]);
-    expect(s.apoio).toEqual(["Atenção e foco"]);
+    expect(s.autonomo).toEqual(["Manter o equilíbrio"]);
+    expect(s.desenvolvendo).toEqual(["Trocar de brinquedo ou espaço com tranquilidade"]);
+    expect(s.apoio).toEqual(["Ficar na atividade até o fim"]);
   });
 });
 
