@@ -160,10 +160,10 @@ export function EntradaScreen({
   const [guardianName, setGuardianName] = useState("");
   const [phone, setPhone] = useState("");
   // Aceite de contato por WhatsApp (avisos + pesquisa de NPS). Começa desmarcado: só vale se o responsável autorizar.
-  const [whatsappConsent, setWhatsappConsent] = useState(false);
+  const [whatsappConsent, setWhatsappConsent] = useState(true);
   // Aceite de MARKETING (ofertas/novidades) — pergunta separada, só oferecida
   // se o responsável já aceitou o contato geral acima.
-  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(true);
   const [favoriteAssetId, setFavoriteAssetId] = useState<string | null>(null);
 
   const [isNeurodivergent, setIsNeurodivergent] = useState(false);
@@ -487,8 +487,8 @@ export function EntradaScreen({
 
   function resetForNextChild(keepGuardian: boolean) {
     if (!keepGuardian) {
-      setWhatsappConsent(false);
-      setMarketingConsent(false);
+      setWhatsappConsent(true);
+      setMarketingConsent(true);
     }
     setQuery("");
     setMatches([]);
@@ -1712,7 +1712,7 @@ export function EntradaScreen({
               if (!v) setMarketingConsent(false); // sem aceite geral, não faz sentido oferecer o de ofertas
             }}
             label="O responsável autoriza contato por WhatsApp (avisos da visita e pesquisa de satisfação)"
-            helpText="Pergunte ao responsável e marque só se ele aceitar. Pode pedir para parar a qualquer momento respondendo PARAR."
+            helpText="Já vem marcado — pergunte ao responsável e desmarque se ele não quiser. Pode pedir para parar a qualquer momento respondendo PARAR."
           />
         )}
         {startNow && whatsappConsent && (
@@ -1720,7 +1720,7 @@ export function EntradaScreen({
             checked={marketingConsent}
             onChange={setMarketingConsent}
             label="Também aceita receber ofertas e novidades (pacotes, promoções) de vez em quando"
-            helpText="Pergunta separada da anterior — só marque se o responsável topar receber ofertas, não só avisos."
+            helpText="Pergunta separada da anterior — desmarque se o responsável quiser receber só os avisos, sem ofertas."
           />
         )}
         <Button
