@@ -4,7 +4,7 @@ import { Api, type PendingSessionReport } from "./client.js";
 const POLL_MS = 60_000;
 
 /**
- * Fila de Relatórios de Sessão pendentes da unidade. Atualiza a cada minuto e
+ * Fila do Olhar FaçaAmigos pendente da unidade. Atualiza a cada minuto e
  * quando a aba volta a ficar visível. Falha de rede mantém o último valor:
  * um badge que some por um soluço de conexão faria o prazo de 40 min passar.
  */

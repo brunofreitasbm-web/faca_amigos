@@ -1,5 +1,5 @@
 /**
- * Relatório de Sessão — catálogo versionado e regras puras.
+ * Olhar FaçaAmigos (antigo Relatório de Sessão; ids internos seguem relatorio_sessao) — catálogo versionado e regras puras.
  *
  * Fonte única para a SPA. O Deno (edge functions) não enxerga `packages/`, então
  * `supabase/functions/_shared/sessionReportCatalog.ts` guarda uma cópia; o teste
@@ -149,6 +149,65 @@ export function sessionEligibleMinutes(s: EligibleMinutesInput): number {
 
 export function isSessionReportEligible(minutes: number): boolean {
   return minutes >= SESSION_REPORT_MIN_MINUTES;
+}
+
+/**
+ * Nomes neutros das áreas para o texto que chega à família (WhatsApp e PDF):
+ * nunca o setor profissional de quem preencheu, senão o texto acaba dizendo
+ * "nossa psicóloga observou" — e o registro é da brincadeira, não clínico.
+ */
+export const SESSION_REPORT_GROUP_NAME: Record<EmployeeSector, string> = {
+  EDUCACAO_FISICA: "Movimento",
+  PSICOLOGIA: "Convivência e emoções",
+  TERAPIA_OCUPACIONAL: "Autonomia e mãos",
+  PEDAGOGIA: "Atenção e comunicação",
+};
+
+/** Chave de cada área no JSON da IA (`ai_report.areas`). */
+export const SESSION_REPORT_GROUP_KEY: Record<EmployeeSector, "movimento" | "convivencia" | "autonomia" | "atencao"> = {
+  EDUCACAO_FISICA: "movimento",
+  PSICOLOGIA: "convivencia",
+  TERAPIA_OCUPACIONAL: "autonomia",
+  PEDAGOGIA: "atencao",
+};
+
+/** Nome do documento entregue à família. Evita "sessão"/"relatório" de propósito (ver nota abaixo). */
+export const SESSION_REPORT_DOC_TITLE = "Olhar FaçaAmigos";
+
+/**
+ * Nota de blindagem: texto FIXO, fora do alcance da IA, impresso em destaque na
+ * 1ª página do PDF e resumido no rodapé de todas. `{crianca}` é substituído
+ * pelo primeiro nome.
+ */
+export const SESSION_REPORT_DISCLAIMER =
+  "Este documento é um registro meramente observacional da brincadeira livre de {crianca} no FaçaAmigos, feito com carinho pela nossa equipe de recreação. " +
+  "Ele não é sessão terapêutica, atendimento, avaliação, diagnóstico, laudo ou parecer de qualquer natureza, e não substitui o acompanhamento de profissionais de saúde ou educação. " +
+  "As observações refletem apenas o momento da visita e servem para compartilhar com a família o que vimos enquanto a criança brincava.";
+
+export const SESSION_REPORT_DISCLAIMER_SHORT =
+  "Registro observacional da brincadeira · sem caráter clínico, terapêutico ou avaliativo · FaçaAmigos";
+
+export interface SectorSummary {
+  sector: EmployeeSector;
+  autonomo: string[];
+  desenvolvendo: string[];
+  apoio: string[];
+}
+
+/** Rótulos respondidos por nível, setor a setor (só setores com algum item) — fallback do PDF. */
+export function summarizeAnswersBySector(answers: SessionReportAnswers): SectorSummary[] {
+  const out: SectorSummary[] = [];
+  for (const s of SESSION_REPORT_CATALOG) {
+    const row: SectorSummary = { sector: s.sector, autonomo: [], desenvolvendo: [], apoio: [] };
+    for (const item of s.items) {
+      const level = answers[item.key];
+      if (level === "AUTONOMO") row.autonomo.push(item.label);
+      else if (level === "DESENVOLVENDO") row.desenvolvendo.push(item.label);
+      else if (level === "APOIO") row.apoio.push(item.label);
+    }
+    if (row.autonomo.length + row.desenvolvendo.length + row.apoio.length > 0) out.push(row);
+  }
+  return out;
 }
 
 /** Agrupa os rótulos dos itens respondidos por nível — alimenta a mensagem de fallback e testes. */

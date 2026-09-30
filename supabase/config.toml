@@ -116,3 +116,9 @@ verify_jwt = false
 # (fa_crm_automation_sends unique kind+ref_key, gravada antes do envio).
 [functions.crm-lifecycle-dispatch]
 verify_jwt = false
+
+# Link do "Registro da Visita" (PDF) que o responsável abre pelo WhatsApp: sem
+# sessão; a autorização é o token de 256 bits do relatório, trocado por uma
+# signed URL de 1h do bucket privado relatorios-sessao.
+[functions.session-report-view]
+verify_jwt = false

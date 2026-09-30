@@ -91,7 +91,7 @@ export function RelatorioSessaoScreen() {
   return (
     <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px", overflow: "auto", height: "100%" }}>
       <div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Relatórios de Sessão</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Olhar FaçaAmigos</h2>
         <HelpText>
           Crianças com plano de 1h ou mais: preencha os 16 itens em até 40 minutos depois da saída. Um toque por item, qualquer
           profissional ou estagiário pode preencher — não é dividido por especialidade. O responsável recebe um resumo no WhatsApp.

@@ -180,7 +180,7 @@ export interface Employee {
   unitIds?: string[];
   /** Path no bucket `ponto-fotos` da última foto de cadastro do rosto — não confundir com o descriptor (ver `Api.myFaceDescriptor`). */
   face_enrolled_photo_path?: string | null;
-  /** Setor de atuação (Relatório de Sessão). Editável em Gerencial > Colaboradores. */
+  /** Setor de atuação (Olhar FaçaAmigos). Editável em Gerencial > Colaboradores. */
   sector?: EmployeeSector | null;
 }
 
@@ -188,7 +188,7 @@ export type SessionReportWhatsappStatus =
   | "PENDING" | "SENT" | "SKIPPED_NO_CONSENT" | "SKIPPED_OPT_OUT" | "SKIPPED_NO_PHONE"
   | "SKIPPED_NO_CHANNEL" | "SKIPPED_NO_TEMPLATE" | "FAILED";
 
-/** Sessão finalizada (plano >= 1h) ainda sem Relatório de Sessão. Sem telefone, de propósito. */
+/** Sessão finalizada (plano >= 1h) ainda sem Olhar FaçaAmigos. Sem telefone, de propósito. */
 export interface PendingSessionReport {
   session_id: string;
   child_id: string;
@@ -212,6 +212,9 @@ export interface RecentSessionReport {
   whatsapp_error: string | null;
   ai_message: string | null;
   filled_by_name: string;
+  pdf_path: string | null;
+  pdf_view_count: number;
+  public_token: string | null;
 }
 
 export interface SessionReportSubmitResult {
@@ -254,7 +257,23 @@ export interface SessionReportRow {
   ai_fallback: boolean;
   sent_at_ms: number | null;
   dispatch_attempts: number;
+  /** PDF do "Olhar FaçaAmigos" (bucket privado relatorios-sessao) — ver migration fa_session_report_pdf. */
+  pdf_path: string | null;
+  pdf_generated_at_ms: number | null;
+  public_token: string | null;
+  pdf_view_count: number;
+  pdf_last_viewed_at_ms: number | null;
+  ai_report: SessionReportDoc | null;
   employee?: { full_name: string } | null;
+}
+
+/** Documento escrito pela IA (ou pelo fallback) que vira o PDF. Espelho de SessionReportDoc em _shared/sessionReportPdf.ts. */
+export interface SessionReportDoc {
+  titulo: string;
+  abertura: string;
+  areas: Partial<Record<"movimento" | "convivencia" | "autonomia" | "atencao", string>>;
+  fechamento: string;
+  destaque_whatsapp: string;
 }
 
 export interface FolhaPagamentoEmployee {
@@ -3766,7 +3785,7 @@ export const Api = {
   setEmployeeSector: (id: string, sector: EmployeeSector | null) =>
     unwrap(supabase().rpc("fa_config_set_employee_sector", { p_employee_id: id, p_sector: sector })),
 
-  // ── Relatório de Sessão (planos >= 1h) ──
+  // ── Olhar FaçaAmigos (planos >= 1h; internamente relatorio_sessao) ──
   sessionReportsPending: (unitId: string) =>
     unwrap<PendingSessionReport[]>(supabase().rpc("fa_session_reports_pending", { p_unit_id: unitId })),
   sessionReportsRecent: (unitId: string, sinceMs: number) =>
@@ -3785,8 +3804,20 @@ export const Api = {
         p_device_id: deviceId,
       }),
     ),
-  sessionReportDispatch: (reportId: string) =>
-    unwrap<SessionReportDispatchResult>(supabase().functions.invoke("session-report-dispatch", { body: { reportId } })),
+  /** Gera o PDF (se ainda não existe) e envia o link ao responsável. `regenerate` refaz texto e PDF, mantendo o mesmo link. */
+  sessionReportDispatch: (reportId: string, opts: { regenerate?: boolean } = {}) =>
+    unwrap<SessionReportDispatchResult>(
+      supabase().functions.invoke("session-report-dispatch", { body: { reportId, regenerate: opts.regenerate === true } }),
+    ),
+  /** Signed URL (60 s) do PDF do relatório — a policy do bucket exige 'relatorio_sessao.read'. */
+  sessionReportPdfUrl: async (pdfPath: string): Promise<string> => {
+    const { data, error } = await supabase().storage.from("relatorios-sessao").createSignedUrl(pdfPath, 60);
+    if (error || !data?.signedUrl) throw new Error(error?.message ?? "Não foi possível abrir o PDF");
+    return data.signedUrl;
+  },
+  /** Link público do PDF, o mesmo que o responsável recebeu no WhatsApp. */
+  sessionReportPublicLink: (publicToken: string) =>
+    `${(import.meta.env.VITE_SUPABASE_URL as string | undefined) || "https://ivjvpdzsfjdpyabbzzuj.supabase.co"}/functions/v1/session-report-view?t=${publicToken}`,
   /** Histórico do Gerencial. A RLS já limita a quem tem 'relatorio_sessao.read'. */
   sessionReportsList: (filters: { unitId?: string | null; sinceMs: number; untilMs: number }) => {
     let q = supabase()

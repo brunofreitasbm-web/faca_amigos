@@ -738,7 +738,7 @@ export function ColaboradoresTab() {
 
                   <Select
                     aria-label={`Setor de ${e.full_name}`}
-                    title="Setor de atuação: define qual bloco do Relatório de Sessão abre primeiro para este colaborador"
+                    title="Setor de atuação: define qual bloco do Olhar FaçaAmigos abre primeiro para este colaborador"
                     value={e.sector ?? ""}
                     onChange={(ev) => void changeSector(e, (ev.target.value || null) as EmployeeSector | null)}
                     style={{ minWidth: "120px", fontSize: "13px" }}

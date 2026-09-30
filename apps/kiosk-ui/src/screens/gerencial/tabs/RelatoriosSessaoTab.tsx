@@ -92,11 +92,11 @@ function Content() {
     return { total, onTime: pct(onTime), sent: pct(sent) };
   }, [filtered]);
 
-  const resend = async (r: SessionReportRow) => {
+  const resend = async (r: SessionReportRow, regenerate = false) => {
     setResending(true);
     try {
-      const res = await Api.sessionReportDispatch(r.id);
-      if (res.status === "SENT" || res.alreadySent) toast.success("Mensagem enviada ao responsável.");
+      const res = await Api.sessionReportDispatch(r.id, { regenerate });
+      if (res.status === "SENT" || res.alreadySent) toast.success("Registro enviado ao responsável.");
       else toast.error(res.error ?? "Não foi possível enviar.");
       await load();
       setDetail(null);
@@ -107,12 +107,31 @@ function Content() {
     }
   };
 
+  const openPdf = async (r: SessionReportRow) => {
+    if (!r.pdf_path) return;
+    try {
+      window.open(await Api.sessionReportPdfUrl(r.pdf_path), "_blank", "noopener");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível abrir o PDF.");
+    }
+  };
+
+  const copyLink = async (r: SessionReportRow) => {
+    if (!r.public_token) return;
+    try {
+      await navigator.clipboard.writeText(Api.sessionReportPublicLink(r.public_token));
+      toast.success("Link copiado.");
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  };
+
   const unitName = (id: string) => units.find((u) => u.id === id)?.name ?? "—";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Relatórios de Sessão</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Olhar FaçaAmigos</h2>
         <HelpText>
           Mapa de observação de cada sessão de 1h ou mais: quem preencheu, em qual setor, se foi no prazo de 40 minutos e a mensagem enviada ao responsável.
         </HelpText>
@@ -255,13 +274,36 @@ function Content() {
               )}
             </div>
 
-            {RETRYABLE.has(detail.whatsapp_status) && (
-              <div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "14px" }}>Olhar FaçaAmigos (PDF)</div>
+              {detail.pdf_path ? (
+                <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>
+                  {detail.pdf_view_count > 0
+                    ? `Aberto pelo responsável ${detail.pdf_view_count}× · última vez ${detail.pdf_last_viewed_at_ms ? dt(detail.pdf_last_viewed_at_ms) : "—"}`
+                    : "Ainda não aberto pelo responsável."}
+                  {detail.ai_report?.titulo ? ` · "${detail.ai_report.titulo}"` : ""}
+                </div>
+              ) : (
+                <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>PDF ainda não gerado.</div>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {detail.pdf_path && (
+                <Button variant="secondary" onClick={() => void openPdf(detail)}>Abrir PDF</Button>
+              )}
+              {detail.public_token && detail.pdf_path && (
+                <Button variant="secondary" onClick={() => void copyLink(detail)}>Copiar link</Button>
+              )}
+              {RETRYABLE.has(detail.whatsapp_status) && (
                 <Button variant="secondary" loading={resending} onClick={() => void resend(detail)}>
                   Reenviar ao responsável
                 </Button>
-              </div>
-            )}
+              )}
+              <Button variant="secondary" loading={resending} onClick={() => void resend(detail, true)}>
+                Regerar e reenviar
+              </Button>
+            </div>
           </div>
         </Modal>
       )}

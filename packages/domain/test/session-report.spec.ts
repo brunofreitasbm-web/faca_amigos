@@ -9,7 +9,13 @@ import {
   sessionReportIsLate,
   sessionReportItemCount,
   sessionReportProgress,
+  summarizeAnswersBySector,
   summarizeAnswersForMessage,
+  SESSION_REPORT_DISCLAIMER,
+  SESSION_REPORT_DISCLAIMER_SHORT,
+  SESSION_REPORT_DOC_TITLE,
+  SESSION_REPORT_GROUP_KEY,
+  SESSION_REPORT_GROUP_NAME,
 } from "../src/session-report/catalog.js";
 
 describe("catálogo do Olhar FaçaAmigos", () => {
@@ -47,6 +53,33 @@ describe("progresso e resumo", () => {
     expect(s.autonomo).toEqual(["Manter o equilíbrio"]);
     expect(s.desenvolvendo).toEqual(["Trocar de brinquedo ou espaço com tranquilidade"]);
     expect(s.apoio).toEqual(["Ficar na atividade até o fim"]);
+  });
+});
+
+describe("Olhar FaçaAmigos (PDF)", () => {
+  it("resume por setor só os setores com itens, na ordem do catálogo", () => {
+    const s = summarizeAnswersBySector({ "ped.atencao_foco": "APOIO", "ef.equilibrio": "AUTONOMO", "ef.resistencia": "DESENVOLVENDO" });
+    expect(s.map((x) => x.sector)).toEqual(["EDUCACAO_FISICA", "PEDAGOGIA"]);
+    expect(s[0]).toEqual({ sector: "EDUCACAO_FISICA", autonomo: ["Manter o equilíbrio"], desenvolvendo: ["Manter a energia na brincadeira"], apoio: [] });
+    expect(s[1]!.apoio).toEqual(["Ficar na atividade até o fim"]);
+    expect(summarizeAnswersBySector({})).toEqual([]);
+  });
+
+  it("nomes neutros das áreas nunca citam o setor profissional", () => {
+    for (const s of EMPLOYEE_SECTORS) {
+      expect(SESSION_REPORT_GROUP_NAME[s]).not.toMatch(/psicolog|terap|pedagog|educa[cç][aã]o f[ií]sica/i);
+      expect(SESSION_REPORT_GROUP_KEY[s]).toMatch(/^(movimento|convivencia|autonomia|atencao)$/);
+    }
+  });
+
+  it("nota de blindagem nega caráter clínico e o título evita 'sessão'/'relatório'", () => {
+    expect(SESSION_REPORT_DISCLAIMER).toMatch(/meramente observacional/);
+    for (const termo of ["sessão terapêutica", "atendimento", "avaliação", "diagnóstico", "laudo", "parecer", "não substitui"]) {
+      expect(SESSION_REPORT_DISCLAIMER).toContain(termo);
+    }
+    expect(SESSION_REPORT_DISCLAIMER).toContain("{crianca}");
+    expect(SESSION_REPORT_DISCLAIMER_SHORT).toMatch(/sem caráter clínico/);
+    expect(SESSION_REPORT_DOC_TITLE).not.toMatch(/sess[aã]o|relat[oó]rio/i);
   });
 });
 

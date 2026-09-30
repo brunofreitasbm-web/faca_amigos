@@ -25,6 +25,8 @@ interface TemplateDef {
   variableCount: number;
   sample: Record<string, string>;
   quickReplyButtons?: { title: string; id: string }[];
+  /** Botão de link (twilio/call-to-action). A variável de URL é o sufixo `{{n}}` no fim da url. */
+  urlButton?: { title: string; url: string };
 }
 
 // Corpo provisório, alinhado ao design e às variáveis que cada Edge Function
@@ -68,14 +70,22 @@ const TEMPLATES: TemplateDef[] = [
     sample: { "1": "Ana", "2": "Miguel", "3": "+30 min" },
   },
   {
-    purpose: "VISITA_FIDELIDADE", name: "fa_visita_fidelidade", category: "UTILITY", variableCount: 3,
-    body: "Oi {{1}}! Sobre {{2}}: {{3}}",
+    purpose: "VISITA_FIDELIDADE", name: "fa_visita_fidelidade_v2", category: "UTILITY", variableCount: 3,
+    body: "Oi {{1}}, tudo bem? Aqui é o FaçaAmigos com uma novidade sobre o cartão fidelidade de {{2}}: {{3}} Cada visita conta e a gente adora ver vocês por aqui. Qualquer dúvida, é só responder esta mensagem. 💛",
     sample: { "1": "Ana", "2": "Miguel", "3": "Miguel está a só 2 visitas de ganhar 30 min de cortesia! Continue vindo brincar." },
   },
   {
-    purpose: "RELATORIO_SESSAO", name: "fa_relatorio_sessao", category: "UTILITY", variableCount: 3,
-    body: "Oi {{1}}! Sobre {{2}}: {{3}}",
+    purpose: "RELATORIO_SESSAO", name: "fa_relatorio_sessao_v3", category: "UTILITY", variableCount: 3,
+    body: "Oi {{1}}, tudo bem? Aqui é a equipe do FaçaAmigos com o Olhar FaçaAmigos de hoje sobre {{2}}. Nossa equipe acompanhou cada momento da brincadeira e separou este recado para você: {{3}} É um registro observacional da brincadeira, sem caráter de avaliação. Qualquer dúvida, é só responder esta mensagem. Até a próxima visita! 💛",
     sample: { "1": "Ana", "2": "Miguel", "3": "Hoje Miguel passou 90 minutos com a gente e brilhou na coordenação motora e na interação social." },
+  },
+  {
+    // Olhar FaçaAmigos em PDF: 1 destaque + botão que abre o documento
+    // (session-report-view?t=<token>). Numeração única entre corpo e botão.
+    purpose: "RELATORIO_SESSAO_PDF", name: "fa_relatorio_sessao_pdf_v2", category: "UTILITY", variableCount: 4,
+    body: "Oi {{1}}, tudo bem? Aqui é a equipe do FaçaAmigos com o Olhar FaçaAmigos de hoje sobre {{2}}. Um destaque: {{3}} O documento completo, com o que a nossa equipe viu enquanto {{2}} brincava, está no botão abaixo. É um registro observacional da brincadeira, sem caráter de avaliação. Qualquer dúvida, é só responder esta mensagem. 💛",
+    sample: { "1": "Ana", "2": "Miguel", "3": "Miguel brilhou ao dividir os brinquedos e entrar no faz de conta com as outras crianças!", "4": "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdEFG" },
+    urlButton: { title: "Abrir Olhar", url: "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t={{4}}" },
   },
   {
     purpose: "MAPEAMENTO", name: "fa_mapeamento_followup", category: "MARKETING", variableCount: 4,
@@ -213,7 +223,9 @@ Deno.serve(async () => {
 
     const types = def.quickReplyButtons
       ? { "twilio/quick-reply": { body: def.body, actions: def.quickReplyButtons } }
-      : { "twilio/text": { body: def.body } };
+      : def.urlButton
+        ? { "twilio/call-to-action": { body: def.body, actions: [{ type: "URL", title: def.urlButton.title, url: def.urlButton.url }] } }
+        : { "twilio/text": { body: def.body } };
 
     const createRes = await fetch(CONTENT_API, {
       method: "POST",

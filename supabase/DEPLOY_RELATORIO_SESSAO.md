@@ -1,4 +1,4 @@
-# Relatório de Sessão — deploy
+# Olhar FaçaAmigos (antigo Relatório de Sessão) — deploy
 
 Sessões com plano de 1h ou mais geram um relatório de observação (mapa por setor,
 3 níveis clicáveis) que o profissional preenche em até 40 min após a saída.
@@ -109,3 +109,19 @@ Colaborador sem setor vê todos os blocos, na ordem padrão.
   ambiente de desenvolvimento): confira no primeiro deploy pelos logs.
 - O envio offline: o relatório entra na fila local e o envio ao responsável é
   feito pelo botão **Reenviar** quando a rede voltar.
+
+## Olhar FaçaAmigos em PDF (link no WhatsApp)
+
+Migration `20260930000000_fa_session_report_pdf.sql` + functions `session-report-dispatch` (alterada), `session-report-view` (nova, `verify_jwt = false`) e o template `RELATORIO_SESSAO_PDF` (bootstrap).
+
+**Fluxo:** `session-report-dispatch` pede ao Gemini UM JSON (`titulo`, `abertura`, `areas{movimento, convivencia, autonomia, atencao}`, `fechamento`, `destaque_whatsapp`), valida formato + termos proibidos em todos os campos (qualquer falha → documento inteiro pelo fallback determinístico, `ai_fallback=true`), desenha o A4 com `pdf-lib` (`_shared/sessionReportPdf.ts`), sobe em `relatorios-sessao/<unit_id>/<report_id>.pdf` (bucket privado, só service role escreve) e grava `pdf_path`, `ai_report` e o `public_token` (256 bits, definido **uma vez** — Reenviar/Regerar mantêm o link).
+
+**Link:** `https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t=<token>` → conta a visualização (`pdf_view_count`) → 302 para signed URL de 1h. Token inválido → site público (a Meta testa a URL de amostra do botão).
+
+**Mensagem:** janela de 24h aberta → texto livre com o link; senão template `RELATORIO_SESSAO_PDF` (`twilio/call-to-action`, botão "Abrir Olhar", variáveis `{{1}}` responsável, `{{2}}` criança, `{{3}}` destaque, `{{4}}` token no sufixo da URL); enquanto ele não estiver aprovado, cai no `RELATORIO_SESSAO` de texto com o link dentro de `{{3}}`.
+
+**Blindagem:** o PDF traz nota fixa (fora da IA) de que é registro meramente observacional da brincadeira — não é sessão terapêutica, atendimento, avaliação, diagnóstico, laudo ou parecer — na 1ª página e resumida no rodapé de todas. O documento se chama "Olhar FaçaAmigos"; o prompt e o filtro `FORBIDDEN` também barram sessão/atendimento/evolução/desenvolvimento/habilidade/etc. Os itens e níveis (pílulas) vêm do catálogo, nunca da IA.
+
+**Assets:** fontes OFL (Fredoka One, Nunito 400/700) e logo em base64 em `_shared/assets/brandAssets.ts`. Para trocar, coloque os arquivos em `_shared/assets/src/` e rode `node scripts/build-brand-assets.mjs` (o `static_files` do Supabase é descartado no deploy sem Docker, por isso base64).
+
+**Gerencial:** no detalhe do relatório: "Abrir PDF" (signed URL de 60 s pela policy `relatorio_sessao.read`), "Copiar link" (o mesmo do WhatsApp), contador de aberturas e "Regerar e reenviar" (`regenerate: true` refaz texto e PDF).

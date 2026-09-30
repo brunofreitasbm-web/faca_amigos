@@ -96,8 +96,8 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "crm.read": "Ver o CRM de WhatsApp (conversas e contatos do Playground e do Circuito)",
   "crm.write": "Responder clientes e editar a ficha no CRM de WhatsApp",
   "crm.admin": "Gerenciar números (canais) e templates do CRM de WhatsApp",
-  "relatorio_sessao.write": "Preencher o Relatório de Sessão (crianças com plano de 1h ou mais)",
-  "relatorio_sessao.read": "Ver o histórico de Relatórios de Sessão no Gerencial",
+  "relatorio_sessao.write": "Preencher o Olhar FaçaAmigos (crianças com plano de 1h ou mais)",
+  "relatorio_sessao.read": "Ver o histórico do Olhar FaçaAmigos no Gerencial",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
