@@ -3,6 +3,7 @@ import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText,
 import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
+import { RelatorioUpsellCard } from "../components/RelatorioUpsellCard.js";
 import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
 import { PrepaidPaymentModal } from "../components/PrepaidPaymentModal.js";
 import { IfCan } from "../auth/RequireCapability.js";
@@ -26,6 +27,7 @@ import {
   formatCpf,
   planDurationMinutes,
   formatAccessCode,
+  SESSION_REPORT_MIN_MINUTES,
 } from "@facaamigos/domain";
 import { money, formatElapsed, formatAge } from "../format.js";
 
@@ -233,6 +235,8 @@ export function EntradaScreen({
   const [quickTriggerMinutes, setQuickTriggerMinutes] = useState(60);
   const [quickUpsellAccepted, setQuickUpsellAccepted] = useState(false);
   const [crossSellModalOpen, setCrossSellModalOpen] = useState(false);
+  // Oferta "1 hora + relatório da sessão": dispensada neste atendimento.
+  const [relatorioOfferDismissed, setRelatorioOfferDismissed] = useState(false);
 
   // Aluguel avulso de pelúcia no Playground: plano PLAYGROUND com assetKind.
   // Fica fora do grid normal (tem card próprio) e não recebe cupom,
@@ -507,6 +511,7 @@ export function EntradaScreen({
     setShowExtras(false);
     setFavoriteAssetId(null);
     setQuickUpsellAccepted(false);
+    setRelatorioOfferDismissed(false);
     setPreCheckinId(null);
     setStartNow(true);
     if (!keepGuardian) {
@@ -594,6 +599,27 @@ export function EntradaScreen({
     () => coupons.filter((c) => !c.allowedPlanId || c.allowedPlanId === planId),
     [coupons, planId],
   );
+
+  // Oferta "1 hora + relatório": plano curto no Playground -> sugere o de 1 h.
+  // Só sem cupom restrito a plano (trocar derrubaria o desconto e o script
+  // mentiria) e só quando a 1 h realmente sai mais barata que ficar a hora
+  // toda no plano atual com o minuto adicional.
+  const relatorioOffer = useMemo(() => {
+    if (relatorioOfferDismissed || activity !== "PLAYGROUND") return null;
+    if (!selectedPlan || isPelucia || usingPackage || usingHourBank || usingChildCredit) return null;
+    const currentMinutes = planDurationMinutes(selectedPlan);
+    if (currentMinutes >= SESSION_REPORT_MIN_MINUTES) return null;
+    const target = regularPlans.find((p) => planDurationMinutes(p) === SESSION_REPORT_MIN_MINUTES);
+    if (!target) return null;
+    const coupon = couponCode ? coupons.find((c) => c.code.toLowerCase() === couponCode.toLowerCase()) : undefined;
+    if (coupon?.allowedPlanId) return null;
+    const extraMinutes = SESSION_REPORT_MIN_MINUTES - currentMinutes;
+    const stayGross = selectedPlan.valueCents + extraMinutes * selectedPlan.overageCentsPerMinute;
+    const stayCents = getPlanDiscountedCents(stayGross, couponCode, coupons, selectedPlan.id).finalCents;
+    const targetCents = getPlanDiscountedCents(target.valueCents, couponCode, coupons, target.id).finalCents;
+    if (targetCents >= stayCents) return null;
+    return { target, extraMinutes, stayCents, targetCents };
+  }, [relatorioOfferDismissed, activity, selectedPlan, isPelucia, usingPackage, usingHourBank, usingChildCredit, regularPlans, couponCode, coupons]);
 
   useEffect(() => {
     if (!unit) return;
@@ -1490,6 +1516,21 @@ export function EntradaScreen({
               {quickUpsellAccepted ? "✓ Vai na comanda" : "Adicionar"}
             </Button>
           </div>
+        )}
+
+        {/* Lembrete de venda: 30 min -> 1 hora + relatório da sessão (só a
+            partir de 1 h gera relatório). Trocar não abre o modal da água:
+            duas ofertas seguidas cansam o cliente. */}
+        {relatorioOffer && selectedPlan && (
+          <RelatorioUpsellCard
+            currentName={selectedPlan.name}
+            targetName={relatorioOffer.target.name}
+            extraMinutes={relatorioOffer.extraMinutes}
+            stayCents={relatorioOffer.stayCents}
+            targetCents={relatorioOffer.targetCents}
+            onSwitch={() => setPlanId(relatorioOffer.target.id)}
+            onDismiss={() => setRelatorioOfferDismissed(true)}
+          />
         )}
 
         {/* Pré-pago: o pai paga e vai embora, o tempo fica como saldo da
