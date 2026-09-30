@@ -105,7 +105,7 @@ export function ConfiguracoesScreen() {
       "Pacotes de horas oferecidos como upgrade ao cliente VIP no check-in. Quem escolhe qual oferecer é o sistema: o pacote de valor imediatamente acima do que a família já gastou no mês, e só se ele baixar o custo por hora dela.",
     PRODUTOS: "Cadastre os itens vendidos avulsos no PDV (loja/lanchonete) e o estoque disponível de cada um.",
     CUPONS: "Crie códigos de desconto ou parceria que o operador pode aplicar na tela de Entrada.",
-    FIDELIDADE: "Defina recompensas automáticas para clientes recorrentes — ex.: a cada 10 visitas, uma entrada grátis.",
+    FIDELIDADE: "Defina recompensas automáticas para clientes recorrentes — ex.: a cada 10 visitas registradas pelo CPF do responsável, a 10ª entrada de 30 minutos é 100% gratuita (Playground e Circuito).",
     FROTA: "Cadastre os carrinhos do Circuito (nome, cor, emoji e foto) e marque quando um estiver em manutenção.",
     PONTO: "Gere e imprima o espelho de ponto mensal de qualquer colaborador, com as marcações do mês e linha para assinatura.",
     UNIDADE: "Dados da unidade: nome, fuso, virada do dia operacional e o que aparece no cabeçalho do cupom.",

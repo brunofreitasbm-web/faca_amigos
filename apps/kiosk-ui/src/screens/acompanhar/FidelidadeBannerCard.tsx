@@ -85,7 +85,7 @@ export function FidelidadeBannerCard({ childFirstName, visitCount = 8 }: Fidelid
             </>
           ) : (
             <>
-              A cada 10 visitas, a 10ª sessão dá 30 min de cortesia. Faltam apenas{" "}
+              A cada 10 visitas registradas pelo CPF do responsável, a 10ª entrada de 30 minutos é 100% gratuita. Vale no Playground e no Circuito. Faltam apenas{" "}
               <strong>{10 - cycleVisits} visita(s)</strong> para o benefício!
             </>
           )}
