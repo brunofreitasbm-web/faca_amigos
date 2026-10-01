@@ -33,9 +33,12 @@ export function nextRampLevel(level: number, sentLastDay: number, declinedLastDa
   return level + 1;
 }
 
+const rampAt = (level: number) => Math.floor(RAMP_BASE * Math.pow(RAMP_FACTOR, level));
+
 /**
- * Meta de envios do dia: a rampa, ou o necessário para fechar a fila dentro
- * do prazo (o que for maior), nunca acima do teto configurado.
+ * Meta de envios do dia: a rampa, enquanto ela sozinha fecha a fila dentro do
+ * prazo; se não fecha (rampa segurada por PARAR, prazo apertado), o necessário
+ * para fechar. Nunca acima do teto configurado.
  */
 export function dailyTarget(
   rampLevel: number,
@@ -43,9 +46,12 @@ export function dailyTarget(
   pending: number,
   daysLeft: number,
 ): number {
-  const ramp = Math.floor(RAMP_BASE * Math.pow(RAMP_FACTOR, rampLevel));
-  const needed = Math.ceil(pending / Math.max(1, daysLeft));
-  return Math.max(0, Math.min(dailyCap, pending, Math.max(ramp, needed)));
+  const days = Math.max(1, daysLeft);
+  let rampCapacity = 0;
+  for (let k = 0; k < days; k++) rampCapacity += Math.min(dailyCap, rampAt(rampLevel + k));
+  const ramp = rampAt(rampLevel);
+  const target = rampCapacity >= pending ? ramp : Math.max(ramp, Math.ceil(pending / days));
+  return Math.max(0, Math.min(dailyCap, pending, target));
 }
 
 export function slotWeight(slotMin: number): number {

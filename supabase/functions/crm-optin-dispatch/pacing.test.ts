@@ -25,6 +25,11 @@ Deno.test("prazo apertado puxa a meta acima da rampa, sem passar do teto", () =>
   assertEquals(dailyTarget(0, 150, 600, 0), 150, "prazo vencido conta como 1 dia");
 });
 
+Deno.test("fila que a rampa fecha no prazo segue a rampa, não a média", () => {
+  assertEquals(dailyTarget(0, 150, 1_066, 15), 30);
+  assertEquals(dailyTarget(2, 150, 1_066, 15), 67);
+});
+
 Deno.test("meta nunca passa do que resta na fila", () => {
   assertEquals(dailyTarget(3, 150, 12, 10), 12);
   assertEquals(dailyTarget(0, 150, 0, 10), 0);
