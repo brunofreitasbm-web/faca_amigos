@@ -34,7 +34,6 @@ import { GeneralOnboardingScreen } from "./screens/GeneralOnboardingScreen.js";
 import { GeneralPjOnboardingScreen } from "./screens/GeneralPjOnboardingScreen.js";
 import { AcompanharScreen } from "./screens/AcompanharScreen.js";
 import { AcessoRapidoScreen } from "./screens/AcessoRapidoScreen.js";
-import { NpsScreen } from "./screens/NpsScreen.js";
 import { EntradaScreen } from "./screens/EntradaScreen.js";
 import { SaidaScreen } from "./screens/SaidaScreen.js";
 import { PainelScreen } from "./screens/PainelScreen.js";
@@ -371,13 +370,6 @@ export function App() {
   const acompanharParam = new URLSearchParams(window.location.search).get("acompanhar");
   if (acompanharParam) {
     return <AcompanharScreen code={acompanharParam} />;
-  }
-
-  // NPS por clique (?nps=<token>): link único enviado por WhatsApp. Público,
-  // sem conta — mesmo espírito do ?acompanhar= acima.
-  const npsParam = new URLSearchParams(window.location.search).get("nps");
-  if (npsParam) {
-    return <NpsScreen token={npsParam} />;
   }
 
   // QR Code de Acesso Rápido (?acesso-rapido=<unit_id>): cartaz fixo na

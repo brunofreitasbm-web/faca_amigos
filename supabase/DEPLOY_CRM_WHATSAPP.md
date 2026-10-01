@@ -39,7 +39,7 @@ values ('Boas-vindas', 'HX...', 'Olá {{1}}! Obrigado por visitar o FaçaAmigos 
 `crm.read` / `crm.write`: Líder e Owner. `crm.admin` (canais/templates): Owner. Ajustáveis em Gerencial > Permissões.
 
 ## NPS por WhatsApp
-A pesquisa saiu da tela pública de acompanhamento e passou a ser enviada pelo CRM (`crm-nps-send`, botão "Enviar NPS" na conversa ou em lote). Cada número pergunta sobre a própria marca (Playground ou Circuito). A resposta 0-10 e o comentário são tratados em `crm-whatsapp-webhook` e aparecem no feed de NPS da Visão Geral Owner.
+A pesquisa saiu da tela pública de acompanhamento e passou a ser enviada pelo CRM (`crm-nps-send`, botão "Enviar NPS" na conversa ou em lote). A pesquisa pergunta a unidade e depois as notas (veja "NPS em etapas" abaixo). As respostas são tratadas em `crm-whatsapp-webhook` e aparecem no feed de NPS da Visão Geral Owner.
 
 Cadastrar o template aprovado pela Meta (variável {{1}} = primeiro nome):
 ```sql
@@ -48,14 +48,21 @@ values ('NPS pós-visita', 'HX...', 'Olá {{1}}! Como foi sua visita ao FaçaAmi
 ```
 Proteções: máx. 100 contatos por envio; pula quem pediu PARAR e quem recebeu NPS nos últimos 30 dias.
 
-### NPS por clique (link `?nps=<token>`)
-Migration `20261001140000_fa_crm_nps_web.sql`. O envio passa `{{2}}` = token da pesquisa; a página pública (`NpsScreen`) coleta recomendação 0-10 (o NPS), equipe 1-5, espaço 1-5 e um texto opcional, só com cliques. Responder digitando no WhatsApp continua funcionando.
+### NPS em etapas, dentro do WhatsApp
+Migration `20261001140000_fa_crm_nps_steps.sql`. O pai nunca sai do WhatsApp e responde digitando o número:
+1. **Unidade** (pergunta do template v2; resposta = número da lista `1) … · 2) … · 3) …`);
+2. **Recomendação 0-10** (o NPS oficial) → 3. **Equipe 1-5** → 4. **Espaço 1-5**;
+5. **Contribuição** em texto livre (ou "não").
 
-Requer um **novo template NPS aprovado na Meta/Twilio com botão de URL dinâmica** apontando para `https://<app>/?nps={{2}}` (variável `{{1}}` = primeiro nome). Cadastre-o com `purpose = 'NPS'` — o envio usa o template ativo mais recente. Templates antigos só com `{{1}}` ignoram o token (o fluxo digitado segue valendo).
+As perguntas 2 a 5 são mensagens livres dentro da janela aberta pela resposta do pai: só o template da primeira pergunta precisa de aprovação. Leitura das respostas em `supabase/functions/_shared/nps.ts` (testes: `deno test supabase/functions/_shared/nps.test.ts`); fluxo em `crm-whatsapp-webhook` (`handleNps`). O envio (`crm-nps-send`, `crm-nps-auto-dispatch`) grava em `fa_crm_nps_surveys.unit_options` a lista de unidades enviada, para o número digitado apontar sempre para a unidade certa.
 
-Ordem de deploy: aplicar a migration, depois publicar `crm-nps-send`, `crm-nps-auto-dispatch` e `crm-whatsapp-webhook`, depois o front.
+**Template novo:** `fa_nps_pos_visita_v2` (purpose `NPS`, 2 variáveis: `{{1}}` primeiro nome, `{{2}}` lista de unidades em linha única). Crie/submeta com `crm-templates-bootstrap`; ele só ativa depois que a Meta aprovar. Enquanto não houver v2 ativo, o envio continua com o v1 (que já abre pedindo a nota 0-10): a pesquisa funciona igual, só sem a pergunta de unidade (aparece como "Não informada" no dashboard). Depois da aprovação, retire o v1 em `RETIRED`.
 
-A migration também corrige `fa_crm_lc_candidates`: as réguas NPS_PROMOTOR/NPS_DETRATOR olhavam só `status = 'SCORED'` e ignoravam respostas já `DONE`.
+Ordem de deploy: aplicar a migration → publicar `crm-whatsapp-webhook`, `crm-nps-send` e `crm-nps-auto-dispatch` → front → aprovar o v2.
+
+**Dashboard:** aba "Dashboard NPS" no Gerencial (Visão Geral & IA). Dados vêm de `fa_crm_nps_dashboard` e `fa_crm_nps_comments` (exigem `crm.read` ou `relatorio.read`; nome e telefone só com `crm.read`).
+
+**Réguas de promotor/detrator:** `20261001150000_fa_crm_nps_lifecycle_done.sql` corrige o filtro (`status in ('SCORED','DONE')`; antes só `SCORED`). **Só aplicar depois de `20261001130000_fa_crm_offer_ladder`**, que é de onde vem a função que ela recria.
 
 ## Aviso de fim de plano + renovação por WhatsApp
 Substitui o "avisar 5 min antes" (Web Push), o bloco de renovação e o card da ZoeIA da tela pública de acompanhamento. `crm-renewal-alert-dispatch` roda a cada minuto (pg_cron), avisa quem deu aceite de contato no check-in e oferece 3 opções de +min/R$ por botão de resposta rápida. O toque vira `RENOVACAO_SOLICITADA` (mesmo pedido pendente que o balcão já vê); sem cobrança automática.

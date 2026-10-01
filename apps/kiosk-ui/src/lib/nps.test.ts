@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageScore, npsBand, summarizeNps } from "./nps.js";
+import { averageScore, deltaPoints, npsBand, npsBandColor, npsValueColor, pct, summarizeNps } from "./nps.js";
 
 describe("summarizeNps", () => {
   it("classifica 9-10 promotor, 7-8 neutro, 0-6 detrator", () => {
@@ -26,5 +26,29 @@ describe("averageScore", () => {
   it("média simples ou null", () => {
     expect(averageScore([4, 5])).toBe(4.5);
     expect(averageScore([])).toBeNull();
+  });
+});
+
+describe("helpers do dashboard", () => {
+  it("variação em pontos", () => {
+    expect(deltaPoints(40, 25)).toBe(15);
+    expect(deltaPoints(4.2, 4.5)).toBe(-0.3);
+    expect(deltaPoints(null, 10)).toBeNull();
+    expect(deltaPoints(10, null)).toBeNull();
+  });
+
+  it("percentual com base zero", () => {
+    expect(pct(1, 4)).toBe(25);
+    expect(pct(0, 0)).toBeNull();
+  });
+
+  it("cores por faixa e por zona do NPS", () => {
+    expect(npsBandColor(10)).toBe("#10b981");
+    expect(npsBandColor(8)).toBe("#f59e0b");
+    expect(npsBandColor(3)).toBe("#ef4444");
+    expect(npsValueColor(60)).toBe("#10b981");
+    expect(npsValueColor(0)).toBe("#f59e0b");
+    expect(npsValueColor(-10)).toBe("#ef4444");
+    expect(npsValueColor(null)).toBe("#64748b");
   });
 });

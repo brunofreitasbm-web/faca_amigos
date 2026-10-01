@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { loadUnitOptions, npsVariables, renderNpsPreview, templateAsksUnit } from "../_shared/npsSurvey.ts";
 
 // Disparada a cada 15 min pelo pg_cron (migration 20260928140000). Envia o
 // NPS por WhatsApp a quem terminou a visita entre 2h e 6h atrás, SOMENTE nas
@@ -35,6 +36,10 @@ Deno.serve(async () => {
     .limit(1)
     .maybeSingle();
   if (!template) return json({ ok: true, skipped: "sem template NPS ativo" });
+
+  // Só o template novo pergunta a unidade; o antigo segue direto para a nota.
+  const unitOptions = templateAsksUnit(template.preview) ? await loadUnitOptions(admin) : null;
+  if (unitOptions && unitOptions.length === 0) return json({ ok: true, skipped: "sem unidades para a pergunta do NPS" });
 
   const { data: channels } = await admin
     .from("fa_crm_channels")
@@ -105,6 +110,18 @@ Deno.serve(async () => {
     }
 
     const firstName = (contact!.name ?? cand.full_name ?? "").trim().split(/\s+/)[0] || "tudo bem";
+    // A pesquisa nasce antes do envio, já com a lista de unidades que o responsável vai ver.
+    const sentAt = Date.now();
+    const { data: survey, error: surveyErr } = await admin
+      .from("fa_crm_nps_surveys")
+      .insert({ contact_id: contact!.id, channel_id: channel.id, sent_at_ms: sentAt, unit_options: unitOptions })
+      .select("id")
+      .single();
+    if (surveyErr || !survey) {
+      console.error("Falha ao criar pesquisa NPS:", surveyErr?.message);
+      failed++;
+      continue;
+    }
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
       method: "POST",
       headers: {
@@ -115,23 +132,22 @@ Deno.serve(async () => {
         From: `whatsapp:${channel.whatsapp_e164}`,
         To: `whatsapp:${cand.phone_e164}`,
         ContentSid: template.content_sid,
-        ContentVariables: JSON.stringify({ "1": firstName }),
+        ContentVariables: JSON.stringify(npsVariables(firstName, unitOptions)),
         StatusCallback: WEBHOOK_URL,
       }),
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok) {
       console.error("Twilio recusou NPS automático:", out?.code, out?.message);
+      await admin.from("fa_crm_nps_surveys").delete().eq("id", survey.id);
       failed++;
       continue;
     }
 
-    const sentAt = Date.now();
-    await admin.from("fa_crm_nps_surveys").insert({ contact_id: contact!.id, channel_id: channel.id, sent_at_ms: sentAt });
     await admin.from("fa_crm_messages").insert({
       contact_id: contact!.id,
       direction: "OUT",
-      body: template.preview.replace(/\{\{1\}\}/g, firstName),
+      body: renderNpsPreview(template.preview, firstName, unitOptions),
       twilio_sid: out.sid,
       status: "queued",
       template_id: template.id,

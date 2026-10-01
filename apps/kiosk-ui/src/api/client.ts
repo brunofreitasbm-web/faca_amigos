@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
 import { assertValidImageUpload, compressImageForUpload } from "../lib/imageCompression.js";
+import type { NpsCommentRow, NpsDashboardData } from "../lib/nps.js";
 import {
   apurarBonificacaoPorDia,
   agregarPorOperador,
@@ -3356,9 +3357,36 @@ export const Api = {
         scored_at_ms: number;
         score_team: number | null;
         score_space: number | null;
+        unit_name: string | null;
       }[]
     >(
       supabase().rpc("fa_crm_nps_feed", { p_limit: limit }),
+    ),
+  crmNpsDashboard: (p: { fromMs: number; toMs: number; unitId?: string | null }) =>
+    unwrap<NpsDashboardData>(
+      supabase().rpc("fa_crm_nps_dashboard", { p_from_ms: p.fromMs, p_to_ms: p.toMs, p_unit_id: p.unitId ?? null }),
+    ),
+  crmNpsComments: (p: {
+    fromMs: number;
+    toMs: number;
+    unitId?: string | null;
+    band?: "PROMOTER" | "PASSIVE" | "DETRACTOR" | null;
+    search?: string;
+    onlyWithComment?: boolean;
+    limit?: number;
+    offset?: number;
+  }) =>
+    unwrap<NpsCommentRow[]>(
+      supabase().rpc("fa_crm_nps_comments", {
+        p_from_ms: p.fromMs,
+        p_to_ms: p.toMs,
+        p_unit_id: p.unitId ?? null,
+        p_band: p.band ?? null,
+        p_search: p.search?.trim() || null,
+        p_only_with_comment: p.onlyWithComment ?? true,
+        p_limit: p.limit ?? 50,
+        p_offset: p.offset ?? 0,
+      }),
     ),
   crmMarkRead: (contactId: string) => unwrap<null>(supabase().rpc("fa_crm_mark_read", { p_contact_id: contactId })),
   crmSend: (body: { contactId: string; body?: string; templateId?: string; variables?: Record<string, string> }) =>

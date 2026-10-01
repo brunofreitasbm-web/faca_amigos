@@ -50,6 +50,17 @@ const TEMPLATES: TemplateDef[] = [
     body: "Olá {{1}}! Como foi sua visita ao FaçaAmigos? De 0 a 10, o quanto você nos recomendaria a um amigo? Responda só com o número. 💛",
     sample: { "1": "Ana" },
   },
+  // NPS em etapas dentro do WhatsApp: este template só pergunta a UNIDADE
+  // (resposta = número da lista em {{2}}); o resto das perguntas sai como
+  // mensagem livre, dentro da janela aberta pela resposta (ver
+  // _shared/nps.ts e crm-whatsapp-webhook). Ao ser aprovado e ativado, vira o
+  // template NPS mais novo e passa a ser o usado no envio. O v1 acima NÃO
+  // entra em RETIRED até a Meta aprovar este.
+  {
+    purpose: "NPS", name: "fa_nps_pos_visita_v2", category: "UTILITY", variableCount: 2,
+    body: "Olá {{1}}! Queremos saber como foi a sua visita ao FaçaAmigos, são só algumas perguntas rápidas. Primeiro: em qual unidade você esteve? Responda só com o número: {{2}} 💛",
+    sample: { "1": "Ana", "2": "1) Playground Parque Shopping · 2) Circuito Parque Shopping · 3) Playground Bosque Grão-Pará" },
+  },
   {
     purpose: "OPTIN", name: "fa_pedido_autorizacao", category: "UTILITY", variableCount: 1,
     body: "Olá, {{1}}! Aqui é o FaçaAmigos, onde seu filho brincou. Podemos te avisar por aqui sobre as visitas e enviar uma pesquisa rápida de satisfação? Responda SIM para aceitar ou PARAR para não receber mensagens.",
