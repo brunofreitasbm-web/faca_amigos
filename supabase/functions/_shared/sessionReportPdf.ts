@@ -20,6 +20,7 @@ import {
   type SessionReportAnswers,
   type SessionReportLevel,
 } from "./sessionReportCatalog.ts";
+import { OLHAR_TRAIL_CHART_NOTE, OLHAR_TRAIL_INTRO, olharOrdinal, type OlharTrail } from "./sessionReportTrail.ts";
 
 /** Documento gerado pela IA (ou pelo fallback determinístico). Chaves de área só quando há itens. */
 export interface SessionReportDoc {
@@ -27,6 +28,10 @@ export interface SessionReportDoc {
   abertura: string;
   areas: Partial<Record<"movimento" | "convivencia" | "autonomia" | "atencao", string>>;
   fechamento: string;
+  /** Só em CONTINUIDADE/MARCO: prosa sobre o que apareceu pela 1ª vez. */
+  novidades?: string;
+  /** Só em MARCO: parágrafo da página de retrospectiva. */
+  retrospectiva?: string;
   destaque_whatsapp: string;
 }
 
@@ -39,6 +44,8 @@ export interface SessionReportPdfInput {
   answers: SessionReportAnswers;
   observacao: string | null;
   report: SessionReportDoc;
+  /** Posição da criança na trilha de Olhares (define o formato do documento). */
+  trail: OlharTrail;
 }
 
 const b64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -59,7 +66,7 @@ const FOOTER_H = 34;
 
 const LEVEL_STYLE: Record<SessionReportLevel, { label: string; fill: RGB; text: RGB }> = {
   AUTONOMO: { label: "Fez com autonomia", fill: TEAL, text: DARK },
-  DESENVOLVENDO: { label: "Em desenvolvimento", fill: YELLOW, text: DARK },
+  DESENVOLVENDO: { label: "Praticando", fill: YELLOW, text: DARK },
   APOIO: { label: "Com apoio", fill: PINK, text: WHITE },
 };
 
@@ -165,10 +172,73 @@ export async function buildSessionReportPdf(input: SessionReportPdfInput): Promi
     return pw;
   };
 
+  const retrospective = () => {
+    newPage();
+    heading("Retrospectiva: nosso caminho de brincadeiras", 17, PINK);
+    const visitasTxt = `${trail.visitas.length} ${trail.visitas.length === 1 ? "visita" : "visitas"} · ${trail.totalMinutos} minutos de brincadeira · ${trail.itensExplorados} de ${trail.totalItens} brincadeiras já exploradas`;
+    paragraph(visitasTxt, body, 10.5, MUTED, 10);
+    if (input.report.retrospectiva) paragraph(input.report.retrospectiva, body, 11.5);
+
+    heading("Conquistas por área", 13, TEAL);
+    page.drawText("Vezes em que a equipe viu a brincadeira acontecer com autonomia, somadas visita a visita.", { x: M, y, size: 9, font: body, color: MUTED });
+    y -= 20;
+    const colors = [PINK, TEAL, YELLOW, DARK];
+    const labelW = 150;
+    const barMax = W - labelW - 40;
+    const counts = SESSION_REPORT_CATALOG.map((sec) => trail.conquistasPorArea[sec.sector as EmployeeSector] ?? 0);
+    const top = Math.max(1, ...counts);
+    SESSION_REPORT_CATALOG.forEach((sec, i) => {
+      ensure(26);
+      page.drawText(stripForPdf(SESSION_REPORT_GROUP_NAME[sec.sector as EmployeeSector]), { x: M, y, size: 10.5, font: body, color: DARK });
+      const w = counts[i]! > 0 ? Math.max(8, (counts[i]! / top) * barMax) : 0;
+      if (w > 0) roundedRect(page, M + labelW, y - 4, w, 15, 5, colors[i % colors.length]!);
+      page.drawText(String(counts[i]), { x: M + labelW + w + 8, y, size: 10.5, font: bold, color: DARK });
+      y -= 26;
+    });
+    y -= 8;
+
+    heading("Nossas visitas", 13, TEAL);
+    const shown = trail.visitas.slice(-12);
+    ensure(70);
+    const step = W / Math.max(shown.length, 1);
+    const lineY = y - 6;
+    page.drawLine({ start: { x: M + step / 2, y: lineY }, end: { x: M + step * (shown.length - 0.5), y: lineY }, thickness: 1.2, color: TEAL });
+    const fmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Belem", day: "2-digit", month: "2-digit" });
+    shown.forEach((v, i) => {
+      const cx = M + step * (i + 0.5);
+      const last = i === shown.length - 1;
+      page.drawCircle({ x: cx, y: lineY, size: last ? 6 : 4.5, color: last ? PINK : TEAL });
+      const d = fmt.format(new Date(v.atMs));
+      page.drawText(d, { x: cx - body.widthOfTextAtSize(d, 7.5) / 2, y: lineY - 18, size: 7.5, font: body, color: DARK });
+      const m = `${v.minutes} min`;
+      page.drawText(m, { x: cx - body.widthOfTextAtSize(m, 7.5) / 2, y: lineY - 28, size: 7.5, font: body, color: MUTED });
+    });
+    y = lineY - 48;
+
+    // Legenda fixa (fora do alcance da IA): o painel soma momentos, não mede nada.
+    const size = 9;
+    const lh = size * 1.45;
+    const lines = wrap(stripForPdf(OLHAR_TRAIL_CHART_NOTE), body, size, W - 24);
+    const boxH = lines.length * lh + 16;
+    ensure(boxH + 6);
+    roundedRect(page, M, y - boxH + 10, W, boxH, 8, SOFT);
+    page.drawRectangle({ x: M, y: y - boxH + 10, width: 4, height: boxH, color: TEAL });
+    let ly = y - 6;
+    for (const line of lines) {
+      page.drawText(line, { x: M + 12, y: ly, size, font: body, color: rgb(0.28, 0.33, 0.32) });
+      ly -= lh;
+    }
+    y = y - boxH + 10 - 24;
+  };
+
   // ── Página 1: cabeçalho ──
   newPage();
+  const { trail } = input;
   page.drawText(SESSION_REPORT_DOC_TITLE, { x: M, y, size: 28, font: display, color: PINK });
   y -= 30;
+  const editionLabel = trail.edition === "ESTREIA" ? "Primeiro Olhar" : `${olharOrdinal(trail.seq)} Olhar`;
+  page.drawText(editionLabel, { x: M, y, size: 13, font: display, color: TEAL });
+  y -= 20;
   paragraph(`${input.childFirst}  ·  ${input.dateLabel}  ·  ${input.minutes} minutos de brincadeira  ·  ${input.unitLabel}`, body, 10.5, MUTED, 14);
 
   heading(input.report.titulo, 19, DARK);
@@ -194,12 +264,80 @@ export async function buildSessionReportPdf(input: SessionReportPdfInput): Promi
     y = y - boxH + 10 - 30;
   }
 
+  // ── Trilha: caixa de boas-vindas (1º) ou faixa de progresso (demais) ──
+  if (trail.edition === "ESTREIA") {
+    const size = 9.5;
+    const lh = size * 1.45;
+    const lines = wrap(stripForPdf(OLHAR_TRAIL_INTRO), body, size, W - 24);
+    const boxH = lines.length * lh + 26;
+    ensure(boxH + 6);
+    roundedRect(page, M, y - boxH + 10, W, boxH, 8, SOFT);
+    page.drawRectangle({ x: M, y: y - boxH + 10, width: 4, height: boxH, color: YELLOW });
+    let ly = y - 8;
+    page.drawText("Sua trilha de Olhares", { x: M + 12, y: ly, size: 10, font: bold, color: DARK });
+    ly -= lh + 2;
+    for (const line of lines) {
+      page.drawText(line, { x: M + 12, y: ly, size, font: body, color: rgb(0.28, 0.33, 0.32) });
+      ly -= lh;
+    }
+    y = y - boxH + 10 - 24;
+  } else {
+    ensure(48);
+    const n = trail.nextMilestone;
+    const gap = Math.min(22, (W - 200) / Math.max(n - 1, 1));
+    for (let i = 1; i <= n; i++) {
+      const cx = M + 6 + (i - 1) * gap;
+      const done = i <= trail.seq;
+      const isMilestone = i === n;
+      page.drawCircle({
+        x: cx, y: y + 4, size: 6,
+        color: done ? TEAL : WHITE,
+        borderColor: isMilestone ? PINK : TEAL,
+        borderWidth: isMilestone ? 1.6 : 1,
+      });
+    }
+    const left = n - trail.seq;
+    const strip =
+      trail.edition === "MARCO"
+        ? `${olharOrdinal(trail.seq)} Olhar · retrospectiva nas próximas páginas`
+        : `${olharOrdinal(trail.seq)} Olhar · ${left === 1 ? "falta 1 Olhar" : `faltam ${left} Olhares`} para a retrospectiva`;
+    page.drawText(strip, { x: M + 6 + (n - 1) * gap + 18, y, size: 10, font: bold, color: DARK });
+    y -= 26;
+
+    const nov = trail.novidades;
+    if (nov.primeiraVez.length + nov.primeiraAutonomia.length > 0) {
+      heading("Novidades desde a última visita", 15, PINK);
+      if (input.report.novidades) paragraph(input.report.novidades, body, 11.5, DARK, 6);
+      for (const [label, items] of [["Apareceu pela primeira vez", nov.primeiraVez], ["Fez com autonomia pela primeira vez", nov.primeiraAutonomia]] as const) {
+        if (items.length === 0) continue;
+        ensure(18);
+        page.drawText(stripForPdf(label), { x: M, y, size: 9.5, font: bold, color: MUTED });
+        y -= 15;
+        for (const it of items) {
+          ensure(16);
+          page.drawCircle({ x: M + 4, y: y + 3.5, size: 2.5, color: TEAL });
+          page.drawText(stripForPdf(it), { x: M + 14, y, size: 11, font: body, color: DARK });
+          y -= 16;
+        }
+        y -= 4;
+      }
+      y -= 6;
+    }
+  }
+
   // ── Áreas: itens observados (fato) + prosa da IA ──
   for (const sec of SESSION_REPORT_CATALOG) {
     const items = sec.items.filter((i) => input.answers[i.key] != null);
     if (items.length === 0) continue;
-    ensure(70);
-    heading(SESSION_REPORT_GROUP_NAME[sec.sector as EmployeeSector], 15, TEAL);
+    const isSpotlight = trail.edition === "ESTREIA" || trail.spotlight === sec.sector;
+    ensure(isSpotlight ? 70 : 50);
+    heading(
+      isSpotlight && trail.edition !== "ESTREIA"
+        ? `${SESSION_REPORT_GROUP_NAME[sec.sector as EmployeeSector]} · em destaque hoje`
+        : SESSION_REPORT_GROUP_NAME[sec.sector as EmployeeSector],
+      isSpotlight ? 15 : 12.5,
+      TEAL,
+    );
     for (const item of items) {
       ensure(20);
       const pw = pill(input.answers[item.key]!, M, y);
@@ -210,10 +348,12 @@ export async function buildSessionReportPdf(input: SessionReportPdfInput): Promi
       page.drawText(line, { x: M + pw + 10, y, size, font: body, color: DARK });
       y -= 20;
     }
-    y -= 4;
-    const prose = input.report.areas[SESSION_REPORT_GROUP_KEY[sec.sector as EmployeeSector]];
+    y -= isSpotlight ? 4 : 12;
+    const prose = isSpotlight ? input.report.areas[SESSION_REPORT_GROUP_KEY[sec.sector as EmployeeSector]] : undefined;
     if (prose) paragraph(prose, body, 11.5);
   }
+
+  if (trail.edition === "MARCO") retrospective();
 
   if (input.observacao) {
     ensure(40);

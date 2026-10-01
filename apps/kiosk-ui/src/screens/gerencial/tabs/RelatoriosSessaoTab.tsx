@@ -201,7 +201,16 @@ function Content() {
             )}
             {filtered.map((r) => (
               <tr key={r.id} onClick={() => setDetail(r)} style={{ cursor: "pointer" }}>
-                <td>{r.child_name_snapshot}</td>
+                <td>
+                  {r.child_name_snapshot}
+                  {r.olhar_seq ? (
+                    <span style={{ marginLeft: "6px" }}>
+                      <Badge variant={r.olhar_edition === "MARCO" ? "teal" : "amber"}>
+                        {r.olhar_seq}º Olhar{r.olhar_edition === "MARCO" ? " · Marco" : ""}
+                      </Badge>
+                    </span>
+                  ) : null}
+                </td>
                 <td>{unitName(r.unit_id)}</td>
                 <td>{dt(r.session_checkout_at_ms)}</td>
                 <td>

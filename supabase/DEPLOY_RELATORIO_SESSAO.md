@@ -125,3 +125,18 @@ Migration `20260930000000_fa_session_report_pdf.sql` + functions `session-report
 **Assets:** fontes OFL (Fredoka One, Nunito 400/700) e logo em base64 em `_shared/assets/brandAssets.ts`. Para trocar, coloque os arquivos em `_shared/assets/src/` e rode `node scripts/build-brand-assets.mjs` (o `static_files` do Supabase é descartado no deploy sem Docker, por isso base64).
 
 **Gerencial:** no detalhe do relatório: "Abrir PDF" (signed URL de 60 s pela policy `relatorio_sessao.read`), "Copiar link" (o mesmo do WhatsApp), contador de aberturas e "Regerar e reenviar" (`regenerate: true` refaz texto e PDF).
+
+## Trilha de Olhares (1º, 2º, 3º…)
+
+Cada criança tem uma sequência de Olhares e cada um é diferente do anterior:
+
+| Tipo | Quando | Conteúdo |
+|---|---|---|
+| ESTREIA | 1º | Retrato completo + caixa "Sua trilha de Olhares" |
+| CONTINUIDADE | demais | Faixa da trilha, "Novidades desde a última visita" (só positivas) e 1 área em destaque com prosa; as outras áreas só com marcadores |
+| MARCO | 3º, 5º, 10º, 15º… | Tudo da CONTINUIDADE + página "Retrospectiva" (conquistas por área, linha das visitas, brincadeiras exploradas) |
+
+- Regras puras em `packages/domain/src/session-report/trail.ts` (cópia Deno em `_shared/sessionReportTrail.ts`; o teste `olhar-trail.spec.ts` confere).
+- O nº e o tipo ficam gravados na 1ª geração (`olhar_seq`, `olhar_edition`); regerar não renumera.
+- Blindagem: o painel só soma momentos "fez com autonomia" (nunca cai), sem nota/média/percentual, com legenda fixa dizendo que não mede desempenho nem é indicador clínico/escolar.
+- Deploy: aplicar `20261001130000_fa_olhar_trail.sql` **antes** de publicar `session-report-dispatch` (o dispatch passa `p_olhar_seq`/`p_olhar_edition` ao RPC).
