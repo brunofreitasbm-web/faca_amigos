@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { type Candidate, PREVIEW_LABEL, PURPOSE, variablesFor } from "./variables.ts";
 
 // Disparada a cada 15 min pelo pg_cron (migration 20260929000000). Um único
 // dispatcher para todas as automações de upsell/cross-sell/LTV/retenção —
@@ -12,6 +13,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // ainda sem nenhum fluxo que o preencha) — ou seja, ficam inativos até o
 // produto decidir como coletar esse aceite.
 //
+// Ordem: fa_crm_lc_candidates já devolve os candidatos por prioridade, com
+// no máximo um de marketing por responsável (migration 20261001130000).
+//
 // Janela de envio: só das 10h às 20h de Belém (UTC-3), como o restante do
 // CRM de marketing. Trava-antes-do-envio em fa_crm_automation_sends
 // (unique kind+ref_key): 5xx solta a trava (tenta nos próximos 15 min),
@@ -21,95 +25,6 @@ const MAX_PER_RUN = 60;
 const WEBHOOK_URL =
   Deno.env.get("CRM_WEBHOOK_PUBLIC_URL") ?? "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/crm-whatsapp-webhook";
 const GOOGLE_REVIEW_URL = Deno.env.get("GOOGLE_REVIEW_URL") ?? "https://g.page/r/review";
-
-type Kind =
-  | "EXPIRACAO" | "RELATORIO_CUPOM" | "PREMIO_FIDELIDADE" | "NPS_PROMOTOR" | "NPS_DETRATOR"
-  | "UPSELL_PACOTE" | "CROSS_ATIVIDADE" | "CROSS_IRMAO" | "ANIVERSARIO" | "VIP"
-  | "WINBACK_1" | "WINBACK_2";
-
-interface Candidate {
-  kind: Kind;
-  category: "MARKETING" | "UTILITY";
-  unit_id: string | null;
-  guardian_id: string;
-  guardian_name: string | null;
-  phone_e164: string;
-  child_first_name: string | null;
-  activity: string | null;
-  ref_key: string;
-  extra: Record<string, unknown> | null;
-}
-
-// kind -> purpose do template. WINBACK_1/2 compartilham o mesmo template
-// (purpose WINBACK); o texto muda pelo próprio conteúdo do template.
-const PURPOSE: Record<Kind, string> = {
-  EXPIRACAO: "EXPIRACAO",
-  RELATORIO_CUPOM: "RELATORIO_CUPOM",
-  PREMIO_FIDELIDADE: "PREMIO_FIDELIDADE",
-  NPS_PROMOTOR: "NPS_PROMOTOR",
-  NPS_DETRATOR: "NPS_DETRATOR",
-  UPSELL_PACOTE: "UPSELL_PACOTE",
-  CROSS_ATIVIDADE: "CROSS_ATIVIDADE",
-  CROSS_IRMAO: "CROSS_IRMAO",
-  ANIVERSARIO: "ANIVERSARIO",
-  VIP: "VIP",
-  WINBACK_1: "WINBACK",
-  WINBACK_2: "WINBACK",
-};
-
-const PREVIEW_LABEL: Record<Kind, string> = {
-  EXPIRACAO: "aviso de saldo/validade enviado",
-  RELATORIO_CUPOM: "cupom de retorno enviado",
-  PREMIO_FIDELIDADE: "lembrete de prêmio enviado",
-  NPS_PROMOTOR: "convite de avaliação enviado",
-  NPS_DETRATOR: "aviso de contato enviado",
-  UPSELL_PACOTE: "oferta de pacote enviada",
-  CROSS_ATIVIDADE: "convite de outra atividade enviado",
-  CROSS_IRMAO: "convite para o irmão enviado",
-  ANIVERSARIO: "mensagem de aniversário enviada",
-  VIP: "reconhecimento VIP enviado",
-  WINBACK_1: "mensagem de saudade enviada",
-  WINBACK_2: "cupom de retorno enviado",
-};
-
-const activityLabel = (a: string | null) => (a === "CARRINHO" ? "Circuito" : a === "PLAYGROUND" ? "Playground" : "");
-
-/** Variáveis do template ({{1}} responsável, {{2}}/{{3}} variam por kind); null = pula. */
-function variablesFor(c: Candidate): Record<string, string> | null {
-  const guardian = (c.guardian_name ?? "").trim().split(/\s+/)[0] || "tudo bem";
-  const child = c.child_first_name || "seu filho(a)";
-  const extra = c.extra ?? {};
-
-  switch (c.kind) {
-    case "EXPIRACAO": {
-      const remaining = extra.remainingMinutes as number | null;
-      const name = (extra.name as string | null) ?? (extra.sourceKind as string | null) ?? "seu saldo";
-      const info = remaining != null && remaining <= 30 ? `restam ${remaining} min` : "está perto de vencer";
-      return { "1": guardian, "2": name, "3": info };
-    }
-    case "RELATORIO_CUPOM":
-      return { "1": guardian, "2": child, "3": "10% de desconto na próxima visita em até 14 dias" };
-    case "PREMIO_FIDELIDADE":
-      return { "1": guardian, "2": child };
-    case "NPS_PROMOTOR":
-      return { "1": guardian, "2": GOOGLE_REVIEW_URL };
-    case "NPS_DETRATOR":
-      return { "1": guardian };
-    case "UPSELL_PACOTE":
-      return { "1": guardian, "2": child };
-    case "CROSS_ATIVIDADE":
-      return { "1": guardian, "2": child, "3": activityLabel((extra.targetActivity as string | null) ?? null) };
-    case "CROSS_IRMAO":
-      return { "1": guardian, "2": child };
-    case "ANIVERSARIO":
-      return { "1": guardian, "2": child };
-    case "VIP":
-      return { "1": guardian, "2": child };
-    case "WINBACK_1":
-    case "WINBACK_2":
-      return { "1": guardian };
-  }
-}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -132,11 +47,11 @@ Deno.serve(async () => {
 
   const { data: tpls } = await admin
     .from("fa_crm_templates")
-    .select("id, content_sid, preview, purpose")
+    .select("id, content_sid, preview, purpose, variable_count")
     .in("purpose", [...new Set(Object.values(PURPOSE))])
     .eq("active", true)
     .order("created_at_ms", { ascending: false });
-  const templateByPurpose = new Map<string, { id: string; content_sid: string; preview: string }>();
+  const templateByPurpose = new Map<string, { id: string; content_sid: string; preview: string; variable_count: number }>();
   for (const t of tpls ?? []) if (!templateByPurpose.has(t.purpose)) templateByPurpose.set(t.purpose, t);
   if (!templateByPurpose.size) return json({ ok: true, skipped: "nenhum template de ciclo de vida ativo" });
 
@@ -162,21 +77,25 @@ Deno.serve(async () => {
   for (const cand of ((candidates ?? []) as Candidate[]).slice(0, MAX_PER_RUN)) {
     const template = templateByPurpose.get(PURPOSE[cand.kind]);
     const channel = channelFor(cand.unit_id);
-    const variables = template && channel ? variablesFor(cand) : null;
-    if (!template || !channel || !variables) {
+    const variables = template && channel ? variablesFor(cand, GOOGLE_REVIEW_URL) : null;
+    // Template de outra versão (número de variáveis diferente do que este
+    // kind monta) não recebe envio: o texto sairia com buracos.
+    if (!template || !channel || !variables || Object.keys(variables).length !== template.variable_count) {
       skipped++;
       continue;
     }
 
-    // Flag por unidade (nasce desligada) — kinds sem unit_id claro (ex.:
-    // NPS, prêmio) checam a flag em qualquer unidade que a tenha ligada.
+    // Flag por unidade (nasce desligada). Com unit_id, vale a flag da própria
+    // unidade; kinds sem unidade clara (ex.: NPS, prêmio, degraus por
+    // frequência) checam a flag em qualquer unidade que a tenha ligada.
     const settingKey = "crm_lc_" + cand.kind.toLowerCase();
-    const { data: flagRows } = await admin
+    let flagQuery = admin
       .from("fa_kiosk_app_settings")
       .select("unit_id")
       .eq("key", settingKey)
-      .eq("value", "1")
-      .limit(1);
+      .eq("value", "1");
+    if (cand.unit_id) flagQuery = flagQuery.eq("unit_id", cand.unit_id);
+    const { data: flagRows } = await flagQuery.limit(1);
     if (!flagRows?.length) {
       skipped++;
       continue;

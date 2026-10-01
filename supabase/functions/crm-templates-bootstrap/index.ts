@@ -7,8 +7,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // demais Edge Functions do CRM já usam para enviar mensagem — nenhuma
 // credencial nova.
 //
-// Idempotente: para cada purpose, se já existe uma linha em fa_crm_templates
-// com content_sid, não recria — só confere o status de aprovação e ativa
+// Idempotente: para cada template (por nome), se já existe uma linha em
+// fa_crm_templates com content_sid, não recria — só confere o status de aprovação e ativa
 // (active=true) se a Meta já aprovou. Nunca ativa sozinho um template que a
 // Meta ainda não aprovou ou recusou.
 //
@@ -34,6 +34,13 @@ interface TemplateDef {
 // crm-mapeamento-dispatch, session-report-dispatch, crm-lifecycle-dispatch).
 // TEXTO CARECE DE REVISÃO/APROVAÇÃO DE NEGÓCIO antes de considerar definitivo
 // — publicado para destravar o cadastro e a submissão à Meta.
+// Botões das ofertas da régua: o payload volta em ButtonPayload no webhook.
+const OFFER_BUTTONS = [{ title: "Quero saber mais", id: "OFERTA_INFO" }, { title: "Agora não", id: "OFERTA_NAO" }];
+
+// Templates substituídos por uma versão nova: nunca reativados aqui, mesmo
+// que a Meta os tenha aprovado (a migration 20261001130000 os desativou).
+const RETIRED = new Set(["fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback"]);
+
 const TEMPLATES: TemplateDef[] = [
   // Estes dois já tinham content_sid real de antes desta rodada — entram
   // aqui só para a submissão de aprovação encontrar nome/categoria (não
@@ -118,16 +125,6 @@ const TEMPLATES: TemplateDef[] = [
     sample: { "1": "Ana" },
   },
   {
-    purpose: "UPSELL_PACOTE", name: "fa_lc_upsell_pacote", category: "MARKETING", variableCount: 2,
-    body: "Oi {{1}}! {{2}} adorou a visita 💛 Que tal conhecer nossos pacotes e economizar nas próximas idas? Fale com a equipe no balcão ou responda aqui.",
-    sample: { "1": "Ana", "2": "Miguel" },
-  },
-  {
-    purpose: "CROSS_ATIVIDADE", name: "fa_lc_cross_atividade", category: "MARKETING", variableCount: 3,
-    body: "Oi {{1}}! {{2}} já manda bem por aqui — que tal conhecer o {{3}} também? Uma experiência diferente esperando por vocês. 💛",
-    sample: { "1": "Ana", "2": "Miguel", "3": "Circuito" },
-  },
-  {
     purpose: "CROSS_IRMAO", name: "fa_lc_cross_irmao", category: "MARKETING", variableCount: 2,
     body: "Oi {{1}}! {{2}} sempre se diverte muito aqui — que tal trazer o irmãozinho(a) também na próxima visita? 💛",
     sample: { "1": "Ana", "2": "Miguel" },
@@ -137,15 +134,45 @@ const TEMPLATES: TemplateDef[] = [
     body: "Parabéns pra {{2}}, {{1}}! 🎉 Que tal comemorar o aniversário brincando com a gente? Preparamos algo especial pra essa data. 💛",
     sample: { "1": "Ana", "2": "Miguel" },
   },
+  // ── Régua de ofertas (migration 20261001130000): produtos maiores, sem
+  //    desconto, com botões "Quero saber mais" / "Agora não" tratados pelo
+  //    crm-whatsapp-webhook. Substituem fa_lc_upsell_pacote e as v1 de
+  //    CROSS_ATIVIDADE, VIP e WINBACK (ver RETIRED). ──
   {
-    purpose: "VIP", name: "fa_lc_vip", category: "MARKETING", variableCount: 2,
-    body: "Oi {{1}}! {{2}} está entre nossos visitantes mais fiéis 💛 Como reconhecimento, você agora tem prioridade no pré-check-in. Obrigado por confiar na gente!",
+    purpose: "DEGRAU_2H", name: "fa_oferta_degrau_2h", category: "MARKETING", variableCount: 2,
+    body: "Oi {{1}}! Vimos que {{2}} ficou com gostinho de quero mais na última visita 😄 Com o plano de 2 horas dá tempo de vocês almoçarem ou fazerem as compras no shopping sem ficar de olho no relógio. Toque abaixo pra ver como funciona.",
     sample: { "1": "Ana", "2": "Miguel" },
+    quickReplyButtons: OFFER_BUTTONS,
   },
   {
-    purpose: "WINBACK", name: "fa_lc_winback", category: "MARKETING", variableCount: 1,
-    body: "Sentimos sua falta, {{1}}! 💛 Faz um tempo que vocês não aparecem por aqui. Que tal marcar uma nova visita? Estamos te esperando.",
-    sample: { "1": "Ana" },
+    purpose: "DEGRAU_PORTO", name: "fa_oferta_porto_seguro", category: "MARKETING", variableCount: 3,
+    body: "Oi {{1}}! {{2}} já veio {{3}} vezes este mês 💛 Pra famílias que vêm sempre, temos o Porto Seguro: 10 horas pra usar em 30 dias, no dia e no horário que quiserem, e os irmãos usam o mesmo saldo. Sem fila no caixa a cada visita.",
+    sample: { "1": "Ana", "2": "Miguel", "3": "4" },
+    quickReplyButtons: OFFER_BUTTONS,
+  },
+  {
+    purpose: "DEGRAU_DAYUSE", name: "fa_oferta_day_use", category: "MARKETING", variableCount: 2,
+    body: "Oi {{1}}! Fim de semana chegando: com o Day Use, {{2}} brinca o dia inteiro, vocês saem pra almoçar ou passear no shopping e voltam quando quiserem, sem contar minuto. Toque abaixo pra saber como reservar.",
+    sample: { "1": "Ana", "2": "Miguel" },
+    quickReplyButtons: OFFER_BUTTONS,
+  },
+  {
+    purpose: "CROSS_ATIVIDADE", name: "fa_oferta_cross_atividade_v2", category: "MARKETING", variableCount: 4,
+    body: "Oi {{1}}! {{2}} já é de casa por aqui, mas ainda não conhece {{3}}: {{4}}. Fica no Parque Shopping, pertinho de onde vocês já brincam. Toque abaixo pra saber como funciona.",
+    sample: { "1": "Ana", "2": "Miguel", "3": "o Circuito", "4": "carrinhos elétricos, motos e pelúcias motorizadas pra pilotar" },
+    quickReplyButtons: OFFER_BUTTONS,
+  },
+  {
+    purpose: "VIP", name: "fa_oferta_vip_v2", category: "MARKETING", variableCount: 2,
+    body: "Oi {{1}}! {{2}} está entre as crianças que mais brincam com a gente 💛 Pra famílias como a de vocês, o Porto Seguro costuma valer mais: 10 horas em 30 dias, entra e sai, irmãos juntos. Toque abaixo e te explicamos.",
+    sample: { "1": "Ana", "2": "Miguel" },
+    quickReplyButtons: OFFER_BUTTONS,
+  },
+  {
+    purpose: "WINBACK", name: "fa_oferta_winback_v2", category: "MARKETING", variableCount: 2,
+    body: "Oi {{1}}! Faz um tempinho que {{2}} não vem brincar 💛 Desde a última visita, nossa equipe passou a enviar o Olhar FaçaAmigos: um recado sobre como cada criança brincou, interagiu e se expressou. Na próxima visita, {{2}} já recebe o seu.",
+    sample: { "1": "Ana", "2": "Miguel" },
+    quickReplyButtons: OFFER_BUTTONS,
   },
   {
     purpose: "OPTIN_MARKETING", name: "fa_optin_marketing", category: "MARKETING", variableCount: 1,
@@ -165,16 +192,17 @@ Deno.serve(async () => {
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  const { data: existing } = await admin.from("fa_crm_templates").select("id, purpose, content_sid, active");
-  const byPurpose = new Map((existing ?? []).map((t) => [t.purpose, t]));
+  const { data: existing } = await admin.from("fa_crm_templates").select("id, name, purpose, content_sid, active");
+  // Por nome, não por purpose: um purpose pode ter versões (ex.: VIP v1 e v2).
+  const byName = new Map((existing ?? []).map((t) => [t.name, t]));
 
   const results: Record<string, unknown>[] = [];
 
   // ── 1. Purposes já com content_sid real: confere aprovação; se nunca foi
   //      submetido (fetch não devolve status), submete agora. ──
-  const defByPurpose = new Map(TEMPLATES.map((d) => [d.purpose, d]));
+  const defByName = new Map(TEMPLATES.map((d) => [d.name, d]));
   for (const row of existing ?? []) {
-    if (row.active || !row.content_sid) continue;
+    if (row.active || !row.content_sid || RETIRED.has(row.name)) continue;
     try {
       const fetchRes = await fetch(`${CONTENT_API}/${row.content_sid}/ApprovalRequests`, { headers: { Authorization: auth } });
       const out = await fetchRes.json().catch(() => ({}));
@@ -194,7 +222,7 @@ Deno.serve(async () => {
       // "unsubmitted"/"received"/ausente: a submissão de aprovação de fato
       // ainda não foi feita. Submete agora, se tivermos a definição
       // (categoria) deste purpose.
-      const def = defByPurpose.get(row.purpose);
+      const def = defByName.get(row.name);
       if (!def) {
         results.push({ purpose: row.purpose, action: "sem definição local para submeter — cadastrar manualmente", contentSid: row.content_sid });
         continue;
@@ -217,9 +245,9 @@ Deno.serve(async () => {
     }
   }
 
-  // ── 2. Purposes sem template: cria + submete para aprovação. ──
+  // ── 2. Templates ainda não criados (por nome): cria + submete para aprovação. ──
   for (const def of TEMPLATES) {
-    if (byPurpose.has(def.purpose)) continue;
+    if (byName.has(def.name)) continue;
 
     const types = def.quickReplyButtons
       ? { "twilio/quick-reply": { body: def.body, actions: def.quickReplyButtons } }

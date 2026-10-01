@@ -1,4 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  OFFER_DECLINE_REPLY, OFFER_INFO_FALLBACK, OFFER_KINDS, type OfferButton, offerButton, offerInfoKey,
+} from "./offer.ts";
 
 // Webhook do WhatsApp (Twilio, subconta do CRM). Recebe DOIS tipos de
 // chamada na mesma URL:
@@ -210,10 +213,16 @@ Deno.serve(async (req) => {
     })
     .eq("id", contact!.id);
 
-  // ── Resposta automática (opt-out/opt-in e NPS) ──
+  // ── Resposta automática (opt-out/opt-in, ofertas, renovação e NPS) ──
+  // Botão de oferta vem antes do aceite: "Quero saber mais" não pode virar
+  // opt-in. Sem oferta recente para o contato, segue o fluxo normal.
+  const offer = optOut || optIn ? null : offerButton(params.ButtonPayload, body);
+  const offerReply = offer ? await handleOffer(admin, contact!.id, offer, now) : null;
+
   let reply: string | null = null;
   if (optOut) reply = "Tudo certo, você não receberá mais mensagens nossas. Para voltar, responda VOLTAR.";
   else if (optIn) reply = "Que bom ter você de volta! 💛";
+  else if (offerReply) reply = offerReply;
   else if (ACCEPT_WORDS.has(word)) {
     // Um "SIM"/"QUERO" pode responder aos dois pedidos ao mesmo tempo, se
     // ambos estiverem em aberto para este contato (geral + marketing).
@@ -309,6 +318,41 @@ function renewalReplyText(result: RenewalResult): string {
     default:
       return "Essa visita já foi encerrada. Até a próxima! 💛";
   }
+}
+
+const OFFER_REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Toque em "Quero saber mais" / "Agora não" numa oferta da régua. Grava a
+ * resposta no envio mais recente (últimos 7 dias) — é o que alimenta
+ * fa_crm_automation_stats e a pausa de 90 dias do "Agora não" em
+ * fa_crm_lc_candidates. Sem oferta recente devolve null.
+ */
+async function handleOffer(admin: ReturnType<typeof createClient>, contactId: string, button: OfferButton, now: number): Promise<string | null> {
+  const { data: send } = await admin
+    .from("fa_crm_automation_sends")
+    .select("id, kind")
+    .eq("contact_id", contactId)
+    .eq("status", "SENT")
+    .in("kind", [...OFFER_KINDS])
+    .gt("sent_at_ms", now - OFFER_REPLY_WINDOW_MS)
+    .order("sent_at_ms", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!send) return null;
+
+  await admin
+    .from("fa_crm_automation_sends")
+    .update({ replied_at_ms: now, reply_payload: { button } })
+    .eq("id", send.id);
+
+  if (button === "OFERTA_NAO") return OFFER_DECLINE_REPLY;
+  const { data: info } = await admin
+    .from("fa_crm_offer_info")
+    .select("reply_text")
+    .eq("kind", offerInfoKey(send.kind as string))
+    .maybeSingle();
+  return (info?.reply_text as string | undefined) ?? OFFER_INFO_FALLBACK;
 }
 
 const NPS_REPLY_WINDOW_MS =7 * 24 * 60 * 60 * 1000; // nota: até 7 dias após o envio
