@@ -385,7 +385,7 @@ async function handleNps(admin: ReturnType<typeof createClient>, contactId: stri
     const m = body.length <= 40 ? body.match(/(?:^|\D)(10|\d)(?!\d)/) : null;
     if (!m) return null;
     const score = Number(m[1]);
-    await admin.from("fa_crm_nps_surveys").update({ status: "SCORED", score, scored_at_ms: now, source: "WHATSAPP" }).eq("id", survey.id);
+    await admin.from("fa_crm_nps_surveys").update({ status: "SCORED", score, scored_at_ms: now }).eq("id", survey.id);
     return score >= 9
       ? "Que alegria! 💛 Obrigado pela nota. Quer contar o que mais gostou? É só responder aqui."
       : score >= 7
