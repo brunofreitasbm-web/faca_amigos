@@ -140,3 +140,26 @@ insert into fa_kiosk_app_settings (unit_id, key, value) values ('<uuid da unidad
 4. Para os kinds Marketing, decidir e implementar a coleta de `marketing_consent_at_ms` antes de ligar a flag — sem isso, `crm_lc_upsell_pacote` etc. nunca encontram candidato (estado seguro, mas também inútil).
 
 Regra Meta de sempre: variável não pode abrir nem fechar o corpo do template.
+
+## Régua de ofertas (produtos maiores, sem desconto)
+Migration `20261001130000_fa_crm_offer_ladder.sql`. Substitui o UPSELL_PACOTE genérico por três degraus com produto e gatilho próprios e reescreve CROSS_ATIVIDADE, VIP e WINBACK. Todas as ofertas levam os botões **Quero saber mais** (`OFERTA_INFO`) e **Agora não** (`OFERTA_NAO`).
+
+| Kind | Quem recebe | Produto |
+|---|---|---|
+| `DEGRAU_2H` | 1–18 h após sair de um plano de 30 min/1 h do Playground com excedente ou renovação | Plano de 2 horas |
+| `DEGRAU_PORTO` | 3+ visitas ao Playground em 30 dias, sem pacote/crédito ativo | Porto Seguro |
+| `DEGRAU_DAYUSE` | Às quintas, 2+ visitas ao Playground em 60 dias, sem pacote/crédito ativo | Day Use |
+| `VIP` | 8+ visitas ao Playground em 60 dias, sem pacote/crédito ativo | Porto Seguro |
+| `CROSS_ATIVIDADE` | 3+ visitas numa atividade e nenhuma na outra | Convite ao Circuito/Playground |
+| `WINBACK_1/2` | Mesma regra de antes | Volta com o Olhar FaçaAmigos |
+
+- **Uma oferta por família por rodada**, na ordem 2H > Porto > VIP > Day Use > Cross > Aniversário > Irmão > Winback (além da trava de 1 marketing a cada 7 dias).
+- **"Quero saber mais"**: o webhook responde com o texto de `fa_crm_offer_info` (por kind, editável sem deploy: preços estão lá) e grava `replied_at_ms`/`reply_payload` em `fa_crm_automation_sends`.
+- **"Agora não"**: tira aquele kind do responsável por 90 dias.
+- A migration também corrige `fa_crm_can_send` (estouro de integer na versão aplicada em produção, que fazia o dispatcher pular **todos** os candidatos). **Depois de aplicar, os kinds com template ativo e flag ligada passam a enviar de verdade** (ex.: EXPIRACAO, NPS_PROMOTOR, NPS_DETRATOR).
+
+Passos:
+1. Aplicar a migration. Ela desliga `crm_lc_upsell_pacote`, `crm_lc_aniversario` e `crm_lc_cross_irmao`; cria `crm_lc_degrau_*` com o mesmo valor que `crm_lc_upsell_pacote` tinha em cada unidade; e desativa os templates v1 (`fa_lc_upsell_pacote`, `fa_lc_cross_atividade`, `fa_lc_vip`, `fa_lc_winback`).
+2. `supabase functions deploy crm-lifecycle-dispatch crm-whatsapp-webhook crm-templates-bootstrap`.
+3. Chamar `crm-templates-bootstrap` uma vez para criar e submeter os 6 templates novos (categoria Marketing). Chamar de novo depois da aprovação da Meta para ativá-los. Até lá, nenhuma oferta da régua sai: o dispatcher pula template cujo número de variáveis não bate com o do kind.
+4. Revisar os textos de `fa_crm_offer_info` (preços) antes de a Meta aprovar.
