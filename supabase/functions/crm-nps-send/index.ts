@@ -88,11 +88,23 @@ Deno.serve(async (req) => {
     }
 
     const firstName = (c.name ?? "").trim().split(/\s+/)[0] || "tudo bem";
+    // A pesquisa nasce antes do envio: o token dela vai no link do template ({{2}}).
+    const sentAt = Date.now();
+    const { data: survey, error: surveyErr } = await admin
+      .from("fa_crm_nps_surveys")
+      .insert({ contact_id: c.id, channel_id: c.channel_id, sent_by_employee_id: employee?.id ?? null, sent_at_ms: sentAt })
+      .select("id, token")
+      .single();
+    if (surveyErr || !survey) {
+      console.error("Falha ao criar pesquisa NPS:", c.id, surveyErr?.message);
+      result.failed++;
+      continue;
+    }
     const form = new URLSearchParams({
       From: `whatsapp:${channel.whatsapp_e164}`,
       To: `whatsapp:${c.phone_e164}`,
       ContentSid: template.content_sid,
-      ContentVariables: JSON.stringify({ "1": firstName }),
+      ContentVariables: JSON.stringify({ "1": firstName, "2": survey.token }),
       StatusCallback: WEBHOOK_URL,
     });
 
@@ -107,21 +119,15 @@ Deno.serve(async (req) => {
     const out = await res.json().catch(() => ({}));
     if (!res.ok) {
       console.error("Twilio recusou NPS:", c.id, out?.code, out?.message);
+      await admin.from("fa_crm_nps_surveys").delete().eq("id", survey.id);
       result.failed++;
       continue;
     }
 
-    const sentAt = Date.now();
-    await admin.from("fa_crm_nps_surveys").insert({
-      contact_id: c.id,
-      channel_id: c.channel_id,
-      sent_by_employee_id: employee?.id ?? null,
-      sent_at_ms: sentAt,
-    });
     await admin.from("fa_crm_messages").insert({
       contact_id: c.id,
       direction: "OUT",
-      body: template.preview.replace(/\{\{1\}\}/g, firstName),
+      body: template.preview.replace(/\{\{1\}\}/g, firstName).replace(/\{\{2\}\}/g, survey.token),
       twilio_sid: out.sid,
       status: "queued",
       template_id: template.id,

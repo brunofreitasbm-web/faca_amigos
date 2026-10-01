@@ -4,6 +4,7 @@ import { useAppState } from "../../../state/AppState.js";
 import { Api, businessDateFor } from "../../../api/client.js";
 import { money } from "../../../format.js";
 import { supabase } from "../../../lib/supabase/client.js";
+import { averageScore, summarizeNps } from "../../../lib/nps.js";
 
 interface UnitMetric {
   unitId: string;
@@ -21,6 +22,8 @@ interface NpsLogItem {
   code: string;
   playgroundScore: number | null;
   circuitoScore: number | null;
+  teamScore?: number | null;
+  spaceScore?: number | null;
   feedback: string;
   activity: string | null;
   createdAt: string;
@@ -121,6 +124,8 @@ export function OwnerAcompanhamentoTab() {
             code: `WhatsApp · ${r.brand}`,
             playgroundScore: circuito ? null : r.score,
             circuitoScore: circuito ? r.score : null,
+            teamScore: r.score_team,
+            spaceScore: r.score_space,
             feedback: r.feedback ?? "",
             activity: circuito ? "CARRINHO" : "PLAYGROUND",
             createdAt: new Date(Number(r.scored_at_ms)).toISOString(),
@@ -163,6 +168,9 @@ export function OwnerAcompanhamentoTab() {
   const avgNps = validScores.length > 0
     ? (validScores.reduce((a, b) => a + b, 0) / validScores.length).toFixed(1)
     : null;
+  const npsSummary = summarizeNps(validScores);
+  const avgTeam = averageScore(npsLogs.flatMap((n) => (n.teamScore != null ? [n.teamScore] : [])));
+  const avgSpace = averageScore(npsLogs.flatMap((n) => (n.spaceScore != null ? [n.spaceScore] : [])));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px", padding: "8px 0 32px" }}>
@@ -294,13 +302,15 @@ export function OwnerAcompanhamentoTab() {
         {/* Card Média NPS */}
         <Card style={{ padding: "20px", borderLeft: "4px solid #f59e0b" }}>
           <span style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", textTransform: "uppercase" }}>
-            Satisfação NPS Média
+            NPS
           </span>
           <div style={{ fontSize: "28px", fontWeight: "bold", color: "#0f172a", margin: "6px 0 2px" }}>
-            {avgNps !== null ? `${avgNps} / 10` : "—"}
+            {npsSummary.nps !== null ? (npsSummary.nps > 0 ? `+${npsSummary.nps}` : npsSummary.nps) : "—"}
           </div>
           <span style={{ fontSize: "12px", color: "#64748b" }}>
-            {npsLogs.length} avaliações recebidas
+            {npsLogs.length} avaliações · nota média {avgNps ?? "—"}/10
+            {avgTeam !== null && ` · equipe ${avgTeam.toFixed(1)}/5`}
+            {avgSpace !== null && ` · espaço ${avgSpace.toFixed(1)}/5`}
           </span>
         </Card>
       </div>
@@ -452,6 +462,18 @@ export function OwnerAcompanhamentoTab() {
                       <div>
                         <span style={{ color: "#64748b" }}>Circuito: </span>
                         <strong style={{ color: "#0f172a" }}>{log.circuitoScore} / 10</strong>
+                      </div>
+                    )}
+                    {log.teamScore != null && (
+                      <div>
+                        <span style={{ color: "#64748b" }}>Equipe: </span>
+                        <strong style={{ color: "#0f172a" }}>{log.teamScore} / 5</strong>
+                      </div>
+                    )}
+                    {log.spaceScore != null && (
+                      <div>
+                        <span style={{ color: "#64748b" }}>Espaço: </span>
+                        <strong style={{ color: "#0f172a" }}>{log.spaceScore} / 5</strong>
                       </div>
                     )}
                   </div>

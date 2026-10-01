@@ -3338,7 +3338,17 @@ export const Api = {
       supabase().functions.invoke("crm-nps-send", { body: { contactIds } }),
     ),
   crmNpsFeed: (limit = 20) =>
-    unwrap<{ id: string; brand: string; score: number; feedback: string | null; scored_at_ms: number }[]>(
+    unwrap<
+      {
+        id: string;
+        brand: string;
+        score: number;
+        feedback: string | null;
+        scored_at_ms: number;
+        score_team: number | null;
+        score_space: number | null;
+      }[]
+    >(
       supabase().rpc("fa_crm_nps_feed", { p_limit: limit }),
     ),
   crmMarkRead: (contactId: string) => unwrap<null>(supabase().rpc("fa_crm_mark_read", { p_contact_id: contactId })),

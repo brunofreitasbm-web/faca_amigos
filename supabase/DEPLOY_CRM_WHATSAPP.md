@@ -48,6 +48,15 @@ values ('NPS pós-visita', 'HX...', 'Olá {{1}}! Como foi sua visita ao FaçaAmi
 ```
 Proteções: máx. 100 contatos por envio; pula quem pediu PARAR e quem recebeu NPS nos últimos 30 dias.
 
+### NPS por clique (link `?nps=<token>`)
+Migration `20261001140000_fa_crm_nps_web.sql`. O envio passa `{{2}}` = token da pesquisa; a página pública (`NpsScreen`) coleta recomendação 0-10 (o NPS), equipe 1-5, espaço 1-5 e um texto opcional, só com cliques. Responder digitando no WhatsApp continua funcionando.
+
+Requer um **novo template NPS aprovado na Meta/Twilio com botão de URL dinâmica** apontando para `https://<app>/?nps={{2}}` (variável `{{1}}` = primeiro nome). Cadastre-o com `purpose = 'NPS'` — o envio usa o template ativo mais recente. Templates antigos só com `{{1}}` ignoram o token (o fluxo digitado segue valendo).
+
+Ordem de deploy: aplicar a migration, depois publicar `crm-nps-send`, `crm-nps-auto-dispatch` e `crm-whatsapp-webhook`, depois o front.
+
+A migration também corrige `fa_crm_lc_candidates`: as réguas NPS_PROMOTOR/NPS_DETRATOR olhavam só `status = 'SCORED'` e ignoravam respostas já `DONE`.
+
 ## Aviso de fim de plano + renovação por WhatsApp
 Substitui o "avisar 5 min antes" (Web Push), o bloco de renovação e o card da ZoeIA da tela pública de acompanhamento. `crm-renewal-alert-dispatch` roda a cada minuto (pg_cron), avisa quem deu aceite de contato no check-in e oferece 3 opções de +min/R$ por botão de resposta rápida. O toque vira `RENOVACAO_SOLICITADA` (mesmo pedido pendente que o balcão já vê); sem cobrança automática.
 
