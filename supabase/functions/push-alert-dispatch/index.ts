@@ -37,7 +37,11 @@ Deno.serve(async (req) => {
     // próximo minuto).
     return jsonResponse({ error: "VAPID_PRIVATE_KEY não configurada" }, 500);
   }
-  const vapidSubject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:instituto@institutofacaamigos.com.br";
+  // web-push exige "mailto:" ou uma URL https no assunto. O secret VAPID_SUBJECT foi configurado só com o
+  // e-mail, o que fazia setVapidDetails lançar "Vapid subject is not a valid URL" e a function devolver 500
+  // a cada minuto. Normaliza o valor em vez de depender do formato do secret.
+  const rawVapidSubject = (Deno.env.get("VAPID_SUBJECT") ?? "mailto:instituto@institutofacaamigos.com.br").trim();
+  const vapidSubject = /^(mailto:|https?:\/\/)/i.test(rawVapidSubject) ? rawVapidSubject : `mailto:${rawVapidSubject}`;
   webpush.setVapidDetails(vapidSubject, VAPID_PUBLIC_KEY, vapidPrivateKey);
 
   const adminClient = createClient(
