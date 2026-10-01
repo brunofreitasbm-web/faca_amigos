@@ -63,6 +63,9 @@ export function CrmWhatsappTab() {
 interface OptinStats {
   status: "PAUSED" | "RUNNING";
   dailyCap: number;
+  dailyTarget: number | null;
+  deadlineDays: number;
+  deadlineDay: number | null;
   pausedReason: string | null;
   sentToday: number;
   sent: number;
@@ -74,9 +77,11 @@ interface OptinStats {
 
 /**
  * Campanha de opt-in da base atual (só Owner, crm.admin): um pedido de
- * autorização por responsável, no máximo `dailyCap` (20) por dia, das 10h às
- * 20h. Nasce pausada; pausa sozinha se >3% pedirem PARAR. Ver migration
- * fa_crm_optin_campaign e a Edge Function crm-optin-dispatch.
+ * autorização por responsável, das 8h às 20h, com meta diária em rampa (30 no
+ * 1º dia, sobe enquanto pouca gente pede PARAR, teto `dailyCap`) para fechar a
+ * fila em `deadlineDays` dias. Nasce pausada; pausa sozinha se >3% pedirem
+ * PARAR. Ver migrations fa_crm_optin_campaign e fa_crm_optin_pacing e a Edge
+ * Function crm-optin-dispatch.
  */
 function OptinCampaignCard() {
   const toast = useToast();
@@ -99,7 +104,7 @@ function OptinCampaignCard() {
     if (next === "RUNNING") {
       const ok = await confirm({
         title: "Iniciar a campanha de autorização?",
-        message: `Serão enviadas mensagens pelo WhatsApp a responsáveis que ainda não autorizaram contato: no máximo ${stats?.dailyCap ?? 20} por dia, das 10h às 20h, dos que visitaram mais recentemente. Pausa sozinha se muita gente pedir PARAR.`,
+        message: `Serão enviadas mensagens pelo WhatsApp a responsáveis que ainda não autorizaram contato, dos que visitaram mais recentemente, das 8h às 20h. Começa com 30 por dia e acelera (até ${stats?.dailyCap ?? 150}) enquanto pouca gente pede PARAR, para terminar a fila em ${stats?.deadlineDays ?? 15} dias. Pausa sozinha se muita gente pedir PARAR.`,
         confirmLabel: "Iniciar",
       });
       if (!ok) return;
@@ -125,8 +130,9 @@ function OptinCampaignCard() {
           <strong>🤝 Campanha de autorização (base atual)</strong>{" "}
           <Tag color={running ? "var(--color-success)" : "var(--border-subtle)"}>{running ? "Em andamento" : "Pausada"}</Tag>
           <HelpText style={{ margin: 0 }}>
-            Hoje: {stats.sentToday}/{stats.dailyCap} · enviados {stats.sent} · aceitaram {stats.accepted} · pediram PARAR {stats.declined} · na fila{" "}
-            {stats.pending} · com autorização {stats.withConsent}
+            Hoje: {stats.sentToday}/{stats.dailyTarget ?? "—"}
+            {stats.deadlineDay != null && ` · dia ${stats.deadlineDay} de ${stats.deadlineDays}`} · enviados {stats.sent} · aceitaram{" "}
+            {stats.accepted} · pediram PARAR {stats.declined} · na fila {stats.pending} · com autorização {stats.withConsent}
           </HelpText>
           {stats.pausedReason && !running && <HelpText style={{ margin: 0, color: "var(--color-error)" }}>⚠️ {stats.pausedReason}</HelpText>}
         </div>

@@ -22,6 +22,14 @@ const OPT_IN_WORDS = new Set(["voltar", "start", "iniciar"]);
 // pedido pendente (QR code do balcão); "sim" só responde a um pedido nosso.
 const ACCEPT_WORDS = new Set(["sim", "quero", "aceito", "aceitar"]);
 
+// Vantagem da 1ª mensagem de marketing, enviada na resposta ao SIM do opt-in
+// de marketing (texto livre: a resposta do cliente abre a janela de 24h, sem
+// template). Ex.: "15 min extras". Definida pelo dono via secret; sem ela, a
+// confirmação sai sem oferta. Só quem aceitou MARKETING recebe oferta: o aceite
+// geral cobre avisos da visita e pesquisa, não promoções.
+const WELCOME_BENEFIT_ENV = "CRM_MARKETING_WELCOME_BENEFIT";
+const WELCOME_VALID_DAYS = 30;
+
 const twiml = (body = "") =>
   new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`, {
     headers: { "Content-Type": "text/xml" },
@@ -129,7 +137,7 @@ Deno.serve(async (req) => {
 
   let { data: contact } = await admin
     .from("fa_crm_contacts")
-    .select("id, unread_count, stage, opt_in, guardian_id")
+    .select("id, name, unread_count, stage, opt_in, guardian_id")
     .eq("channel_id", channel.id)
     .eq("phone_e164", from)
     .maybeSingle();
@@ -138,7 +146,7 @@ Deno.serve(async (req) => {
     const { data: created, error } = await admin
       .from("fa_crm_contacts")
       .insert({ channel_id: channel.id, phone_e164: from, name: params.ProfileName || null })
-      .select("id, unread_count, stage, opt_in, guardian_id")
+      .select("id, name, unread_count, stage, opt_in, guardian_id")
       .single();
     if (error) {
       console.error("erro ao criar contato:", error);
@@ -213,7 +221,7 @@ Deno.serve(async (req) => {
     const acceptedMarketing = await handleMarketingOptinAccept(admin, contact!, from, now);
     if (acceptedGeneral || acceptedMarketing) {
       reply = acceptedMarketing
-        ? "Combinado! 💛 Você também vai receber, de vez em quando, nossas ofertas e novidades. Para parar, é só responder PARAR."
+        ? marketingWelcome(contact!.name, now)
         : "Combinado! 💛 Vamos te avisar por aqui sobre suas visitas e, às vezes, pedir sua opinião. Para parar, é só responder PARAR.";
     } else {
       const choice = renewalChoice(params.ButtonPayload, body);
@@ -242,6 +250,24 @@ Deno.serve(async (req) => {
     .eq("id", contact!.id);
   return twiml(`<Message>${reply.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</Message>`);
 });
+
+/** Confirmação do aceite de marketing, com a vantagem de boas-vindas se configurada. */
+function marketingWelcome(name: string | null, now: number): string {
+  const benefit = Deno.env.get(WELCOME_BENEFIT_ENV)?.trim();
+  if (!benefit) {
+    return "Combinado! 💛 Você também vai receber, de vez em quando, nossas ofertas e novidades. Para parar, é só responder PARAR.";
+  }
+  const firstName = (name ?? "").trim().split(/\s+/)[0];
+  const until = new Date(now + WELCOME_VALID_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR", {
+    timeZone: "America/Belem",
+    day: "2-digit",
+    month: "2-digit",
+  });
+  return (
+    `Combinado${firstName ? `, ${firstName}` : ""}! 💛 Para comemorar, sua próxima visita ao FaçaAmigos ganha ${benefit}. ` +
+    `É só mostrar esta mensagem na recepção até ${until}. Para não receber mais ofertas, responda PARAR.`
+  );
+}
 
 /**
  * Opção escolhida (1-3) na oferta de renovação: botão de resposta rápida do

@@ -1,12 +1,18 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { dailyTarget, gapMs, nextRampLevel, runQuota, WINDOW_END_MIN, WINDOW_START_MIN } from "./pacing.ts";
 
-// Campanha de opt-in da base atual (migration 20260928160000). Disparada de
-// hora em hora (10h-19h de Belém) pelo pg_cron. Envia UMA mensagem por
-// responsável perguntando se aceita contato por WhatsApp.
+// Campanha de opt-in da base atual (migrations 20260928165000 e
+// 20261001120000). Disparada a cada 5 min (8h-20h de Belém) pelo pg_cron.
+// Envia UMA mensagem por responsável perguntando se aceita contato por WhatsApp.
 //
 // Só age se fa_crm_optin_config.status = 'RUNNING' (nasce PAUSED; o Owner
-// inicia na aba CRM WhatsApp). Teto diário = daily_cap (máx. 20, com check
-// no banco). Nada de reenvio: fa_crm_optin_requests.guardian_id é único.
+// inicia na aba CRM WhatsApp). Nada de reenvio: fa_crm_optin_requests.guardian_id
+// é único.
+//
+// Ritmo (pacing.ts): meta do dia em rampa (30, 45, 67, 101…), que só sobe se o
+// último dia teve PARAR < 1,5%, ou o necessário para fechar a fila em
+// deadline_days, nunca acima de daily_cap (máx. 150, check no banco). Cada
+// rodada sorteia 0-2 envios, com pausa aleatória entre eles.
 //
 // Freio automático: nas últimas 24h, pausa se >3% pediram PARAR ou >20% das
 // entregas falharam — sinais que a Meta usa para derrubar a nota de
@@ -17,7 +23,6 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BELEM_OFFSET_MS = 3 * 60 * 60 * 1000; // UTC-3, sem horário de verão
-const PER_RUN = 2; // 10 rodadas/dia x 2 = 20
 const OPT_OUT_RATE_LIMIT = 0.03;
 const FAILURE_RATE_LIMIT = 0.2;
 const MIN_SAMPLE = 10; // abaixo disso as taxas não significam nada
@@ -34,13 +39,17 @@ Deno.serve(async () => {
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  const { data: cfg } = await admin.from("fa_crm_optin_config").select("status, daily_cap").eq("id", 1).single();
+  const { data: cfg } = await admin
+    .from("fa_crm_optin_config")
+    .select("status, daily_cap, started_at_ms, deadline_days, ramp_level, target_day_ms, today_target")
+    .eq("id", 1)
+    .single();
   if (!cfg || cfg.status !== "RUNNING") return json({ ok: true, skipped: "pausada" });
 
   const now = Date.now();
   const belem = new Date(now - BELEM_OFFSET_MS);
-  const hour = belem.getUTCHours();
-  if (hour < 10 || hour >= 20) return json({ ok: true, skipped: "fora do horário" });
+  const minuteOfDay = belem.getUTCHours() * 60 + belem.getUTCMinutes();
+  if (minuteOfDay < WINDOW_START_MIN || minuteOfDay >= WINDOW_END_MIN) return json({ ok: true, skipped: "fora do horário" });
   const startOfDayMs = Date.UTC(belem.getUTCFullYear(), belem.getUTCMonth(), belem.getUTCDate()) + BELEM_OFFSET_MS;
 
   // ── Freio automático ──
@@ -70,13 +79,46 @@ Deno.serve(async () => {
     }
   }
 
-  // ── Teto do dia ──
+  // ── Meta do dia (calculada na 1ª rodada do dia e guardada no config) ──
+  let target = cfg.today_target as number;
+  if (Number(cfg.target_day_ms) !== startOfDayMs) {
+    let rampLevel = cfg.ramp_level as number;
+    if (cfg.target_day_ms != null) {
+      // Reação da base no último dia em que a meta valeu.
+      const lastDay = Number(cfg.target_day_ms);
+      const { data: lastRows } = await admin
+        .from("fa_crm_optin_requests")
+        .select("status")
+        .gte("sent_at_ms", lastDay)
+        .lt("sent_at_ms", lastDay + DAY_MS);
+      const declined = (lastRows ?? []).filter((r) => r.status === "DECLINED").length;
+      rampLevel = nextRampLevel(rampLevel, lastRows?.length ?? 0, declined);
+    }
+    const startedAt = cfg.started_at_ms != null ? Number(cfg.started_at_ms) : now;
+    const startedDayMs = startedAt - ((startedAt - BELEM_OFFSET_MS) % DAY_MS + DAY_MS) % DAY_MS;
+    const daysLeft = cfg.deadline_days - Math.round((startOfDayMs - startedDayMs) / DAY_MS);
+    const { count: pending, error: pendingErr } = await admin.rpc(
+      "fa_crm_optin_candidates",
+      { p_limit: 100000 },
+      { count: "exact", head: true },
+    );
+    if (pendingErr) {
+      console.error("fila:", pendingErr);
+      return json({ error: "falha ao contar a fila" }, 500);
+    }
+    target = dailyTarget(rampLevel, cfg.daily_cap, pending ?? 0, daysLeft);
+    await admin
+      .from("fa_crm_optin_config")
+      .update({ ramp_level: rampLevel, target_day_ms: startOfDayMs, today_target: target, started_at_ms: startedAt })
+      .eq("id", 1);
+  }
+
   const { count: sentToday } = await admin
     .from("fa_crm_optin_requests")
     .select("id", { count: "exact", head: true })
     .gte("sent_at_ms", startOfDayMs);
-  const room = cfg.daily_cap - (sentToday ?? 0);
-  if (room <= 0) return json({ ok: true, skipped: "teto do dia atingido" });
+  const quota = runQuota(target, sentToday ?? 0, minuteOfDay);
+  if (quota <= 0) return json({ ok: true, skipped: "nada nesta rodada", target, sentToday });
 
   const { data: template } = await admin
     .from("fa_crm_templates")
@@ -99,7 +141,7 @@ Deno.serve(async () => {
     // Circuito e Playground compartilham o mesmo número: com um único canal, ele atende qualquer atividade.
     (channels.length === 1 ? channels[0] : undefined);
 
-  const { data: candidates, error } = await admin.rpc("fa_crm_optin_candidates", { p_limit: Math.min(PER_RUN, room) });
+  const { data: candidates, error } = await admin.rpc("fa_crm_optin_candidates", { p_limit: quota });
   if (error) {
     console.error("candidatos:", error);
     return json({ error: "falha ao buscar candidatos" }, 500);
@@ -108,7 +150,8 @@ Deno.serve(async () => {
   let sent = 0;
   let failed = 0;
 
-  for (const cand of candidates ?? []) {
+  for (const [i, cand] of (candidates ?? []).entries()) {
+    if (i > 0) await new Promise((r) => setTimeout(r, gapMs()));
     const channel = channelFor(cand.activity);
     if (!channel) continue;
 
@@ -182,5 +225,5 @@ Deno.serve(async () => {
     sent++;
   }
 
-  return json({ ok: true, sent, failed, sentToday: (sentToday ?? 0) + sent });
+  return json({ ok: true, sent, failed, target, sentToday: (sentToday ?? 0) + sent });
 });
