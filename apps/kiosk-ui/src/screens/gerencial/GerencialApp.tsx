@@ -83,7 +83,6 @@ const CATEGORIES: ModuleCategory[] = [
     badge: "Estratégico",
     description: "Cockpit executivo, assistente de vendas e inteligência de mercado",
     items: [
-      { value: "ACOMPANHAMENTO_OWNER", label: "Visão Geral Owner", icon: "👑", tag: "Ao Vivo", description: "Monitoramento em tempo real do faturamento vs meta, sessões ativas e NPS." },
       { value: "COPILOT_IA", label: "ZoeIA (Copilot)", icon: "✦", tag: "IA Vendas", description: "Assistente comercial humana para sugestões automáticas e aumento de ticket médio." },
       { value: "RELATORIOS", label: "Relatórios Consolidados", icon: "📊", description: "Vendas, visitas, planos e sessões unificadas da rede." },
     ],
@@ -123,9 +122,6 @@ const CATEGORIES: ModuleCategory[] = [
     description: "Gestão da equipe, controle legal de ponto, recrutamento e clientes",
     items: [
       { value: "COLABORADORES", label: "Equipe & Operadores", icon: "👤", description: "Cadastro unificado da equipe e permissões por unidade." },
-      { value: "FREQUENCIA", label: "Ponto & Frequência", icon: "⏱️", tag: "Ao Vivo", description: "Marcação legal de ponto com foto em tempo real para CLT e Estagiários." },
-      { value: "OCORRENCIAS", label: "Atestados & Ocorrências", icon: "📋", description: "Lançamento de atestados médicos, faltas e justificativas do RH." },
-      { value: "TALENTOS", label: "Banco de Talentos", icon: "💼", description: "Triagem de currículos recebidos na landing page do site." },
       { value: "CLIENTES", label: "Base de Clientes", icon: "🧑‍🤝‍🧑", description: "Consulta e histórico centralizado de responsáveis e crianças da rede." },
       { value: "CRM_WHATSAPP", label: "CRM WhatsApp", icon: "💬", tag: "Novo", description: "Conversas e funil de clientes do Playground e do Circuito pelo WhatsApp." },
       { value: "RELATORIOS_SESSAO", label: "Olhar FaçaAmigos", icon: "📝", tag: "Novo", description: "Mapa de observação de cada visita de 1h+, quem preencheu, prazo de 40 min e a mensagem enviada ao responsável." },
@@ -163,8 +159,8 @@ const ALL_ITEMS: (ModuleItem & { categoryLabel: string })[] = CATEGORIES.flatMap
 
 export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogout: () => void | Promise<void> }) {
   const { employee } = useAppState();
-  const [tab, setTab] = useState<GerencialTab>("ACOMPANHAMENTO_OWNER");
-  const [activeCategory, setActiveCategory] = useState<string>(() => ITEM_TO_CATEGORY["ACOMPANHAMENTO_OWNER"] || "visao_geral");
+  const [tab, setTab] = useState<GerencialTab>("COPILOT_IA");
+  const [activeCategory, setActiveCategory] = useState<string>(() => ITEM_TO_CATEGORY["COPILOT_IA"] || "visao_geral");
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleSelectTab = (newTab: GerencialTab) => {
