@@ -163,3 +163,6 @@ Passos:
 2. `supabase functions deploy crm-lifecycle-dispatch crm-whatsapp-webhook crm-templates-bootstrap`.
 3. Chamar `crm-templates-bootstrap` uma vez para criar e submeter os 6 templates novos (categoria Marketing). Chamar de novo depois da aprovação da Meta para ativá-los. Até lá, nenhuma oferta da régua sai: o dispatcher pula template cujo número de variáveis não bate com o do kind.
 4. Revisar os textos de `fa_crm_offer_info` (preços) antes de a Meta aprovar.
+
+### Pedido de avaliação no Google: retirado
+`NPS_PROMOTOR` (nota 9 ou 10 → convite para avaliar no Google) está desligado: flag `crm_lc_nps_promotor` = 0 e template `fa_lc_nps_promotor` inativo (migration `20261001140000_fa_crm_retire_google_review.sql`). O `crm-templates-bootstrap` não o recria nem o reativa. `NPS_DETRATOR` segue ligado. Para voltar a usar: remover o nome de `RETIRED`, recolocar a definição em `TEMPLATES`, religar a flag e ativar o template.
