@@ -38,9 +38,18 @@ import {
   SESSION_REPORT_GROUP_NAME,
   summarizeAnswersBySector,
   summarizeAnswersForMessage,
+  type SectorSummary,
   type SessionReportAnswers,
   type SessionReportLevel,
 } from "../_shared/sessionReportCatalog.ts";
+import {
+  buildOlharTrail,
+  nextOlharMilestone,
+  olharEdition,
+  olharOrdinal,
+  type OlharTrail,
+  type OlharTrailHistoryItem,
+} from "../_shared/sessionReportTrail.ts";
 import { buildSessionReportPdf, stripForPdf, type SessionReportDoc } from "../_shared/sessionReportPdf.ts";
 
 const GEMINI_MODEL = "gemini-flash-latest";
@@ -52,7 +61,7 @@ const BUCKET = "relatorios-sessao";
 // vocabulário de "sessão/atendimento": o documento é um registro da
 // brincadeira, e a nota de blindagem só faz sentido se o corpo não contradiz.
 const FORBIDDEN =
-  /\b(transtorno|d[eé]ficit|atraso|laudo|diagn[oó]stic\w*|sintoma\w*|TEA|TDAH|autis\w*|patolog\w*|avalia[cç]\w*|regula[cç][aã]o emocional|processamento sensorial|planejamento motor|terap\w*|sess[aã]o|sess[oõ]es|atendimento\w*|evolu[cç][aã]o|interven[cç][aã]o|desenvolvimento|habilidade\w*|estimula[cç][aã]o|paciente\w*|tratamento\w*|cl[ií]nic\w*)\b/i;
+  /\b(transtorno|d[eé]ficit|atraso|laudo|diagn[oó]stic\w*|sintoma\w*|TEA|TDAH|autis\w*|patolog\w*|avalia[cç]\w*|regula[cç][aã]o emocional|processamento sensorial|planejamento motor|terap\w*|sess[aã]o|sess[oõ]es|atendimento\w*|evolu[cç][aã]o|progress\w*|regred\w*|regress\w*|piorou|melhorou|desempenho|notas?|pontua[cç]\w*|interven[cç][aã]o|desenvolvimento|habilidade\w*|estimula[cç][aã]o|paciente\w*|tratamento\w*|cl[ií]nic\w*)\b/i;
 
 // Como cada nível chega à IA — nunca o rótulo "técnico" do catálogo.
 const LEVEL_FOR_AI: Record<SessionReportLevel, string> = {
@@ -87,53 +96,110 @@ const list = (items: string[]) =>
   items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}`;
 const lower = (items: string[]) => items.map((x) => x.charAt(0).toLowerCase() + x.slice(1));
 
-/** Documento determinístico, montado só do catálogo. Sai quando a IA falha ou usa termo proibido. */
-function buildFallbackDoc(child: string, minutes: number, answers: SessionReportAnswers, observacao: string | null): SessionReportDoc {
+/** Prosa de uma área, só do catálogo: celebra o autônomo, depois o que seguimos praticando. */
+function areaProse(child: string, s: SectorSummary): string {
+  const parts: string[] = [];
+  if (s.autonomo.length) parts.push(`${child} brilhou em ${list(lower(s.autonomo))}, fazendo tudo sozinho(a).`);
+  if (s.desenvolvendo.length) parts.push(`Seguimos praticando juntos, no ritmo de ${child}: ${list(lower(s.desenvolvendo))}.`);
+  if (s.apoio.length) parts.push(`Com uma ajudinha carinhosa da equipe, ${child} também experimentou ${list(lower(s.apoio))}.`);
+  return parts.join(" ");
+}
+
+/** Documento determinístico, montado só do catálogo e da trilha. Sai quando a IA falha ou usa termo proibido. */
+function buildFallbackDoc(child: string, minutes: number, answers: SessionReportAnswers, observacao: string | null, trail: OlharTrail): SessionReportDoc {
   const areas: SessionReportDoc["areas"] = {};
   for (const s of summarizeAnswersBySector(answers)) {
-    const parts: string[] = [];
-    if (s.autonomo.length) parts.push(`${child} brilhou em ${list(lower(s.autonomo))}, fazendo tudo sozinho(a).`);
-    if (s.desenvolvendo.length) parts.push(`Seguimos praticando juntos, no ritmo de ${child}: ${list(lower(s.desenvolvendo))}.`);
-    if (s.apoio.length) parts.push(`Com uma ajudinha carinhosa da equipe, ${child} também experimentou ${list(lower(s.apoio))}.`);
-    areas[SESSION_REPORT_GROUP_KEY[s.sector]] = parts.join(" ");
+    if (trail.edition !== "ESTREIA" && s.sector !== trail.spotlight) continue;
+    areas[SESSION_REPORT_GROUP_KEY[s.sector]] = areaProse(child, s);
   }
   const all = summarizeAnswersForMessage(answers);
   const obs = observacao ? ` ${observacao.replace(/[.!?\s]+$/, "")}.` : "";
   const highlight = all.autonomo.length
     ? `${child} brilhou em ${lower(all.autonomo.slice(0, 2)).join(" e ")}, fazendo sozinho(a)!`
     : `${child} brincou por ${minutes} minutos com a gente e explorou o espaço do seu jeito!`;
-  return {
-    titulo: `O dia de ${child} no FaçaAmigos`,
-    abertura: `Hoje ${child} passou ${minutes} minutos brincando com a gente. Aqui está um pouco do que a nossa equipe de recreação viu enquanto ${child} brincava, corria e fazia amigos.${obs}`,
+  if (trail.edition === "ESTREIA") {
+    return {
+      titulo: `O dia de ${child} no FaçaAmigos`,
+      abertura: `Hoje ${child} passou ${minutes} minutos brincando com a gente. Aqui está um pouco do que a nossa equipe de recreação viu enquanto ${child} brincava, corria e fazia amigos.${obs}`,
+      areas,
+      fechamento: `Foi uma alegria receber vocês! Cada visita é um dia diferente, e a gente adora ver ${child} brincando do seu jeito. Estamos esperando a próxima brincadeira.`,
+      destaque_whatsapp: oneLine(highlight, MAX_HIGHLIGHT_CHARS),
+    };
+  }
+  const ord = olharOrdinal(trail.seq);
+  const { primeiraVez, primeiraAutonomia } = trail.novidades;
+  const novParts: string[] = [];
+  if (primeiraVez.length) novParts.push(`Hoje apareceram brincadeiras novas por aqui: ${list(lower(primeiraVez))}.`);
+  if (primeiraAutonomia.length) novParts.push(`E ${child} fez sozinho(a): ${list(lower(primeiraAutonomia))}.`);
+  const doc: SessionReportDoc = {
+    titulo: `O ${ord} Olhar de ${child}`,
+    abertura: `Que bom ter ${child} de volta! Este é o ${ord} Olhar, e hoje ${child} brincou por ${minutes} minutos com a gente. Cada visita traz um jeito novo de brincar.${obs}`,
     areas,
-    fechamento: `Foi uma alegria receber vocês! Cada visita é um dia diferente, e a gente adora ver ${child} brincando do seu jeito. Estamos esperando a próxima brincadeira.`,
+    fechamento: `Obrigado por trazer ${child} de novo! A cada visita a gente descobre mais um jeito de brincar junto. Estamos esperando a próxima.`,
     destaque_whatsapp: oneLine(highlight, MAX_HIGHLIGHT_CHARS),
   };
+  if (novParts.length) doc.novidades = novParts.join(" ");
+  if (trail.edition === "MARCO") {
+    doc.retrospectiva = `Em ${trail.visitas.length} visitas, ${child} já brincou ${trail.totalMinutos} minutos com a gente e explorou ${trail.itensExplorados} de ${trail.totalItens} brincadeiras do nosso caminho. A cada visita, um jeito novo de brincar!`;
+  }
+  return doc;
 }
 
-function buildPrompt(child: string, minutes: number, answers: SessionReportAnswers, observacao: string | null) {
+function keysSpec(trail: OlharTrail): string {
+  const titulo = `   "titulo": string até 60 caracteres, alegre, com o nome da criança;`;
+  const fim = `   "fechamento": 1 parágrafo de 150 a 300 caracteres, convidando a voltar;
+   "destaque_whatsapp": 1 ou 2 frases, até 200 caracteres, uma cena concreta e alegre do dia.`;
+  if (trail.edition === "ESTREIA") {
+    return `${titulo}
+   "abertura": 1 parágrafo de 250 a 450 caracteres;
+   "areas": objeto com as chaves movimento, convivencia, autonomia, atencao — SÓ as áreas listadas nos dados —, cada uma 1 parágrafo de 200 a 400 caracteres;
+${fim}`;
+  }
+  const hasNov = trail.novidades.primeiraVez.length + trail.novidades.primeiraAutonomia.length > 0;
+  return `${titulo}
+   "abertura": 1 parágrafo de 250 a 450 caracteres, que reconheça que a criança voltou e que este é o ${olharOrdinal(trail.seq)} Olhar (não repita o que se diria no primeiro);
+   "areas": objeto SÓ com a chave da área em destaque listada nos dados, 1 parágrafo de 300 a 550 caracteres, mais aprofundado, com uma cena concreta;${
+     hasNov ? `\n   "novidades": 1 parágrafo de 100 a 350 caracteres sobre o que apareceu de novo hoje (use SOMENTE a lista de novidades dos dados);` : ""
+   }${
+     trail.edition === "MARCO"
+       ? `\n   "retrospectiva": 1 parágrafo de 300 a 600 caracteres celebrando o caminho de brincadeiras até aqui, usando só os números dos dados; celebre o caminho, não compare com outras crianças nem com um "antes ruim";`
+       : ""
+   }
+${fim}`;
+}
+
+function buildPrompt(child: string, minutes: number, answers: SessionReportAnswers, observacao: string | null, trail: OlharTrail) {
   const system = `Você é a equipe de recreação do FaçaAmigos, um playground inclusivo em Belém do Pará. Escreva, para o responsável, o "Olhar FaçaAmigos": um texto sobre como foi a BRINCADEIRA da criança hoje, do jeito que a equipe viu.
 REGRAS ABSOLUTAS:
 1. Português do Brasil, tom caloroso, leve e concreto, de quem gosta da criança. Use o primeiro nome da criança. Descreva o que ela FEZ enquanto brincava — nunca o que ela "é" ou "tem".
-2. Em cada área, celebre primeiro o que a criança fez sozinha; depois cite no máximo 1 item que "está praticando" ou que "precisou de uma ajudinha", sempre como algo que seguimos fazendo juntos (ex.: "está ganhando confiança em...", "seguimos praticando juntos..."). Só use as áreas que receberam itens.
+2. Em cada área que você escrever, celebre primeiro o que a criança fez sozinha; depois cite no máximo 1 item que "está praticando" ou que "precisou de uma ajudinha", sempre como algo que seguimos fazendo juntos (ex.: "está ganhando confiança em...", "seguimos praticando juntos..."). Só use as áreas que receberam itens.
 3. Se houver observação da equipe, transforme numa cena concreta na abertura ou na área que combina.
-4. PROIBIDO, em qualquer campo: qualquer palavra de sessão, atendimento, terapia, avaliação, evolução, desenvolvimento, habilidade, estimulação, intervenção, clínica, diagnóstico, laudo, transtorno, déficit, atraso, sintoma, TEA, TDAH, autismo, paciente, tratamento; notas, pontuações ou comparação com outras crianças; promessas de resultado. Baseie-se SOMENTE nos dados fornecidos, sem inventar.
+4. PROIBIDO, em qualquer campo: progresso, melhora, piora, regressão, desempenho, nota, pontuação; qualquer palavra de sessão, atendimento, terapia, avaliação, evolução, desenvolvimento, habilidade, estimulação, intervenção, clínica, diagnóstico, laudo, transtorno, déficit, atraso, sintoma, TEA, TDAH, autismo, paciente, tratamento; notas, pontuações ou comparação com outras crianças; promessas de resultado. Baseie-se SOMENTE nos dados fornecidos, sem inventar.
 5. PROIBIDO emojis (o documento é impresso). NÃO comece com "Olá"/"Oi" e NÃO assine.
 6. Responda EXCLUSIVAMENTE em JSON com estas chaves:
-   "titulo": string até 60 caracteres, alegre, com o nome da criança;
-   "abertura": 1 parágrafo de 250 a 450 caracteres;
-   "areas": objeto com as chaves movimento, convivencia, autonomia, atencao — SÓ as áreas listadas nos dados —, cada uma 1 parágrafo de 200 a 400 caracteres;
-   "fechamento": 1 parágrafo de 150 a 300 caracteres, convidando a voltar;
-   "destaque_whatsapp": 1 ou 2 frases, até 200 caracteres, uma cena concreta e alegre do dia.`;
+${keysSpec(trail)}`;
 
   const lines: string[] = [];
   for (const s of summarizeAnswersBySector(answers)) {
+    if (trail.edition !== "ESTREIA" && s.sector !== trail.spotlight) continue;
     lines.push(`${SESSION_REPORT_GROUP_NAME[s.sector]} (chave "${SESSION_REPORT_GROUP_KEY[s.sector]}"):`);
     for (const l of s.autonomo) lines.push(`  - ${l}: ${LEVEL_FOR_AI.AUTONOMO}`);
     for (const l of s.desenvolvendo) lines.push(`  - ${l}: ${LEVEL_FOR_AI.DESENVOLVENDO}`);
     for (const l of s.apoio) lines.push(`  - ${l}: ${LEVEL_FOR_AI.APOIO}`);
   }
-  const prompt = `Criança: ${child}\nTempo de brincadeira: ${minutes} minutos\nO que a equipe reparou, por área:\n${lines.join("\n") || "  (nenhum item marcado)"}\nObservação livre da equipe: ${observacao ?? "(nenhuma)"}`;
+  const extra: string[] = [];
+  if (trail.edition !== "ESTREIA") {
+    extra.push(`Este é o ${olharOrdinal(trail.seq)} Olhar da criança (${trail.visitas.length} visitas até aqui).`);
+    extra.push(`Novidades de hoje — apareceram pela primeira vez: ${trail.novidades.primeiraVez.join("; ") || "(nenhuma)"}`);
+    extra.push(`Novidades de hoje — fez sozinho(a) pela primeira vez: ${trail.novidades.primeiraAutonomia.join("; ") || "(nenhuma)"}`);
+  }
+  if (trail.edition === "MARCO") {
+    extra.push(`Totais do caminho: ${trail.visitas.length} visitas, ${trail.totalMinutos} minutos de brincadeira, ${trail.itensExplorados} de ${trail.totalItens} brincadeiras já exploradas.`);
+    const top = Object.entries(trail.conquistasPorArea).sort((a, b) => b[1] - a[1])[0];
+    if (top && top[1] > 0) extra.push(`Área com mais momentos de autonomia vistos: ${SESSION_REPORT_GROUP_NAME[top[0] as keyof typeof SESSION_REPORT_GROUP_NAME]} (${top[1]} momentos).`);
+  }
+  const heading = trail.edition === "ESTREIA" ? "O que a equipe reparou, por área" : "Área em destaque hoje";
+  const prompt = `Criança: ${child}\nTempo de brincadeira: ${minutes} minutos\n${extra.length ? extra.join("\n") + "\n" : ""}${heading}:\n${lines.join("\n") || "  (nenhum item marcado)"}\nObservação livre da equipe: ${observacao ?? "(nenhuma)"}`;
   return { system, prompt };
 }
 
@@ -176,7 +242,7 @@ async function callGemini(apiKey: string, system: string, prompt: string): Promi
 const AREA_KEYS = ["movimento", "convivencia", "autonomia", "atencao"] as const;
 
 /** Valida o formato e a ausência de termos proibidos em TODOS os campos; null = usar fallback. */
-function validateDoc(raw: unknown, allowedAreas: Set<string>): SessionReportDoc | null {
+function validateDoc(raw: unknown, allowedAreas: Set<string>, trail: OlharTrail): SessionReportDoc | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const str = (v: unknown, min: number, max: number) =>
@@ -190,12 +256,22 @@ function validateDoc(raw: unknown, allowedAreas: Set<string>): SessionReportDoc 
   const rawAreas = (r.areas && typeof r.areas === "object" ? r.areas : {}) as Record<string, unknown>;
   for (const k of AREA_KEYS) {
     if (!allowedAreas.has(k)) continue;
-    const v = str(rawAreas[k], 80, 700);
+    const v = str(rawAreas[k], 80, 800);
     if (!v) return null; // área com itens precisa de prosa
     areas[k] = v;
   }
   const doc: SessionReportDoc = { titulo, abertura, areas, fechamento, destaque_whatsapp: oneLine(destaque, MAX_HIGHLIGHT_CHARS) };
-  const everything = [doc.titulo, doc.abertura, doc.fechamento, doc.destaque_whatsapp, ...Object.values(doc.areas)].join("\n");
+  if (trail.edition !== "ESTREIA" && trail.novidades.primeiraVez.length + trail.novidades.primeiraAutonomia.length > 0) {
+    const nov = str(r.novidades, 40, 500);
+    if (!nov) return null;
+    doc.novidades = nov;
+  }
+  if (trail.edition === "MARCO") {
+    const retro = str(r.retrospectiva, 150, 800);
+    if (!retro) return null;
+    doc.retrospectiva = retro;
+  }
+  const everything = [doc.titulo, doc.abertura, doc.fechamento, doc.destaque_whatsapp, doc.novidades ?? "", doc.retrospectiva ?? "", ...Object.values(doc.areas)].join("\n");
   if (FORBIDDEN.test(everything)) {
     console.warn("[session-report] IA usou termo proibido; usando fallback");
     return null;
@@ -275,6 +351,28 @@ Deno.serve(async (req) => {
   const observacao = (report.observacao as string | null) ?? null;
   const minutes = Number(report.eligible_minutes ?? 0);
 
+  // --- Trilha: posição da criança na sequência de Olhares (define o formato) ---
+  const { data: histRows, error: histErr } = await admin
+    .from("fa_kiosk_session_reports")
+    .select("id, filled_at_ms, eligible_minutes, answers")
+    .eq("child_id", report.child_id)
+    .lte("filled_at_ms", report.filled_at_ms)
+    .order("filled_at_ms", { ascending: true })
+    .order("id", { ascending: true });
+  if (histErr) console.error("[session-report] histórico da trilha falhou", histErr.message);
+  const history: OlharTrailHistoryItem[] = (histRows ?? []).map((h) => ({
+    id: h.id as string,
+    filledAtMs: Number(h.filled_at_ms),
+    eligibleMinutes: Number(h.eligible_minutes ?? 0),
+    answers: (h.answers ?? {}) as SessionReportAnswers,
+  }));
+  let trail = buildOlharTrail(history, report.id as string);
+  // O nº gravado na 1ª geração manda: regerar não renumera a trilha.
+  const savedSeq = Number(report.olhar_seq ?? 0);
+  if (savedSeq > 0 && savedSeq !== trail.seq) {
+    trail = { ...trail, seq: savedSeq, edition: olharEdition(savedSeq), nextMilestone: nextOlharMilestone(savedSeq) };
+  }
+
   let doc: SessionReportDoc | null = !regenerate && report.ai_report ? (report.ai_report as SessionReportDoc) : null;
   let aiFallback = Boolean(report.ai_fallback);
   aiModel = (report.ai_model as string | null) ?? GEMINI_MODEL;
@@ -282,17 +380,21 @@ Deno.serve(async (req) => {
     const key = Deno.env.get("GEMINI_API_KEY");
     let generated: SessionReportDoc | null = null;
     if (key) {
-      const { system, prompt } = buildPrompt(childFirst, minutes, answers, observacao);
-      const allowed = new Set(summarizeAnswersBySector(answers).map((s) => SESSION_REPORT_GROUP_KEY[s.sector]));
+      const { system, prompt } = buildPrompt(childFirst, minutes, answers, observacao, trail);
+      const allowed = new Set(
+        summarizeAnswersBySector(answers)
+          .filter((s) => trail.edition === "ESTREIA" || s.sector === trail.spotlight)
+          .map((s) => SESSION_REPORT_GROUP_KEY[s.sector]),
+      );
       const answer = await callGemini(key, system, prompt);
-      generated = answer ? validateDoc(answer.raw, allowed) : null;
+      generated = answer ? validateDoc(answer.raw, allowed, trail) : null;
       if (answer) aiModel = answer.model;
     }
     if (generated) {
       doc = generated;
       aiFallback = false;
     } else {
-      doc = buildFallbackDoc(childFirst, minutes, answers, observacao);
+      doc = buildFallbackDoc(childFirst, minutes, answers, observacao, trail);
       aiFallback = true;
     }
   }
@@ -313,6 +415,7 @@ Deno.serve(async (req) => {
         answers,
         observacao,
         report: doc,
+        trail,
       });
     } catch (e) {
       console.error("[session-report] falha ao gerar PDF", e instanceof Error ? e.message : e);
@@ -328,6 +431,7 @@ Deno.serve(async (req) => {
     }
     const { data: savedToken, error: setErr } = await admin.rpc("fa_session_report_set_pdf", {
       p_report_id: report.id, p_pdf_path: path, p_public_token: token ?? newToken(), p_ai_report: doc,
+      p_olhar_seq: trail.seq, p_olhar_edition: trail.edition,
     });
     if (setErr) {
       console.error("[session-report] set_pdf falhou", setErr.message);
@@ -367,7 +471,11 @@ Deno.serve(async (req) => {
   if (inFreeformWindow(contact.last_inbound_ms)) {
     sendMode = "FREEFORM";
     const body =
-      `Olá ${guardianFirst}! ${highlight}\n\nO Olhar FaçaAmigos de hoje sobre ${childFirst}, com o que a nossa equipe viu enquanto ${childFirst} brincava, está aqui: ${link}\n\n` +
+      `Olá ${guardianFirst}! ${highlight}\n\n${
+        trail.edition === "ESTREIA"
+          ? `O Olhar FaçaAmigos de hoje sobre ${childFirst}`
+          : `O ${olharOrdinal(trail.seq)} Olhar FaçaAmigos de ${childFirst}${trail.edition === "MARCO" ? ", com a retrospectiva das brincadeiras," : ""}`
+      }, com o que a nossa equipe viu enquanto ${childFirst} brincava, está aqui: ${link}\n\n` +
       `É um registro observacional da brincadeira, sem caráter de avaliação. Qualquer dúvida, é só responder esta mensagem. 💛`;
     result = await sendWhatsapp(admin, creds, { ...common, content: { kind: "TEXT", body } });
   } else {

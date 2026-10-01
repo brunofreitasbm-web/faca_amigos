@@ -184,7 +184,43 @@ const TEMPLATES: TemplateDef[] = [
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body, null, 2), { status, headers: { "Content-Type": "application/json" } });
 
-Deno.serve(async () => {
+// Só service_role chama esta function: ela cria/submete templates na Meta e
+// ativa linhas de fa_crm_templates. verify_jwt = true sozinho NÃO basta — a
+// chave anônima (pública, embutida na SPA) também é um JWT válido.
+function bearer(req: Request): string | null {
+  const m = /^Bearer\s+(.+)$/i.exec(req.headers.get("Authorization") ?? "");
+  return m ? m[1].trim() : null;
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const x = enc.encode(a);
+  const y = enc.encode(b);
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
+}
+
+function isServiceRole(req: Request): boolean {
+  const token = bearer(req);
+  if (!token) return false;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (key && timingSafeEqual(token, key)) return true;
+  // JWT legado com role=service_role: a assinatura já foi validada pelo
+  // gateway (verify_jwt = true), aqui só se lê o papel. Se o verify_jwt for
+  // desligado, este ramo deixa de ser seguro — remova-o.
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload?.role === "service_role";
+  } catch {
+    return false;
+  }
+}
+
+Deno.serve(async (req) => {
+  if (!isServiceRole(req)) return json({ error: "forbidden" }, 403);
+
   const accountSid = Deno.env.get("TWILIO_CRM_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_CRM_AUTH_TOKEN");
   if (!accountSid || !authToken) return json({ error: "Twilio do CRM não configurado" }, 503);

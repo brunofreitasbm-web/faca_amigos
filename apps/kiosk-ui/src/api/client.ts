@@ -215,6 +215,8 @@ export interface RecentSessionReport {
   pdf_path: string | null;
   pdf_view_count: number;
   public_token: string | null;
+  olhar_seq: number | null;
+  olhar_edition: "ESTREIA" | "CONTINUIDADE" | "MARCO" | null;
 }
 
 export interface SessionReportSubmitResult {
@@ -263,6 +265,9 @@ export interface SessionReportRow {
   public_token: string | null;
   pdf_view_count: number;
   pdf_last_viewed_at_ms: number | null;
+  /** Posição na trilha de Olhares da criança (migration fa_olhar_trail). */
+  olhar_seq: number | null;
+  olhar_edition: "ESTREIA" | "CONTINUIDADE" | "MARCO" | null;
   ai_report: SessionReportDoc | null;
   employee?: { full_name: string } | null;
 }
@@ -273,6 +278,10 @@ export interface SessionReportDoc {
   abertura: string;
   areas: Partial<Record<"movimento" | "convivencia" | "autonomia" | "atencao", string>>;
   fechamento: string;
+  /** Só em CONTINUIDADE/MARCO. */
+  novidades?: string;
+  /** Só em MARCO. */
+  retrospectiva?: string;
   destaque_whatsapp: string;
 }
 

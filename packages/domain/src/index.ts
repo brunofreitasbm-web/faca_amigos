@@ -20,3 +20,4 @@ export * from "./utils/accessCode.js";
 
 
 export * from "./session-report/catalog.js";
+export * from "./session-report/trail.js";
