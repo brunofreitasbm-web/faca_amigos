@@ -37,9 +37,10 @@ interface TemplateDef {
 // Botões das ofertas da régua: o payload volta em ButtonPayload no webhook.
 const OFFER_BUTTONS = [{ title: "Quero saber mais", id: "OFERTA_INFO" }, { title: "Agora não", id: "OFERTA_NAO" }];
 
-// Templates substituídos por uma versão nova: nunca reativados aqui, mesmo
-// que a Meta os tenha aprovado (a migration 20261001130000 os desativou).
-const RETIRED = new Set(["fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback"]);
+// Templates substituídos por uma versão nova ou retirados de uso: nunca
+// reativados aqui, mesmo que a Meta os tenha aprovado (as migrations
+// 20261001130000 e 20261001140000 os desativaram).
+const RETIRED = new Set(["fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor"]);
 
 const TEMPLATES: TemplateDef[] = [
   // Estes dois já tinham content_sid real de antes desta rodada — entram
@@ -124,11 +125,6 @@ const TEMPLATES: TemplateDef[] = [
     purpose: "PREMIO_FIDELIDADE", name: "fa_lc_premio_fidelidade", category: "UTILITY", variableCount: 2,
     body: "Oi {{1}}! Lembrando que {{2}} ainda tem um prêmio de fidelidade esperando pra ser resgatado na próxima visita. Não deixe vencer! 💛",
     sample: { "1": "Ana", "2": "Miguel" },
-  },
-  {
-    purpose: "NPS_PROMOTOR", name: "fa_lc_nps_promotor", category: "UTILITY", variableCount: 2,
-    body: "Que alegria, {{1}}! Ficaríamos muito felizes se você deixasse uma avaliação rápida pra gente no Google: {{2}} 💛",
-    sample: { "1": "Ana", "2": "https://g.page/r/review" },
   },
   {
     purpose: "NPS_DETRATOR", name: "fa_lc_nps_detrator", category: "UTILITY", variableCount: 1,

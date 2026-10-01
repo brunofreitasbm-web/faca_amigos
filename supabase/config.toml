@@ -122,3 +122,11 @@ verify_jwt = false
 # signed URL de 1h do bucket privado relatorios-sessao.
 [functions.session-report-view]
 verify_jwt = false
+
+# Olhar FaçaAmigos: gera o PDF/texto e envia o link ao responsável. Chamada pelo
+# kiosk com o JWT do colaborador; a função valida usuário e capacidade
+# (relatorio_sessao.write) por conta própria via requireCapability. Em produção
+# já roda com verify_jwt = false: declarar aqui evita que um deploy sem flag
+# o religue sem querer.
+[functions.session-report-dispatch]
+verify_jwt = false
