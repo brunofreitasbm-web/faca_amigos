@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { Asset, ChildMatch, Coupon, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer } from "../api/client.js";
+import type { Asset, ChildMatch, Coupon, ForeignPackageBalance, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { OlharUpsellCard } from "../components/OlharUpsellCard.js";
 import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
@@ -221,6 +221,9 @@ export function EntradaScreen({
   // consultado. creditId aponta para o crédito mais antigo (FIFO) — é o
   // que fa_checkin referencia para fixar tarifa/piso da sessão.
   const [childCredit, setChildCredit] = useState<{ remainingMinutes: number; creditId: string } | null>(null);
+  // Saldo de pacote da família gravado em outro responsável: o check-in
+  // cobraria avulso, então o operador é avisado antes de confirmar.
+  const [foreignPackages, setForeignPackages] = useState<ForeignPackageBalance[]>([]);
 
   // Oferta de upgrade da criança identificada. `null` cobre os dois casos
   // em que não há card: ainda não consultado e não elegível — a tela trata
@@ -400,6 +403,13 @@ export function EntradaScreen({
     setOffer(null);
     setHourBank(null);
     setChildCredit(null);
+    setForeignPackages([]);
+
+    if (unit?.id) {
+      Api.foreignPackageBalances(unit.id, match.id, match.cpf ? normalizeCpf(match.cpf) : null, match.phone_e164)
+        .then(setForeignPackages)
+        .catch(() => setForeignPackages([]));
+    }
 
     const activeTerm = (match.cpf ? normalizeCpf(match.cpf) : "") || (match.phone_e164 ? phoneDigitsBr(match.phone_e164) : "");
     if (activeTerm && activeTerm.length >= 3) {
@@ -501,6 +511,7 @@ export function EntradaScreen({
     setOffer(null);
     setHourBank(null);
     setChildCredit(null);
+    setForeignPackages([]);
     setChildName("");
     setBirthDate("");
     setIsNeurodivergent(false);
@@ -1317,6 +1328,25 @@ export function EntradaScreen({
       {/* ---------------------------------------------------------------- */}
       <section>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px 0" }}>2. Plano de permanência</h2>
+        {matchedChild && foreignPackages.length > 0 && (
+          <div
+            role="alert"
+            style={{
+              margin: "0 0 10px 0",
+              padding: "10px 14px",
+              borderRadius: "12px",
+              border: "2px solid var(--color-warning, #F5A623)",
+              background: "rgba(245, 166, 35, 0.12)",
+              fontSize: "13px",
+            }}
+          >
+            <strong>⚠ Saldo de pacote em outro responsável.</strong>{" "}
+            {foreignPackages
+              .map((p) => `${p.package_name}: ${formatPlanoHoras(p.remaining_minutes)} em nome de ${p.guardian_name}`)
+              .join(" · ")}
+            . Se esta família usa esse saldo, a criança será cobrada como avulsa — corrija o responsável no cadastro antes de confirmar.
+          </div>
+        )}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           {/* Banco de horas antes dos planos pagos, de propósito: a regra é
               usar o saldo que a família já pagou ANTES de vender plano novo. */}

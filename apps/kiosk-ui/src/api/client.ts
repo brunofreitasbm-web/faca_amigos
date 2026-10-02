@@ -810,6 +810,15 @@ export interface VipFlag {
 }
 
 /** Saldo do banco de horas de uma criança (`fa_kiosk_hour_bank_balance`). */
+export interface ForeignPackageBalance {
+  guardian_package_id: string;
+  guardian_id: string;
+  guardian_name: string;
+  package_name: string;
+  remaining_minutes: number;
+  expires_at_ms: number;
+}
+
 export interface HourBankBalance {
   child_id: string;
   remaining_minutes: number;
@@ -2430,6 +2439,17 @@ export const Api = {
     );
     return new Map(rows.map((r) => [r.child_id, r]));
   },
+
+  /** Saldo de pacote ligado à família mas gravado em OUTRO responsável — o check-in cobraria avulso. */
+  foreignPackageBalances: (unitId: string, childId: string, cpf?: string | null, phoneE164?: string | null) =>
+    unwrap<ForeignPackageBalance[]>(
+      supabase().rpc("fa_kiosk_foreign_package_balance", {
+        p_unit_id: unitId,
+        p_child_id: childId,
+        p_cpf: cpf ?? null,
+        p_phone_e164: phoneE164 ?? null,
+      }),
+    ),
 
   /** Fila do Painel: crianças com saldo pré-pago aguardando o operador iniciar a sessão. */
   prepaidCreditQueue: (unitId: string) =>
