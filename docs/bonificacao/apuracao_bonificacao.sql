@@ -1,11 +1,11 @@
 -- Apuração da bonificação por operador/dia — Playground e Circuito (Parque Shopping)
--- Regras: docs/bonificacao/programa-bonificacao-set-2026.md
+-- Regras: docs/bonificacao/manual-bonificacao.md e programa-bonificacao-set-2026.md
 -- Somente leitura. Ajuste o período em `params` (business_date, já com o corte de 4h).
 --
 -- Fonte única: kiosk (fa_kiosk_orders PAGA + fa_kiosk_sessions.checkin_by_employee_id).
 -- Receita por operador = soma dos pedidos PAGA distintos das sessões que ele fez check-in
 -- (irmãos no mesmo pedido contam uma vez). Produtos = pedidos fechados pelo operador.
--- Travas: caixa aberto até 10h15 e fechamento sem divergência > R$ 20 sem justificativa.
+-- Travas: caixa aberto até 10h15 (12h15 aos domingos) e fechamento sem divergência > R$ 20 sem justificativa.
 --
 -- Metas, teto do mês e valores de bônus NÃO estão mais fixos aqui: vêm de
 -- fa_kiosk_bonus_program_goals/fa_kiosk_bonus_program_config, configurados
@@ -16,7 +16,7 @@
 -- para a folha — uma unidade sem nada configurado nessas duas tabelas
 -- simplesmente não gera bônus. Owner/ADMIN fica fora da apuração.
 --
--- Bônus de Planos Longos (2 horas, Day Use, Porto Seguro): bônus fixo por unidade
+-- Bônus de Planos Longos (1 hora + Olhar, 2 horas, Day Use, Porto Seguro): bônus fixo por unidade
 -- vendida, escada mensal e teto próprio (fa_kiosk_bonus_program_config.planos_teto_mes_cents),
 -- SEM as travas de caixa. Regras em fa_kiosk_bonus_plan_rules. Aparece nas colunas
 -- planos_2h / pacotes / bonus_planos desta consulta (por dia, sem escada nem teto)
@@ -32,7 +32,7 @@
 -- soma na meta de itens do mês. O excedente de tempo não vira item.
 
 with params as (
-  select date '2026-08-28' as d_from, date '2026-09-02' as d_to
+  select date '2026-10-01' as d_from, date '2026-10-31' as d_to
 ),
 units as (
   select id, name,
@@ -289,7 +289,7 @@ order by unidade, business_date, operador
 -- próprio (planos_teto_mes_cents; 0/null = sem teto).
 -- ---------------------------------------------------------------------------
 with params as (
-  select date '2026-10-06' as d_from, date '2026-11-05' as d_to
+  select date '2026-10-06' as d_from, date '2026-10-31' as d_to
 ),
 units as (
   select id from fa_kiosk_units

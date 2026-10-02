@@ -1,10 +1,9 @@
 # Programa de Bonificação — Playground e Circuito (Parque Shopping)
 
-Piloto: **08/09 a 05/10/2026**. Recalibração das metas em 06/10 com 30 dias de kiosk.
-Teto: **R$ 200 por operador por mês** (10% do salário de R$ 2.000). Apuração: `apuracao_bonificacao.sql`.
+Piloto: **08/09 a 31/10/2026**, com as metas atuais mantidas (decisão do dono em 02/10; a recalibração prevista para 06/10 foi adiada para o fim do piloto).
+Teto de metas e produtos: **R$ 200 por operador por mês** (10% do salário de R$ 2.000). O Bônus de Planos Longos tem teto próprio (ver `programa-planos-longos-out-2026.md`). Apuração: `apuracao_bonificacao.sql`.
 
-Para imprimir e entregar direto à equipe, use `manual-operadores.md` — só as regras
-e exemplos, sem a simulação e o diagnóstico deste documento. As mesmas regras também
+Para imprimir e entregar à equipe, use `manual-bonificacao.md`, o manual único (metas, produtos, planos longos, método de venda e FAQ), sem a simulação e o diagnóstico deste documento. As mesmas regras também
 aparecem ao vivo no Painel (card **🎮 Bonificação de hoje**), calculadas em
 `apps/kiosk-ui/src/bonificacao.ts`.
 
@@ -17,9 +16,9 @@ aparecem ao vivo no Painel (card **🎮 Bonificação de hoje**), calculadas em
 1. **Só conta o que está no kiosk.** Sessão com check-in no seu PIN e pedido pago. O formulário antigo de bonificação acabou.
 2. **É individual e por dia.** Quem trabalhou o dia leva o bônus do dia. A meta muda conforme o dia da semana.
 3. **Duas travas. Falhou uma, o bônus do dia é zero:**
-   - Caixa aberto no kiosk **até 10h15**.
+   - Caixa aberto no kiosk **até 10h15 de segunda a sábado e até 12h15 aos domingos**.
    - Fechamento **sem diferença acima de R$ 20 sem justificativa**. Diferença justificada e aceita pelo dono não zera.
-4. **Teto de R$ 200 no mês**, contando metas e produtos.
+4. **Teto de R$ 200 no mês**, contando metas e produtos. O bônus de planos longos (Playground) tem teto próprio e não passa por estas travas.
 5. Pago na folha do mês seguinte. Placar toda segunda-feira no grupo.
 
 ### Playground — "Meta do Dia + 1 Hora"
@@ -108,6 +107,8 @@ Produtos: meta de 10 itens/operador/mês = 20 na unidade ≈ + R$ 700–900/mês
 O programa custa no máximo R$ 800/mês nominal (1,4% da receita atual) e só custa isso se a receita subir 33%. O risco financeiro é zero. O risco real é meta mal calibrada.
 
 **Regra do piloto:** se nas 2 primeiras semanas ninguém bater meta em mais de 30% dos dias, reduzir as metas em 10%. Se todo mundo bater em mais de 80% dos dias, subir 10%.
+
+**Situação em 02/10:** metas batidas em 6 de 22 dias-operador (27%), abaixo do gatilho de 30%. Pela regra, as metas cairiam 10%. O dono decidiu manter as metas até 31/10 para ter um ciclo completo de dados; reavaliar no fechamento do piloto.
 
 ### Sobre o teto de R$ 200 e encargos
 
