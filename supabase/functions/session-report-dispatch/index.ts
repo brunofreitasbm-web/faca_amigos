@@ -446,7 +446,10 @@ Deno.serve(async (req) => {
     ? await admin.from("fa_kiosk_guardians").select("id, full_name, phone_e164, whatsapp_consent_at_ms").eq("id", report.guardian_id).maybeSingle()
     : { data: null };
   const phone = (guardian?.phone_e164 as string | undefined) ?? "";
-  if (!guardian || !phone) return mark("SKIPPED_NO_PHONE", { aiMessage: highlight, aiFallback });
+  // Celular/fixo BR em E.164 (+55 DDD 8-9 dígitos). Dado corrompido (ex.: dois números colados) não vai à Twilio nem vira contato no CRM.
+  if (!guardian || !/^\+55[1-9]\d(9\d{8}|[2-5]\d{7})$/.test(phone)) {
+    return mark("SKIPPED_NO_PHONE", { aiMessage: highlight, aiFallback });
+  }
   if (!guardian.whatsapp_consent_at_ms) return mark("SKIPPED_NO_CONSENT", { aiMessage: highlight, aiFallback });
 
   const creds = twilioCreds();
