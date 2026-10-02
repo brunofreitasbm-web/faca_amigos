@@ -1,31 +1,12 @@
 # Venda Consultiva de Planos Longos — Manual do Operador
 
-**Vale a partir de 06/10/2026.** Playground Parque Shopping. Este bônus é **além** do bônus de meta do dia. Não substitui nada.
+Playground Parque Shopping. Este manual ensina **uma técnica**: como descobrir quanto tempo a família vai ficar e recomendar o plano certo, sem empurrar.
 
 ---
 
 ## Por que isso existe
 
-Hoje, de cada 100 crianças, 67 entram com 30 minutos, 30 com 1 hora e **1 com 2 horas**. Day Use e Porto Seguro quase não saem. Não é porque a família não quer: é porque ninguém pergunta quanto tempo ela vai ficar. Quem pergunta, vende. Quem vende, ganha.
-
----
-
-## O que você ganha
-
-| Você vendeu | Ganha por unidade | Escada do mês | Prêmio ao bater a escada |
-|---|---|---|---|
-| **2 horas** | R$ 3 | 12 no mês | + R$ 15 |
-| **Day Use** | R$ 10 | 2 no mês | + R$ 10 |
-| **Porto Seguro** | R$ 25 | 1 no mês | + R$ 15 |
-
-- **Teto: R$ 100 por mês**, separado dos R$ 200 do bônus de meta.
-- **Não tem trava de caixa.** Vendeu, contou. A trava de abertura e fechamento continua valendo só para o bônus de meta do dia.
-- Conta **por criança**: dois irmãos em 2 horas são 2 unidades no seu placar.
-- Só conta o que está no kiosk, no seu PIN, com pedido pago. Pacote conta para quem estava logado quando vendeu.
-- Cancelou ou estornou, sai do placar.
-- Pago na folha do mês seguinte, junto do bônus de meta. Placar toda segunda no grupo.
-
-Exemplo: no mês você vendeu 12 planos de 2 horas, 1 Day Use e 0 Porto Seguro → R$ 36 + R$ 15 (escada) + R$ 10 = **R$ 61**.
+Hoje, de cada 100 crianças, 67 entram com 30 minutos, 30 com 1 hora e **1 com 2 horas**. Day Use e Porto Seguro quase não saem. Não é porque a família não quer: é porque ninguém pergunta quanto tempo ela vai ficar. Quem pergunta, vende.
 
 ---
 
@@ -47,16 +28,18 @@ Minuto de relógio (excedente): **R$ 1,80** (R$ 1,50 na meia).
 
 ## O método: Perguntar → Calcular → Oferecer
 
-Você **não empurra plano**. Você faz duas perguntas, decide em 5 segundos e recomenda **uma vez**.
+Você **não empurra plano**. Você segue três passos, sempre nesta ordem: pergunta, calcula em 5 segundos e recomenda **uma vez**.
 
-### As 2 perguntas (em todo check-in, sem exceção)
+### Passo 1 — Perguntar (2 perguntas, em todo check-in, sem exceção)
 
 1. **"Vocês vão ficar quanto tempo hoje?"**
    Se a pessoa hesitar: *"Vão fazer mais alguma coisa no shopping? Cinema, almoço, compras?"*
 2. **"É a primeira vez aqui ou já vieram outras vezes?"**
    O kiosk mostra o selo ★ VIP e o número de visitas. Olhe antes de perguntar.
 
-### Decisão em 5 segundos
+### Passo 2 — Calcular (5 segundos)
+
+Pelo que a família respondeu, escolha o plano que cobre o tempo dela e **guarde a diferença em reais**: quanto ela pagaria ficando no plano de baixo e passando do tempo, contra quanto paga no plano certo. É essa diferença que você vai falar, não o preço cheio. Os números estão na tabela de preços acima.
 
 | O que a família respondeu | O que você recomenda |
 |---|---|
@@ -64,6 +47,10 @@ Você **não empurra plano**. Você faz duas perguntas, decide em 5 segundos e r
 | "Uma hora", "uma horinha" | **1 h**, com o gancho: *"Se passar, cada minuto é R$ 1,80. Se vocês acham que pode passar, 2 horas fica mais tranquilo."* |
 | "Vamos almoçar / cinema / compras", "a tarde toda", aniversário, férias, 2 irmãos ou mais | **2 horas.** Se o adulto disse que **vai sair do playground**: **Day Use**. |
 | Selo ★ VIP, 3 ou mais visitas, "a gente vem sempre" | **Porto Seguro.** Se o card laranja apareceu na tela, leia o script dele: ele já traz os números da família. |
+
+### Passo 3 — Oferecer (uma vez)
+
+Leia a frase-âncora do produto escolhido, com a diferença em reais que você calculou. Se a família recusar, aceite com um sorriso e faça o check-in normal.
 
 ---
 
@@ -104,13 +91,13 @@ Gatilho: ★ VIP, 3 ou mais visitas, "a gente vem sempre", mora perto, avó que 
 2. **Nunca ofereça Day Use ou Porto Seguro para quem disse "rapidinho".** 2 horas só a partir de "uma hora".
 3. **Use o kiosk.** Planos e pacotes estão na tela de Entrada. Se o card laranja (VIP) apareceu, o script já está pronto: leia. Se a família recusou, **clique em "Recusado"**. Isso pausa a oferta por 15 dias. Se você não clicar, a mesma família ouve a mesma coisa na próxima visita e se irrita.
 4. **Fale a diferença, não o preço cheio.** "Economiza R$ 24" convence mais que "R$ 192".
-5. **Continue oferecendo 1 hora em vez de 30 min.** O bônus de 45% de sessões de 1 hora continua valendo.
-6. **Irmãos:** ofereça o mesmo plano para os dois. Duas crianças em 2 horas são 2 no seu placar.
+5. **Prefira 1 hora a 30 min quando a família não tem pressa.** Quem aceita 1 hora fica mais perto de aceitar 2.
+6. **Irmãos:** ofereça o mesmo plano para os dois, para a família decidir uma vez só e sair junta.
 
 ## Quando vender mais
 
 - **14h às 16h.** Quem chega nesse horário veio passar a tarde.
-- **Sexta, sábado e domingo.** É onde está o volume. Todos os planos de 2 horas do piloto saíram nesses dias.
+- **Sexta, sábado e domingo.** É onde está o volume. Todos os planos de 2 horas vendidos de 28/08 a 29/09 saíram nesses dias.
 - **Aniversário, férias escolares, Círio, dia de chuva.** A família fica mais tempo. Pergunte.
 - **Mãe ou pai com sacola de compras ou ingresso de cinema na mão.** Day Use na hora.
 
@@ -125,7 +112,7 @@ Gatilho: ★ VIP, 3 ou mais visitas, "a gente vem sempre", mora perto, avó que 
 | 3 | Role-play: família ★ VIP e Porto Seguro pelo card laranja | Usou os números do card? Clicou em Recusado? |
 | 4 | Role-play: "vou ao cinema, a tarde toda" e Day Use | Falou "pode deixar ele(a) aqui com a gente"? |
 | 5 | Sombra: gerente observa 5 check-ins reais | Fez as 2 perguntas nos 5? |
-| Toda segunda | Placar no grupo e 1 objeção nova da semana | — |
+| Toda segunda | 1 objeção nova que apareceu na semana, discutida em grupo | — |
 
 ---
 
@@ -156,11 +143,11 @@ Ofereça UMA vez. Recusou? Clique Recusado.
 
 ## Perguntas que vão surgir
 
-**"A família pegou 30 min e depois mudou para 2 horas no Painel. Conta?"**
-Conta para quem fez o check-in. Por isso pergunte na entrada, não depois.
+**"A família pegou 30 min e na hora de sair quer ficar mais. E agora?"**
+Dá para mudar o plano da sessão pelo Painel. Mas o melhor momento é a entrada: pergunte o tempo antes, não depois.
 
-**"Vendi o Porto Seguro, mas a família só vai usar semana que vem. Conta agora?"**
-Conta no dia da venda.
+**"A família comprou o Porto Seguro, mas só vai usar semana que vem. Tem problema?"**
+Não. São 10 horas para usar em 30 dias a contar da compra, nos dias que a família escolher.
 
 **"O card laranja não apareceu, mas a família vem sempre. Posso oferecer?"**
 Pode. O card só aparece com 4 visitas em 30 dias. Se você sabe que a família é frequente, ofereça pela tela de Entrada.
@@ -168,14 +155,5 @@ Pode. O card só aparece com 4 visitas em 30 dias. Se você sabe que a família 
 **"E se a família pedir desconto no pacote?"**
 O cupom de 40% já vale no pacote, e os preços deste manual já são com ele. Não tem desconto além disso.
 
-**"Cheguei atrasado e o caixa abriu depois das 10h15. Perdi o bônus de plano?"**
-Não. A trava de caixa zera só o bônus de meta do dia. O bônus de plano é seu.
-
-**"Bati o teto de R$ 100. Vale continuar oferecendo?"**
-Vale. A família que compra 2 horas volta mais, e o teto é revisto a cada ciclo.
-
-**"A criança usou o saldo do pacote. Conta como 2 horas?"**
-Não. O pacote já contou no dia em que foi vendido.
-
-**"Onde vejo meu placar?"**
-Menu "Minha Bonificação", card "Planos longos do mês". Mostra quantos de cada, a escada e quanto já acumulou.
+**"A criança já tem Porto Seguro. Ofereço 2 horas?"**
+Não. Ela entra pelo saldo do pacote, e o card laranja não aparece enquanto houver saldo.
