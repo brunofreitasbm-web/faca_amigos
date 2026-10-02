@@ -6,7 +6,7 @@
 // níveis (pílulas) vêm de `answers` + catálogo — fato, nunca da IA. A nota de
 // blindagem é fixa e sempre impressa (1ª página em caixa + rodapé em todas).
 
-import { PDFDocument, type PDFFont, type PDFPage, type RGB, rgb } from "npm:pdf-lib@1.17.1";
+import { PDFArray, PDFDocument, type PDFFont, PDFName, type PDFPage, PDFString, type RGB, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 import { FREDOKA_B64, LOGO_PNG_B64, NUNITO_BOLD_B64, NUNITO_REG_B64 } from "./assets/brandAssets.ts";
 import {
@@ -102,6 +102,48 @@ function roundedRect(page: PDFPage, x: number, y: number, w: number, h: number, 
     `M${r},0 H${w - r} A${r},${r} 0 0 1 ${w},${r} V${h - r} A${r},${r} 0 0 1 ${w - r},${h} ` +
     `H${r} A${r},${r} 0 0 1 0,${h - r} V${r} A${r},${r} 0 0 1 ${r},0 Z`;
   page.drawSvgPath(d, { x, y: y + h, color });
+}
+
+/** Links oficiais do convite digital (rodapé do Olhar). */
+export const OLHAR_SITE_URL = "https://institutofacaamigos.com.br/";
+export const OLHAR_INSTAGRAM_URL = "https://www.instagram.com/facaamigos.belem/";
+
+/** Área clicável (anotação de link URI) sobre o retângulo dado. */
+function addLink(doc: PDFDocument, page: PDFPage, url: string, x: number, y: number, w: number, h: number) {
+  const annot = doc.context.obj({
+    Type: "Annot",
+    Subtype: "Link",
+    Rect: [x, y, x + w, y + h],
+    Border: [0, 0, 0],
+    A: { Type: "Action", S: "URI", URI: PDFString.of(url) },
+  });
+  const ref = doc.context.register(annot);
+  const existing = page.node.lookupMaybe(PDFName.of("Annots"), PDFArray);
+  if (existing) existing.push(ref);
+  else page.node.set(PDFName.of("Annots"), doc.context.obj([ref]));
+}
+
+/** Ícone de globo (site), desenhado em vetor, centrado em (cx, cy). */
+function drawGlobeIcon(page: PDFPage, cx: number, cy: number, r: number, color: RGB) {
+  const t = 1.2;
+  page.drawCircle({ x: cx, y: cy, size: r, borderColor: color, borderWidth: t });
+  page.drawEllipse({ x: cx, y: cy, xScale: r * 0.42, yScale: r, borderColor: color, borderWidth: t * 0.8 });
+  page.drawLine({ start: { x: cx - r, y: cy }, end: { x: cx + r, y: cy }, thickness: t * 0.8, color });
+  page.drawLine({ start: { x: cx - r * 0.82, y: cy + r * 0.5 }, end: { x: cx + r * 0.82, y: cy + r * 0.5 }, thickness: t * 0.6, color });
+  page.drawLine({ start: { x: cx - r * 0.82, y: cy - r * 0.5 }, end: { x: cx + r * 0.82, y: cy - r * 0.5 }, thickness: t * 0.6, color });
+}
+
+/** Ícone de câmera (Instagram), desenhado em vetor, centrado em (cx, cy). */
+function drawInstagramIcon(page: PDFPage, cx: number, cy: number, r: number, color: RGB) {
+  const t = 1.3;
+  const s = r * 2;
+  const rr = r * 0.62;
+  const d =
+    `M${rr},0 H${s - rr} A${rr},${rr} 0 0 1 ${s},${rr} V${s - rr} A${rr},${rr} 0 0 1 ${s - rr},${s} ` +
+    `H${rr} A${rr},${rr} 0 0 1 0,${s - rr} V${rr} A${rr},${rr} 0 0 1 ${rr},0 Z`;
+  page.drawSvgPath(d, { x: cx - r, y: cy + r, borderColor: color, borderWidth: t });
+  page.drawCircle({ x: cx, y: cy, size: r * 0.42, borderColor: color, borderWidth: t });
+  page.drawCircle({ x: cx + r * 0.52, y: cy + r * 0.52, size: r * 0.1, color });
 }
 
 export async function buildSessionReportPdf(input: SessionReportPdfInput): Promise<Uint8Array> {
@@ -364,6 +406,34 @@ export async function buildSessionReportPdf(input: SessionReportPdfInput): Promi
   ensure(40);
   heading("Até a próxima brincadeira", 15, PINK);
   paragraph(input.report.fechamento, body, 11.5);
+
+  // ── Convite digital: botões clicáveis (site e Instagram) ──
+  {
+    const boxH = 84;
+    ensure(boxH + 16);
+    y -= 4;
+    const top = y + 8;
+    roundedRect(page, M, top - boxH, W, boxH, 10, SOFT);
+    page.drawRectangle({ x: M, y: top - boxH, width: 4, height: boxH, color: PINK });
+    page.drawText("Continue pertinho do FaçaAmigos", { x: M + 16, y: top - 22, size: 13.5, font: display, color: PINK });
+    page.drawText("Vem conhecer nosso mundo e acompanhar a brincadeira de cada dia.", { x: M + 16, y: top - 38, size: 9.5, font: body, color: rgb(0.28, 0.33, 0.32) });
+    const btnH = 26;
+    const btnY = top - boxH + 12;
+    const buttons = [
+      { label: "Nosso site", url: OLHAR_SITE_URL, fill: TEAL, icon: drawGlobeIcon },
+      { label: "@facaamigos.belem", url: OLHAR_INSTAGRAM_URL, fill: PINK, icon: drawInstagramIcon },
+    ];
+    let bx = M + 16;
+    for (const b of buttons) {
+      const bw = bold.widthOfTextAtSize(b.label, 10) + 46;
+      roundedRect(page, bx, btnY, bw, btnH, btnH / 2, b.fill);
+      b.icon(page, bx + 17, btnY + btnH / 2, 7, WHITE);
+      page.drawText(b.label, { x: bx + 31, y: btnY + 9, size: 10, font: bold, color: WHITE });
+      addLink(doc, page, b.url, bx, btnY, bw, btnH);
+      bx += bw + 10;
+    }
+    y = top - boxH - 18;
+  }
 
   // Legenda das pílulas
   ensure(30);
