@@ -23,23 +23,14 @@ interface Option {
 // copy.ts e copyCircuito.ts) — mudou lá, muda aqui. O valor enviado fica
 // congelado em fa_crm_renewal_alerts.options.
 const PLAYGROUND_OPTIONS: Option[] = [
-  { minutes: 15, cents: 3000 },
   { minutes: 30, cents: 4800 },
   { minutes: 60, cents: 9600 },
 ];
-const CIRCUITO_OPTIONS: Record<string, Record<number, Option[]>> = {
-  CARRO: {
-    15: [{ minutes: 10, cents: 1800 }, { minutes: 15, cents: 2300 }, { minutes: 30, cents: 4400 }],
-    30: [{ minutes: 10, cents: 1800 }, { minutes: 15, cents: 2400 }, { minutes: 30, cents: 4400 }],
-  },
-  PELUCIA: {
-    10: [{ minutes: 5, cents: 1500 }, { minutes: 10, cents: 2300 }, { minutes: 20, cents: 4400 }],
-    20: [{ minutes: 5, cents: 1500 }, { minutes: 10, cents: 2400 }, { minutes: 20, cents: 4400 }],
-  },
-};
 
-const optionsFor = (activity: string, assetKind: string | null, durationMinutes: number): Option[] | null =>
-  activity === "CARRINHO" ? (CIRCUITO_OPTIONS[assetKind ?? ""]?.[durationMinutes] ?? null) : PLAYGROUND_OPTIONS;
+// O template tem 2 botões fixos ("+30 min" e "+60 min"), que são os do
+// Playground. O Circuito tem outras durações, então não recebe a oferta.
+const optionsFor = (activity: string, _assetKind: string | null, _durationMinutes: number): Option[] | null =>
+  activity === "CARRINHO" ? null : PLAYGROUND_OPTIONS;
 
 const brl = (cents: number) => `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
 
@@ -130,7 +121,7 @@ Deno.serve(async () => {
     const guardianFirst = (contact!.name ?? cand.guardian_name ?? "").trim().split(/\s+/)[0] || "tudo bem";
     const child = cand.child_first_name || "seu filho(a)";
     // Newline não é permitido em variável de template do WhatsApp.
-    const optionsText = options.map((o, i) => `${i + 1}) +${o.minutes} min por ${brl(o.cents)}`).join(" · ");
+    const optionsText = options.map((o) => `+${o.minutes} min por ${brl(o.cents)}`).join(" ou ");
     const variables = { "1": guardianFirst, "2": child, "3": optionsText };
 
     let res: Response | null = null;

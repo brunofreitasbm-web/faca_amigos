@@ -40,7 +40,7 @@ const OFFER_BUTTONS = [{ title: "Quero saber mais", id: "OFERTA_INFO" }, { title
 // Templates substituídos por uma versão nova ou retirados de uso: nunca
 // reativados aqui, mesmo que a Meta os tenha aprovado (as migrations
 // 20261001130000 e 20261001140000 os desativaram).
-const RETIRED = new Set(["fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor"]);
+const RETIRED = new Set(["fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor", "fa_renovacao_fim_plano"]);
 
 const TEMPLATES: TemplateDef[] = [
   // Estes dois já tinham content_sid real de antes desta rodada — entram
@@ -66,11 +66,14 @@ const TEMPLATES: TemplateDef[] = [
     body: "Olá, {{1}}! Aqui é o FaçaAmigos. Para te enviar por aqui o relatório e os avisos da visita do seu filho, precisamos da sua autorização. Responda SIM para autorizar ou PARAR para não receber mensagens.",
     sample: { "1": "Ana" },
   },
+  // v2: só 2 botões (+30 e +60 min do Playground). A v1 tinha 3 botões
+  // ("Opção 1/2/3") e o 3º ficaria morto. Preços vão na variável {{3}}, não nos
+  // botões, para mudar a tabela sem reaprovar o template.
   {
-    purpose: "RENOVACAO", name: "fa_renovacao_fim_plano", category: "UTILITY", variableCount: 3,
+    purpose: "RENOVACAO", name: "fa_renovacao_fim_plano_v2", category: "UTILITY", variableCount: 3,
     body: "Oi {{1}}! O tempo de {{2}} termina em poucos minutos. Para continuar sem pressa: {{3}}. Toque na opção desejada.",
-    sample: { "1": "Ana", "2": "Miguel", "3": "1) +15 min por R$ 30,00 · 2) +30 min por R$ 48,00 · 3) +60 min por R$ 96,00" },
-    quickReplyButtons: [{ title: "Opção 1", id: "RENOVAR_1" }, { title: "Opção 2", id: "RENOVAR_2" }, { title: "Opção 3", id: "RENOVAR_3" }],
+    sample: { "1": "Ana", "2": "Miguel", "3": "+30 min por R$ 48,00 ou +60 min por R$ 96,00" },
+    quickReplyButtons: [{ title: "+30 min", id: "RENOVAR_1" }, { title: "+60 min", id: "RENOVAR_2" }],
   },
   {
     purpose: "VISITA_BOAS_VINDAS", name: "fa_visita_boas_vindas", category: "UTILITY", variableCount: 3,
