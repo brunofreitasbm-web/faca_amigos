@@ -392,8 +392,12 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     const key = revKey(o.unit_id, o.business_date, o.closed_by_employee_id);
     const cur = prodByKey.get(key) ?? { itens: 0, prodCents: 0, bonusProdCents: 0 };
     const program = input.programs[o.unit_id] ?? null;
-    // TODO(human): contabilizar o aluguel de pelúcia como produto em `cur`
-    // (itens, prodCents, bonusProdCents) — ver a regra no SQL (prod_raw).
+    const val = rentalCentsBySession.get(s.id) ?? 0;
+    cur.itens += 1;
+    cur.prodCents += val;
+    if (program) {
+      cur.bonusProdCents += program.produtoBonusBaixoCents;
+    }
     prodByKey.set(key, cur);
   }
 

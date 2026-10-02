@@ -1690,6 +1690,21 @@ async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgram
   return result;
 }
 
+async function fetchInBatches<T>(
+  ids: string[],
+  batchSize: number,
+  fetcher: (batch: string[]) => Promise<T[]>,
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  if (ids.length <= batchSize) return fetcher(ids);
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += batchSize) {
+    batches.push(ids.slice(i, i + batchSize));
+  }
+  const results = await Promise.all(batches.map(fetcher));
+  return results.flat();
+}
+
 /**
  * Busca os dados brutos e roda `apurarBonificacaoPorDia` (mesma lógica de
  * docs/bonificacao/apuracao_bonificacao.sql) — reaproveitado por
@@ -1743,14 +1758,14 @@ async function fetchApuracaoDias(
   const planIds = [...new Set(sessions.map((s) => s.plan_id as string | null).filter((id): id is string => Boolean(id)))];
   const orderIds = orders.map((o) => o.id as string);
   const [plans, orderItems] = await Promise.all([
-    planIds.length === 0
-      ? Promise.resolve([] as Record<string, unknown>[])
-      : unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("id, duration_unit, duration_value").in("id", planIds)),
-    orderIds.length === 0
-      ? Promise.resolve([] as Record<string, unknown>[])
-      : unwrap<Record<string, unknown>[]>(
-          supabase().from("fa_kiosk_order_items").select("order_id, session_id, item_type, quantity, total_cents, unit_price_cents").in("order_id", orderIds),
-        ),
+    fetchInBatches(planIds, 100, (batch) =>
+      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("id, duration_unit, duration_value").in("id", batch)),
+    ),
+    fetchInBatches(orderIds, 100, (batch) =>
+      unwrap<Record<string, unknown>[]>(
+        supabase().from("fa_kiosk_order_items").select("order_id, session_id, item_type, quantity, total_cents, unit_price_cents").in("order_id", batch),
+      ),
+    ),
   ]);
 
   const rawSessions: RawSession[] = sessions.map((s) => ({
@@ -2933,24 +2948,26 @@ export const Api = {
     const orderIds = orders.map((o) => o.id as string);
 
     const [payments, items] = await Promise.all([
-      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_payments").select("order_id, method, amount_cents").in("order_id", orderIds)),
-      unwrap<Record<string, unknown>[]>(
-        supabase().from("fa_kiosk_order_items").select("order_id, session_id, description, quantity").in("order_id", orderIds),
+      fetchInBatches(orderIds, 100, (batch) =>
+        unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_payments").select("order_id, method, amount_cents").in("order_id", batch)),
+      ),
+      fetchInBatches(orderIds, 100, (batch) =>
+        unwrap<Record<string, unknown>[]>(
+          supabase().from("fa_kiosk_order_items").select("order_id, session_id, description, quantity").in("order_id", batch),
+        ),
       ),
     ]);
 
     const sessionIds = [...new Set(items.map((i) => i.session_id as string | null).filter((id): id is string => Boolean(id)))];
-    const sessions =
-      sessionIds.length === 0
-        ? []
-        : await unwrap<Record<string, unknown>[]>(
-            supabase().from("fa_kiosk_sessions").select("id, child_name_snapshot, guardian_id, coupon_discount_cents").in("id", sessionIds),
-          );
+    const sessions = await fetchInBatches(sessionIds, 100, (batch) =>
+      unwrap<Record<string, unknown>[]>(
+        supabase().from("fa_kiosk_sessions").select("id, child_name_snapshot, guardian_id, coupon_discount_cents").in("id", batch),
+      ),
+    );
     const guardianIds = [...new Set(sessions.map((s) => s.guardian_id as string))];
-    const guardians =
-      guardianIds.length === 0
-        ? []
-        : await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164, cpf").in("id", guardianIds));
+    const guardians = await fetchInBatches(guardianIds, 100, (batch) =>
+      unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_guardians").select("id, full_name, phone_e164, cpf").in("id", batch)),
+    );
 
     const sessionById = new Map(sessions.map((s) => [s.id as string, s]));
     const guardianById = new Map(guardians.map((g) => [g.id as string, g]));
