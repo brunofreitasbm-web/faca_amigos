@@ -243,6 +243,62 @@ export function CaixaScreen() {
   // duplicado quando a fila reenviava sozinha. Ver fa_record_cash_movement.
   const [pendingMovementKey, setPendingMovementKey] = useState<string | null>(null);
 
+  // Rascunho do fechamento em sessionStorage (por turno). Se a tela remontar
+  // no meio do fechamento (troca de aba, recarga, queda de sessão), sem isto
+  // o valor contado/fundo voltavam a vazio: o envelope calculado virava R$ 0,00
+  // (e contava como "registrado"), mesmo já tendo sido gravado no servidor, e
+  // a passagem de turno digitada se perdia.
+  const closingDraftKey = shift ? `fa:closing-draft:${shift.id}` : null;
+  const [closingDraftLoadedFor, setClosingDraftLoadedFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!closingDraftKey || closingDraftLoadedFor === closingDraftKey) return;
+    try {
+      const raw = sessionStorage.getItem(closingDraftKey);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d && typeof d === "object") {
+          if (typeof d.countedCash === "string") setCountedCash(d.countedCash);
+          if (typeof d.nextDayFloat === "string") setNextDayFloat(d.nextDayFloat);
+          if (d.declared && typeof d.declared === "object") setDeclared(d.declared);
+          if (d.closeJustifications && typeof d.closeJustifications === "object") setCloseJustifications(d.closeJustifications);
+          if (d.handover && typeof d.handover === "object") {
+            setHandover({ noChanges: !!d.handover.noChanges, conteudo: String(d.handover.conteudo ?? "") });
+          }
+          if (d.envelopeLocked) setClosingEnvelopeLocked(true);
+          if (d.closing) setClosing(true);
+        }
+      }
+    } catch {
+      // sessionStorage indisponível/corrompido: segue sem rascunho.
+    }
+    setClosingDraftLoadedFor(closingDraftKey);
+  }, [closingDraftKey, closingDraftLoadedFor]);
+
+  useEffect(() => {
+    if (!closingDraftKey || closingDraftLoadedFor !== closingDraftKey) return;
+    try {
+      if (closing && !closeResult) {
+        sessionStorage.setItem(
+          closingDraftKey,
+          JSON.stringify({
+            closing: true,
+            countedCash,
+            nextDayFloat,
+            declared,
+            closeJustifications,
+            handover,
+            envelopeLocked: closingEnvelopeLocked,
+          }),
+        );
+      } else {
+        sessionStorage.removeItem(closingDraftKey);
+      }
+    } catch {
+      // idem
+    }
+  }, [closingDraftKey, closingDraftLoadedFor, closing, closeResult, countedCash, nextDayFloat, declared, closeJustifications, handover, closingEnvelopeLocked]);
+
   // Estados do Modal "Registrar Envelope"
   const [envelopeModalOpen, setEnvelopeModalOpen] = useState(false);
   const [envelopeNum, setEnvelopeNum] = useState("");
@@ -1422,8 +1478,21 @@ export function CaixaScreen() {
           // Pré-preenche com o calculado (fundo inicial + vendas em dinheiro ±
           // movimentações) e com o mesmo fundo de hoje; o operador corrige pela
           // contagem física. Não sobrescreve se já vinha digitando.
-          if (countedCash.trim() === "") setCountedCash((drawerMath(revenue, movements).drawerNowCents / 100).toFixed(2));
-          if (nextDayFloat.trim() === "") setNextDayFloat((shift.opening_cash_cents / 100).toFixed(2));
+          // Se o envelope do fechamento já foi gravado (ex.: a tela recarregou
+          // no meio), recupera contado/fundo dele em vez de recalcular — senão
+          // o envelope aparece como R$ 0,00 e o registrado fica invisível.
+          const lastEnvelope = [...movements]
+            .reverse()
+            .find((m) => m.kind === "SANGRIA" && !!m.envelope_number && m.fundo_caixa_cents != null);
+          if (countedCash.trim() === "" && nextDayFloat.trim() === "" && lastEnvelope) {
+            const fundo = lastEnvelope.fundo_caixa_cents ?? 0;
+            setCountedCash(((lastEnvelope.amount_cents + fundo) / 100).toFixed(2));
+            setNextDayFloat((fundo / 100).toFixed(2));
+            setClosingEnvelopeLocked(true);
+          } else {
+            if (countedCash.trim() === "") setCountedCash((drawerMath(revenue, movements).drawerNowCents / 100).toFixed(2));
+            if (nextDayFloat.trim() === "") setNextDayFloat((shift.opening_cash_cents / 100).toFixed(2));
+          }
           setClosing(true);
         }}
       >
