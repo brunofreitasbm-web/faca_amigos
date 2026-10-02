@@ -798,7 +798,10 @@ export type UnitSettingKey =
   | "crm_lc_aniversario"
   | "crm_lc_vip"
   | "crm_lc_winback_1"
-  | "crm_lc_winback_2";
+  | "crm_lc_winback_2"
+  | "crm_lc_degrau_2h"
+  | "crm_lc_degrau_porto"
+  | "crm_lc_degrau_dayuse";
 
 export interface VipFlag {
   child_id: string;
