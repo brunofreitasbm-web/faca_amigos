@@ -1,7 +1,7 @@
 # Bônus de Planos Longos — Playground (Parque Shopping)
 
-Início: **06/10/2026**, junto da recalibração do piloto de bonificação. Convive com o bônus de meta do dia (`programa-bonificacao-set-2026.md`) e não o substitui.
-Para a equipe, use `manual-venda-planos-longos.md`: script de venda, regras e trilha de treinamento, sem a simulação e o diagnóstico deste documento.
+Período: **06/10 a 31/10/2026**. Convive com o bônus de meta do dia (`programa-bonificacao-set-2026.md`) e não o substitui.
+Para a equipe, use `manual-bonificacao.md`, o manual único: regras, script de venda e trilha de treinamento, sem a simulação e o diagnóstico deste documento.
 
 ---
 
@@ -11,19 +11,22 @@ Bônus **fixo por unidade vendida**, não por valor. Valores configuráveis pelo
 
 | Produto | Bônus por unidade | % do preço com cupom | Escada no mês | Prêmio da escada |
 |---|---|---|---|---|
+| **1 hora + Olhar FaçaAmigos** (plano) | R$ 1 | 0,9% de R$ 108 | 100 | + R$ 20 |
 | 2 horas (plano) | R$ 3 | 1,6% de R$ 192 | 12 | + R$ 15 |
 | Day Use (pacote) | R$ 10 | 3,7% de R$ 270 | 2 | + R$ 10 |
 | Porto Seguro (pacote) | R$ 25 | 3,0% de R$ 840 | 1 | + R$ 15 |
 
-- **Teto próprio: R$ 100 por operador por mês**, fora dos R$ 200 do bônus de meta e produtos. 0 = sem teto.
-- **Sem travas de caixa.** A trava de abertura e de fechamento continua zerando só o bônus de meta do dia. Venda consultiva não deve ser punida por atraso de abertura. Ponto a confirmar com o dono.
+- **Teto próprio: R$ 200 por operador por mês**, fora dos R$ 200 do bônus de meta e produtos (máximo de R$ 400 por operador no Playground). 0 = sem teto.
+- **Por que R$ 1 e escada de 100 no plano de 1 hora.** O 1 hora já é 30% das sessões (164 em 33 dias, cerca de 75 por operador no mês), então o bônus unitário paga principalmente o que já acontece. Por isso o valor unitário é baixo (0,9% do preço) e o incentivo real está na escada, que fica 33% acima da base. Para incentivo maior, suba a escada ou o prêmio, não o valor unitário.
+- **Olhar FaçaAmigos.** O Olhar existe só a partir do plano de 1 hora e é preenchido pelo próprio operador em até 40 minutos depois da saída. O sistema ainda **não confere** se o Olhar foi enviado: o bônus conta a venda do plano de 1 hora. Se o Olhar atrasar ou não sair, o controle é do gerente (aba Gerencial > Olhar FaçaAmigos). Condicionar o bônus ao Olhar enviado no prazo exige mudança no motor de apuração (TypeScript e SQL).
+- **Sem travas de caixa.** A trava de abertura (10h15; 12h15 aos domingos) e de fechamento continua zerando só o bônus de meta do dia. Venda consultiva não deve ser punida por atraso de abertura. Ponto a confirmar com o dono.
 - Pago na folha do mês seguinte. Placar toda segunda no grupo.
 
 ### O que conta e para quem
 
 | Produto | Como o sistema identifica | Quem leva |
 |---|---|---|
-| 2 horas | Sessão com plano cadastrado na regra, pedido pago, sem uso de saldo de pacote | Operador do check-in |
+| 1 hora + Olhar, 2 horas | Sessão com plano cadastrado na regra, pedido pago, sem uso de saldo de pacote | Operador do check-in |
 | Day Use, Porto Seguro | Linha em `fa_kiosk_guardian_packages` do pacote cadastrado na regra | Operador logado na venda; se não houver, quem fechou o pedido |
 
 - Conta **por criança**. Irmãos no mesmo pedido de 2 horas são 2 unidades.
@@ -44,26 +47,31 @@ Bônus **fixo por unidade vendida**, não por valor. Valores configuráveis pelo
 
 Por operador, por mês, valores nominais.
 
-| Cenário | 2 h | Day Use | Porto Seguro | Bônus unitário | Escadas | Total |
-|---|---|---|---|---|---|---|
-| Hoje, sem mudar nada | 3 | 0 | 0 | R$ 9 | 0 | **R$ 9** |
-| Provável | 8 | 1 | 0 | R$ 34 | 0 | **R$ 34** |
-| Bateu tudo | 12 | 2 | 1 | R$ 81 | R$ 40 | R$ 121, **teto R$ 100** |
+| Cenário | 1 h | 2 h | Day Use | Porto Seguro | Bônus unitário | Escadas | Total |
+|---|---|---|---|---|---|---|---|
+| Hoje, sem mudar nada | 75 | 3 | 0 | 0 | R$ 84 | 0 | **R$ 84** |
+| Provável | 85 | 8 | 1 | 0 | R$ 119 | 0 | **R$ 119** |
+| Bateu tudo | 100 | 12 | 2 | 1 | R$ 181 | R$ 60 | R$ 241, **teto R$ 200** |
 
-Custo máximo: R$ 200 por mês para 2 operadores. Com encargos (×1,5): cerca de R$ 300.
+O cenário "hoje" já paga R$ 84 por operador porque o plano de 1 hora já vende. É o custo de incluir um plano que 30% dos clientes já levam: cerca de R$ 170 por mês para 2 operadores, R$ 250 com encargos (×1,5). Para se pagar, o programa precisa de cerca de 5 upgrades de 30 min para 1 h por mês (R$ 250 ÷ R$ 48 de diferença por upgrade).
+
+Custo máximo do bloco: R$ 400 por mês para 2 operadores. Com encargos (×1,5): cerca de R$ 600. Custo máximo do programa inteiro (A, B e C): R$ 1.200 nominais por mês, cerca de R$ 1.800 com encargos.
 
 Receita incremental no cenário "bateu tudo", 2 operadores. As premissas são hipóteses a validar:
 
 | Item | Cálculo | Valor |
 |---|---|---|
+| 1 h no lugar de 30 min | 33 upgrades × R$ 48 (108 − 60), ver programa de set/2026 | + R$ 1.580 |
 | 2 h no lugar de 1 h | 18 upgrades × R$ 84 (192 − 108) | + R$ 1.512 |
 | Day Use | 4 vendas × R$ 270 | R$ 1.080 |
 | Porto Seguro | 2 vendas × R$ 840 | R$ 1.680 |
-| **Total** | | **≈ R$ 4.300** |
+| **Total** | | **≈ R$ 5.900** |
 
 Atenção: Day Use e Porto Seguro nem sempre são receita nova. Quem compra Day Use provavelmente gastaria R$ 190 a R$ 270 em 2 horas. Quem compra Porto Seguro trocaria visitas avulsas por pré-pagamento. O ganho real é menor que o total acima. Só o 2 horas é upgrade de ticket quase puro.
 
-**Regra de recalibração:** se em 2 semanas nenhum operador passar de 4 unidades de 2 horas, baixar a escada de 12 para 8. Se todos bateram em 2 semanas, subir.
+**Regra de recalibração:** se em 2 semanas nenhum operador passar de 4 unidades de 2 horas, baixar a escada de 12 para 8. Se todos bateram em 2 semanas, subir. Para o plano de 1 hora: se nenhum operador passar de 40 unidades em 2 semanas, baixar a escada de 100 para 80.
+
+**Limite do período:** a escada é mensal. Em outubro o bloco C vale de 06/10 a 31/10 (26 dias), então a escada de 100 do plano de 1 hora fica proporcionalmente mais difícil do que num mês cheio.
 
 ---
 
@@ -121,9 +129,9 @@ Dias-operador em que a meta de faturamento foi batida: **6 de 22 (27%)**. Meta b
 
 ## Como publicar
 
-1. Aplicar as duas migrations de `supabase/migrations/20260930100000_fa_bonus_plan_rules.sql` e `20260930100001_fa_bonus_plan_rules_seed.sql`. A segunda semeia o Playground do Parque Shopping com os valores da Parte 1.
+1. Aplicar as três migrations: `20260930100000_fa_bonus_plan_rules.sql`, `20260930100001_fa_bonus_plan_rules_seed.sql` (semeia 2 horas, Day Use e Porto Seguro) e `20261002140000_fa_bonus_plan_rules_1h_olhar.sql` (inclui o plano de 1 hora e sobe o teto do bloco para R$ 200). A última acha o plano de 1 hora do Playground pela duração e não por UUID.
 2. Publicar o aplicativo. **Nesta ordem:** o aplicativo novo lê a tabela de regras e a coluna de vendedor, e falha nas telas de bonificação se elas ainda não existirem.
-3. Conferir em Gerencial > Metas > "Bônus de Planos Longos" se as três regras e o teto de R$ 100 aparecem.
+3. Conferir em Gerencial > Metas > "Bônus de Planos Longos" se as quatro regras (1 hora + Olhar, 2 horas, Day Use, Porto Seguro) e o teto de R$ 200 aparecem.
 4. Fazer um check-in com pacote e conferir `sold_by_employee_id` e `business_date` em `fa_kiosk_guardian_packages`.
 
 Reverter é seguro: desmarcar as regras em Gerencial > Metas zera o bônus sem apagar nada.

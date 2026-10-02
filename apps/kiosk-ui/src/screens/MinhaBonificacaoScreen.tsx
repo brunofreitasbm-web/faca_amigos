@@ -13,7 +13,7 @@ type Escopo = "UNIDADE" | "TODAS";
  * Menu individual, somente-consulta: cada colaborador vê seus próprios
  * números do programa de bonificação (piloto Playground + Circuito), sem
  * depender do gerente para saber "quanto já ganhei no mês" (FAQ do
- * manual-operadores.md). Nada aqui é editável — quem decide meta, teto e
+ * manual-bonificacao.md). Nada aqui é editável — quem decide meta, teto e
  * regras continua sendo Gerencial > Metas/Bonificação.
  */
 export function MinhaBonificacaoScreen() {
