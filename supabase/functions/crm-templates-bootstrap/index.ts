@@ -86,6 +86,14 @@ const TEMPLATES: TemplateDef[] = [
     sample: { "1": "Ana", "2": "Miguel", "3": "R$ 3,00" },
   },
   {
+    // v2: o aviso de excedente ganha o botão SIM, que renova o plano atual no
+    // balcão (fa_crm_overage_renew). A v1 segue ativa até a Meta aprovar esta.
+    purpose: "VISITA_EXCEDENTE", name: "fa_visita_excedente_v2", category: "UTILITY", variableCount: 5,
+    body: "Oi {{1}}! O tempo do plano de {{2}} terminou. Se quiser que ela(e) continue brincando, cada minuto adicional custa {{3}}. Se quiser renovar o plano atual ({{4}} por {{5}}) e não pagar por minutos excedentes, clique em SIM. 💛",
+    sample: { "1": "Ana", "2": "Miguel", "3": "R$ 3,00", "4": "1 hora", "5": "R$ 96,00" },
+    quickReplyButtons: [{ title: "SIM", id: "RENOVAR_ATUAL" }],
+  },
+  {
     purpose: "VISITA_RENOVACAO_OK", name: "fa_visita_renovacao_ok", category: "UTILITY", variableCount: 3,
     body: "Oi {{1}}! Tudo certo: acrescentamos {{3}} ao tempo de {{2}}. Boa diversão! 💛",
     sample: { "1": "Ana", "2": "Miguel", "3": "+30 min" },

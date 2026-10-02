@@ -88,6 +88,20 @@ function variablesFor(c: Candidate): Record<string, string> | null {
   return third ? { "1": guardian, "2": child, "3": third } : null;
 }
 
+/** Plano da sessão (rótulo e valor) para o botão de renovação do excedente. */
+async function overagePlan(admin: ReturnType<typeof createClient>, sessionId: string): Promise<{ label: string; price: string } | null> {
+  const { data } = await admin
+    .from("fa_kiosk_sessions")
+    .select("fa_kiosk_plans(value_cents, duration_value, duration_unit)")
+    .eq("id", sessionId)
+    .maybeSingle();
+  const plan = (data as { fa_kiosk_plans: { value_cents: number; duration_value: number; duration_unit: string } | null } | null)?.fa_kiosk_plans;
+  if (!plan) return null;
+  const minutes = plan.duration_unit === "HORA" ? plan.duration_value * 60 : plan.duration_value;
+  const label = minutes % 60 === 0 ? (minutes === 60 ? "1 hora" : `${minutes / 60} horas`) : `${minutes} min`;
+  return { label, price: brl(plan.value_cents) };
+}
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -101,11 +115,11 @@ Deno.serve(async () => {
   // Templates ativos por propósito (o mais recente de cada).
   const { data: tpls } = await admin
     .from("fa_crm_templates")
-    .select("id, content_sid, preview, purpose")
+    .select("id, content_sid, preview, purpose, name")
     .in("purpose", Object.values(PURPOSE))
     .eq("active", true)
     .order("created_at_ms", { ascending: false });
-  const templateByPurpose = new Map<string, { id: string; content_sid: string; preview: string }>();
+  const templateByPurpose = new Map<string, { id: string; content_sid: string; preview: string; name: string }>();
   for (const t of tpls ?? []) if (!templateByPurpose.has(t.purpose)) templateByPurpose.set(t.purpose, t);
   if (!templateByPurpose.size) return json({ ok: true, skipped: "sem template de visita ativo" });
 
@@ -135,6 +149,16 @@ Deno.serve(async () => {
     const template = templateByPurpose.get(PURPOSE[cand.kind]);
     const channel = channelFor(cand.activity);
     const variables = variablesFor(cand);
+    // fa_visita_excedente_v2 também leva o plano atual ({{4}}) e o valor da renovação ({{5}}).
+    if (variables && cand.kind === "OVERAGE" && template?.name.endsWith("_v2")) {
+      const plan = await overagePlan(admin, cand.session_id);
+      if (!plan) {
+        skipped++;
+        continue;
+      }
+      variables["4"] = plan.label;
+      variables["5"] = plan.price;
+    }
     if (!template || !channel || !variables) {
       skipped++;
       continue;

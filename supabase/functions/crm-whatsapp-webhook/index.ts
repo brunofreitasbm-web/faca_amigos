@@ -230,11 +230,17 @@ Deno.serve(async (req) => {
   // opt-in. Sem oferta recente para o contato, segue o fluxo normal.
   const offer = optOut || optIn ? null : offerButton(params.ButtonPayload, body);
   const offerReply = offer ? await handleOffer(admin, contact!.id, offer, now) : null;
+  // Botão SIM do aviso de excedente (fa_visita_excedente_v2): renova o plano atual.
+  const overageReply =
+    optOut || optIn || offerReply || params.ButtonPayload !== OVERAGE_RENEW_PAYLOAD
+      ? null
+      : await handleOverageRenewal(admin, contact!.id, now);
 
   let reply: string | null = null;
   if (optOut) reply = "Tudo certo, você não receberá mais mensagens nossas. Para voltar, responda VOLTAR.";
   else if (optIn) reply = "Que bom ter você de volta! 💛";
   else if (offerReply) reply = offerReply;
+  else if (overageReply) reply = overageReply;
   else if (ACCEPT_WORDS.has(word)) {
     // Um "SIM"/"QUERO" pode responder aos dois pedidos ao mesmo tempo, se
     // ambos estiverem em aberto para este contato (geral + marketing).
@@ -256,6 +262,7 @@ Deno.serve(async (req) => {
   }
 
   if (!reply) return twiml();
+  if (!optOut) reply = await withClosing(admin, contact!.id, reply, now);
 
   // Grava a resposta automática no histórico para a equipe ver a conversa inteira.
   await admin.from("fa_crm_messages").insert({
@@ -330,6 +337,62 @@ function renewalReplyText(result: RenewalResult): string {
     default:
       return "Essa visita já foi encerrada. Até a próxima! 💛";
   }
+}
+
+/** Payload do botão SIM do template fa_visita_excedente_v2 (ver crm-templates-bootstrap). */
+const OVERAGE_RENEW_PAYLOAD = "RENOVAR_ATUAL";
+
+type OverageRenewalResult =
+  | { status: "OK"; minutes: number; cents: number }
+  | { status: "ALREADY" | "EXPIRED" | "NONE" };
+
+const planLabel = (minutes: number) =>
+  minutes % 60 === 0 ? (minutes === 60 ? "1 hora" : `${minutes / 60} horas`) : `${minutes} min`;
+
+/** Toque em SIM no aviso de excedente: pedido de renovação do plano atual no balcão; devolve a resposta ou null. */
+async function handleOverageRenewal(admin: ReturnType<typeof createClient>, contactId: string, now: number): Promise<string | null> {
+  const { data, error } = await admin.rpc("fa_crm_overage_renew", { p_contact_id: contactId, p_now_ms: now });
+  if (error) {
+    console.error("renovação do excedente:", error);
+    return null;
+  }
+  const result = data as OverageRenewalResult;
+  switch (result.status) {
+    case "OK":
+      return `Combinado! Avisamos a recepção para renovar o plano: ${planLabel(result.minutes)} por ${brl(result.cents)}. Você recebe a confirmação assim que a equipe aplicar. 💛`;
+    case "ALREADY":
+      return "Já avisamos a recepção sobre o seu pedido. 💛";
+    case "EXPIRED":
+      return "Essa visita já foi encerrada. Até a próxima! 💛";
+    default:
+      return null;
+  }
+}
+
+const CLOSING_URLS = ["https://institutofacaamigos.com.br/", "https://www.instagram.com/facaamigos.belem/"] as const;
+const CLOSING_TEXT =
+  "Pra continuar pertinho do FaçaAmigos, vem conhecer nosso mundo em https://institutofacaamigos.com.br/ " +
+  "e acompanhar a brincadeira de cada dia no Instagram: https://www.instagram.com/facaamigos.belem/ 💛";
+const CLOSING_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Mensagem de fechamento: convite ao site e ao Instagram no fim de toda
+ * resposta automática (texto livre dentro da janela de 24h aberta pelo cliente,
+ * sem template e sem Meta). No máximo uma vez a cada 24h por contato, e nunca
+ * duplica quando a própria resposta já traz os links.
+ */
+async function withClosing(admin: ReturnType<typeof createClient>, contactId: string, reply: string, now: number): Promise<string> {
+  if (CLOSING_URLS.some((u) => reply.includes(u))) return reply;
+  const { data: recent } = await admin
+    .from("fa_crm_messages")
+    .select("id")
+    .eq("contact_id", contactId)
+    .eq("direction", "OUT")
+    .gte("created_at_ms", now - CLOSING_INTERVAL_MS)
+    .ilike("body", "%instagram.com/facaamigos.belem%")
+    .limit(1);
+  if (recent?.length) return reply;
+  return `${reply}\n\n${CLOSING_TEXT}`;
 }
 
 const OFFER_REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
