@@ -83,7 +83,7 @@ CONTEÚDO DO PACOTE
 RASTREAMENTO JÁ CONFIGURADO NO index.html (não precisa mexer)
 ----------------------------------------------------------------
 - Google Analytics 4 (ID G-Q7LHH3C9P8) — origem de tráfego, sessões, páginas
-- Microsoft Clarity (ID xz0butjjbh) — mapa de calor + gravação de sessão
+- Microsoft Clarity (ID yr8qq61339) — mapa de calor + gravação de sessão
 - Hotjar/Contentsquare — segundo mapa de calor + gravação de sessão
 - SEO: Open Graph, Twitter Card, canonical e dados estruturados (Schema.org
   LocalBusiness) para aparecer melhor no Google e ao compartilhar o link
@@ -127,7 +127,7 @@ diferentes, a política de privacidade usava outro container do GTM e o
 hub não tinha rastreamento nenhum. Foi unificado em:
 - Google Tag Manager  GTM-PN5D2BTS
 - Google Analytics 4  G-Q7LHH3C9P8
-- Microsoft Clarity   xz0butjjbh
+- Microsoft Clarity   yr8qq61339
 - Contentsquare       c3b9c7ee91c87
 (os IDs GTM-K3NVZCCL e Clarity y3je6ymu3d foram removidos)
 
