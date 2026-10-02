@@ -1,7 +1,7 @@
 # Bônus de Planos Longos — Playground (Parque Shopping)
 
 Início: **06/10/2026**, junto da recalibração do piloto de bonificação. Convive com o bônus de meta do dia (`programa-bonificacao-set-2026.md`) e não o substitui.
-Para a equipe, use `manual-venda-planos-longos.md`: ele traz só a técnica de venda (método, script e trilha de treinamento), sem nada de bonificação. As regras de bônus da Parte 1 são passadas à equipe à parte.
+Para a equipe, use `manual-venda-planos-longos.md`: ele traz só a técnica de venda (método SPIN, script e cartão de bolso), sem nada de bonificação. As regras de bônus da Parte 1 são passadas à equipe à parte.
 
 ---
 

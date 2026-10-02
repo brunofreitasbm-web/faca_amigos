@@ -30,16 +30,45 @@ Minuto de relógio (excedente): **R$ 1,80** (R$ 1,50 na meia).
 
 Você **não empurra plano**. Você segue três passos, sempre nesta ordem: pergunta, calcula em 5 segundos e recomenda **uma vez**.
 
-### Passo 1 — Perguntar (2 perguntas, em todo check-in, sem exceção)
+### Passo 1 — Perguntar (SPIN de balcão)
 
-1. **"Vocês vão ficar quanto tempo hoje?"**
-   Se a pessoa hesitar: *"Vão fazer mais alguma coisa no shopping? Cinema, almoço, compras?"*
-2. **"É a primeira vez aqui ou já vieram outras vezes?"**
-   O kiosk mostra o selo ★ VIP e o número de visitas. Olhe antes de perguntar.
+SPIN são quatro tipos de pergunta, sempre nesta ordem: **S**ituação, **P**roblema, **I**mplicação e **N**ecessidade. A ideia é fazer a **própria família** dizer por que mais tempo ajuda, em vez de você dizer. No balcão, com fila e criança puxando a mão, o SPIN é **curto**: uma pergunta de cada tipo, uma por vez, e você escuta a resposta inteira antes de seguir.
+
+| Letra | Para que serve | Perguntas prontas |
+|---|---|---|
+| **S — Situação** | Descobrir os fatos: quanto tempo, o que mais vão fazer, se já vieram | "Vocês vão ficar quanto tempo hoje?"<br>"Vão fazer mais alguma coisa no shopping? Cinema, almoço, compras?"<br>"É a primeira vez aqui ou já vieram outras vezes?" |
+| **P — Problema** | Descobrir se o tempo costuma ficar curto | "Costuma dar tempo de brincar com calma?"<br>"Na última vez, deu tempo ou vocês saíram com ele(a) ainda querendo ficar?" |
+| **I — Implicação** | Fazer a família perceber o custo de ficar com pouco tempo | "E se o tempo acabar quando ele(a) estiver no meio da brincadeira?"<br>"Se passar, cada minuto a mais é R$ 1,80. Isso já aconteceu com vocês?"<br>"Vocês teriam que ficar de olho no relógio?" |
+| **N — Necessidade de solução** | Fazer a família dizer o benefício de ter o tempo garantido | "Se vocês tivessem o tempo garantido e não precisassem olhar o relógio, ajudaria?"<br>"Faria diferença poder ir ao cinema sem se preocupar com a hora?" |
+
+O kiosk mostra o selo ★ VIP e o número de visitas. Olhe antes de perguntar: já responde parte do S.
+
+**Exemplo completo (2 horas):**
+
+- **S:** "Vocês vão ficar quanto tempo hoje?" — *"Uma hora, mais ou menos. Depois vamos almoçar."*
+- **P:** "Costuma dar tempo de brincar com calma?" — *"Ele nunca quer sair."*
+- **I:** "E se o tempo acabar com ele no meio da brincadeira? Cada minuto a mais é R$ 1,80." — *"Aí eu teria que pagar o excedente ou tirar ele."*
+- **N:** "Se vocês tivessem o tempo garantido, ajudaria?" — *"Ajudaria bastante."*
+- **Oferecer:** a frase-âncora de 2 horas, abaixo.
+
+**As perguntas que mudam em cada produto** (o S de tempo vale para todos):
+
+| Produto | P — Problema | I — Implicação | N — Necessidade |
+|---|---|---|---|
+| **Day Use** | "Dá tempo de resolver tudo com ele(a) junto?" | "E levar ele(a) junto ao cinema ou às compras, como fica?" | "Se vocês pudessem deixar ele(a) brincando aqui e resolver tudo com calma, ajudaria?" |
+| **Porto Seguro** | "Vocês costumam voltar quantas vezes por mês?" | "Cada hora avulsa sai R$ 108. Dez horas pagando uma a uma dão R$ 1.080." | "Se as horas já estivessem pagas e saíssem mais baratas, ajudaria?" |
+
+#### Regras do SPIN de balcão
+
+1. **Uma pergunta por vez.** Ouça a resposta inteira antes da próxima.
+2. **Pare quando a família decidir.** Se depois do S e do P ela disser que 30 minutos bastam, faça o check-in. SPIN não é interrogatório.
+3. **Com fila no balcão, use a versão de 10 segundos: só S e N.** "Vão ficar quanto tempo?" e "Se tivessem o tempo garantido, ajudaria?".
+4. **A Implicação fala do relógio e do bolso, nunca da criança.** Não pergunte de birra, crise ou dificuldade de largar o brinquedo. Isso expõe a criança e constrange a família. Pergunte do tempo, não do comportamento.
+5. **A pergunta N fecha o passo.** Só ofereça depois que a família disser, com as palavras dela, que mais tempo ajudaria. Se ela não disser, não ofereça: siga com o plano que ela pediu.
 
 ### Passo 2 — Calcular (5 segundos)
 
-Pelo que a família respondeu, escolha o plano que cobre o tempo dela e **guarde a diferença em reais**: quanto ela pagaria ficando no plano de baixo e passando do tempo, contra quanto paga no plano certo. É essa diferença que você vai falar, não o preço cheio. Os números estão na tabela de preços acima.
+Pelo que a família respondeu no S e no P, escolha o plano que cobre o tempo dela e **guarde a diferença em reais**: quanto ela pagaria ficando no plano de baixo e passando do tempo, contra quanto paga no plano certo. É essa diferença que você vai falar, não o preço cheio. Os números estão na tabela de preços acima.
 
 | O que a família respondeu | O que você recomenda |
 |---|---|
@@ -50,7 +79,7 @@ Pelo que a família respondeu, escolha o plano que cobre o tempo dela e **guarde
 
 ### Passo 3 — Oferecer (uma vez)
 
-Leia a frase-âncora do produto escolhido, com a diferença em reais que você calculou. Se a família recusar, aceite com um sorriso e faça o check-in normal.
+Comece repetindo, com as palavras da família, o que ela disse no N ("Então vocês querem almoçar sem olhar o relógio..."). Depois leia a frase-âncora do produto escolhido, com a diferença em reais que você calculou. Se a família recusar, aceite com um sorriso e faça o check-in normal.
 
 ---
 
@@ -103,26 +132,15 @@ Gatilho: ★ VIP, 3 ou mais visitas, "a gente vem sempre", mora perto, avó que 
 
 ---
 
-## Trilha de treinamento (1 semana, 15 minutos no briefing de abertura)
-
-| Dia | O que fazer | Como o gerente valida |
-|---|---|---|
-| 1 | Ler este manual e decorar a tabela de preços | Quiz oral: 5 preços, sem olhar |
-| 2 | Role-play: gerente faz a família "vamos almoçar" e você oferece 2 horas | A frase-âncora saiu inteira? Falou da economia? |
-| 3 | Role-play: família ★ VIP e Porto Seguro pelo card laranja | Usou os números do card? Clicou em Recusado? |
-| 4 | Role-play: "vou ao cinema, a tarde toda" e Day Use | Falou "pode deixar ele(a) aqui com a gente"? |
-| 5 | Sombra: gerente observa 5 check-ins reais | Fez as 2 perguntas nos 5? |
-| Toda segunda | 1 objeção nova que apareceu na semana, discutida em grupo | — |
-
----
-
 ## Cartão de bolso (imprimir, frente e verso)
 
 **FRENTE**
 
 ```
-1. "Vão ficar quanto tempo hoje?"
-2. "Primeira vez ou já vieram?"
+S  "Vão ficar quanto tempo hoje?"
+P  "Costuma dar tempo de brincar com calma?"
+I  "E se acabar no meio da brincadeira?"
+N  "Se o tempo fosse garantido, ajudaria?"
 
 rapidinho .............. 30 min
 uma hora ............... 1 h  (+ gancho do relógio)
