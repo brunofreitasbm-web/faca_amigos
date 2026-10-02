@@ -19,6 +19,15 @@ const PER_RUN = 2; // 10 rodadas/dia x 2 = 20
 const OPT_OUT_RATE_LIMIT = 0.03;
 const FAILURE_RATE_LIMIT = 0.2;
 const MIN_SAMPLE = 10;
+const FAILURE_MIN_SAMPLE = 30;
+// Cópia de crm-optin-dispatch/pacing.ts (inline, sem _shared): falha que depende
+// de quem recebe não conta no freio, só a do remetente.
+const RECIPIENT_SIDE_ERRORS = new Set(["63003", "63024", "63033", "63049", "63050"]);
+const senderFaultCount = (rows: Array<{ error: string | null }>) =>
+  rows.filter((r) => {
+    const code = r.error?.match(/\d{5}/)?.[0];
+    return !code || !RECIPIENT_SIDE_ERRORS.has(code);
+  }).length;
 const WEBHOOK_URL =
   Deno.env.get("CRM_WEBHOOK_PUBLIC_URL") ?? "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/crm-whatsapp-webhook";
 
@@ -50,15 +59,21 @@ Deno.serve(async () => {
   if (sent24 >= MIN_SAMPLE) {
     const declined = last24!.filter((r) => r.status === "DECLINED").length;
     const sids = last24!.map((r) => r.twilio_sid).filter(Boolean) as string[];
-    const { count: failed } = await admin
-      .from("fa_crm_messages")
-      .select("id", { count: "exact", head: true })
-      .in("twilio_sid", sids)
-      .in("status", ["failed", "undelivered"]);
+    // Só falha do remetente conta (pacing.ts): número sem WhatsApp ou limite de
+    // marketing da Meta é problema de quem recebe, não da nota do número.
+    let failed = 0;
+    if (sent24 >= FAILURE_MIN_SAMPLE) {
+      const { data: failedRows } = await admin
+        .from("fa_crm_messages")
+        .select("error")
+        .in("twilio_sid", sids)
+        .in("status", ["failed", "undelivered"]);
+      failed = senderFaultCount(failedRows ?? []);
+    }
     const reason =
       declined / sent24 > OPT_OUT_RATE_LIMIT
         ? `freio automático: ${declined} pedidos de PARAR em ${sent24} envios (>${OPT_OUT_RATE_LIMIT * 100}%)`
-        : (failed ?? 0) / sent24 > FAILURE_RATE_LIMIT
+        : failed / sent24 > FAILURE_RATE_LIMIT
           ? `freio automático: ${failed} falhas de entrega em ${sent24} envios (>${FAILURE_RATE_LIMIT * 100}%)`
           : null;
     if (reason) {

@@ -97,12 +97,24 @@ Deno.serve(async (req) => {
   if (params.MessageStatus && params.SmsStatus !== "received") {
     const next = STATUS_MAP[params.MessageStatus.toLowerCase()];
     if (!next) return twiml();
-    const { data: msg } = await admin.from("fa_crm_messages").select("id, status").eq("twilio_sid", sid).maybeSingle();
+    const { data: msg } = await admin.from("fa_crm_messages").select("id, status, contact_id").eq("twilio_sid", sid).maybeSingle();
     if (msg && (STATUS_RANK[next] ?? 0) > (STATUS_RANK[msg.status] ?? 0)) {
       await admin
         .from("fa_crm_messages")
         .update({ status: next, error: params.ErrorCode ? `Twilio ${params.ErrorCode}` : null })
         .eq("id", msg.id);
+    }
+    // 63024 = número sem WhatsApp (ou sem aceitar os termos): tira o responsável
+    // das filas de opt-in para não gastar envio nem sujar o freio.
+    if (msg && params.ErrorCode === "63024") {
+      const { data: contact } = await admin.from("fa_crm_contacts").select("guardian_id").eq("id", msg.contact_id).maybeSingle();
+      if (contact?.guardian_id) {
+        await admin
+          .from("fa_kiosk_guardians")
+          .update({ whatsapp_invalid_at_ms: Date.now() })
+          .eq("id", contact.guardian_id)
+          .is("whatsapp_invalid_at_ms", null);
+      }
     }
     return twiml();
   }

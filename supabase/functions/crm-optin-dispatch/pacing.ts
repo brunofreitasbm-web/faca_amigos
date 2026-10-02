@@ -87,3 +87,23 @@ export function runQuota(
 export function gapMs(random: () => number = Math.random): number {
   return Math.round(8_000 + random() * 82_000);
 }
+
+// Falhas de entrega que dependem de QUEM RECEBE (sem WhatsApp, limite de
+// marketing da Meta, já deu PARAR) não dizem nada sobre a saúde do número e
+// não entram no freio automático. Qualquer outro código (conta travada, limite
+// diário, template pausado…) ou erro sem código conta como falha do remetente.
+const RECIPIENT_SIDE_ERRORS = new Set(["63003", "63024", "63033", "63049", "63050"]);
+
+export const FAILURE_MIN_SAMPLE = 30; // base antiga sempre tem números mortos: amostra maior que a do PARAR
+
+export function isSenderFault(error: string | null | undefined): boolean {
+  const code = error?.match(/\d{5}/)?.[0];
+  return !code || !RECIPIENT_SIDE_ERRORS.has(code);
+}
+
+export function senderFaultCount(rows: Array<{ error: string | null }>): number {
+  return rows.filter((r) => isSenderFault(r.error)).length;
+}
+
+/** Erro que indica número sem WhatsApp: o responsável sai das próximas filas. */
+export const isNoWhatsappError = (code: string | undefined) => code === "63024";

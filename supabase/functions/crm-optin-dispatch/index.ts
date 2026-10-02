@@ -1,5 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { dailyTarget, gapMs, nextRampLevel, runQuota, WINDOW_END_MIN, WINDOW_START_MIN } from "./pacing.ts";
+import { dailyTarget, FAILURE_MIN_SAMPLE, gapMs, nextRampLevel, runQuota, senderFaultCount, WINDOW_END_MIN, WINDOW_START_MIN } from "./pacing.ts";
 
 // Campanha de opt-in da base atual (migrations 20260928165000 e
 // 20261001120000). Disparada a cada 5 min (8h-20h de Belém) pelo pg_cron.
@@ -61,15 +61,21 @@ Deno.serve(async () => {
   if (sent24 >= MIN_SAMPLE) {
     const declined = last24!.filter((r) => r.status === "DECLINED").length;
     const sids = last24!.map((r) => r.twilio_sid).filter(Boolean) as string[];
-    const { count: failed } = await admin
-      .from("fa_crm_messages")
-      .select("id", { count: "exact", head: true })
-      .in("twilio_sid", sids)
-      .in("status", ["failed", "undelivered"]);
+    // Só falha do remetente conta (pacing.ts): número sem WhatsApp ou limite de
+    // marketing da Meta é problema de quem recebe, não da nota do número.
+    let failed = 0;
+    if (sent24 >= FAILURE_MIN_SAMPLE) {
+      const { data: failedRows } = await admin
+        .from("fa_crm_messages")
+        .select("error")
+        .in("twilio_sid", sids)
+        .in("status", ["failed", "undelivered"]);
+      failed = senderFaultCount(failedRows ?? []);
+    }
     const reason =
       declined / sent24 > OPT_OUT_RATE_LIMIT
         ? `freio automático: ${declined} pedidos de PARAR em ${sent24} envios (>${OPT_OUT_RATE_LIMIT * 100}%)`
-        : (failed ?? 0) / sent24 > FAILURE_RATE_LIMIT
+        : failed / sent24 > FAILURE_RATE_LIMIT
           ? `freio automático: ${failed} falhas de entrega em ${sent24} envios (>${FAILURE_RATE_LIMIT * 100}%)`
           : null;
     if (reason) {

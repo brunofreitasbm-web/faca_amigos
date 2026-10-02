@@ -56,6 +56,16 @@ const TEMPLATES: TemplateDef[] = [
     body: "Olá, {{1}}! Aqui é o FaçaAmigos, onde seu filho brincou. Podemos te avisar por aqui sobre as visitas e enviar uma pesquisa rápida de satisfação? Responda SIM para aceitar ou PARAR para não receber mensagens.",
     sample: { "1": "Ana" },
   },
+  // v1 foi recategorizada como MARKETING pela Meta (erro 63049 em quem já
+  // atingiu o limite de marketing): "pesquisa de satisfação" no texto puxa essa
+  // categoria. v2 pede a autorização só para o que é da visita (relatório e
+  // avisos), sem pesquisa nem tom promocional, para ser aceita como UTILITY.
+  // A Meta decide a categoria pelo conteúdo: conferir o resultado depois de aprovada.
+  {
+    purpose: "OPTIN", name: "fa_pedido_autorizacao_v2", category: "UTILITY", variableCount: 1,
+    body: "Olá, {{1}}! Aqui é o FaçaAmigos. Para te enviar por aqui o relatório e os avisos da visita do seu filho, precisamos da sua autorização. Responda SIM para autorizar ou PARAR para não receber mensagens.",
+    sample: { "1": "Ana" },
+  },
   {
     purpose: "RENOVACAO", name: "fa_renovacao_fim_plano", category: "UTILITY", variableCount: 3,
     body: "Oi {{1}}! O tempo de {{2}} termina em poucos minutos. Para continuar sem pressa: {{3}}. Toque na opção desejada.",

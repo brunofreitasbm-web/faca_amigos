@@ -2,10 +2,12 @@
 import {
   dailyTarget,
   gapMs,
+  isSenderFault,
   MAX_PER_RUN,
   nextRampLevel,
   RUN_EVERY_MIN,
   runQuota,
+  senderFaultCount,
   WINDOW_END_MIN,
   WINDOW_START_MIN,
 } from "./pacing.ts";
@@ -75,4 +77,12 @@ Deno.test("pausa entre envios fica entre 8 e 90 s", () => {
     gapMs(() => 1),
     90_000,
   );
+});
+
+Deno.test("isSenderFault: erro do destinatário não conta, do remetente e sem código contam", () => {
+  assertEquals(isSenderFault("Twilio 63024"), false);
+  assertEquals(isSenderFault("Twilio 63049"), false);
+  assertEquals(isSenderFault("Twilio 63051"), true);
+  assertEquals(isSenderFault(null), true);
+  assertEquals(senderFaultCount([{ error: "Twilio 63024" }, { error: "Twilio 63049" }, { error: "Twilio 63051" }, { error: null }]), 2);
 });
