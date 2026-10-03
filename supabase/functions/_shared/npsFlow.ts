@@ -1,6 +1,7 @@
 import {
   isDecline, NPS_FIRST_REPLY_WINDOW_MS, NPS_STEP_WINDOW_MS, NPS_TEXT, npsStep, parseNumberInRange, unitOptions,
 } from "./nps.ts";
+import { loadUnitOptions } from "./npsSurvey.ts";
 
 // Só o que o fluxo usa do client do Supabase (o tipo real vem de createClient,
 // sem tipagem do banco); mantém este módulo testável com um client falso.
@@ -11,8 +12,11 @@ export type NpsAdmin = { from(table: string): any };
  * NPS em etapas dentro do WhatsApp (regras de leitura em ./nps.ts). Devolve o
  * texto da próxima pergunta, ou null quando a mensagem não faz parte de uma
  * pesquisa em aberto (segue como conversa normal para a equipe).
- *   SENT   + nº da unidade   -> grava a unidade, pergunta 1/3 (recomendação 0-10)
+ *   SENT   + nº da unidade   -> grava a unidade, pergunta 1/3 (recomendação 0-10)   [template novo]
  *   SENT   + 0..10           -> grava a nota, pergunta 2/3 (equipe)        (ASKING)
+ *                               Template antigo (sem unit_options): grava a nota e pergunta
+ *                               a unidade antes da equipe; ASKING + nº da unidade -> grava
+ *                               a unidade e pergunta a equipe.
  *   ASKING + 1..5            -> grava a equipe, pergunta 3/3 (espaço)
  *   ASKING + 1..5            -> grava o espaço, pergunta a contribuição     (SCORED)
  *   SCORED + texto ou "não"  -> grava a contribuição e agradece             (DONE)
@@ -62,12 +66,22 @@ export async function handleNps(admin: NpsAdmin, contactId: string, body: string
       if (r.kind === "none") return null;
       if (r.kind === "out") return NPS_TEXT.retryUnit(options);
       const unit = options[r.value - 1]!;
-      return (await advance({ unit_id: unit.id }, "unit_id")) ? NPS_TEXT.scoreQuestion(unit.name) : null;
+      // Antes da nota (template novo) a próxima pergunta é a nota; depois da nota (template antigo), a equipe.
+      const next = survey.status === "ASKING" ? NPS_TEXT.teamQuestion : NPS_TEXT.scoreQuestion(unit.name);
+      return (await advance({ unit_id: unit.id }, "unit_id")) ? next : null;
     }
     case "SCORE": {
       const r = parseNumberInRange(body, 0, 10);
       if (r.kind === "none") return null;
       if (r.kind === "out") return NPS_TEXT.retryScore;
+      // Template antigo (sem pergunta de unidade): fixa a lista de unidades agora e pergunta a unidade
+      // antes da equipe. Sem unidades cadastradas, segue direto para a equipe.
+      const late = unitOptions(survey.unit_options).length === 0 ? await loadUnitOptions(admin) : [];
+      if (late.length > 0) {
+        return (await advance({ status: "ASKING", score: r.value, scored_at_ms: now, unit_options: late }, "score"))
+          ? NPS_TEXT.unitAfterScoreQuestion(late)
+          : null;
+      }
       return (await advance({ status: "ASKING", score: r.value, scored_at_ms: now }, "score")) ? NPS_TEXT.teamQuestion : null;
     }
     case "TEAM": {

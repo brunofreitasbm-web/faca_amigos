@@ -4,6 +4,7 @@ import {
   pickProductOffer, type SiteOfferKind, siteOfferKeyword, welcomeWithOffer,
 } from "./offer.ts";
 import { handleNps } from "../_shared/npsFlow.ts";
+import { isNpsFinalReply } from "../_shared/nps.ts";
 
 // Webhook do WhatsApp (Twilio, subconta do CRM). Recebe DOIS tipos de
 // chamada na mesma URL:
@@ -241,6 +242,14 @@ Deno.serve(async (req) => {
   const siteKind = optOut || optIn || offerReply || overageReply ? null : siteOfferKeyword(body);
   const siteReply = siteKind ? await handleSiteOffer(admin, contact!, siteKind, now) : null;
 
+  // Pergunta da pesquisa de NPS no meio da conversa: não leva a mensagem de fechamento (só o agradecimento final leva).
+  let npsQuestion = false;
+  const npsReply = async () => {
+    const r = await handleNps(admin, contact!.id, body, now);
+    if (r && !isNpsFinalReply(r)) npsQuestion = true;
+    return r;
+  };
+
   let reply: string | null = null;
   if (optOut) reply = "Tudo certo, você não receberá mais mensagens nossas. Para voltar, responda VOLTAR.";
   else if (optIn) reply = "Que bom ter você de volta! 💛";
@@ -259,16 +268,16 @@ Deno.serve(async (req) => {
     } else {
       const choice = renewalChoice(params.ButtonPayload, body);
       reply = choice ? await handleRenewal(admin, contact!.id, choice, now) : null;
-      reply ??= await handleNps(admin, contact!.id, body, now);
+      reply ??= await npsReply();
     }
   } else {
     const choice = renewalChoice(params.ButtonPayload, body);
     reply = choice ? await handleRenewal(admin, contact!.id, choice, now) : null;
-    reply ??= await handleNps(admin, contact!.id, body, now);
+    reply ??= await npsReply();
   }
 
   if (!reply) return twiml();
-  if (!optOut) reply = await withClosing(admin, contact!.id, reply, now);
+  if (!optOut && !npsQuestion) reply = await withClosing(admin, contact!.id, reply, now);
 
   // Grava a resposta automática no histórico para a equipe ver a conversa inteira.
   await admin.from("fa_crm_messages").insert({
