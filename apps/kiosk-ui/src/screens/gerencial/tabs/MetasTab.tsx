@@ -269,15 +269,6 @@ export function MetasTab() {
 
   const [publishing, setPublishing] = useState(false);
 
-  // Calculate Next Month Label for Publication
-  const getNextMonthLabel = () => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 1);
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `01/${month}/${year}`;
-  };
-
   async function loadTicketGoalsAndSuggestions() {
     if (units.length === 0) return;
     setLoadingSuggestions(true);
@@ -418,7 +409,7 @@ export function MetasTab() {
     setPublishing(true);
     try {
       await new Promise((res) => setTimeout(res, 600));
-      toast.success(`Programa de Bonificação publicado com sucesso! Validade agendada para ${getNextMonthLabel()}.`);
+      toast.success(`Programa de Bonificação publicado com sucesso!`);
     } catch {
       toast.error("Erro ao publicar programa de bonificação.");
     } finally {
@@ -462,13 +453,10 @@ export function MetasTab() {
               🏆 Programa de Bonificação & Metas Comerciais
             </h2>
             <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: "13px" }}>
-              Configure os parâmetros de incentivo comercial, simule o faturamento projetado e publique para o mês seguinte.
+              Configure os parâmetros de incentivo comercial, simule o faturamento projetado e publique.
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ fontSize: "12px", background: "rgba(59, 130, 246, 0.15)", color: "#2563eb", padding: "6px 12px", borderRadius: "20px", fontWeight: 600 }}>
-              📅 Vigência Agendada: {getNextMonthLabel()}
-            </span>
             <Button variant="primary" disabled={publishing} onClick={handlePublishProgram} style={{ padding: "8px 20px" }}>
               {publishing ? "Publicando..." : "💾 Salvar e Publicar Programa"}
             </Button>
