@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, Input } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
 import type { TicketGoal, Unit } from "../../../api/client.js";
@@ -8,7 +8,8 @@ import { money } from "../../../format.js";
 import { IfCan } from "../../../auth/RequireCapability.js";
 import { useAuth } from "../../../auth/AuthContext.js";
 import { supabase } from "../../../lib/supabase/client.js";
-import { PlanosLongosSection } from "./PlanosLongosSection.js";
+import { PlanosLongosSection, type RegisterSave } from "./PlanosLongosSection.js";
+import { BonusProgramSection } from "./BonusProgramSection.js";
 
 interface WeekdayGoal {
   dayLabel: string;
@@ -269,14 +270,13 @@ export function MetasTab() {
 
   const [publishing, setPublishing] = useState(false);
 
-  // Calculate Next Month Label for Publication
-  const getNextMonthLabel = () => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 1);
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `01/${month}/${year}`;
-  };
+  // Cada seção real (metas/configuração, planos longos) registra aqui como se grava;
+  // o botão do topo chama todas. O simulador desta tela NÃO grava nada.
+  const savers = useRef(new Map<string, () => Promise<void>>());
+  const registerSave = useCallback<RegisterSave>((id, fn) => {
+    if (fn) savers.current.set(id, fn);
+    else savers.current.delete(id);
+  }, []);
 
   async function loadTicketGoalsAndSuggestions() {
     if (units.length === 0) return;
@@ -417,10 +417,15 @@ export function MetasTab() {
   async function handlePublishProgram() {
     setPublishing(true);
     try {
-      await new Promise((res) => setTimeout(res, 600));
-      toast.success(`Programa de Bonificação publicado com sucesso! Validade agendada para ${getNextMonthLabel()}.`);
-    } catch {
-      toast.error("Erro ao publicar programa de bonificação.");
+      const entries = [...savers.current.entries()];
+      const results = await Promise.allSettled(entries.map(([, fn]) => fn()));
+      const failed = results.flatMap((r, i) => (r.status === "rejected" ? [{ id: entries[i]![0], reason: r.reason }] : []));
+      if (failed.length === 0) {
+        toast.success("Programa de Bonificação publicado: metas, configuração e planos longos gravados.");
+      } else {
+        const msg = failed.map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason))).join(" | ");
+        toast.error(`${failed.length} de ${entries.length} seções não foram gravadas: ${msg}`);
+      }
     } finally {
       setPublishing(false);
     }
@@ -462,13 +467,10 @@ export function MetasTab() {
               🏆 Programa de Bonificação & Metas Comerciais
             </h2>
             <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: "13px" }}>
-              Configure os parâmetros de incentivo comercial, simule o faturamento projetado e publique para o mês seguinte.
+              Configure os parâmetros de incentivo comercial, simule o faturamento projetado e publique.
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ fontSize: "12px", background: "rgba(59, 130, 246, 0.15)", color: "#2563eb", padding: "6px 12px", borderRadius: "20px", fontWeight: 600 }}>
-              📅 Vigência Agendada: {getNextMonthLabel()}
-            </span>
             <Button variant="primary" disabled={publishing} onClick={handlePublishProgram} style={{ padding: "8px 20px" }}>
               {publishing ? "Publicando..." : "💾 Salvar e Publicar Programa"}
             </Button>
@@ -878,7 +880,9 @@ export function MetasTab() {
         })}
       </Card>
 
-      {activeUnit && <PlanosLongosSection key={activeUnit.id} unit={activeUnit} />}
+      {activeUnit && <PlanosLongosSection key={activeUnit.id} unit={activeUnit} registerSave={registerSave} />}
+
+      <BonusProgramSection units={units} registerSave={registerSave} />
     </div>
   );
 }
