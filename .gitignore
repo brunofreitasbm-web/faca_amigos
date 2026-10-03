@@ -1,5 +1,7 @@
 # === Local tooling ===
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 
 # === Supabase CLI local cache ===
 supabase/.temp/
