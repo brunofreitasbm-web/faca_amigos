@@ -79,3 +79,20 @@ export function siteOfferKeyword(body: string): SiteOfferKind | null {
   if (/\b(2 horas|2 ?h|duas horas)\b/.test(t)) return "DEGRAU_2H";
   return null;
 }
+
+export type RenewRequest = { minutes: 30 | 60 | null; childHint: string | null };
+
+/**
+ * Pedido de renovação vindo do botão da tela de acompanhamento: o link wa.me
+ * abre a conversa com "Quero renovar +30 min da Maria" (ou "+60 min"). Sem 30
+ * nem 60 no texto, `minutes` vem null e o webhook explica como pedir. Mantenha
+ * em sincronia com apps/kiosk-ui/src/screens/acompanhar/renovarSite.ts.
+ */
+export function renewRequest(body: string): RenewRequest | null {
+  if (body.length > SITE_KEYWORD_MAX_LENGTH) return null;
+  const t = body.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (!/\brenov(ar|a[cç]ao)\b/.test(t)) return null;
+  const minutes = /\b60\b|\b1 ?h(ora)?\b/.test(t) ? 60 : /\b30\b/.test(t) ? 30 : null;
+  const hint = body.trim().match(/\bd[ao]\s+([^\s.,!?]+)\s*[.!?]*$/i);
+  return { minutes, childHint: hint ? hint[1] : null };
+}

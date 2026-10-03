@@ -11,6 +11,8 @@ import { MapeamentoBanner } from "./acompanhar/MapeamentoBanner.js";
 import { FidelidadeBannerCard } from "./acompanhar/FidelidadeBannerCard.js";
 import { OfertaCard } from "./acompanhar/OfertaCard.js";
 import { ofertaParaSessao } from "./acompanhar/ofertaSite.js";
+import { RenovarCard } from "./acompanhar/RenovarCard.js";
+import { opcoesDeRenovacao } from "./acompanhar/renovarSite.js";
 
 /**
  * Painel público do responsável — aberto sem login pelo QR mostrado no
@@ -126,6 +128,13 @@ function AcompanharConteudo({
     ? circuitoStatusHeadline(childFirstName, phase, assetKind ?? "CARRO")
     : statusHeadline(childFirstName, phase, sensoryTags);
 
+  const renovar = opcoesDeRenovacao({
+    activity,
+    isPausada,
+    childFirstName,
+    remainingMs: timing.durationMs - timing.elapsedMs,
+  });
+
   const oferta = ofertaParaSessao({
     activity,
     isPausada,
@@ -149,6 +158,9 @@ function AcompanharConteudo({
             : `${planDurationMinutes} min inclusos no pacote — ${money(0)} adicionais`}
         </p>
       </Card>
+
+      {/* Renovação pelo WhatsApp, nos últimos 15 min do plano ou no excedente. O botão abre o WhatsApp do CRM com o pedido escrito. */}
+      {renovar && <RenovarCard childFirstName={childFirstName} opcoes={renovar} />}
 
       {/* Oferta de produto, só nos últimos 15 min do plano (ou no excedente); o botão abre o WhatsApp do CRM. */}
       {oferta && <OfertaCard oferta={oferta} />}
