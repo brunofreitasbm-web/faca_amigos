@@ -11,6 +11,10 @@ import { MapeamentoBanner } from "./acompanhar/MapeamentoBanner.js";
 import { FidelidadeBannerCard } from "./acompanhar/FidelidadeBannerCard.js";
 import { OfertaCard } from "./acompanhar/OfertaCard.js";
 import { ofertaParaSessao } from "./acompanhar/ofertaSite.js";
+import { OlharCard } from "./acompanhar/OlharCard.js";
+import { olharUrl } from "./acompanhar/olharSite.js";
+import { RenovarCard } from "./acompanhar/RenovarCard.js";
+import { opcoesDeRenovacao } from "./acompanhar/renovarSite.js";
 
 /**
  * Painel público do responsável — aberto sem login pelo QR mostrado no
@@ -78,6 +82,13 @@ export function AcompanharScreen({ code }: { code: string }) {
         </Card>
       )}
 
+      {/* Olhar FaçaAmigos: aparece assim que o relatório da visita é gerado (a tela atualiza sozinha). */}
+      {status === "ready" && sessao?.status === "FINALIZADA" && olharUrl(sessao.reportToken) && (
+        <div style={{ maxWidth: 420, width: "100%" }}>
+          <OlharCard childFirstName={sessao.childFirstName} url={olharUrl(sessao.reportToken)!} />
+        </div>
+      )}
+
       {status === "ready" && sessao && (sessao.status === "ATIVA" || sessao.status === "PAUSADA") && timing && (
         <AcompanharConteudo
           childFirstName={sessao.childFirstName}
@@ -126,6 +137,13 @@ function AcompanharConteudo({
     ? circuitoStatusHeadline(childFirstName, phase, assetKind ?? "CARRO")
     : statusHeadline(childFirstName, phase, sensoryTags);
 
+  const renovar = opcoesDeRenovacao({
+    activity,
+    isPausada,
+    childFirstName,
+    remainingMs: timing.durationMs - timing.elapsedMs,
+  });
+
   const oferta = ofertaParaSessao({
     activity,
     isPausada,
@@ -149,6 +167,9 @@ function AcompanharConteudo({
             : `${planDurationMinutes} min inclusos no pacote — ${money(0)} adicionais`}
         </p>
       </Card>
+
+      {/* Renovação pelo WhatsApp, nos últimos 15 min do plano ou no excedente. O botão abre o WhatsApp do CRM com o pedido escrito. */}
+      {renovar && <RenovarCard childFirstName={childFirstName} opcoes={renovar} />}
 
       {/* Oferta de produto, só nos últimos 15 min do plano (ou no excedente); o botão abre o WhatsApp do CRM. */}
       {oferta && <OfertaCard oferta={oferta} />}

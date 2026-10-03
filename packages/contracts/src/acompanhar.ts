@@ -26,6 +26,8 @@ export const acompanharSessaoSchema = z.discriminatedUnion("status", [
     status: z.literal("FINALIZADA"),
     childFirstName: z.string(),
     checkoutAtMs: z.number().int().nonnegative().nullable(),
+    /** Token do link do Olhar FaçaAmigos (PDF), quando o relatório da visita já foi gerado. */
+    reportToken: z.string().nullable().optional().default(null).catch(null),
   }),
   z.object({
     status: z.enum(["ATIVA", "PAUSADA"]),

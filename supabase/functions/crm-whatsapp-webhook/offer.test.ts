@@ -1,5 +1,5 @@
 // deno test supabase/functions/crm-whatsapp-webhook/offer.test.ts
-import { offerButton, offerInfoKey, pickProductOffer, siteOfferKeyword, welcomeWithOffer } from "./offer.ts";
+import { offerButton, offerInfoKey, pickProductOffer, renewRequest, siteOfferKeyword, welcomeWithOffer } from "./offer.ts";
 
 function assertEquals(actual: unknown, expected: unknown, msg = "") {
   if (actual !== expected) throw new Error(`${msg} esperado ${expected}, veio ${actual}`);
@@ -59,4 +59,24 @@ Deno.test("conversa comum não vira oferta", () => {
   assertEquals(siteOfferKeyword("O porto seguro é bom?"), null, "sem 'quero'");
   assertEquals(siteOfferKeyword("Quero 2 bolas de sorvete"), null, "'2' sem horas");
   assertEquals(siteOfferKeyword("quero saber do day use " + "x".repeat(60)), null, "mensagem longa");
+});
+
+Deno.test("pedido de renovação do botão da tela", () => {
+  const a = renewRequest("Quero renovar +30 min da Maria");
+  assertEquals(a?.minutes, 30);
+  assertEquals(a?.childHint, "Maria");
+  const b = renewRequest("Quero renovar +60 min do Noah");
+  assertEquals(b?.minutes, 60);
+  assertEquals(b?.childHint, "Noah");
+  assertEquals(renewRequest("quero renovar 1 hora")?.minutes, 60);
+  assertEquals(renewRequest("Quero renovar")?.minutes, null, "sem duração");
+  assertEquals(renewRequest("Quero renovar")?.childHint, null);
+  assertEquals(renewRequest("Quero renovar +30 min da Maria!")?.childHint, "Maria", "pontuação final");
+});
+
+Deno.test("conversa comum não vira renovação", () => {
+  assertEquals(renewRequest("Obrigada"), null);
+  assertEquals(renewRequest("sim"), null);
+  assertEquals(renewRequest("quero saber do day use"), null);
+  assertEquals(renewRequest("Quero renovar " + "x".repeat(60)), null, "mensagem longa");
 });

@@ -1,7 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   OFFER_DECLINE_REPLY, OFFER_INFO_FALLBACK, OFFER_KINDS, type OfferButton, offerButton, offerInfoKey,
-  pickProductOffer, type SiteOfferKind, siteOfferKeyword, welcomeWithOffer,
+  pickProductOffer, renewRequest, type SiteOfferKind, siteOfferKeyword, welcomeWithOffer,
 } from "./offer.ts";
 import { handleNps } from "../_shared/npsFlow.ts";
 import { isNpsFinalReply } from "../_shared/nps.ts";
@@ -241,6 +241,9 @@ Deno.serve(async (req) => {
   // Texto pré-preenchido do card de oferta da tela de acompanhamento ("Quero saber do Porto Seguro").
   const siteKind = optOut || optIn || offerReply || overageReply ? null : siteOfferKeyword(body);
   const siteReply = siteKind ? await handleSiteOffer(admin, contact!, siteKind, now) : null;
+  // Botão "Renovar" da tela de acompanhamento ("Quero renovar +30 min da Maria").
+  const renew = optOut || optIn || offerReply || overageReply || siteReply ? null : renewRequest(body);
+  const renewReply = renew ? await handleRenewRequest(admin, contact!.id, renew.minutes, renew.childHint, now) : null;
 
   // Pergunta da pesquisa de NPS no meio da conversa: não leva a mensagem de fechamento (só o agradecimento final leva).
   let npsQuestion = false;
@@ -256,6 +259,7 @@ Deno.serve(async (req) => {
   else if (offerReply) reply = offerReply;
   else if (overageReply) reply = overageReply;
   else if (siteReply) reply = siteReply;
+  else if (renewReply) reply = renewReply;
   else if (ACCEPT_WORDS.has(word)) {
     // Um "SIM"/"QUERO" pode responder aos dois pedidos ao mesmo tempo, se
     // ambos estiverem em aberto para este contato (geral + marketing).
@@ -595,4 +599,46 @@ async function handleSiteOffer(
   const text = await offerInfoText(admin, kind);
   await recordFreeformOffer(admin, contact, kind, null, "site_card", now);
   return text;
+}
+
+const RENEW_HELP =
+  "Para renovar, toque em um dos botões na tela de acompanhamento ou responda “Quero renovar 30” (+30 min por R$ 48,00) ou “Quero renovar 60” (+60 min por R$ 96,00). 💛";
+
+type RenewRequestResult =
+  | { status: "OK"; minutes: number; cents: number }
+  | { status: "ALREADY" | "AMBIGUOUS" | "NO_SESSION" | "INVALID" };
+
+/**
+ * Pedido de renovação iniciado pelo responsável (texto livre dentro da janela
+ * que a própria mensagem abriu). Grava o mesmo RENOVACAO_SOLICITADA que o
+ * balcão já lista; o valor é acertado no caixa.
+ */
+async function handleRenewRequest(
+  admin: ReturnType<typeof createClient>,
+  contactId: string,
+  minutes: 30 | 60 | null,
+  childHint: string | null,
+  now: number,
+): Promise<string> {
+  if (!minutes) return RENEW_HELP;
+  const { data, error } = await admin.rpc("fa_crm_renew_request", {
+    p_contact_id: contactId, p_minutes: minutes, p_child_hint: childHint, p_now_ms: now,
+  });
+  if (error) {
+    console.error("pedido de renovação:", error);
+    return "Não consegui registrar agora. Fale com a nossa equipe no balcão que renovamos na hora. 💛";
+  }
+  const r = data as RenewRequestResult;
+  switch (r.status) {
+    case "OK":
+      return `Combinado! Avisamos a recepção: +${r.minutes} min por ${brl(r.cents)}. O valor é acertado no balcão. 💛`;
+    case "ALREADY":
+      return "Já avisamos a recepção sobre o seu pedido. 💛";
+    case "AMBIGUOUS":
+      return "Você tem mais de uma criança brincando. Toque no botão de renovar da criança certa na tela de acompanhamento. 💛";
+    case "NO_SESSION":
+      return "Não encontramos uma visita ativa no Playground para este número. Fale com a nossa equipe no balcão. 💛";
+    default:
+      return RENEW_HELP;
+  }
 }
