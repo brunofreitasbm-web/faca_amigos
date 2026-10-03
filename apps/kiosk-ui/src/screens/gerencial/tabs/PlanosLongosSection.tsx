@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, HelpText, Input } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
 import type { Unit } from "../../../api/client.js";
@@ -32,7 +32,9 @@ const toInt = (v: string): number => Math.max(0, Math.round(Number(v) || 0));
  * Salva em fa_kiosk_bonus_plan_rules / fa_kiosk_bonus_program_config
  * (`Api.setBonusPlanRules`). Regras: docs/bonificacao/programa-planos-longos-out-2026.md.
  */
-export function PlanosLongosSection({ unit }: { unit: Unit }) {
+export type RegisterSave = (id: string, fn: (() => Promise<void>) | null) => void;
+
+export function PlanosLongosSection({ unit, registerSave }: { unit: Unit; registerSave?: RegisterSave }) {
   const toast = useToast();
   const { can } = useAuth();
   const activity = unit.kind === "QUIOSQUE" ? "CARRINHO" : "PLAYGROUND";
@@ -88,20 +90,36 @@ export function PlanosLongosSection({ unit }: { unit: Unit }) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
 
+  /** Grava as regras e o teto; lança em caso de erro. Nunca grava antes de carregar (o teto zeraria). */
+  async function persist() {
+    if (loading) return;
+    if (erro) throw new Error(`Planos Longos de ${unit.name}: ${erro}`);
+    const rules: BonusPlanRule[] = rows.map((r, i) => ({
+      kind: r.kind,
+      refId: r.refId,
+      label: r.label,
+      bonusCents: toCents(r.bonusReais),
+      escadaMeta: toInt(r.escadaMeta),
+      escadaBonusCents: toCents(r.escadaBonusReais),
+      active: r.active,
+      sortOrder: i + 1,
+    }));
+    await Api.setBonusPlanRules(unit.id, rules, toCents(tetoReais));
+  }
+
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+  useEffect(() => {
+    if (!registerSave) return;
+    const id = `planos:${unit.id}`;
+    registerSave(id, () => persistRef.current());
+    return () => registerSave(id, null);
+  }, [registerSave, unit.id]);
+
   async function save() {
     setBusy(true);
     try {
-      const rules: BonusPlanRule[] = rows.map((r, i) => ({
-        kind: r.kind,
-        refId: r.refId,
-        label: r.label,
-        bonusCents: toCents(r.bonusReais),
-        escadaMeta: toInt(r.escadaMeta),
-        escadaBonusCents: toCents(r.escadaBonusReais),
-        active: r.active,
-        sortOrder: i + 1,
-      }));
-      await Api.setBonusPlanRules(unit.id, rules, toCents(tetoReais));
+      await persist();
       toast.success(`Bônus de Planos Longos de ${unit.name} salvo.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível salvar o Bônus de Planos Longos.");

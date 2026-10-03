@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, Input } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
 import type { TicketGoal, Unit } from "../../../api/client.js";
@@ -8,7 +8,8 @@ import { money } from "../../../format.js";
 import { IfCan } from "../../../auth/RequireCapability.js";
 import { useAuth } from "../../../auth/AuthContext.js";
 import { supabase } from "../../../lib/supabase/client.js";
-import { PlanosLongosSection } from "./PlanosLongosSection.js";
+import { PlanosLongosSection, type RegisterSave } from "./PlanosLongosSection.js";
+import { BonusProgramSection } from "./BonusProgramSection.js";
 
 interface WeekdayGoal {
   dayLabel: string;
@@ -269,6 +270,14 @@ export function MetasTab() {
 
   const [publishing, setPublishing] = useState(false);
 
+  // Cada seção real (metas/configuração, planos longos) registra aqui como se grava;
+  // o botão do topo chama todas. O simulador desta tela NÃO grava nada.
+  const savers = useRef(new Map<string, () => Promise<void>>());
+  const registerSave = useCallback<RegisterSave>((id, fn) => {
+    if (fn) savers.current.set(id, fn);
+    else savers.current.delete(id);
+  }, []);
+
   async function loadTicketGoalsAndSuggestions() {
     if (units.length === 0) return;
     setLoadingSuggestions(true);
@@ -408,10 +417,15 @@ export function MetasTab() {
   async function handlePublishProgram() {
     setPublishing(true);
     try {
-      await new Promise((res) => setTimeout(res, 600));
-      toast.success(`Programa de Bonificação publicado com sucesso!`);
-    } catch {
-      toast.error("Erro ao publicar programa de bonificação.");
+      const entries = [...savers.current.entries()];
+      const results = await Promise.allSettled(entries.map(([, fn]) => fn()));
+      const failed = results.flatMap((r, i) => (r.status === "rejected" ? [{ id: entries[i]![0], reason: r.reason }] : []));
+      if (failed.length === 0) {
+        toast.success("Programa de Bonificação publicado: metas, configuração e planos longos gravados.");
+      } else {
+        const msg = failed.map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason))).join(" | ");
+        toast.error(`${failed.length} de ${entries.length} seções não foram gravadas: ${msg}`);
+      }
     } finally {
       setPublishing(false);
     }
@@ -866,7 +880,9 @@ export function MetasTab() {
         })}
       </Card>
 
-      {activeUnit && <PlanosLongosSection key={activeUnit.id} unit={activeUnit} />}
+      {activeUnit && <PlanosLongosSection key={activeUnit.id} unit={activeUnit} registerSave={registerSave} />}
+
+      <BonusProgramSection units={units} registerSave={registerSave} />
     </div>
   );
 }
