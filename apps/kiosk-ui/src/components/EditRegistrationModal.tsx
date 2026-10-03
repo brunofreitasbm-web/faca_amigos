@@ -189,9 +189,6 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
             <span>🎂</span>
             <div>
               <strong>{birthdayInfo.isToday ? "ANIVERSÁRIO HOJE! 🎉" : `Aniversário próximo (${birthdayInfo.daysUntil} dias)!`}</strong>
-              <div style={{ fontSize: "12px", fontWeight: "normal", marginTop: "2px" }}>
-                Oportunidade Comercial: Ofereça o Pacote de Festa ou Combo Especial de Aniversariante!
-              </div>
             </div>
           </div>
         )}
