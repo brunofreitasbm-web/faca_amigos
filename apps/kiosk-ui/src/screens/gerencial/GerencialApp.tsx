@@ -28,10 +28,12 @@ import { ClientesTab } from "./tabs/ClientesTab.js";
 import { CrmWhatsappTab } from "./tabs/CrmWhatsappTab.js";
 import { RelatoriosSessaoTab } from "./tabs/RelatoriosSessaoTab.js";
 import { OwnerAcompanhamentoTab } from "./tabs/OwnerAcompanhamentoTab.js";
+import { NpsDashboardTab } from "./tabs/NpsDashboardTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 
 export type GerencialTab =
   | "ACOMPANHAMENTO_OWNER"
+  | "NPS_DASHBOARD"
   | "PLANOS"
   | "PACOTES"
   | "PRODUTOS"
@@ -83,6 +85,7 @@ const CATEGORIES: ModuleCategory[] = [
     badge: "Estratégico",
     description: "Cockpit executivo, assistente de vendas e inteligência de mercado",
     items: [
+      { value: "NPS_DASHBOARD", label: "Dashboard NPS", icon: "📈", tag: "Novo", description: "NPS, equipe e espaço por unidade, taxa de resposta, tendência, detratores a tratar e contribuições dos responsáveis." },
       { value: "COPILOT_IA", label: "ZoeIA (Copilot)", icon: "✦", tag: "IA Vendas", description: "Assistente comercial humana para sugestões automáticas e aumento de ticket médio." },
       { value: "RELATORIOS", label: "Relatórios Consolidados", icon: "📊", description: "Vendas, visitas, planos e sessões unificadas da rede." },
     ],
@@ -496,6 +499,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
             {/* ÁREA DE CONTEÚDO EXPANDIDA (DESKTOP FULL WIDTH) */}
             <div role="tabpanel" style={{ width: "100%", flex: 1 }}>
               {tab === "ACOMPANHAMENTO_OWNER" && <OwnerAcompanhamentoTab />}
+              {tab === "NPS_DASHBOARD" && <NpsDashboardTab />}
               {tab === "COPILOT_IA" && <GeminiGerencialCopilot />}
               {tab === "PLANOS" && <PlanosTab />}
               {tab === "PACOTES" && <PacotesTab />}

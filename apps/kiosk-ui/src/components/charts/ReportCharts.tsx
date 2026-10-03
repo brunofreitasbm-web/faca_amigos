@@ -18,7 +18,7 @@ import { money } from "../../format.js";
 
 const CHART_COLORS = ["#2ECFB5", "#6366F1", "#F59E0B", "#EC4899", "#10B981", "#8B5CF6"];
 
-const tooltipStyle = {
+export const tooltipStyle = {
   background: "var(--surface-card, #ffffff)",
   border: "1px solid var(--border-subtle, #e5e7eb)",
   borderRadius: 8,
@@ -28,7 +28,7 @@ const tooltipStyle = {
   padding: "8px 12px",
 };
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+export function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card style={{ padding: "16px", background: "var(--surface-card, #ffffff)" }}>
       <h3 style={{ margin: "0 0 14px 0", fontSize: "14px", fontWeight: 600, color: "var(--text-primary, #111827)" }}>

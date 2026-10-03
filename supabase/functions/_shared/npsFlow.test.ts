@@ -1,0 +1,156 @@
+// deno test supabase/functions/_shared/npsFlow.test.ts
+import { handleNps } from "./npsFlow.ts";
+import { NPS_TEXT } from "./nps.ts";
+
+// deno-lint-ignore no-explicit-any
+type Row = Record<string, any>;
+
+function assertEquals(actual: unknown, expected: unknown, msg = "") {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${msg} esperado ${JSON.stringify(expected)}, veio ${JSON.stringify(actual)}`);
+  }
+}
+
+/** Client falso do Supabase só com o que handleNps usa, sobre linhas em memória. */
+function fakeAdmin(rows: Row[]) {
+  return {
+    from(_table: string) {
+      const filters: ((r: Row) => boolean)[] = [];
+      let patch: Row | null = null;
+      let returning = false;
+      // deno-lint-ignore no-explicit-any
+      const b: any = {
+        select() {
+          if (patch) returning = true;
+          return b;
+        },
+        update(p: Row) {
+          patch = p;
+          return b;
+        },
+        eq(k: string, v: unknown) {
+          filters.push((r) => r[k] === v);
+          return b;
+        },
+        is(k: string, v: unknown) {
+          filters.push((r) => (r[k] ?? null) === v);
+          return b;
+        },
+        in(k: string, vs: unknown[]) {
+          filters.push((r) => vs.includes(r[k]));
+          return b;
+        },
+        order() {
+          return b;
+        },
+        limit() {
+          return b;
+        },
+        maybeSingle() {
+          const m = rows.filter((r) => filters.every((f) => f(r))).sort((x, y) => y.sent_at_ms - x.sent_at_ms);
+          return Promise.resolve({ data: m[0] ? { ...m[0] } : null });
+        },
+        // deno-lint-ignore no-explicit-any
+        then(resolve: (v: any) => void) {
+          const m = rows.filter((r) => filters.every((f) => f(r)));
+          if (patch) m.forEach((r) => Object.assign(r, patch));
+          resolve({ data: returning ? m.map((r) => ({ id: r.id })) : null });
+        },
+      };
+      return b;
+    },
+  };
+}
+
+const NOW = 1_800_000_000_000;
+const MIN = 60_000;
+const UNITS = [
+  { id: "u1", name: "Playground Bosque" },
+  { id: "u2", name: "Playground Parque" },
+  { id: "u3", name: "Circuito Parque" },
+];
+const survey = (over: Row = {}): Row => ({
+  id: "s1", contact_id: "c1", status: "SENT", sent_at_ms: NOW - 3 * 60 * MIN, last_step_ms: null,
+  scored_at_ms: null, score: null, score_team: null, score_space: null, unit_id: null, unit_options: UNITS,
+  feedback: null, ...over,
+});
+
+Deno.test("conversa completa: unidade, nota, equipe, espaço e contribuição", async () => {
+  const rows = [survey()];
+  const admin = fakeAdmin(rows);
+  const say = (body: string, at = NOW) => handleNps(admin, "c1", body, at);
+
+  assertEquals(await say("oi, tudo bem?"), null, "texto livre não é resposta");
+  assertEquals(await say("4"), NPS_TEXT.retryUnit(UNITS), "unidade fora da lista");
+  assertEquals(rows[0].unit_id, null);
+
+  assertEquals(await say("2", NOW + MIN), NPS_TEXT.scoreQuestion("Playground Parque"));
+  assertEquals(rows[0].unit_id, "u2");
+  assertEquals(rows[0].status, "SENT");
+
+  assertEquals(await say("9", NOW + 2 * MIN), NPS_TEXT.teamQuestion);
+  assertEquals([rows[0].status, rows[0].score], ["ASKING", 9]);
+
+  assertEquals(await say("7", NOW + 3 * MIN), NPS_TEXT.retryFive, "7 fora da escala 1-5");
+  assertEquals(await say("5", NOW + 3 * MIN), NPS_TEXT.spaceQuestion);
+  assertEquals(rows[0].score_team, 5);
+
+  assertEquals(await say("4", NOW + 4 * MIN), NPS_TEXT.commentQuestion(9));
+  assertEquals([rows[0].status, rows[0].score_space, rows[0].scored_at_ms], ["SCORED", 4, NOW + 4 * MIN]);
+
+  assertEquals(await say("O espaço é lindo e a equipe é ótima", NOW + 5 * MIN), NPS_TEXT.thanks);
+  assertEquals([rows[0].status, rows[0].feedback], ["DONE", "O espaço é lindo e a equipe é ótima"]);
+  assertEquals(await say("obrigada!", NOW + 6 * MIN), null, "pesquisa encerrada: volta a ser conversa normal");
+});
+
+Deno.test("template antigo (sem unit_options) começa direto na nota", async () => {
+  const rows = [survey({ unit_options: null })];
+  const admin = fakeAdmin(rows);
+  assertEquals(await handleNps(admin, "c1", "8", NOW), NPS_TEXT.teamQuestion);
+  assertEquals([rows[0].status, rows[0].score, rows[0].unit_id], ["ASKING", 8, null]);
+});
+
+Deno.test("recusar a contribuição encerra sem comentário", async () => {
+  const rows = [survey({ status: "SCORED", score: 6, score_team: 3, score_space: 3, last_step_ms: NOW - MIN })];
+  const admin = fakeAdmin(rows);
+  assertEquals(await handleNps(admin, "c1", "Não", NOW), NPS_TEXT.thanksNoComment);
+  assertEquals([rows[0].status, rows[0].feedback], ["DONE", null]);
+});
+
+Deno.test("mídia sem texto na pergunta da contribuição espera o texto", async () => {
+  const rows = [survey({ status: "SCORED", score: 9, score_team: 5, score_space: 5, last_step_ms: NOW - MIN })];
+  assertEquals(await handleNps(fakeAdmin(rows), "c1", "   ", NOW), null);
+  assertEquals(rows[0].status, "SCORED");
+});
+
+Deno.test("pesquisa antiga da régua (SCORED sem equipe/espaço) ainda aceita a contribuição", async () => {
+  const rows = [survey({ status: "SCORED", score: 9, scored_at_ms: NOW - MIN, unit_options: null })];
+  assertEquals(await handleNps(fakeAdmin(rows), "c1", "Adorei", NOW), NPS_TEXT.thanks);
+  assertEquals(rows[0].feedback, "Adorei");
+});
+
+Deno.test("janelas: 7 dias na primeira resposta, 24h entre as etapas", async () => {
+  const old = [survey({ sent_at_ms: NOW - 8 * 24 * 60 * MIN })];
+  assertEquals(await handleNps(fakeAdmin(old), "c1", "2", NOW), null);
+  assertEquals(old[0].status, "EXPIRED");
+
+  const stalled = [survey({ status: "ASKING", score: 9, last_step_ms: NOW - 25 * 60 * MIN })];
+  assertEquals(await handleNps(fakeAdmin(stalled), "c1", "5", NOW), null);
+  assertEquals([stalled[0].status, stalled[0].score_team], ["DONE", null], "encerra com o que tem; nota 9 fica");
+
+  const fresh = [survey({ sent_at_ms: NOW - 6 * 24 * 60 * MIN })];
+  assertEquals(await handleNps(fakeAdmin(fresh), "c1", "1", NOW), NPS_TEXT.scoreQuestion("Playground Bosque"));
+});
+
+Deno.test("reenvio duplicado do mesmo webhook responde uma vez só", async () => {
+  const rows = [survey()];
+  const admin = fakeAdmin(rows);
+  const [a, b] = await Promise.all([handleNps(admin, "c1", "2", NOW), handleNps(admin, "c1", "2", NOW)]);
+  assertEquals([a, b].filter((r) => r !== null).length, 1, "só uma das duas entregas responde");
+  assertEquals(rows[0].unit_id, "u2");
+});
+
+Deno.test("contato sem pesquisa aberta segue como conversa normal", async () => {
+  assertEquals(await handleNps(fakeAdmin([survey({ status: "DONE" })]), "c1", "9", NOW), null);
+  assertEquals(await handleNps(fakeAdmin([survey()]), "outro", "9", NOW), null);
+});

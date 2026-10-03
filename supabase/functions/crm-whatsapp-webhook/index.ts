@@ -2,6 +2,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   OFFER_DECLINE_REPLY, OFFER_INFO_FALLBACK, OFFER_KINDS, type OfferButton, offerButton, offerInfoKey,
 } from "./offer.ts";
+import { handleNps } from "../_shared/npsFlow.ts";
 
 // Webhook do WhatsApp (Twilio, subconta do CRM). Recebe DOIS tipos de
 // chamada na mesma URL:
@@ -428,54 +429,6 @@ async function handleOffer(admin: ReturnType<typeof createClient>, contactId: st
     .eq("kind", offerInfoKey(send.kind as string))
     .maybeSingle();
   return (info?.reply_text as string | undefined) ?? OFFER_INFO_FALLBACK;
-}
-
-const NPS_REPLY_WINDOW_MS =7 * 24 * 60 * 60 * 1000; // nota: até 7 dias após o envio
-const NPS_FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000; // comentário: até 24h após a nota
-
-/**
- * Fluxo do NPS por WhatsApp. Devolve o texto da resposta automática, ou
- * null quando a mensagem não faz parte de uma pesquisa em aberto (segue
- * como conversa normal para a equipe).
- *   SENT   + "0".."10"  -> grava a nota, pergunta o motivo      (SCORED)
- *   SCORED + texto      -> grava o comentário, agradece         (DONE)
- */
-async function handleNps(admin: ReturnType<typeof createClient>, contactId: string, body: string, now: number): Promise<string | null> {
-  const { data: survey } = await admin
-    .from("fa_crm_nps_surveys")
-    .select("id, status, sent_at_ms, scored_at_ms, score")
-    .eq("contact_id", contactId)
-    .in("status", ["SENT", "SCORED"])
-    .order("sent_at_ms", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!survey) return null;
-
-  if (survey.status === "SENT") {
-    if (now - Number(survey.sent_at_ms) > NPS_REPLY_WINDOW_MS) {
-      await admin.from("fa_crm_nps_surveys").update({ status: "EXPIRED" }).eq("id", survey.id);
-      return null;
-    }
-    // Só conta como nota se a mensagem for basicamente o número ("9", "10", "nota 8").
-    const m = body.length <= 40 ? body.match(/(?:^|\D)(10|\d)(?!\d)/) : null;
-    if (!m) return null;
-    const score = Number(m[1]);
-    await admin.from("fa_crm_nps_surveys").update({ status: "SCORED", score, scored_at_ms: now }).eq("id", survey.id);
-    return score >= 9
-      ? "Que alegria! 💛 Obrigado pela nota. Quer contar o que mais gostou? É só responder aqui."
-      : score >= 7
-        ? "Obrigado pela nota! 💛 O que podemos fazer para sua próxima visita ser ainda melhor?"
-        : "Poxa, sentimos muito. 😔 Pode nos contar o que aconteceu? Vamos usar seu retorno para melhorar.";
-  }
-
-  // SCORED: a próxima mensagem de texto é o comentário.
-  if (now - Number(survey.scored_at_ms) > NPS_FEEDBACK_WINDOW_MS) {
-    await admin.from("fa_crm_nps_surveys").update({ status: "DONE", done_at_ms: now }).eq("id", survey.id);
-    return null;
-  }
-  if (!body) return null; // só mídia: espera o texto
-  await admin.from("fa_crm_nps_surveys").update({ status: "DONE", feedback: body.slice(0, 1000), done_at_ms: now }).eq("id", survey.id);
-  return "Muito obrigado pelo seu retorno! Ele ajuda a melhorar cada visita. 💛";
 }
 
 async function guardianByPhone(admin: ReturnType<typeof createClient>, phone: string): Promise<string | null> {

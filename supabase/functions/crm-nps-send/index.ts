@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/http.ts";
 import { requireCapability } from "../_shared/requireCapability.ts";
+import { loadUnitOptions, npsVariables, renderNpsPreview, templateAsksUnit } from "../_shared/npsSurvey.ts";
 
 // Dispara a pesquisa de NPS por WhatsApp para uma lista de contatos do CRM.
 // A resposta (nota 0-10 e comentário) é tratada por crm-whatsapp-webhook.
@@ -55,6 +56,12 @@ Deno.serve(async (req) => {
     return jsonResponse(req, { error: "Nenhum template de NPS aprovado cadastrado (fa_crm_templates, purpose = NPS)" }, 409);
   }
 
+  // Só o template novo pergunta a unidade; o antigo segue direto para a nota.
+  const unitOptions = templateAsksUnit(template.preview) ? await loadUnitOptions(admin) : null;
+  if (unitOptions && unitOptions.length === 0) {
+    return jsonResponse(req, { error: "Nenhuma unidade cadastrada para montar a pergunta do NPS" }, 409);
+  }
+
   const { data: employee } = await admin.from("fa_kiosk_employees").select("id").eq("auth_user_id", auth.userId).maybeSingle();
 
   const { data: contacts } = await admin
@@ -88,11 +95,29 @@ Deno.serve(async (req) => {
     }
 
     const firstName = (c.name ?? "").trim().split(/\s+/)[0] || "tudo bem";
+    // A pesquisa nasce antes do envio, já com a lista de unidades que o responsável vai ver.
+    const sentAt = Date.now();
+    const { data: survey, error: surveyErr } = await admin
+      .from("fa_crm_nps_surveys")
+      .insert({
+        contact_id: c.id,
+        channel_id: c.channel_id,
+        sent_by_employee_id: employee?.id ?? null,
+        sent_at_ms: sentAt,
+        unit_options: unitOptions,
+      })
+      .select("id")
+      .single();
+    if (surveyErr || !survey) {
+      console.error("Falha ao criar pesquisa NPS:", c.id, surveyErr?.message);
+      result.failed++;
+      continue;
+    }
     const form = new URLSearchParams({
       From: `whatsapp:${channel.whatsapp_e164}`,
       To: `whatsapp:${c.phone_e164}`,
       ContentSid: template.content_sid,
-      ContentVariables: JSON.stringify({ "1": firstName }),
+      ContentVariables: JSON.stringify(npsVariables(firstName, unitOptions)),
       StatusCallback: WEBHOOK_URL,
     });
 
@@ -107,21 +132,15 @@ Deno.serve(async (req) => {
     const out = await res.json().catch(() => ({}));
     if (!res.ok) {
       console.error("Twilio recusou NPS:", c.id, out?.code, out?.message);
+      await admin.from("fa_crm_nps_surveys").delete().eq("id", survey.id);
       result.failed++;
       continue;
     }
 
-    const sentAt = Date.now();
-    await admin.from("fa_crm_nps_surveys").insert({
-      contact_id: c.id,
-      channel_id: c.channel_id,
-      sent_by_employee_id: employee?.id ?? null,
-      sent_at_ms: sentAt,
-    });
     await admin.from("fa_crm_messages").insert({
       contact_id: c.id,
       direction: "OUT",
-      body: template.preview.replace(/\{\{1\}\}/g, firstName),
+      body: renderNpsPreview(template.preview, firstName, unitOptions),
       twilio_sid: out.sid,
       status: "queued",
       template_id: template.id,
