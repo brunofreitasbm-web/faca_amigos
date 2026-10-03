@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { parseScope } from "./scope.ts";
 
 // Function ADMINISTRATIVA, de uso único (não é chamada por cron nem pela
 // SPA): cria no Twilio Content API os templates de WhatsApp que faltam para
@@ -14,6 +15,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 //
 // Aprovação da Meta é ASSÍNCRONA (até 24h) e fora do nosso controle — esta
 // function só SUBMETE; rodar de novo mais tarde reflete o status atualizado.
+//
+// Escopo (ver ./scope.ts): sem corpo trata o catálogo inteiro; com
+// {"names": ["fa_nps_pos_visita_v2"]} trata só esses; {"dryRun": true} só
+// mostra o que faria, sem tocar na Twilio, na Meta nem no banco.
 
 const CONTENT_API = "https://content.twilio.com/v1/Content";
 
@@ -260,13 +265,26 @@ Deno.serve(async (req) => {
   // Por nome, não por purpose: um purpose pode ter versões (ex.: VIP v1 e v2).
   const byName = new Map((existing ?? []).map((t) => [t.name, t]));
 
+  const scope = parseScope(
+    await req.text().catch(() => ""),
+    new Set([...TEMPLATES.map((d) => d.name), ...byName.keys()]),
+  );
+  if (!scope.ok) return json({ error: scope.error }, 400);
+  const only = scope.names;
+  const dryRun = scope.dryRun;
+  const inScope = (name: string) => !only || only.has(name);
+
   const results: Record<string, unknown>[] = [];
 
   // ── 1. Purposes já com content_sid real: confere aprovação; se nunca foi
   //      submetido (fetch não devolve status), submete agora. ──
   const defByName = new Map(TEMPLATES.map((d) => [d.name, d]));
   for (const row of existing ?? []) {
-    if (row.active || !row.content_sid || RETIRED.has(row.name)) continue;
+    if (row.active || !row.content_sid || RETIRED.has(row.name) || !inScope(row.name)) continue;
+    if (dryRun) {
+      results.push({ purpose: row.purpose, name: row.name, action: "[dryRun] conferiria a aprovação na Meta (ativa se aprovado; submete se nunca foi submetido)" });
+      continue;
+    }
     try {
       const fetchRes = await fetch(`${CONTENT_API}/${row.content_sid}/ApprovalRequests`, { headers: { Authorization: auth } });
       const out = await fetchRes.json().catch(() => ({}));
@@ -311,7 +329,11 @@ Deno.serve(async (req) => {
 
   // ── 2. Templates ainda não criados (por nome): cria + submete para aprovação. ──
   for (const def of TEMPLATES) {
-    if (byName.has(def.name)) continue;
+    if (byName.has(def.name) || !inScope(def.name)) continue;
+    if (dryRun) {
+      results.push({ purpose: def.purpose, name: def.name, action: "[dryRun] criaria na Twilio e submeteria à Meta (ficaria inativo)" });
+      continue;
+    }
 
     const types = def.quickReplyButtons
       ? { "twilio/quick-reply": { body: def.body, actions: def.quickReplyButtons } }
@@ -356,5 +378,5 @@ Deno.serve(async (req) => {
     });
   }
 
-  return json({ ok: true, results });
+  return json({ ok: true, scope: only ? [...only] : "todos", dryRun, results });
 });
