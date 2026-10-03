@@ -9,6 +9,8 @@ import { statusHeadline } from "./acompanhar/copy.js";
 import { circuitoStatusHeadline, type CircuitoAssetKind } from "./acompanhar/copyCircuito.js";
 import { MapeamentoBanner } from "./acompanhar/MapeamentoBanner.js";
 import { FidelidadeBannerCard } from "./acompanhar/FidelidadeBannerCard.js";
+import { OfertaCard } from "./acompanhar/OfertaCard.js";
+import { ofertaParaSessao } from "./acompanhar/ofertaSite.js";
 
 /**
  * Painel público do responsável — aberto sem login pelo QR mostrado no
@@ -124,6 +126,16 @@ function AcompanharConteudo({
     ? circuitoStatusHeadline(childFirstName, phase, assetKind ?? "CARRO")
     : statusHeadline(childFirstName, phase, sensoryTags);
 
+  const oferta = ofertaParaSessao({
+    activity,
+    isPausada,
+    childFirstName,
+    childVisitCount,
+    planDurationMinutes,
+    remainingMs: timing.durationMs - timing.elapsedMs,
+    nowMs: Date.now(),
+  });
+
   return (
     <div style={{ width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: "16px" }}>
       <Card style={{ textAlign: "center", border: `2px solid ${color}` }}>
@@ -137,6 +149,9 @@ function AcompanharConteudo({
             : `${planDurationMinutes} min inclusos no pacote — ${money(0)} adicionais`}
         </p>
       </Card>
+
+      {/* Oferta de produto, só nos últimos 15 min do plano (ou no excedente); o botão abre o WhatsApp do CRM. */}
+      {oferta && <OfertaCard oferta={oferta} />}
 
       {/* Card do Programa de Fidelidade com visual do progresso de visitas */}
       <FidelidadeBannerCard childFirstName={childFirstName} visitCount={childVisitCount} />

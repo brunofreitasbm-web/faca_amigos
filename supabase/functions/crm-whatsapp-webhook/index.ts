@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   OFFER_DECLINE_REPLY, OFFER_INFO_FALLBACK, OFFER_KINDS, type OfferButton, offerButton, offerInfoKey,
+  pickProductOffer, type SiteOfferKind, siteOfferKeyword, welcomeWithOffer,
 } from "./offer.ts";
 import { handleNps } from "../_shared/npsFlow.ts";
 
@@ -236,12 +237,16 @@ Deno.serve(async (req) => {
     optOut || optIn || offerReply || params.ButtonPayload !== OVERAGE_RENEW_PAYLOAD
       ? null
       : await handleOverageRenewal(admin, contact!.id, now);
+  // Texto pré-preenchido do card de oferta da tela de acompanhamento ("Quero saber do Porto Seguro").
+  const siteKind = optOut || optIn || offerReply || overageReply ? null : siteOfferKeyword(body);
+  const siteReply = siteKind ? await handleSiteOffer(admin, contact!, siteKind, now) : null;
 
   let reply: string | null = null;
   if (optOut) reply = "Tudo certo, você não receberá mais mensagens nossas. Para voltar, responda VOLTAR.";
   else if (optIn) reply = "Que bom ter você de volta! 💛";
   else if (offerReply) reply = offerReply;
   else if (overageReply) reply = overageReply;
+  else if (siteReply) reply = siteReply;
   else if (ACCEPT_WORDS.has(word)) {
     // Um "SIM"/"QUERO" pode responder aos dois pedidos ao mesmo tempo, se
     // ambos estiverem em aberto para este contato (geral + marketing).
@@ -249,7 +254,7 @@ Deno.serve(async (req) => {
     const acceptedMarketing = await handleMarketingOptinAccept(admin, contact!, from, now);
     if (acceptedGeneral || acceptedMarketing) {
       reply = acceptedMarketing
-        ? marketingWelcome(contact!.name, now)
+        ? await marketingReply(admin, contact!.id, acceptedMarketing, marketingWelcome(contact!.name, now), now)
         : "Combinado! 💛 Vamos te avisar por aqui sobre suas visitas e, às vezes, pedir sua opinião. Para parar, é só responder PARAR.";
     } else {
       const choice = renewalChoice(params.ButtonPayload, body);
@@ -472,14 +477,15 @@ async function handleOptinAccept(
  * Registra o aceite de MARKETING quando o cliente responde SIM/QUERO a um
  * pedido de fa_crm_marketing_optin_requests em aberto. Ao contrário do aceite
  * geral, "quero" sozinho (sem pedido pendente) NÃO basta aqui — não existe
- * QR code de balcão para marketing, só a campanha. Devolve true se gravou.
+ * QR code de balcão para marketing, só a campanha. Devolve o id do
+ * responsável se gravou, senão null.
  */
 async function handleMarketingOptinAccept(
   admin: ReturnType<typeof createClient>,
   contact: { id: string; guardian_id: string | null },
   phone: string,
   now: number,
-): Promise<boolean> {
+): Promise<string | null> {
   const { data: pending } = await admin
     .from("fa_crm_marketing_optin_requests")
     .select("id")
@@ -487,13 +493,97 @@ async function handleMarketingOptinAccept(
     .eq("status", "SENT")
     .limit(1)
     .maybeSingle();
-  if (!pending) return false;
+  if (!pending) return null;
 
   const guardianId = contact.guardian_id ?? (await guardianByPhone(admin, phone));
-  if (!guardianId) return false;
+  if (!guardianId) return null;
 
   await admin.from("fa_kiosk_guardians").update({ marketing_consent_at_ms: now }).eq("id", guardianId);
   await admin.from("fa_crm_marketing_optin_requests").update({ status: "ACCEPTED", answered_at_ms: now }).eq("id", pending.id);
   if (!contact.guardian_id) await admin.from("fa_crm_contacts").update({ guardian_id: guardianId }).eq("id", contact.id);
-  return true;
+  return guardianId;
+}
+
+/** Flag crm_lc_<kind> ligada (na unidade da oferta, ou em qualquer uma quando a oferta não é de uma unidade). */
+async function offerFlagOn(admin: ReturnType<typeof createClient>, kind: string, unitId: string | null): Promise<boolean> {
+  let q = admin.from("fa_kiosk_app_settings").select("value").eq("key", `crm_lc_${kind.toLowerCase()}`).eq("value", "1").limit(1);
+  if (unitId) q = q.eq("unit_id", unitId);
+  const { data } = await q;
+  return !!data?.length;
+}
+
+async function offerInfoText(admin: ReturnType<typeof createClient>, kind: string): Promise<string> {
+  const { data } = await admin.from("fa_crm_offer_info").select("reply_text").eq("kind", offerInfoKey(kind)).maybeSingle();
+  return (data?.reply_text as string | undefined) ?? OFFER_INFO_FALLBACK;
+}
+
+/** Registra a oferta enviada em texto livre, para as estatísticas, a trava de frequência e o "Agora não". */
+async function recordFreeformOffer(
+  admin: ReturnType<typeof createClient>,
+  contact: { id: string; guardian_id: string | null },
+  kind: string,
+  unitId: string | null,
+  via: "optin_reply" | "site_card",
+  now: number,
+): Promise<void> {
+  const { error } = await admin.from("fa_crm_automation_sends").insert({
+    kind,
+    unit_id: unitId,
+    contact_id: contact.id,
+    guardian_id: contact.guardian_id,
+    ref_key: `${via}:${contact.id}:${now}`,
+    payload: { via },
+    status: "SENT",
+    sent_at_ms: now,
+  });
+  if (error) console.error("registro da oferta em texto livre:", error.message);
+}
+
+/**
+ * Resposta ao SIM do aceite de marketing: a confirmação de sempre mais a
+ * primeira oferta de produto que o responsável já mereceria na régua (mesma
+ * ordem de prioridade, mesma flag por unidade, mesma trava de 1 marketing a
+ * cada 7 dias). Texto livre, dentro da janela aberta pelo SIM: sem template.
+ * Sem oferta elegível, sai só a confirmação.
+ */
+async function marketingReply(
+  admin: ReturnType<typeof createClient>,
+  contactId: string,
+  guardianId: string,
+  welcome: string,
+  now: number,
+): Promise<string> {
+  try {
+    const { data: canSend } = await admin.rpc("fa_crm_can_send", { p_contact_id: contactId, p_category: "MARKETING", p_now_ms: now });
+    if (canSend === false) return welcome;
+    const { data: candidates } = await admin.rpc("fa_crm_lc_candidates", { p_now_ms: now });
+    const mine = ((candidates ?? []) as { kind: string; guardian_id: string | null; unit_id: string | null }[])
+      .filter((c) => c.guardian_id === guardianId);
+    // A RPC já vem em ordem de prioridade; descarta os kinds com a flag desligada antes de escolher.
+    const enabled: typeof mine = [];
+    for (const c of mine) if (await offerFlagOn(admin, c.kind, c.unit_id)) enabled.push(c);
+    const pick = pickProductOffer(enabled, guardianId);
+    if (!pick) return welcome;
+    await recordFreeformOffer(admin, { id: contactId, guardian_id: guardianId }, pick.kind, pick.unit_id, "optin_reply", now);
+    return welcomeWithOffer(welcome, await offerInfoText(admin, pick.kind));
+  } catch (e) {
+    console.error("oferta na resposta ao aceite:", e);
+    return welcome; // a confirmação nunca deixa de sair por causa da oferta
+  }
+}
+
+/**
+ * Pedido do card de oferta da tela de acompanhamento. Quem escreve pediu a
+ * informação, então responde mesmo sem aceite de marketing; não grava aceite.
+ * Fica registrado em fa_crm_automation_sends, o que também segura a régua por 7 dias.
+ */
+async function handleSiteOffer(
+  admin: ReturnType<typeof createClient>,
+  contact: { id: string; guardian_id: string | null },
+  kind: SiteOfferKind,
+  now: number,
+): Promise<string | null> {
+  const text = await offerInfoText(admin, kind);
+  await recordFreeformOffer(admin, contact, kind, null, "site_card", now);
+  return text;
 }
