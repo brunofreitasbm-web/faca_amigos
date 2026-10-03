@@ -98,5 +98,7 @@ begin
 end;
 $$ language plpgsql volatile security definer set search_path = public, pg_temp;
 
-revoke execute on function fa_push_claim_olhar(bigint) from public;
+-- O Supabase concede EXECUTE direto a anon/authenticated em funções novas; `from public` não remove.
+-- Esta função devolve chaves de push e códigos de acesso: só o service_role pode chamar.
+revoke execute on function fa_push_claim_olhar(bigint) from public, anon, authenticated;
 grant execute on function fa_push_claim_olhar(bigint) to service_role;
