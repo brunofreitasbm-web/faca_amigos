@@ -12,6 +12,7 @@ import { FidelidadeBannerCard } from "./acompanhar/FidelidadeBannerCard.js";
 import { OfertaCard } from "./acompanhar/OfertaCard.js";
 import { ofertaParaSessao } from "./acompanhar/ofertaSite.js";
 import { OlharCard } from "./acompanhar/OlharCard.js";
+import { AvisoOlharPush } from "./acompanhar/AvisoOlharPush.js";
 import { olharUrl } from "./acompanhar/olharSite.js";
 import { RenovarCard } from "./acompanhar/RenovarCard.js";
 import { opcoesDeRenovacao } from "./acompanhar/renovarSite.js";
@@ -82,6 +83,13 @@ export function AcompanharScreen({ code }: { code: string }) {
         </Card>
       )}
 
+      {/* Convite ao aviso por push, enquanto o Olhar ainda não saiu (some quando o card do Olhar aparece). */}
+      {status === "ready" && sessao?.status === "FINALIZADA" && !olharUrl(sessao.reportToken) && (
+        <div style={{ maxWidth: 420, width: "100%" }}>
+          <AvisoOlharPush code={code} childFirstName={sessao.childFirstName} />
+        </div>
+      )}
+
       {/* Olhar FaçaAmigos: aparece assim que o relatório da visita é gerado (a tela atualiza sozinha). */}
       {status === "ready" && sessao?.status === "FINALIZADA" && olharUrl(sessao.reportToken) && (
         <div style={{ maxWidth: 420, width: "100%" }}>
@@ -91,6 +99,7 @@ export function AcompanharScreen({ code }: { code: string }) {
 
       {status === "ready" && sessao && (sessao.status === "ATIVA" || sessao.status === "PAUSADA") && timing && (
         <AcompanharConteudo
+          code={code}
           childFirstName={sessao.childFirstName}
           childVisitCount={sessao.childVisitCount}
           sensoryTags={sessao.sensoryTags}
@@ -112,6 +121,7 @@ const PHASE_COLOR: Record<string, string> = {
 };
 
 function AcompanharConteudo({
+  code,
   childFirstName,
   childVisitCount = 8,
   sensoryTags,
@@ -120,6 +130,7 @@ function AcompanharConteudo({
   timing,
   isPausada,
 }: {
+  code: string;
   childFirstName: string;
   childVisitCount?: number;
   sensoryTags: string[];
@@ -173,6 +184,9 @@ function AcompanharConteudo({
 
       {/* Oferta de produto, só nos últimos 15 min do plano (ou no excedente); o botão abre o WhatsApp do CRM. */}
       {oferta && <OfertaCard oferta={oferta} />}
+
+      {/* Convite ao aviso por push quando o Olhar ficar pronto (some se o navegador não suporta ou já ativou). */}
+      <AvisoOlharPush code={code} childFirstName={childFirstName} />
 
       {/* Card do Programa de Fidelidade com visual do progresso de visitas */}
       <FidelidadeBannerCard childFirstName={childFirstName} visitCount={childVisitCount} />

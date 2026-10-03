@@ -42,3 +42,21 @@ export async function registrarAcompanharPush(
   if (error) throw new Error(error.message);
   return { alertDueAtMs: Number((data as { alertDueAtMs: number }).alertDueAtMs) };
 }
+
+/**
+ * Inscreve o navegador para o aviso "o Olhar FaçaAmigos está pronto". Não reativa o alerta
+ * de fim de tempo (esse virou WhatsApp). `JA_PRONTO`: o PDF já existe, o card aparece sozinho.
+ */
+export async function registrarAcompanharPushOlhar(
+  code: string,
+  keys: { endpoint: string; p256dh: string; auth: string },
+): Promise<"OK" | "JA_PRONTO"> {
+  const { data, error } = await supabase().rpc("fa_acompanhar_registrar_push_olhar", {
+    p_code: code,
+    p_endpoint: keys.endpoint,
+    p_p256dh: keys.p256dh,
+    p_auth: keys.auth,
+  });
+  if (error) throw new Error(error.message);
+  return (data as { status: string }).status === "JA_PRONTO" ? "JA_PRONTO" : "OK";
+}
