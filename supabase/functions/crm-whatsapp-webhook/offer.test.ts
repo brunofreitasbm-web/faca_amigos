@@ -1,5 +1,5 @@
 // deno test supabase/functions/crm-whatsapp-webhook/offer.test.ts
-import { offerButton, offerInfoKey, pickProductOffer, renewRequest, siteOfferKeyword, welcomeWithOffer } from "./offer.ts";
+import { offerButton, phoneVariants, offerInfoKey, pickProductOffer, renewRequest, siteOfferKeyword, welcomeWithOffer } from "./offer.ts";
 
 function assertEquals(actual: unknown, expected: unknown, msg = "") {
   if (actual !== expected) throw new Error(`${msg} esperado ${expected}, veio ${actual}`);
@@ -79,4 +79,10 @@ Deno.test("conversa comum não vira renovação", () => {
   assertEquals(renewRequest("sim"), null);
   assertEquals(renewRequest("quero saber do day use"), null);
   assertEquals(renewRequest("Quero renovar " + "x".repeat(60)), null, "mensagem longa");
+});
+
+Deno.test("celular BR com e sem o 9º dígito", () => {
+  assertEquals(phoneVariants("+559193031583").join(), "+559193031583,+5591993031583");
+  assertEquals(phoneVariants("+5591993031583").join(), "+5591993031583,+559193031583");
+  assertEquals(phoneVariants("+14155550100").join(), "+14155550100");
 });

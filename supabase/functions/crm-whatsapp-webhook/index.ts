@@ -1,7 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   OFFER_DECLINE_REPLY, OFFER_INFO_FALLBACK, OFFER_KINDS, type OfferButton, offerButton, offerInfoKey,
-  pickProductOffer, renewRequest, type SiteOfferKind, siteOfferKeyword, welcomeWithOffer,
+  phoneVariants, pickProductOffer, renewRequest, type SiteOfferKind, siteOfferKeyword, welcomeWithOffer,
 } from "./offer.ts";
 import { handleNps } from "../_shared/npsFlow.ts";
 import { isNpsFinalReply } from "../_shared/nps.ts";
@@ -153,11 +153,14 @@ Deno.serve(async (req) => {
   const { data: dup } = await admin.from("fa_crm_messages").select("id").eq("twilio_sid", sid).maybeSingle();
   if (dup) return twiml();
 
+  // Com/sem o 9º dígito: prefere o contato mais antigo (o que recebeu os avisos).
   let { data: contact } = await admin
     .from("fa_crm_contacts")
     .select("id, name, unread_count, stage, opt_in, guardian_id")
     .eq("channel_id", channel.id)
-    .eq("phone_e164", from)
+    .in("phone_e164", phoneVariants(from))
+    .order("created_at_ms", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
   if (!contact) {
@@ -450,7 +453,7 @@ async function handleOffer(admin: ReturnType<typeof createClient>, contactId: st
 }
 
 async function guardianByPhone(admin: ReturnType<typeof createClient>, phone: string): Promise<string | null> {
-  const { data } = await admin.from("fa_kiosk_guardians").select("id").eq("phone_e164", phone).limit(1).maybeSingle();
+  const { data } = await admin.from("fa_kiosk_guardians").select("id").in("phone_e164", phoneVariants(phone)).limit(1).maybeSingle();
   return (data?.id as string | undefined) ?? null;
 }
 

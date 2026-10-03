@@ -80,7 +80,20 @@ export function siteOfferKeyword(body: string): SiteOfferKind | null {
   return null;
 }
 
-export type RenewRequest = { minutes: 30 | 60 | null; childHint: string | null };
+/**
+ * O WhatsApp entrega celulares do Pará sem o 9º dígito (+559193031583) mesmo
+ * quando o cadastro tem o 9 (+5591993031583). Sem tratar as duas grafias, a
+ * resposta vira um contato novo, sem o aviso de renovação/oferta enviado ao
+ * contato original, e o toque no botão não chega ao painel.
+ */
+export function phoneVariants(e164: string): string[] {
+  const m = e164.match(/^\+55(\d{2})(9?)(\d{8})$/);
+  if (!m) return [e164];
+  const [, ddd, nine, rest] = m;
+  return nine ? [e164, `+55${ddd}${rest}`] : [e164, `+55${ddd}9${rest}`];
+}
+
+export type RenewRequest ={ minutes: 30 | 60 | null; childHint: string | null };
 
 /**
  * Pedido de renovação vindo do botão da tela de acompanhamento: o link wa.me
