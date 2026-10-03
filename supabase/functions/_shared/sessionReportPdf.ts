@@ -182,6 +182,21 @@ export async function buildSessionReportPdf(input: SessionReportPdfInput): Promi
     page.drawImage(logo, { x: M - 6, y: A4_H - 28 - lh, width: lw, height: lh });
     y = A4_H - 28 - lh - (pageNo === 1 ? 14 : 8);
     footer(page, pageNo);
+
+    // Atalhos clicáveis no topo de toda página (site e Instagram): ficam visíveis
+    // sem rolar, ao contrário do convite do fim do documento.
+    const chipR = 12;
+    const chipY = A4_H - 28 - lh / 2;
+    const chips = [
+      { url: OLHAR_INSTAGRAM_URL, fill: PINK, icon: drawInstagramIcon },
+      { url: OLHAR_SITE_URL, fill: TEAL, icon: drawGlobeIcon },
+    ];
+    chips.forEach((c, i) => {
+      const cx = A4_W - M - chipR - i * (chipR * 2 + 8);
+      page.drawCircle({ x: cx, y: chipY, size: chipR, color: c.fill });
+      c.icon(page, cx, chipY, 6.5, WHITE);
+      addLink(doc, page, c.url, cx - chipR, chipY - chipR, chipR * 2, chipR * 2);
+    });
   };
 
   const ensure = (need: number) => {
