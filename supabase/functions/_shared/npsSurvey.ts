@@ -1,4 +1,3 @@
-import type { createClient } from "jsr:@supabase/supabase-js@2";
 import { type UnitOption, unitListText } from "./nps.ts";
 
 /**
@@ -12,7 +11,8 @@ import { type UnitOption, unitListText } from "./nps.ts";
 export const templateAsksUnit = (preview: string): boolean => /\{\{2\}\}/.test(preview);
 
 /** Unidades na ordem estável de criação; o número digitado pelo responsável aponta para esta lista. */
-export async function loadUnitOptions(admin: ReturnType<typeof createClient>): Promise<UnitOption[]> {
+// deno-lint-ignore no-explicit-any
+export async function loadUnitOptions(admin: { from(table: string): any }): Promise<UnitOption[]> {
   const { data } = await admin.from("fa_kiosk_units").select("id, name").order("created_at", { ascending: true });
   return (data ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name }));
 }

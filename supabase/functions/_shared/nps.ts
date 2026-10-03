@@ -1,7 +1,8 @@
 // Pesquisa de NPS em etapas, respondida digitando o número dentro do WhatsApp.
 // Só funções puras (sem Deno nem Supabase) para poderem ser testadas.
 //
-//   UNIT    "Em qual unidade você esteve?"  -> número da lista enviada no template
+//   UNIT    "Em qual unidade você esteve?"  -> número da lista (no template novo é a 1ª pergunta;
+//           no template antigo, que já abre pedindo a nota, vem logo depois da nota)
 //   SCORE   recomendação de 0 a 10 (o NPS)
 //   TEAM    equipe, 1 a 5
 //   SPACE   espaço, 1 a 5
@@ -34,6 +35,8 @@ export function npsStep(s: NpsSurveyState): NpsStep | null {
     case "SENT":
       return unitOptions(s.unit_options).length > 0 && !s.unit_id ? "UNIT" : "SCORE";
     case "ASKING":
+      // Template antigo: a unidade é perguntada DEPOIS da nota (unit_options é gravado nessa hora).
+      if (unitOptions(s.unit_options).length > 0 && !s.unit_id) return "UNIT";
       return s.score_team == null ? "TEAM" : "SPACE";
     case "SCORED":
       return "COMMENT";
@@ -94,6 +97,9 @@ export function unitListText(options: UnitOption[]): string {
 export const NPS_TEXT = {
   scoreQuestion: (unitName: string | null) =>
     `Obrigado! 💛 1/3 — De 0 a 10, o quanto você recomendaria ${unitName ?? "o FaçaAmigos"} a um amigo? Responda só com o número.`,
+  /** Template antigo: o cliente já deu a nota; a unidade vem em seguida. */
+  unitAfterScoreQuestion: (options: UnitOption[]) =>
+    `Obrigado pela nota! 💛 Para registrar direitinho: em qual unidade você esteve? Responda só com o número: ${unitListText(options)}`,
   teamQuestion:
     "Anotado! 2/3 — De 1 a 5, como foi o cuidado e o atendimento da nossa equipe? (1 = ruim, 5 = excelente) Responda só com o número.",
   spaceQuestion:

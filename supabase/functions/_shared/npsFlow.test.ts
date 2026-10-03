@@ -12,9 +12,19 @@ function assertEquals(actual: unknown, expected: unknown, msg = "") {
 }
 
 /** Client falso do Supabase só com o que handleNps usa, sobre linhas em memória. */
-function fakeAdmin(rows: Row[]) {
+function fakeAdmin(rows: Row[], units: Row[] = []) {
   return {
-    from(_table: string) {
+    from(table: string) {
+      if (table === "fa_kiosk_units") {
+        // deno-lint-ignore no-explicit-any
+        const u: any = {
+          select: () => u,
+          order: () => u,
+          // deno-lint-ignore no-explicit-any
+          then: (resolve: (v: any) => void) => resolve({ data: units }),
+        };
+        return u;
+      }
       const filters: ((r: Row) => boolean)[] = [];
       let patch: Row | null = null;
       let returning = false;
@@ -103,11 +113,29 @@ Deno.test("conversa completa: unidade, nota, equipe, espaço e contribuição", 
   assertEquals(await say("obrigada!", NOW + 6 * MIN), null, "pesquisa encerrada: volta a ser conversa normal");
 });
 
-Deno.test("template antigo (sem unit_options) começa direto na nota", async () => {
+Deno.test("template antigo (sem unit_options): a unidade é perguntada logo depois da nota", async () => {
   const rows = [survey({ unit_options: null })];
-  const admin = fakeAdmin(rows);
-  assertEquals(await handleNps(admin, "c1", "8", NOW), NPS_TEXT.teamQuestion);
+  const admin = fakeAdmin(rows, UNITS);
+  const say = (body: string, at = NOW) => handleNps(admin, "c1", body, at);
+
+  assertEquals(await say("8"), NPS_TEXT.unitAfterScoreQuestion(UNITS));
   assertEquals([rows[0].status, rows[0].score, rows[0].unit_id], ["ASKING", 8, null]);
+  assertEquals(rows[0].unit_options, UNITS, "a lista enviada fica gravada para o número digitado apontar para ela");
+
+  assertEquals(await say("9", NOW + MIN), NPS_TEXT.retryUnit(UNITS), "9 está fora da lista de 3 unidades");
+  assertEquals(await say("oi", NOW + MIN), null, "texto livre não é resposta");
+  assertEquals(await say("3", NOW + 2 * MIN), NPS_TEXT.teamQuestion, "depois da unidade vem a equipe, não a nota de novo");
+  assertEquals(rows[0].unit_id, "u3");
+
+  assertEquals(await say("4", NOW + 3 * MIN), NPS_TEXT.spaceQuestion);
+  assertEquals(await say("5", NOW + 4 * MIN), NPS_TEXT.commentQuestion(8));
+  assertEquals([rows[0].status, rows[0].score_team, rows[0].score_space, rows[0].unit_id], ["SCORED", 4, 5, "u3"]);
+});
+
+Deno.test("template antigo sem unidades cadastradas segue direto para a equipe", async () => {
+  const rows = [survey({ unit_options: null })];
+  assertEquals(await handleNps(fakeAdmin(rows, []), "c1", "8", NOW), NPS_TEXT.teamQuestion);
+  assertEquals([rows[0].status, rows[0].score, rows[0].unit_options], ["ASKING", 8, null]);
 });
 
 Deno.test("recusar a contribuição encerra sem comentário", async () => {

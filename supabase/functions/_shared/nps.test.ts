@@ -52,6 +52,8 @@ Deno.test("etapa em aberto pelo estado da pesquisa", () => {
   assertEquals(npsStep({ status: "SENT", unit_id: "a", unit_options: opts, score_team: null }), "SCORE");
   assertEquals(npsStep({ status: "SENT", unit_id: null, unit_options: null, score_team: null }), "SCORE", "template antigo");
   assertEquals(npsStep({ status: "ASKING", unit_id: "a", unit_options: opts, score_team: null }), "TEAM");
+  assertEquals(npsStep({ status: "ASKING", unit_id: null, unit_options: opts, score_team: null }), "UNIT", "template antigo: unidade depois da nota");
+  assertEquals(npsStep({ status: "ASKING", unit_id: null, unit_options: null, score_team: null }), "TEAM", "sem unidades cadastradas");
   assertEquals(npsStep({ status: "ASKING", unit_id: "a", unit_options: opts, score_team: 4 }), "SPACE");
   assertEquals(npsStep({ status: "SCORED", unit_id: null, unit_options: null, score_team: null }), "COMMENT");
   assertEquals(npsStep({ status: "DONE", unit_id: null, unit_options: null, score_team: null }), null);
