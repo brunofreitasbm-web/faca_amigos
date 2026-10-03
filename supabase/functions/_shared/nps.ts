@@ -116,3 +116,10 @@ export const NPS_TEXT = {
   retryScore: "Não entendi 😅 Responda só com um número de 0 a 10.",
   retryFive: "Não entendi 😅 Responda só com um número de 1 a 5.",
 } as const;
+
+/**
+ * Resposta que ENCERRA a pesquisa (agradecimento). As demais são perguntas: não
+ * devem receber anexos como a mensagem de fechamento do webhook, que ficaria
+ * grudada numa pergunta no meio da conversa.
+ */
+export const isNpsFinalReply = (reply: string): boolean => reply === NPS_TEXT.thanks || reply === NPS_TEXT.thanksNoComment;

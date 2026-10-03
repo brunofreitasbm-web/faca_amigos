@@ -1,5 +1,5 @@
 // deno test supabase/functions/_shared/nps.test.ts
-import { isDecline, npsStep, NPS_TEXT, parseNumberInRange, unitListText, unitOptions } from "./nps.ts";
+import { isDecline, isNpsFinalReply, npsStep, NPS_TEXT, parseNumberInRange, unitListText, unitOptions } from "./nps.ts";
 
 function assertEquals(actual: unknown, expected: unknown, msg = "") {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -65,4 +65,13 @@ Deno.test("lista de unidades e opções inválidas", () => {
   assertEquals(unitOptions(null), []);
   assertEquals(NPS_TEXT.scoreQuestion("Circuito").includes("Circuito"), true);
   assertEquals(NPS_TEXT.commentQuestion(10) !== NPS_TEXT.commentQuestion(3), true);
+});
+
+Deno.test("só o agradecimento encerra a pesquisa; perguntas não", () => {
+  assertEquals(isNpsFinalReply(NPS_TEXT.thanks), true);
+  assertEquals(isNpsFinalReply(NPS_TEXT.thanksNoComment), true);
+  assertEquals(isNpsFinalReply(NPS_TEXT.teamQuestion), false);
+  assertEquals(isNpsFinalReply(NPS_TEXT.commentQuestion(9)), false);
+  assertEquals(isNpsFinalReply(NPS_TEXT.retryFive), false);
+  assertEquals(isNpsFinalReply("Combinado! Avisamos a recepção."), false);
 });
