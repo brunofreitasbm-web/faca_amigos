@@ -11,6 +11,8 @@ import { MapeamentoBanner } from "./acompanhar/MapeamentoBanner.js";
 import { FidelidadeBannerCard } from "./acompanhar/FidelidadeBannerCard.js";
 import { OfertaCard } from "./acompanhar/OfertaCard.js";
 import { ofertaParaSessao } from "./acompanhar/ofertaSite.js";
+import { OlharCard } from "./acompanhar/OlharCard.js";
+import { olharUrl } from "./acompanhar/olharSite.js";
 import { RenovarCard } from "./acompanhar/RenovarCard.js";
 import { opcoesDeRenovacao } from "./acompanhar/renovarSite.js";
 
@@ -78,6 +80,13 @@ export function AcompanharScreen({ code }: { code: string }) {
         <Card style={{ maxWidth: 420, width: "100%" }} title={sessao.childFirstName}>
           <p style={{ margin: 0 }}>A visita já foi encerrada. Até a próxima! 💛</p>
         </Card>
+      )}
+
+      {/* Olhar FaçaAmigos: aparece assim que o relatório da visita é gerado (a tela atualiza sozinha). */}
+      {status === "ready" && sessao?.status === "FINALIZADA" && olharUrl(sessao.reportToken) && (
+        <div style={{ maxWidth: 420, width: "100%" }}>
+          <OlharCard childFirstName={sessao.childFirstName} url={olharUrl(sessao.reportToken)!} />
+        </div>
       )}
 
       {status === "ready" && sessao && (sessao.status === "ATIVA" || sessao.status === "PAUSADA") && timing && (
