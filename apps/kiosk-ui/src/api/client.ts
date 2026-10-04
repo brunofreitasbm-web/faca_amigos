@@ -271,6 +271,7 @@ export interface SessionReportRow {
   olhar_edition: "ESTREIA" | "CONTINUIDADE" | "MARCO" | null;
   ai_report: SessionReportDoc | null;
   employee?: { full_name: string } | null;
+  guardian?: { full_name: string | null; phone_e164: string | null } | null;
 }
 
 /** Documento escrito pela IA (ou pelo fallback) que vira o PDF. Espelho de SessionReportDoc em _shared/sessionReportPdf.ts. */
@@ -3909,7 +3910,7 @@ export const Api = {
   sessionReportsList: (filters: { unitId?: string | null; sinceMs: number; untilMs: number }) => {
     let q = supabase()
       .from("fa_kiosk_session_reports")
-      .select("*, employee:fa_kiosk_employees!filled_by_employee_id(full_name)")
+      .select("*, employee:fa_kiosk_employees!filled_by_employee_id(full_name), guardian:fa_kiosk_guardians!guardian_id(full_name, phone_e164)")
       .gte("filled_at_ms", filters.sinceMs)
       .lt("filled_at_ms", filters.untilMs)
       .order("filled_at_ms", { ascending: false })

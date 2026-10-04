@@ -126,6 +126,49 @@ function Content() {
     }
   };
 
+  const sendManualPdf = async (r: SessionReportRow) => {
+    setResending(true);
+    try {
+      let token = r.public_token;
+      if (!token || !r.pdf_path) {
+        await Api.sessionReportDispatch(r.id);
+        const until = Date.now() + 60_000;
+        const refreshed = await Api.sessionReportsList({ unitId: unitId || null, sinceMs: until - Number(days) * DAY_MS, untilMs: until });
+        setRows(refreshed);
+        const updated = refreshed.find((item) => item.id === r.id);
+        token = updated?.public_token ?? null;
+        if (updated && detail?.id === r.id) {
+          setDetail(updated);
+        }
+      }
+
+      if (!token) {
+        toast.error("Não foi possível obter o link do PDF.");
+        return;
+      }
+
+      const publicUrl = Api.sessionReportPublicLink(token);
+      const childFirst = r.child_name_snapshot ? r.child_name_snapshot.trim().split(/\s+/)[0] : "criança";
+      const guardianFirst = r.guardian?.full_name ? r.guardian.full_name.trim().split(/\s+/)[0] : "tudo bem";
+
+      const defaultMsg = `Olá ${guardianFirst}! 💛 O Olhar FaçaAmigos em PDF de ${childFirst} sobre como foi a brincadeira hoje no FaçaAmigos está disponível!\n\nAcesse o PDF completo aqui:\n${publicUrl}\n\nRegistro observacional preparado com carinho pela nossa equipe de recreação. Qualquer dúvida, estamos à disposição! 💛`;
+
+      const rawPhone = r.guardian?.phone_e164 ?? "";
+      const phoneDigits = rawPhone.replace(/\D/g, "");
+
+      const waUrl = phoneDigits
+        ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(defaultMsg)}`
+        : `https://wa.me/?text=${encodeURIComponent(defaultMsg)}`;
+
+      window.open(waUrl, "_blank", "noopener");
+      toast.success("WhatsApp aberto com a mensagem padrão e o PDF!");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível preparar o envio do PDF.");
+    } finally {
+      setResending(false);
+    }
+  };
+
   const unitName = (id: string) => units.find((u) => u.id === id)?.name ?? "—";
 
   return (
@@ -191,12 +234,13 @@ function Content() {
               <th>Prazo</th>
               <th>Itens</th>
               <th>WhatsApp</th>
+              <th style={{ textAlign: "right" }}>Enviar Manual</th>
             </tr>
           </thead>
           <tbody>
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ color: "var(--text-muted)" }}>Nenhum relatório neste filtro.</td>
+                <td colSpan={8} style={{ color: "var(--text-muted)" }}>Nenhum relatório neste filtro.</td>
               </tr>
             )}
             {filtered.map((r) => (
@@ -220,6 +264,11 @@ function Content() {
                 <td>{r.late ? <Badge variant="amber">Atrasado</Badge> : <Badge variant="teal">No prazo</Badge>}</td>
                 <td>{sessionReportProgress(r.answers).answered}/{sessionReportProgress(r.answers).total}</td>
                 <td>{STATUS_LABEL[r.whatsapp_status]}</td>
+                <td onClick={(e) => e.stopPropagation()} style={{ textAlign: "right" }}>
+                  <Button variant="teal" size="sm" loading={resending} onClick={() => void sendManualPdf(r)}>
+                    Enviar Olhar FaçaAmigos em PDF (MANUAL)
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -298,6 +347,9 @@ function Content() {
             </div>
 
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <Button variant="teal" loading={resending} onClick={() => void sendManualPdf(detail)}>
+                Enviar Olhar FaçaAmigos em PDF (MANUAL)
+              </Button>
               {detail.pdf_path && (
                 <Button variant="secondary" onClick={() => void openPdf(detail)}>Abrir PDF</Button>
               )}
