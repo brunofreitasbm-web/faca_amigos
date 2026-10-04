@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, HelpText } from "@facaamigos/ui";
 import { Api } from "../../../api/client.js";
 import type { Unit } from "../../../api/client.js";
@@ -6,6 +6,7 @@ import type { BonusProgramConfig, BonusProgramGoal, BonusProgramsByUnit } from "
 import { useToast } from "../../../state/ToastContext.js";
 import { supabase } from "../../../lib/supabase/client.js";
 import { money } from "../../../format.js";
+import type { RegisterSave } from "./PlanosLongosSection.js";
 
 type GroupKey = "SEG_QUI" | "SEX" | "SAB" | "DOM";
 
@@ -122,7 +123,7 @@ interface HistoricalStats {
   hasData: boolean;
 }
 
-export function BonusProgramSection({ units }: { units: Unit[] }) {
+export function BonusProgramSection({ units, registerSave }: { units: Unit[]; registerSave?: RegisterSave }) {
   const toast = useToast();
   const [forms, setForms] = useState<Record<string, UnitForm>>({});
   const [history, setHistory] = useState<Record<string, HistoricalStats>>({});
@@ -262,6 +263,23 @@ export function BonusProgramSection({ units }: { units: Unit[] }) {
       return { ...prev, [unitId]: { ...form, groups: newGroups } };
     });
   }
+
+  /** Grava metas e configuração de todas as unidades já carregadas; lança no primeiro erro. */
+  async function persistAll() {
+    for (const unit of units) {
+      const form = forms[unit.id];
+      if (!form) continue;
+      await Api.setBonusProgram(unit.id, goalsFromForm(form, unit.kind === "QUIOSQUE"), configFromForm(form));
+    }
+  }
+
+  const persistAllRef = useRef(persistAll);
+  persistAllRef.current = persistAll;
+  useEffect(() => {
+    if (!registerSave) return;
+    registerSave("bonus:programa", () => persistAllRef.current());
+    return () => registerSave("bonus:programa", null);
+  }, [registerSave]);
 
   async function save(unit: Unit) {
     const form = forms[unit.id];
