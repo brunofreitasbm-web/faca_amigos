@@ -260,6 +260,7 @@ export function MetasTab() {
   // Interactive Simulator Slider (% of Goal Attainment)
   const [simulationPercent, setSimulationPercent] = useState<number>(100);
   const [simulatingOperatorsCount, setSimulatingOperatorsCount] = useState<number>(2);
+  const [isSimulationOpen, setIsSimulationOpen] = useState<boolean>(false); // Inicia recolhida para não confundir
 
   // Ticket Goals per unit
   const [ticketGoals, setTicketGoals] = useState<Record<string, { minReais: string; targetReais: string }>>({});
@@ -570,85 +571,133 @@ export function MetasTab() {
       </div>
 
       {/* SIMULADOR INTERATIVO COM RÉGUA DE ARRASTE (SLIDER QUE CONTROLA A TABELA AUTO) */}
-      <Card style={{ padding: "20px", background: "var(--surface-elevated)", border: "1px solid var(--border-prominent)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+      <Card style={{ padding: "16px 20px", background: "var(--surface-elevated)", border: "1px solid var(--border-prominent)" }}>
+        <div
+          onClick={() => setIsSimulationOpen(!isSimulationOpen)}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+            marginBottom: isSimulationOpen ? "16px" : 0,
+            userSelect: "none",
+          }}
+        >
           <div>
             <h3 style={{ margin: 0, fontSize: "16px", color: "var(--color-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
               🎛️ Simulador Comercial & Potencial de Faturamento
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  padding: "2px 8px",
+                  borderRadius: "12px",
+                  background: isSimulationOpen ? "rgba(37, 99, 235, 0.1)" : "var(--surface-sunken)",
+                  color: isSimulationOpen ? "#2563eb" : "var(--text-muted)",
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                {isSimulationOpen ? "Expandido" : "Recolhido"}
+              </span>
             </h3>
             <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-              Arraste a régua de atingimento da meta: os valores por dia da semana serão recalculados automaticamente via série histórica.
+              {isSimulationOpen
+                ? "Arraste a régua de atingimento da meta: os valores por dia da semana serão recalculados automaticamente via série histórica."
+                : "Clique para expandir o simulador interativo de metas e faturamento projetado."}
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "12px" }}>Operadores Ativos:</span>
-            <input
-              type="number"
-              min={1}
-              max={20}
-              value={simulatingOperatorsCount}
-              onChange={(e) => setSimulatingOperatorsCount(Number(e.target.value))}
-              style={{ width: "60px", padding: "4px 8px", borderRadius: "6px", border: "1px solid var(--border-subtle)" }}
-            />
+
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {isSimulationOpen && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <span style={{ fontSize: "12px" }}>Operadores Ativos:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={simulatingOperatorsCount}
+                  onChange={(e) => setSimulatingOperatorsCount(Number(e.target.value))}
+                  style={{ width: "60px", padding: "4px 8px", borderRadius: "6px", border: "1px solid var(--border-subtle)" }}
+                />
+              </div>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSimulationOpen(!isSimulationOpen);
+              }}
+              style={{ padding: "4px 12px", fontSize: "12px" }}
+            >
+              {isSimulationOpen ? "🔼 Recolher Simulação" : "🔽 Abrir Simulador"}
+            </Button>
           </div>
         </div>
 
-        {/* RÉGUA DE ARRASTE / SLIDER (IMAGEM 2) */}
-        <div style={{ marginBottom: "20px", background: "var(--surface-card)", padding: "16px", borderRadius: "8px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontWeight: "bold" }}>
-            <span>Atingimento da Meta da Equipe:</span>
-            <span style={{ color: simulationPercent >= 100 ? "#16a34a" : "#d97706" }}>{simulationPercent}% da Meta</span>
-          </div>
-          <input
-            type="range"
-            min={50}
-            max={150}
-            step={5}
-            value={simulationPercent}
-            onChange={(e) => setSimulationPercent(Number(e.target.value))}
-            style={{ width: "100%", height: "8px", cursor: "pointer", accentColor: "var(--color-primary)" }}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-            <span>50% (Abaixo da Meta)</span>
-            <span>100% (Meta Batida Base)</span>
-            <span>150% (Supermeta Máxima)</span>
-          </div>
-        </div>
-
-        {/* CARDS DE RESULTADO DA SIMULAÇÃO */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
-          <div style={{ padding: "12px", background: "rgba(34, 197, 94, 0.08)", borderRadius: "8px", border: "1px solid rgba(34, 197, 94, 0.3)" }}>
-            <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#15803d", fontWeight: 700 }}>
-              Faturamento Bruto Projetado
-            </span>
-            <div style={{ fontSize: "20px", fontWeight: "bold", color: "#166534", marginTop: "4px" }}>
-              {money(simulatedMonthlyRevenueReais * 100)}
+        {isSimulationOpen && (
+          <>
+            {/* RÉGUA DE ARRASTE / SLIDER */}
+            <div style={{ marginBottom: "20px", background: "var(--surface-card)", padding: "16px", borderRadius: "8px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontWeight: "bold" }}>
+                <span>Atingimento da Meta da Equipe:</span>
+                <span style={{ color: simulationPercent >= 100 ? "#16a34a" : "#d97706" }}>{simulationPercent}% da Meta</span>
+              </div>
+              <input
+                type="range"
+                min={50}
+                max={150}
+                step={5}
+                value={simulationPercent}
+                onChange={(e) => setSimulationPercent(Number(e.target.value))}
+                style={{ width: "100%", height: "8px", cursor: "pointer", accentColor: "var(--color-primary)" }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                <span>50% (Abaixo da Meta)</span>
+                <span>100% (Meta Batida Base)</span>
+                <span>150% (Supermeta Máxima)</span>
+              </div>
             </div>
-            <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-              {isCircuitoActive ? `Equiv. a ${simulatedMonthlyCount} locações (TM R$ ${CIRCUITO_TM_REAIS})` : "Estimativa mensal da unidade"}
-            </span>
-          </div>
 
-          <div style={{ padding: "12px", background: "rgba(239, 68, 68, 0.08)", borderRadius: "8px", border: "1px solid rgba(239, 68, 68, 0.3)" }}>
-            <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#b91c1c", fontWeight: 700 }}>
-              Custo Total Bonificação
-            </span>
-            <div style={{ fontSize: "20px", fontWeight: "bold", color: "#991b1b", marginTop: "4px" }}>
-              {money(simulatedTotalBonusCost * 100)}
-            </div>
-            <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Respeitando teto de {money(Number(monthlyCapReais) * 100)}/op</span>
-          </div>
+            {/* CARDS DE RESULTADO DA SIMULAÇÃO */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
+              <div style={{ padding: "12px", background: "rgba(34, 197, 94, 0.08)", borderRadius: "8px", border: "1px solid rgba(34, 197, 94, 0.3)" }}>
+                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#15803d", fontWeight: 700 }}>
+                  Faturamento Bruto Projetado
+                </span>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#166534", marginTop: "4px" }}>
+                  {money(simulatedMonthlyRevenueReais * 100)}
+                </div>
+                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                  {isCircuitoActive ? `Equiv. a ${simulatedMonthlyCount} locações (TM R$ ${CIRCUITO_TM_REAIS})` : "Estimativa mensal da unidade"}
+                </span>
+              </div>
 
-          <div style={{ padding: "12px", background: "rgba(59, 130, 246, 0.08)", borderRadius: "8px", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
-            <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#1d4ed8", fontWeight: 700 }}>
-              Faturamento Líquido Incremental
-            </span>
-            <div style={{ fontSize: "20px", fontWeight: "bold", color: "#1e40af", marginTop: "4px" }}>
-              {money(simulatedNetRevenueReais * 100)}
+              <div style={{ padding: "12px", background: "rgba(239, 68, 68, 0.08)", borderRadius: "8px", border: "1px solid rgba(239, 68, 68, 0.3)" }}>
+                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#b91c1c", fontWeight: 700 }}>
+                  Custo Total Bonificação
+                </span>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#991b1b", marginTop: "4px" }}>
+                  {money(simulatedTotalBonusCost * 100)}
+                </div>
+                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Respeitando teto de {money(Number(monthlyCapReais) * 100)}/op</span>
+              </div>
+
+              <div style={{ padding: "12px", background: "rgba(59, 130, 246, 0.08)", borderRadius: "8px", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
+                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#1d4ed8", fontWeight: 700 }}>
+                  Faturamento Líquido Incremental
+                </span>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#1e40af", marginTop: "4px" }}>
+                  {money(simulatedNetRevenueReais * 100)}
+                </div>
+                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Faturamento líquido pós-bônus</span>
+              </div>
             </div>
-            <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Faturamento líquido pós-bônus</span>
-          </div>
-        </div>
+          </>
+        )}
       </Card>
 
       {/* GRID DE METAS POR DIA DA SEMANA (CORREÇÃO IMAGEM 2: AUTOMÁTICO VIA SÉRIE HISTÓRICA) */}
