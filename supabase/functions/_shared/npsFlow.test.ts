@@ -12,7 +12,7 @@ function assertEquals(actual: unknown, expected: unknown, msg = "") {
 }
 
 /** Client falso do Supabase só com o que handleNps usa, sobre linhas em memória. */
-function fakeAdmin(rows: Row[], units: Row[] = []) {
+function fakeAdmin(rows: Row[], units: Row[] = [], tables: Record<string, Row[]> = {}) {
   return {
     from(table: string) {
       if (table === "fa_kiosk_units") {
@@ -25,6 +25,7 @@ function fakeAdmin(rows: Row[], units: Row[] = []) {
         };
         return u;
       }
+      const data = tables[table] ?? rows;
       const filters: ((r: Row) => boolean)[] = [];
       let patch: Row | null = null;
       let returning = false;
@@ -42,6 +43,10 @@ function fakeAdmin(rows: Row[], units: Row[] = []) {
           filters.push((r) => r[k] === v);
           return b;
         },
+        lte(k: string, v: number) {
+          filters.push((r) => r[k] <= v);
+          return b;
+        },
         is(k: string, v: unknown) {
           filters.push((r) => (r[k] ?? null) === v);
           return b;
@@ -57,12 +62,12 @@ function fakeAdmin(rows: Row[], units: Row[] = []) {
           return b;
         },
         maybeSingle() {
-          const m = rows.filter((r) => filters.every((f) => f(r))).sort((x, y) => y.sent_at_ms - x.sent_at_ms);
+          const m = data.filter((r) => filters.every((f) => f(r))).sort((x, y) => (y.sent_at_ms ?? y.checkout_at_ms) - (x.sent_at_ms ?? x.checkout_at_ms));
           return Promise.resolve({ data: m[0] ? { ...m[0] } : null });
         },
         // deno-lint-ignore no-explicit-any
         then(resolve: (v: any) => void) {
-          const m = rows.filter((r) => filters.every((f) => f(r)));
+          const m = data.filter((r) => filters.every((f) => f(r)));
           if (patch) m.forEach((r) => Object.assign(r, patch));
           resolve({ data: returning ? m.map((r) => ({ id: r.id })) : null });
         },
@@ -181,4 +186,29 @@ Deno.test("reenvio duplicado do mesmo webhook responde uma vez só", async () =>
 Deno.test("contato sem pesquisa aberta segue como conversa normal", async () => {
   assertEquals(await handleNps(fakeAdmin([survey({ status: "DONE" })]), "c1", "9", NOW), null);
   assertEquals(await handleNps(fakeAdmin([survey()]), "outro", "9", NOW), null);
+});
+
+Deno.test("unidade: vale a da visita, não a digitada; sessão depois do envio não conta", async () => {
+  const contacts = [{ id: "c1", guardian_id: "g1" }];
+  const sessions = [
+    { guardian_id: "g1", status: "FINALIZADA", unit_id: "u3", checkout_at_ms: NOW - 4 * 60 * MIN },
+    { guardian_id: "g1", status: "FINALIZADA", unit_id: "u1", checkout_at_ms: NOW - 3 * 60 * MIN + 1 },
+    { guardian_id: "g1", status: "CANCELADA", unit_id: "u1", checkout_at_ms: NOW - 3 * 60 * MIN - 1 },
+  ];
+  const rows = [survey()];
+  const admin = fakeAdmin(rows, [], { fa_crm_contacts: contacts, fa_kiosk_sessions: sessions });
+  assertEquals(await handleNps(admin, "c1", "2", NOW), NPS_TEXT.scoreQuestion("Circuito Parque"));
+  assertEquals(rows[0].unit_id, "u3", "digitou 2 (Playground Parque), mas a visita foi no Circuito");
+});
+
+Deno.test("unidade: sem responsável ou sem visita conhecida, vale a digitada", async () => {
+  const semResponsavel = [survey()];
+  const a = fakeAdmin(semResponsavel, [], { fa_crm_contacts: [{ id: "c1", guardian_id: null }], fa_kiosk_sessions: [] });
+  assertEquals(await handleNps(a, "c1", "2", NOW), NPS_TEXT.scoreQuestion("Playground Parque"));
+  assertEquals(semResponsavel[0].unit_id, "u2");
+
+  const semVisita = [survey()];
+  const b = fakeAdmin(semVisita, [], { fa_crm_contacts: [{ id: "c1", guardian_id: "g1" }], fa_kiosk_sessions: [] });
+  assertEquals(await handleNps(b, "c1", "1", NOW), NPS_TEXT.scoreQuestion("Playground Bosque"));
+  assertEquals(semVisita[0].unit_id, "u1");
 });

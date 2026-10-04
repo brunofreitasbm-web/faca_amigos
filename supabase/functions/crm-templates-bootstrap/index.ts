@@ -45,7 +45,7 @@ const OFFER_BUTTONS = [{ title: "Quero saber mais", id: "OFERTA_INFO" }, { title
 // Templates substituídos por uma versão nova ou retirados de uso: nunca
 // reativados aqui, mesmo que a Meta os tenha aprovado (as migrations
 // 20261001130000 e 20261001140000 os desativaram).
-const RETIRED = new Set(["fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor", "fa_renovacao_fim_plano"]);
+const RETIRED = new Set(["fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor", "fa_renovacao_fim_plano", "fa_nps_pos_visita_v2"]);
 
 const TEMPLATES: TemplateDef[] = [
   // Estes dois já tinham content_sid real de antes desta rodada — entram

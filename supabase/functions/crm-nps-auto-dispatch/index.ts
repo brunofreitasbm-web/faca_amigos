@@ -37,8 +37,10 @@ Deno.serve(async () => {
     .maybeSingle();
   if (!template) return json({ ok: true, skipped: "sem template NPS ativo" });
 
-  // Só o template novo pergunta a unidade; o antigo segue direto para a nota.
-  const unitOptions = templateAsksUnit(template.preview) ? await loadUnitOptions(admin) : null;
+  // Template com {{2}} pergunta a unidade; o sem {{2}} segue direto para a nota e a unidade vem da visita.
+  const asksUnit = templateAsksUnit(template.preview);
+  const allUnits = await loadUnitOptions(admin);
+  const unitOptions = asksUnit ? allUnits : null;
   if (unitOptions && unitOptions.length === 0) return json({ ok: true, skipped: "sem unidades para a pergunta do NPS" });
 
   const { data: channels } = await admin
@@ -112,9 +114,28 @@ Deno.serve(async () => {
     const firstName = (contact!.name ?? cand.full_name ?? "").trim().split(/\s+/)[0] || "tudo bem";
     // A pesquisa nasce antes do envio, já com a lista de unidades que o responsável vai ver.
     const sentAt = Date.now();
+    // Sem pergunta de unidade: grava a da visita (lista de uma só, para o webhook não perguntar depois da nota).
+    let visitUnit: { id: string; name: string } | undefined;
+    if (!asksUnit) {
+      const { data: visit } = await admin
+        .from("fa_kiosk_sessions")
+        .select("unit_id")
+        .eq("guardian_id", cand.guardian_id)
+        .eq("activity", cand.activity)
+        .eq("status", "FINALIZADA")
+        .gte("checkout_at_ms", now - MAX_AGE_MS)
+        .lte("checkout_at_ms", now - MIN_DELAY_MS)
+        .order("checkout_at_ms", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      visitUnit = allUnits.find((u) => u.id === visit?.unit_id);
+    }
     const { data: survey, error: surveyErr } = await admin
       .from("fa_crm_nps_surveys")
-      .insert({ contact_id: contact!.id, channel_id: channel.id, sent_at_ms: sentAt, unit_options: unitOptions })
+      .insert({
+        contact_id: contact!.id, channel_id: channel.id, sent_at_ms: sentAt,
+        unit_options: visitUnit ? [visitUnit] : unitOptions, unit_id: visitUnit?.id ?? null,
+      })
       .select("id")
       .single();
     if (surveyErr || !survey) {
