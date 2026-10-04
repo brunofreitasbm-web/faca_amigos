@@ -78,6 +78,26 @@ export function RelatorioSessaoScreen() {
     [toast, loadRecent],
   );
 
+  const handleSendManualPdf = useCallback(
+    async (reportId: string) => {
+      setBusyIds((s) => new Set(s).add(reportId));
+      try {
+        await Api.sessionReportSendManualPdf(reportId);
+        toast.success("WhatsApp aberto com a mensagem padrão e o PDF!");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Não foi possível preparar o envio do PDF.");
+      } finally {
+        setBusyIds((s) => {
+          const next = new Set(s);
+          next.delete(reportId);
+          return next;
+        });
+        void loadRecent();
+      }
+    },
+    [toast, loadRecent],
+  );
+
   const selected = pending.find((p) => p.session_id === selectedId) ?? null;
 
   const handleSubmitted = (reportId: string | null) => {
@@ -154,13 +174,21 @@ export function RelatorioSessaoScreen() {
                 {r.whatsapp_error && (
                   <div style={{ fontSize: "12px", color: "var(--color-error-text)" }}>{r.whatsapp_error}</div>
                 )}
-                {!busy && RETRYABLE.has(r.whatsapp_status) && (
-                  <div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+                  <Button
+                    variant="teal"
+                    size="sm"
+                    loading={busy}
+                    onClick={() => void handleSendManualPdf(r.id)}
+                  >
+                    Enviar Olhar FaçaAmigos em PDF (MANUAL)
+                  </Button>
+                  {!busy && RETRYABLE.has(r.whatsapp_status) && (
                     <Button variant="secondary" size="sm" onClick={() => void dispatch(r.id)}>
                       Reenviar
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </Card>
             );
           })}

@@ -3906,6 +3906,35 @@ export const Api = {
   /** Link público do PDF, o mesmo que o responsável recebeu no WhatsApp. */
   sessionReportPublicLink: (publicToken: string) =>
     `${(import.meta.env.VITE_SUPABASE_URL as string | undefined) || "https://ivjvpdzsfjdpyabbzzuj.supabase.co"}/functions/v1/session-report-view?t=${publicToken}`,
+  /** Envio manual do Olhar FaçaAmigos em PDF via WhatsApp com mensagem padrão. */
+  sessionReportSendManualPdf: async (reportId: string) => {
+    await Api.sessionReportDispatch(reportId);
+    const { data, error } = await supabase()
+      .from("fa_kiosk_session_reports")
+      .select("public_token, child_name_snapshot, guardian:fa_kiosk_guardians!guardian_id(full_name, phone_e164)")
+      .eq("id", reportId)
+      .single();
+
+    if (error || !data?.public_token) {
+      throw new Error("Não foi possível obter o link do PDF do relatório.");
+    }
+
+    const publicUrl = Api.sessionReportPublicLink(data.public_token);
+    const childFirst = data.child_name_snapshot ? data.child_name_snapshot.trim().split(/\s+/)[0] : "criança";
+    const guardianRaw = data.guardian as { full_name?: string | null; phone_e164?: string | null } | null;
+    const guardianFirst = guardianRaw?.full_name ? guardianRaw.full_name.trim().split(/\s+/)[0] : "tudo bem";
+
+    const defaultMsg = `Olá ${guardianFirst}! 💛 O Olhar FaçaAmigos em PDF de ${childFirst} sobre como foi a brincadeira hoje no FaçaAmigos está disponível!\n\nAcesse o PDF completo aqui:\n${publicUrl}\n\nRegistro observacional preparado com carinho pela nossa equipe de recreação. Qualquer dúvida, estamos à disposição! 💛`;
+
+    const rawPhone = guardianRaw?.phone_e164 ?? "";
+    const phoneDigits = rawPhone.replace(/\D/g, "");
+
+    const waUrl = phoneDigits
+      ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(defaultMsg)}`
+      : `https://wa.me/?text=${encodeURIComponent(defaultMsg)}`;
+
+    window.open(waUrl, "_blank", "noopener");
+  },
   /** Histórico do Gerencial. A RLS já limita a quem tem 'relatorio_sessao.read'. */
   sessionReportsList: (filters: { unitId?: string | null; sinceMs: number; untilMs: number }) => {
     let q = supabase()
