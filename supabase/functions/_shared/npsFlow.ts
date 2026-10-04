@@ -8,6 +8,22 @@ import { loadUnitOptions } from "./npsSurvey.ts";
 // deno-lint-ignore no-explicit-any
 export type NpsAdmin = { from(table: string): any };
 
+/** Unidade da última visita finalizada do responsável antes do envio da pesquisa, ou null se não der para saber. */
+async function visitUnitFor(admin: NpsAdmin, contactId: string, sentAtMs: number): Promise<string | null> {
+  const { data: contact } = await admin.from("fa_crm_contacts").select("guardian_id").eq("id", contactId).maybeSingle();
+  if (!contact?.guardian_id) return null;
+  const { data: visit } = await admin
+    .from("fa_kiosk_sessions")
+    .select("unit_id")
+    .eq("guardian_id", contact.guardian_id)
+    .eq("status", "FINALIZADA")
+    .lte("checkout_at_ms", sentAtMs)
+    .order("checkout_at_ms", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (visit?.unit_id as string | undefined) ?? null;
+}
+
 /**
  * NPS em etapas dentro do WhatsApp (regras de leitura em ./nps.ts). Devolve o
  * texto da próxima pergunta, ou null quando a mensagem não faz parte de uma
@@ -65,7 +81,9 @@ export async function handleNps(admin: NpsAdmin, contactId: string, body: string
       const r = parseNumberInRange(body, 1, options.length);
       if (r.kind === "none") return null;
       if (r.kind === "out") return NPS_TEXT.retryUnit(options);
-      const unit = options[r.value - 1]!;
+      // A lista confundia os responsáveis: vale a unidade da visita; a digitada só entra se a visita não for conhecida.
+      const visitUnitId = await visitUnitFor(admin, contactId, Number(survey.sent_at_ms));
+      const unit = options.find((o) => o.id === visitUnitId) ?? options[r.value - 1]!;
       // Antes da nota (template novo) a próxima pergunta é a nota; depois da nota (template antigo), a equipe.
       const next = survey.status === "ASKING" ? NPS_TEXT.teamQuestion : NPS_TEXT.scoreQuestion(unit.name);
       return (await advance({ unit_id: unit.id }, "unit_id")) ? next : null;
