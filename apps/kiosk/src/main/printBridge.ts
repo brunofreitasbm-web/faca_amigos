@@ -412,6 +412,9 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
    */
   async function handleJob(job: PrintJobRow): Promise<void> {
     const deviceId = getLocalDeviceId(db);
+    // Comprimento estimado (mm) do que foi de fato impresso neste job —
+    // só preenchido pro caminho RECEIPT, alimenta a métrica de bobina.
+    let paperLengthMm = 0;
 
     try {
       let deviceName: string | null = null;
@@ -472,6 +475,14 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
             Boolean(payload.assetName) ||
             /circuito/i.test(payload.unitName));
 
+        // Calculado sempre (RAW ou HTML) a partir do mesmo payload — é a
+        // mesma impressão, só muda o driver; a estimativa de bobina não
+        // deve depender de qual caminho a impressora aceitou.
+        const escpos = generateEscPosReceipt(payload);
+        paperLengthMm += escpos.estimatedLengthMm;
+        const termoEscpos = isCircuito ? generateEscPosCircuitoTermo(payload) : null;
+        if (termoEscpos) paperLengthMm += termoEscpos.estimatedLengthMm;
+
         if (isVirtualOrPdf) {
           const html = await receiptHtml(payload);
           await printHtml(html, deviceName);
@@ -480,15 +491,13 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
             await printHtml(termoHtml, deviceName);
           }
         } else {
-          const escpos = generateEscPosReceipt(payload);
           const rawBuffer = Buffer.from(escpos.commandsHex, "hex");
           const printedRaw = await printRawWindows(rawBuffer, deviceName);
           if (!printedRaw) {
             const html = await receiptHtml(payload);
             await printHtml(html, deviceName);
           }
-          if (isCircuito) {
-            const termoEscpos = generateEscPosCircuitoTermo(payload);
+          if (isCircuito && termoEscpos) {
             const termoRawBuffer = Buffer.from(termoEscpos.commandsHex, "hex");
             const printedTermoRaw = await printRawWindows(termoRawBuffer, deviceName);
             if (!printedTermoRaw) {
@@ -501,9 +510,20 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
 
       await supabase
         .from("fa_kiosk_print_jobs")
-        .update({ status: "PRINTED", printed_at_ms: Date.now() })
+        .update({ status: "PRINTED", printed_at_ms: Date.now(), paper_length_mm: paperLengthMm || null })
         .eq("id", job.id)
         .eq("claimed_by_device_id", deviceId);
+      // Abate da bobina ativa da unidade — fire-and-forget: um erro aqui não
+      // deve re-marcar um cupom que já saiu como falho. Só RECEIPT consome
+      // bobina (pulseira usa etiqueta própria, e está suspensa — ver
+      // WRISTBAND_PRINTING_SUSPENDED).
+      if (job.kind === "RECEIPT" && paperLengthMm > 0) {
+        try {
+          await supabase.rpc("fa_kiosk_register_print_consumption", { p_unit_id: job.unit_id, p_length_mm: paperLengthMm });
+        } catch (err) {
+          console.warn(`[print-bridge] Falha ao registrar consumo de bobina do job ${job.id}:`, err);
+        }
+      }
       console.log(`[print-bridge] job ${job.id} (${job.kind}) impresso em "${deviceName}".`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

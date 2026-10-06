@@ -1,5 +1,5 @@
 import { quoteForSession, normalizeCpf, normalizePhoneE164 } from "@facaamigos/domain";
-import type { EmployeeSector, SessionReportAnswers } from "@facaamigos/domain";
+import type { EmployeeSector, SessionReportAnswers, PaperConsumptionSample } from "@facaamigos/domain";
 import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
@@ -138,6 +138,37 @@ export interface Unit {
   latitude?: number | null;
   longitude?: number | null;
   geofence_radius_m?: number | null;
+}
+
+/** Uma bobina de cupom (`fa_kiosk_paper_rolls`) — ver Gerencial > Bobinas. */
+export interface PaperRoll {
+  id: string;
+  unitId: string;
+  rollLengthMm: number;
+  consumedMm: number;
+  status: "ACTIVE" | "FINISHED";
+  installedAtMs: number;
+  finishedAtMs: number | null;
+}
+
+function mapPaperRoll(row: {
+  id: string;
+  unit_id: string;
+  roll_length_mm: number;
+  consumed_mm: number;
+  status: "ACTIVE" | "FINISHED";
+  installed_at_ms: number;
+  finished_at_ms: number | null;
+}): PaperRoll {
+  return {
+    id: row.id,
+    unitId: row.unit_id,
+    rollLengthMm: row.roll_length_mm,
+    consumedMm: row.consumed_mm,
+    status: row.status,
+    installedAtMs: row.installed_at_ms,
+    finishedAtMs: row.finished_at_ms,
+  };
 }
 
 export interface Birthday {
@@ -3276,6 +3307,58 @@ export const Api = {
       }
     }
   },
+
+  /** Bobina ATIVA da unidade, ou `null` se nenhum cupom foi impresso ainda (nenhuma bobina criada). */
+  activePaperRoll: async (unitId: string): Promise<PaperRoll | null> => {
+    const row = await unwrap<Record<string, unknown> | null>(
+      supabase()
+        .from("fa_kiosk_paper_rolls")
+        .select("id, unit_id, roll_length_mm, consumed_mm, status, installed_at_ms, finished_at_ms")
+        .eq("unit_id", unitId)
+        .eq("status", "ACTIVE")
+        .maybeSingle(),
+    );
+    return row ? mapPaperRoll(row as Parameters<typeof mapPaperRoll>[0]) : null;
+  },
+
+  /** Bobinas já trocadas desta unidade, mais recente primeiro — pra "Ver histórico de trocas". */
+  paperRollHistory: async (unitId: string, limit = 10): Promise<PaperRoll[]> => {
+    const rows = await unwrap<Array<Record<string, unknown>>>(
+      supabase()
+        .from("fa_kiosk_paper_rolls")
+        .select("id, unit_id, roll_length_mm, consumed_mm, status, installed_at_ms, finished_at_ms")
+        .eq("unit_id", unitId)
+        .eq("status", "FINISHED")
+        .order("finished_at_ms", { ascending: false })
+        .limit(limit),
+    );
+    return rows.map((r) => mapPaperRoll(r as Parameters<typeof mapPaperRoll>[0]));
+  },
+
+  /**
+   * Impressões de cupom (RECEIPT) da unidade desde `sinceMs`, com o
+   * comprimento estimado de cada uma — matéria-prima pra `computePaperRollForecast`
+   * (`@facaamigos/domain`) decidir ritmo de consumo e previsão de término.
+   * Não agrega nada aqui de propósito: quem decide a janela/agregação é a
+   * função de projeção, num lugar só.
+   */
+  paperConsumptionSince: async (unitId: string, sinceMs: number): Promise<PaperConsumptionSample[]> => {
+    const rows = await unwrap<Array<{ printed_at_ms: number; paper_length_mm: number | null }>>(
+      supabase()
+        .from("fa_kiosk_print_jobs")
+        .select("printed_at_ms, paper_length_mm")
+        .eq("unit_id", unitId)
+        .eq("kind", "RECEIPT")
+        .eq("status", "PRINTED")
+        .gte("printed_at_ms", sinceMs)
+        .not("paper_length_mm", "is", null),
+    );
+    return rows.map((r) => ({ printedAtMs: r.printed_at_ms, lengthMm: r.paper_length_mm ?? 0 }));
+  },
+
+  /** Fecha a bobina ativa (se houver) e abre uma nova — botão "Registrar troca de bobina". */
+  registerRollChange: (unitId: string, rollLengthMm = 30000): Promise<string> =>
+    unwrap<string>(supabase().rpc("fa_kiosk_register_roll_change", { p_unit_id: unitId, p_roll_length_mm: rollLengthMm })),
 
   /**
    * Estado do worker de transcrição de voz DESTE terminal (whisper-cli

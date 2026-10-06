@@ -80,6 +80,20 @@ export interface ReceiptPrintPayload {
 const WIDTH = 48;
 
 /**
+ * mm por linha de texto impressa, Font A no passo padrão (1/6") das
+ * térmicas 80mm usadas aqui. Base da métrica de consumo de bobina do
+ * módulo de gestão — calibrável: imprima 1 cupom real, meça com trena e
+ * ajuste esta constante proporcionalmente (ver `estimatedLengthMm`).
+ */
+const LINE_HEIGHT_MM = 4.23;
+
+/** Altura aproximada do QR impresso por `qrCommandHex` (módulo 6). */
+const QR_HEIGHT_MM = 19;
+
+/** Linhas de avanço antes do corte automático (`hexFeed` = ESC d 3). */
+const FEED_BEFORE_CUT_LINES = 3;
+
+/**
  * Codifica uma string em bytes da tabela de caracteres CP860 (Português),
  * suportada nativamente por impressoras térmicas ESC/POS (Epson, Elgin, Bematech, Apptech, etc.).
  * Converte acentos e cedilhas para bytes single-byte (0x80-0xFF) em vez de UTF-8 (0xC3 0xXX),
@@ -185,13 +199,13 @@ export const LOGO_NV_IMAGE_NUMBER = 1;
 /**
  * Comando `FS q` (Store NV graphics data) — grava o bitmap 1-bit do timbre
  * na memória não-volátil da impressora, no slot `LOGO_NV_IMAGE_NUMBER`.
- * É comando de PROVISIONAMENTO: manda-se uma vez por impressora (ex: numa
- * tela de configuração), não em toda impressão de cupom — impressoras
- * térmicas ESC/POS (Elgin, Epson, Bematech, Daruma) têm ciclo de escrita
- * limitado na NV, então regravar a cada venda desgastaria a memória.
- * O bitmap em si (dados gerados a partir da arte oficial, sem cor — cabeça
- * térmica é monocromática) vem de `logoBitmap.ts`, gerado por
- * `scripts/generate-print-logo.mjs`.
+ *
+ * NÃO é chamado em nenhum caminho de impressão hoje (ver `generateEscPosReceipt`,
+ * onde o timbre foi removido do cupom — nenhuma tela de configuração grava
+ * isto na NV de verdade, então `nvLogoPrintCommandHex` só imprimia bytes
+ * pra um slot vazio: zero marca visível, consumindo papel do avanço que o
+ * vinha acompanhando). Mantido exportado — com o bitmap em `logoBitmap.ts`
+ * — caso a gravação na NV seja provisionada manualmente no futuro.
  */
 export function nvLogoStoreCommandHex(): string {
   const widthBytes = LOGO_WIDTH_BYTES;
@@ -210,9 +224,7 @@ export function nvLogoStoreCommandHex(): string {
 
 /**
  * Comando `FS p` (Print NV graphics) — imprime o timbre já gravado na NV
- * (ver `nvLogoStoreCommandHex`). 4 bytes fixos, independente do tamanho do
- * bitmap — é isso que faz o timbre caber em todo cupom não fiscal sem pesar
- * no tamanho do stream RAW enviado pra impressora.
+ * (ver `nvLogoStoreCommandHex`). Não é mais usado por `generateEscPosReceipt`.
  */
 export function nvLogoPrintCommandHex(mode: 0 | 1 | 2 | 3 = 0): string {
   return bytesToHex([0x1c, 0x70, LOGO_NV_IMAGE_NUMBER, mode]);
@@ -281,7 +293,7 @@ function wrap(str: string, width = WIDTH): string[] {
  *     fica com os pais no check-in, com o código de saída, os dados de
  *     quem entregou a criança e a regra de retirada.
  */
-export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: string; commandsHex: string } {
+export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: string; commandsHex: string; estimatedLengthMm: number } {
   const dateTime = payload.dateTime || new Date().toLocaleString("pt-BR");
   const isGuardReceipt = Boolean(payload.accessCode);
   const isFiscalReceipt = Boolean(payload.fiscalQrUrl);
@@ -307,9 +319,13 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   lines.push(subDivider);
 
   if (isGuardReceipt) {
-    // Compacto e centralizado no papel de 80mm
-    lines.push(centerText(`Código de saída: ${formatAccessCode(payload.accessCode)}`));
-    if (payload.exitPin) lines.push(centerText(`PIN rápido (Saída): ${payload.exitPin}`));
+    // Compacto e centralizado no papel de 80mm. Código e PIN numa linha só
+    // quando o PIN existe — economiza 1 linha de bobina sem perder nenhum
+    // dos dois dados (ver proposta "Enxuto" do diagnóstico de cupons).
+    const saidaLine = payload.exitPin
+      ? `Saída: ${formatAccessCode(payload.accessCode)} · PIN ${payload.exitPin}`
+      : `Código de saída: ${formatAccessCode(payload.accessCode)}`;
+    lines.push(centerText(saidaLine));
     lines.push(centerText("Apresente este recibo na saída"));
     lines.push(subDivider);
   }
@@ -319,12 +335,11 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   // (preview na tela e fallback HTML), o QR em si é comando de impressora.
   let qrInsertAt = -1;
   if (isGuardReceipt && payload.trackingUrl) {
-    lines.push("");
-    lines.push(centerText("ACOMPANHE PELO CELULAR"));
-    lines.push(centerText("Aponte a câmera para o QR abaixo"));
+    // Uma linha de legenda só (era 2 legendas + linha em branco antes e
+    // depois) — o QR gráfico abaixo já é autoexplicativo.
+    lines.push(centerText("ACOMPANHE PELO CELULAR: aponte a câmera"));
     qrInsertAt = lines.length;
     for (const line of chunkString(payload.trackingUrl.replace(/^https?:\/\//, ""))) lines.push(centerText(line));
-    lines.push("");
     lines.push(subDivider);
   }
 
@@ -356,8 +371,9 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   // "PREVISTO" logo abaixo, então a tabela ficaria repetindo a mesma
   // informação 3 vezes. Só cupom de venda (checkout/PDV) mostra a tabela.
   if (!isGuardReceipt) {
-    lines.push(`${"ITEM".padEnd(WIDTH - 5, " ")}VALOR`);
-    lines.push(subDivider);
+    // Sem cabeçalho "ITEM...VALOR": a linha anterior já é um subDivider
+    // (do cabeçalho do cupom) separando a lista, e cada item já é
+    // autoexplicativo (descrição + valor) — a legenda era redundante.
     for (const item of payload.items) {
       const qty = item.quantity ?? 1;
       const label = qty > 1 ? `${item.description} x${qty}` : item.description;
@@ -394,9 +410,8 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
     lines.push(divider);
     lines.push(centerText("RETIRADA"));
     lines.push(subDivider);
-    for (const line of wrap("Mediante leitura do QR (deste recibo ou da pulseira) ou documento com foto do responsável cadastrado.")) {
-      lines.push(centerText(line));
-    }
+    // Regra única, cabendo em 48 colunas — eram 3 linhas pro mesmo aviso.
+    lines.push(centerText("QR (recibo/pulseira) ou documento com foto."));
   }
 
   // DANFE NFC-e: chave de acesso, protocolo de autorização e número/série,
@@ -440,11 +455,10 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   if (!isFiscalReceipt) lines.push(centerText("Comprovante interno, sem valor fiscal"));
   lines.push(divider);
 
-  // Avanço de 3 linhas de papel para garantir que o corte da guilhotina não atinja o texto
-  lines.push("");
-  lines.push("");
-  lines.push("");
-
+  // Sem linhas em branco extras aqui: o `hexFeed` (ESC d 3), mandado depois
+  // do corpo do cupom, já avança 3 linhas antes do corte. As linhas em
+  // branco que existiam aqui dobravam esse avanço (6 linhas de papel em
+  // branco, ~25mm) sem ganho nenhum de segurança pra guilhotina.
   const text = lines.join("\n");
 
   // Bytes de inicialização ESC/POS (ESC @), seleção CP860 (ESC t 3), alinhamento (ESC a 1), avanço de 3 linhas (ESC d 3) e corte automático (GS V 66 0)
@@ -452,12 +466,13 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
   const hexFeed = "1b6403"; // ESC d 3
   const hexCut = "1d564200"; // GS V 66 0
 
-  // Timbre no topo do cupom: só em cupom não fiscal (venda/guarda) — a
-  // NFC-e é documento fiscal com layout regulado, sem espaço pra marca.
-  // Assume que o timbre já foi gravado na NV da impressora uma vez (ver
-  // `nvLogoStoreCommandHex`); aqui só manda o comando de impressão (4
-  // bytes) + um avanço de linha (ESC d 3) pro texto não colar na imagem.
-  const hexLogo = isFiscalReceipt ? "" : nvLogoPrintCommandHex() + hexFeed;
+  // Timbre REMOVIDO do cupom (06/10/2026): nenhuma tela de configuração
+  // grava o bitmap na NV da impressora de verdade, então `FS p` imprimia
+  // num slot vazio — nenhuma marca saía no papel, só o avanço de 3 linhas
+  // (~12,7mm) que sempre o acompanhava era gasto à toa em todo cupom
+  // (guarda e venda). Ver `nvLogoStoreCommandHex`/`nvLogoPrintCommandHex`
+  // se a gravação na NV for provisionada de verdade no futuro.
+  const hexLogo = "";
 
   // Quando há QR de acompanhamento, os bytes do comando de QR entram no meio
   // do stream ESC/POS — text/lines seguem só como transcrição legível
@@ -475,14 +490,21 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
     hexBody = textToHex(text);
   }
 
-  return { text, commandsHex: hexHeader + hexLogo + hexBody + hexFeed + hexCut };
+  // Comprimento estimado de papel deste cupom — calculado aqui (não num
+  // helper separado) pra nunca se descolar do que foi de fato montado em
+  // `lines`/`qrInsertAt` acima. Alimenta a métrica de consumo de bobina do
+  // módulo de gestão: cada impressão abate isto do rolo ativo da unidade.
+  const estimatedLengthMm =
+    lines.length * LINE_HEIGHT_MM + (qrInsertAt >= 0 && qrData ? QR_HEIGHT_MM : 0) + FEED_BEFORE_CUT_LINES * LINE_HEIGHT_MM;
+
+  return { text, commandsHex: hexHeader + hexLogo + hexBody + hexFeed + hexCut, estimatedLengthMm };
 }
 
 /**
  * Gerador do Termo de Responsabilidade e Uso exclusivo da Unidade Circuito.
  * Impresso em via separada retida no balcão para assinatura física do responsável.
  */
-export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { text: string; commandsHex: string } {
+export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { text: string; commandsHex: string; estimatedLengthMm: number } {
   const dateTime = payload.dateTime || new Date().toLocaleString("pt-BR");
   const lines: string[] = [];
 
@@ -533,5 +555,8 @@ export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { tex
   const hexFeed = "1b6403"; // ESC d 3
   const hexCut = "1d564200"; // GS V 66 0
 
-  return { text, commandsHex: hexHeader + textToHex(text) + hexFeed + hexCut };
+  // Sem QR aqui (termo de assinatura física, não tem acompanhamento).
+  const estimatedLengthMm = lines.length * LINE_HEIGHT_MM + FEED_BEFORE_CUT_LINES * LINE_HEIGHT_MM;
+
+  return { text, commandsHex: hexHeader + textToHex(text) + hexFeed + hexCut, estimatedLengthMm };
 }

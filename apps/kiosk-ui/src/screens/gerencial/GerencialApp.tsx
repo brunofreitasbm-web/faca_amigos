@@ -23,6 +23,7 @@ import { SaldoEnvelopesTab } from "./tabs/SaldoEnvelopesTab.js";
 import { HistoricoTab } from "./tabs/HistoricoTab.js";
 import { AuditoriaTab } from "./tabs/AuditoriaTab.js";
 import { ContratoTab } from "./tabs/ContratoTab.js";
+import { BobinasTab } from "./tabs/BobinasTab.js";
 import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
 import { CrmWhatsappTab } from "./tabs/CrmWhatsappTab.js";
@@ -58,6 +59,7 @@ export type GerencialTab =
   | "AUDITORIA"
   | "CONTRATO"
   | "TALENTOS"
+  | "BOBINAS"
   | "COPILOT_IA";
 
 interface ModuleItem {
@@ -144,6 +146,7 @@ const CATEGORIES: ModuleCategory[] = [
       { value: "FOTOS_ENVELOPE", label: "Fotos de Sangria", icon: "📸", description: "Comprovantes visuais das sangrias registradas nos PDVs." },
       { value: "HISTORICO", label: "Fluxograma de Caixa", icon: "🔄", description: "Rastreabilidade do fluxo de caixa e movimentação por turno." },
       { value: "AUDITORIA", label: "Log de Auditoria", icon: "🛡️", description: "Histórico de ações sensíveis, logins e alterações de dados." },
+      { value: "BOBINAS", label: "Bobinas de Cupom", icon: "🧻", tag: "Novo", description: "Consumo de papel térmico por unidade, previsão de término e troca de bobina." },
     ],
   },
 ];
@@ -525,6 +528,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "HISTORICO" && <HistoricoTab />}
               {tab === "AUDITORIA" && <AuditoriaTab />}
               {tab === "CONTRATO" && <ContratoTab />}
+              {tab === "BOBINAS" && <BobinasTab />}
             </div>
 
           </div>

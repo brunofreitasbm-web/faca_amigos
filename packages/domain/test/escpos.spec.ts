@@ -61,24 +61,40 @@ describe("generateEscPosReceipt", () => {
     expect(receipt.commandsHex).not.toContain("1d286b");
   });
 
-  it("imprime o timbre (FS p, via NV Graphics) logo após o cabeçalho em todo cupom não fiscal", () => {
-    const receipt = generateEscPosReceipt({
+  it("estima o comprimento de papel do cupom (linhas × 4,23mm + avanço antes do corte) para alimentar a métrica de bobina", () => {
+    const vendaSemQr = generateEscPosReceipt({
+      title: "Comprovante de Saída",
+      unitName: "Playground Parque Shopping",
+      items: [{ description: "Plano Livre 2h", amountCents: 4500 }],
+      totalCents: 4500,
+      payments: [{ method: "PIX", amountCents: 4500 }],
+    });
+    // 11 linhas de texto (contadas em receipt.text) + 3 linhas de avanço antes do corte, sem QR.
+    const linhas = vendaSemQr.text.split("\n").length;
+    expect(vendaSemQr.estimatedLengthMm).toBeCloseTo((linhas + 3) * 4.23, 1);
+
+    const guardaComQr = generateEscPosReceipt({
+      title: "Check-in",
+      unitName: "Playground Parque Shopping",
+      items: [{ description: "Plano 2 horas", amountCents: 6000 }],
+      totalCents: 6000,
+      accessCode: "K7QP3F2X9AB",
+      trackingUrl: "https://kiosk-ui.vercel.app/?acompanhar=K7QP3F2X9AB",
+    });
+    // Mesma conta, mais os ~19mm do QR impresso.
+    const linhasGuarda = guardaComQr.text.split("\n").length;
+    expect(guardaComQr.estimatedLengthMm).toBeCloseTo((linhasGuarda + 3) * 4.23 + 19, 1);
+  });
+
+  it("NÃO imprime o timbre em nenhum cupom — NV Graphics nunca é provisionada numa impressora real, então FS p só gastava avanço de papel sem marca nenhuma saindo", () => {
+    const vendaReceipt = generateEscPosReceipt({
       title: "Recibo de Caixa",
       unitName: "Playground Parque Shopping",
       items: [{ description: "Água mineral", quantity: 1, amountCents: 1000 }],
       totalCents: 1000,
       payments: [{ method: "PIX", amountCents: 1000 }],
     });
-
-    // FS p (1c70) + slot 01 + modo 00 = comando de impressão do timbre já
-    // gravado na NV — vem logo após o cabeçalho de inicialização.
-    const logoCmd = nvLogoPrintCommandHex();
-    expect(logoCmd).toBe("1c700100");
-    expect(receipt.commandsHex.indexOf(logoCmd)).toBe("1b401b74031b6100".length);
-  });
-
-  it("NÃO imprime o timbre no DANFE NFC-e — documento fiscal tem layout regulado", () => {
-    const receipt = generateEscPosReceipt({
+    const danfeReceipt = generateEscPosReceipt({
       title: "DANFE NFC-e",
       unitName: "Playground Parque Shopping",
       items: [{ description: "Plano 30 minutos", quantity: 1, amountCents: 4000 }],
@@ -87,7 +103,13 @@ describe("generateEscPosReceipt", () => {
       fiscalQrUrl: "https://appnfc.sefa.pa.gov.br/portal/view/consultas/nfce/consultanfce.seam?p=123",
     });
 
-    expect(receipt.commandsHex).not.toContain(nvLogoPrintCommandHex());
+    // FS p (1c70) + slot 01 + modo 00 = comando de impressão do timbre.
+    const logoCmd = nvLogoPrintCommandHex();
+    expect(logoCmd).toBe("1c700100");
+    expect(vendaReceipt.commandsHex).not.toContain(logoCmd);
+    expect(danfeReceipt.commandsHex).not.toContain(logoCmd);
+    // Corpo do cupom começa imediatamente após o cabeçalho de inicialização.
+    expect(vendaReceipt.commandsHex.startsWith("1b401b74031b6100")).toBe(true);
   });
 
   it("gera o comando de gravação do timbre na NV (FS q) com as dimensões do bitmap gerado", () => {
@@ -148,9 +170,8 @@ describe("generateEscPosReceipt", () => {
     });
 
     expect(receipt.text).toContain("*** CHECK-IN ***");
-    // Código e PIN compactos, sem linhas em branco ao redor.
-    expect(receipt.text).toContain("Código de saída: K7QP-3F2X-9AB");
-    expect(receipt.text).toContain("PIN rápido (Saída): 4821");
+    // Código e PIN numa linha só quando o PIN existe (economiza 1 linha de bobina).
+    expect(receipt.text).toContain("Saída: K7QP-3F2X-9AB · PIN 4821");
     // Nome da criança e responsável numa linha; nascimento e CPF em outra.
     expect(receipt.text).toContain("Helena Souza - Resp: Maria Souza");
     // Nascimento + CPF juntos passam de 42 colunas — quebram em duas linhas, sem perder dado.
