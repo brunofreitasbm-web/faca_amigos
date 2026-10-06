@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { generateEscPosReceipt, generateEscPosCircuitoTermo } from "@facaamigos/domain";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 import { Api, systemStatus } from "../api/client.js";
@@ -17,6 +17,8 @@ interface ReceiptPrintModalProps {
  * e sem exigir qualquer clique do operador.
  */
 export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
+  const queuedRef = useRef(false);
+  const mountedRef = useRef(false);
   const { unit } = useAppState();
   const isCircuito =
     Boolean(data.accessCode) &&
@@ -87,7 +89,12 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
   }
 
   useEffect(() => {
-    let isMounted = true;
+    mountedRef.current = true;
+
+    // StrictMode (dev) executa o efeito duas vezes; sem este guard cada
+    // execução enfileirava um job e o cupom saía em duplicidade.
+    if (queuedRef.current) return () => { mountedRef.current = false; };
+    queuedRef.current = true;
 
     if (!unit) {
       handleBrowserPrint();
@@ -97,20 +104,20 @@ export function ReceiptPrintModal({ data, onClose }: ReceiptPrintModalProps) {
 
     Api.queuePrintJob(unit.id, "RECEIPT", data)
       .then(() => {
-        if (isMounted) {
+        if (mountedRef.current) {
           onClose();
         }
       })
       .catch((err) => {
         console.warn("Fila de impressão indisponível, disparando impressão automática:", err);
-        if (isMounted) {
+        if (mountedRef.current) {
           handleBrowserPrint();
           onClose();
         }
       });
 
     return () => {
-      isMounted = false;
+      mountedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

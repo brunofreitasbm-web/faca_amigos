@@ -371,6 +371,40 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
     return match.name;
   }
 
+  /**
+   * Confirma que o job saiu no papel. NUNCA pode falhar em silêncio: o
+   * supabase-js devolve `{ error }` em vez de lançar, e um ack perdido deixa
+   * o job em CLAIMED — aí a reserva "stale" (180s) o devolve a PENDING e o
+   * cupom sai de novo (foi o que gerou as 3 vias quando o update passou a
+   * gravar `paper_length_mm` numa base sem a coluna).
+   *
+   * Por isso: (1) tenta com o comprimento da bobina; (2) se falhar, repete só
+   * com o status (a confirmação não depende de migration de bobina); (3) em
+   * último caso tenta de novo algumas vezes com espera curta.
+   */
+  async function ackPrinted(jobId: string, deviceId: string | null, paperLengthMm: number): Promise<void> {
+    const base = { status: "PRINTED", printed_at_ms: Date.now() };
+    const attempts: Array<Record<string, unknown>> = [
+      paperLengthMm > 0 ? { ...base, paper_length_mm: paperLengthMm } : base,
+      base,
+      base,
+      base,
+    ];
+    let lastError: unknown = null;
+    for (let i = 0; i < attempts.length; i++) {
+      const { error } = await supabase
+        .from("fa_kiosk_print_jobs")
+        .update(attempts[i])
+        .eq("id", jobId)
+        .eq("claimed_by_device_id", deviceId);
+      if (!error) return;
+      lastError = error;
+      console.warn(`[print-bridge] ack do job ${jobId} falhou (tentativa ${i + 1}/${attempts.length}):`, error.message);
+      if (i >= 1) await new Promise((r) => setTimeout(r, 1000 * i));
+    }
+    console.error(`[print-bridge] job ${jobId} IMPRESSO mas não foi possível confirmar no banco; pode ser reimpresso.`, lastError);
+  }
+
   async function handleReceiptPdfFallback(job: PrintJobRow, originalError: string, deviceId: string | null): Promise<void> {
     const rawPayload = job.payload_json as unknown as ReceiptPrintPayload;
     const trackingUrl = trackingUrlFor(rawPayload.accessCode);
@@ -508,11 +542,7 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
         }
       }
 
-      await supabase
-        .from("fa_kiosk_print_jobs")
-        .update({ status: "PRINTED", printed_at_ms: Date.now(), paper_length_mm: paperLengthMm || null })
-        .eq("id", job.id)
-        .eq("claimed_by_device_id", deviceId);
+      await ackPrinted(job.id, deviceId, paperLengthMm);
       // Abate da bobina ativa da unidade — fire-and-forget: um erro aqui não
       // deve re-marcar um cupom que já saiu como falho. Só RECEIPT consome
       // bobina (pulseira usa etiqueta própria, e está suspensa — ver
