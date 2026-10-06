@@ -3,7 +3,7 @@ import type { EmployeeSector, SessionReportAnswers, PaperConsumptionSample } fro
 import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
-import { assertValidImageUpload, compressImageForUpload } from "../lib/imageCompression.js";
+import { assertValidDocumentUpload, assertValidImageUpload, prepareUpload, uploadFileName } from "../lib/imageCompression.js";
 import type { NpsCommentRow, NpsDashboardData } from "../lib/nps.js";
 import {
   apurarBonificacaoPorDia,
@@ -2084,9 +2084,10 @@ export const Api = {
   /** Upload da foto de rosto (cadastro OU marcação de ponto) — bucket privado `ponto-fotos`, path prefixado por employeeId. */
   uploadPontoFoto: async (employeeId: string, photo: Blob, kind: "enroll" | "punch"): Promise<string> => {
     assertValidImageUpload(photo);
-    const path = `${employeeId}/${kind}-${Date.now()}.jpg`;
-    const { error } = await supabase().storage.from("ponto-fotos").upload(path, photo, {
-      contentType: "image/jpeg",
+    const prepared = await prepareUpload(photo, "selfie");
+    const path = `${employeeId}/${kind}-${Date.now()}.${prepared.ext}`;
+    const { error } = await supabase().storage.from("ponto-fotos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (error) throw new Error(error.message);
@@ -2863,11 +2864,10 @@ export const Api = {
   // MB por envelope e inflava o Storage sem necessidade (ver imageCompression.ts).
   uploadEnvelopePhoto: async (unitId: string, file: File): Promise<string> => {
     assertValidImageUpload(file);
-    const optimized = await compressImageForUpload(file);
-    const ext = optimized.type === "image/png" ? "png" : "jpg";
-    const path = `${unitId}/${Date.now()}.${ext}`;
-    const { error } = await supabase().storage.from("envelope-fotos").upload(path, optimized, {
-      contentType: optimized.type,
+    const prepared = await prepareUpload(file, "documento"); // comprovante: texto/números precisam ficar legíveis
+    const path = `${unitId}/${Date.now()}.${prepared.ext}`;
+    const { error } = await supabase().storage.from("envelope-fotos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (error) throw new Error(error.message);
@@ -3173,13 +3173,11 @@ export const Api = {
     }),
   /** Upload do anexo (atestado etc.) — bucket privado `ocorrencia-documentos`, path prefixado por employeeId. */
   uploadOcorrenciaDocumento: async (employeeId: string, file: File): Promise<string> => {
-    assertValidImageUpload(file);
-    const optimized = (await compressImageForUpload(file)) as File;
-    const ext = optimized.type === "image/png" ? "png" : "jpg";
-    const fileName = optimized.name || file.name || "documento.jpg";
-    const path = `${employeeId}/${Date.now()}-${fileName.replace(/[^\w.\-]/g, "_")}`;
-    const { error } = await supabase().storage.from("ocorrencia-documentos").upload(path, optimized, {
-      contentType: optimized.type || "image/jpeg",
+    assertValidDocumentUpload(file);
+    const prepared = await prepareUpload(file, "documento");
+    const path = `${employeeId}/${Date.now()}-${uploadFileName(file.name, prepared.ext, "documento")}`;
+    const { error } = await supabase().storage.from("ocorrencia-documentos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (error) throw new Error(error.message);
@@ -3914,10 +3912,10 @@ export const Api = {
   // fora do escopo deste formulário.
   uploadChildPhoto: async (childId: string, photo: Blob): Promise<void> => {
     assertValidImageUpload(photo);
-    const optimized = await compressImageForUpload(photo);
-    const path = `${childId}/${Date.now()}.jpg`;
-    const { error: uploadError } = await supabase().storage.from("crianca-fotos").upload(path, optimized, {
-      contentType: "image/jpeg",
+    const prepared = await prepareUpload(photo, "foto");
+    const path = `${childId}/${Date.now()}.${prepared.ext}`;
+    const { error: uploadError } = await supabase().storage.from("crianca-fotos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (uploadError) throw new Error(uploadError.message);
@@ -3927,11 +3925,10 @@ export const Api = {
   // fa_kiosk_asset_photos) — comprimida antes do upload para economizar storage.
   uploadAssetPhoto: async (unitId: string, file: File): Promise<string> => {
     assertValidImageUpload(file);
-    const optimized = (await compressImageForUpload(file)) as File;
-    const ext = optimized.type === "image/png" ? "png" : "jpg";
-    const path = `${unitId}/${Date.now()}.${ext}`;
-    const { error } = await supabase().storage.from("carrinho-fotos").upload(path, optimized, {
-      contentType: optimized.type || "image/jpeg",
+    const prepared = await prepareUpload(file, "foto");
+    const path = `${unitId}/${Date.now()}.${prepared.ext}`;
+    const { error } = await supabase().storage.from("carrinho-fotos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (error) throw new Error(error.message);

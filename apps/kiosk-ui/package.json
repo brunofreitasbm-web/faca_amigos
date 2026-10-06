@@ -20,6 +20,7 @@
     "@types/qrcode": "^1.5.6",
     "@vladmandic/face-api": "^1.7.15",
     "jsqr": "^1.4.0",
+    "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "react": "catalog:",
     "react-dom": "catalog:",

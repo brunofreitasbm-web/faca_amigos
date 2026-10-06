@@ -126,16 +126,20 @@ Deno.serve(async (req) => {
 
   if (Array.isArray(body.faceDescriptor) && body.faceDescriptor.length > 0 && body.facePhotoBase64) {
     try {
-      const cleanBase64 = body.facePhotoBase64.replace(/^data:image\/\w+;base64,/, "");
+      const dataUrl = /^data:image\/(webp|jpeg|png);base64,/.exec(body.facePhotoBase64);
+      if (!dataUrl) throw new Error("formato de foto não suportado");
+      const photoMime = `image/${dataUrl[1]}`;
+      const photoExt = dataUrl[1] === "jpeg" ? "jpg" : dataUrl[1];
+      const cleanBase64 = body.facePhotoBase64.slice(dataUrl[0].length);
       const binaryStr = atob(cleanBase64);
       const bytes = new Uint8Array(binaryStr.length);
       for (let i = 0; i < binaryStr.length; i++) {
         bytes[i] = binaryStr.charCodeAt(i);
       }
-      const photoPath = `${employeeRow.id}/enroll-${Date.now()}.jpg`;
+      const photoPath = `${employeeRow.id}/enroll-${Date.now()}.${photoExt}`;
       const { error: uploadError } = await adminClient.storage
         .from("ponto-fotos")
-        .upload(photoPath, bytes, { contentType: "image/jpeg", upsert: true });
+        .upload(photoPath, bytes, { contentType: photoMime, upsert: true });
 
       if (!uploadError) {
         await adminClient
