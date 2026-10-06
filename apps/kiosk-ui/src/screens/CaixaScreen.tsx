@@ -15,6 +15,7 @@ import { PassagemTurnoForm } from "../components/PassagemTurnoForm.js";
 import { PassagemTurnoGate } from "../components/PassagemTurnoGate.js";
 import { normalizeHandover, validateHandover } from "../lib/passagemTurno.js";
 import type { HandoverDraft } from "../lib/passagemTurno.js";
+import { extensionForMime } from "../lib/imageCompression.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
@@ -668,7 +669,7 @@ export function CaixaScreen() {
               previewAlt="Foto capturada do envelope"
               showEnvelopeGrid={true}
               onChange={(blob) =>
-                setEnvelopePhoto(blob ? new File([blob], `envelope-${Date.now()}.jpg`, { type: "image/jpeg" }) : null)
+                setEnvelopePhoto(blob ? new File([blob], `envelope-${Date.now()}.${extensionForMime(blob.type)}`, { type: blob.type }) : null)
               }
             />
 

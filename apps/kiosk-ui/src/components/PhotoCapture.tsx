@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@facaamigos/ui";
+import { canvasToImageBlob } from "../lib/imageCompression.js";
 
 /**
  * Foto pela câmera do tablet — usada tanto para a criança (identificação
@@ -100,17 +101,13 @@ export function PhotoCapture({
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, w, h);
 
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        stopStream();
-        setPreviewUrl(URL.createObjectURL(blob));
-        setStatus("captured");
-        onChange(blob);
-      },
-      "image/jpeg",
-      0.85,
-    );
+    void canvasToImageBlob(canvas, 0.85).then((blob) => {
+      if (!blob) return;
+      stopStream();
+      setPreviewUrl(URL.createObjectURL(blob));
+      setStatus("captured");
+      onChange(blob);
+    });
   }
 
   function retake() {

@@ -1,4 +1,5 @@
 import * as faceapi from "@vladmandic/face-api";
+import { canvasToImageBlob } from "./imageCompression.js";
 
 // Modelos self-hosted em public/models (não CDN) — o quiosque precisa
 // funcionar mesmo com a internet do local instável/fora do ar, e um
@@ -67,15 +68,15 @@ export function isSameFace(a: number[], b: number[]): boolean {
   return faceDistance(a, b) <= MATCH_THRESHOLD;
 }
 
-/** Congela o frame atual do <video> como um JPEG (Blob) — para guardar como evidência da marcação ou do cadastro. */
-export function captureFrameAsJpeg(video: HTMLVideoElement, quality = 0.8): Promise<Blob | null> {
+/** Congela o frame atual do <video> como WebP (JPEG se o navegador não gerar WebP) — evidência da marcação ou do cadastro. */
+export function captureFrame(video: HTMLVideoElement, quality = 0.85): Promise<Blob | null> {
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext("2d");
   if (!ctx) return Promise.resolve(null);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  return canvasToImageBlob(canvas, quality);
 }
 
 export interface FaceCandidate {

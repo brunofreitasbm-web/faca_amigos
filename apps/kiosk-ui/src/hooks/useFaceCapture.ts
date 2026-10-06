@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { captureFrameAsJpeg, extractFaceDescriptor, loadFaceModels } from "../lib/faceRecognition.js";
+import { captureFrame, extractFaceDescriptor, loadFaceModels } from "../lib/faceRecognition.js";
 
 interface UseFaceCaptureState {
   ready: boolean;
@@ -134,7 +134,7 @@ export function useFaceCapture() {
     if (!videoRef.current || videoRef.current.readyState < 2) return null;
     const [descriptor, photo] = await Promise.all([
       extractFaceDescriptor(videoRef.current),
-      captureFrameAsJpeg(videoRef.current),
+      captureFrame(videoRef.current),
     ]);
     if (!descriptor || !photo) return null;
     return { descriptor, photo };
