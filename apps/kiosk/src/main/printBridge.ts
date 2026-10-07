@@ -8,6 +8,7 @@ import { resolveTerminalSupabaseKey } from "../config/supabaseTerminalKey.js";
 import { generateEscPosReceipt, generateEscPosCircuitoTermo, generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import type { ReceiptPrintPayload, WristbandPrintPayload } from "@facaamigos/domain";
 import { printRawWindows } from "./rawPrint.js";
+import { createPrintQueue } from "./printQueue.js";
 import { listWindowsPrinters } from "./listPrinters.js";
 import { onPrintBridgeRebind } from "./printBridgeControl.js";
 import {
@@ -19,6 +20,7 @@ import {
   releasePrintJob,
   isRetryableClaim,
   isVirtualOrPdfPrinter,
+  isCircuitoReceipt,
   resolvePrinterName,
   type PrintJobRow,
 } from "./printJobPolicy.js";
@@ -258,6 +260,14 @@ export async function cleanupExpiredPdfReceipts(
   return cleanedCount;
 }
 
+/** RAW terminou sem confirmação, possivelmente já no spooler: proibido reimprimir. */
+class UncertainPrintError extends Error {
+  constructor(detail: string) {
+    super(`Resultado de impressão incerto (a via pode ter saído; confira o papel e reimprima manualmente se faltar): ${detail}`);
+    this.name = "UncertainPrintError";
+  }
+}
+
 export interface PrintBridgeStartResult {
   started: boolean;
   /** false = terminal sem unidade amarrada; tem conserto na tela, sem reiniciar. */
@@ -384,17 +394,17 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
    */
   async function ackPrinted(jobId: string, deviceId: string | null, paperLengthMm: number): Promise<void> {
     const base = { status: "PRINTED", printed_at_ms: Date.now() };
-    const attempts: Array<Record<string, unknown>> = [
+    const attempts: Array<{ status: string; printed_at_ms: number; paper_length_mm?: number }> = [
       paperLengthMm > 0 ? { ...base, paper_length_mm: paperLengthMm } : base,
       base,
       base,
       base,
     ];
     let lastError: unknown = null;
-    for (let i = 0; i < attempts.length; i++) {
+    for (const [i, body] of attempts.entries()) {
       const { error } = await supabase
         .from("fa_kiosk_print_jobs")
-        .update(attempts[i])
+        .update(body)
         .eq("id", jobId)
         .eq("claimed_by_device_id", deviceId);
       if (!error) return;
@@ -424,7 +434,7 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
     const base64Data = pdfBuffer.toString("base64");
     const pdfDataUrl = `data:application/pdf;base64,${base64Data}`;
 
-    await supabase
+    const { error: pdfAckError } = await supabase
       .from("fa_kiosk_print_jobs")
       .update({
         status: "SAVED_PDF",
@@ -435,6 +445,12 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
       })
       .eq("id", job.id)
       .eq("claimed_by_device_id", deviceId);
+    if (pdfAckError) {
+      // Lançar aqui cairia no catch do handleJob e tentaria FAILED; o job fica
+      // em CLAIMED e o dedupe em memória impede a reimpressão neste processo.
+      console.error(`[print-bridge] job ${job.id} salvo em PDF mas o update de status falhou:`, pdfAckError.message);
+      return;
+    }
 
     console.log(`[print-bridge] job ${job.id} (RECEIPT) salvo em PDF devido a impressora ausente/com erro: ${filePath}`);
   }
@@ -444,7 +460,7 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
    * Postgres (fa_kiosk_claim_print_job/_jobs): é a reserva, e não o
    * filtro em TypeScript, que garante que só um terminal imprime.
    */
-  async function handleJob(job: PrintJobRow): Promise<void> {
+  async function handleJob(job: PrintJobRow): Promise<void | "released"> {
     const deviceId = getLocalDeviceId(db);
     // Comprimento estimado (mm) do que foi de fato impresso neste job —
     // só preenchido pro caminho RECEIPT, alimenta a métrica de bobina.
@@ -468,7 +484,7 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
         // amarrado à unidade tentar — inclusive um com a impressora certa.
         if (isRetryableClaim(job) && (await releasePrintJob(supabase, job.id, deviceId))) {
           console.warn(`[print-bridge] ${reason} — job ${job.id} devolvido pra fila para outro terminal tentar.`);
-          return;
+          return "released";
         }
 
         if (job.kind === "RECEIPT") {
@@ -492,8 +508,9 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
           await printHtml(html, deviceName);
         } else {
           const tspl = generateGainschaGS2208DTSPL(job.payload_json as unknown as WristbandPrintPayload);
-          const printedRaw = await printRawWindows(tspl, deviceName);
-          if (!printedRaw) {
+          const raw = await printRawWindows(tspl, deviceName);
+          if (raw.status === "UNCERTAIN") throw new UncertainPrintError(raw.detail);
+          if (raw.status === "NOT_SENT") {
             const html = await wristbandHtml(job.payload_json as unknown as WristbandPayload);
             await printHtml(html, deviceName);
           }
@@ -502,12 +519,7 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
         const rawPayload = job.payload_json as unknown as ReceiptPrintPayload;
         const trackingUrl = trackingUrlFor(rawPayload.accessCode);
         const payload = trackingUrl ? { ...rawPayload, trackingUrl } : rawPayload;
-        const isCircuito =
-          Boolean(payload.accessCode) &&
-          payload.activity !== "PLAYGROUND" &&
-          (payload.activity === "CARRINHO" ||
-            Boolean(payload.assetName) ||
-            /circuito/i.test(payload.unitName));
+        const isCircuito = isCircuitoReceipt(payload);
 
         // Calculado sempre (RAW ou HTML) a partir do mesmo payload — é a
         // mesma impressão, só muda o driver; a estimativa de bobina não
@@ -526,15 +538,17 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
           }
         } else {
           const rawBuffer = Buffer.from(escpos.commandsHex, "hex");
-          const printedRaw = await printRawWindows(rawBuffer, deviceName);
-          if (!printedRaw) {
+          const raw = await printRawWindows(rawBuffer, deviceName);
+          if (raw.status === "UNCERTAIN") throw new UncertainPrintError(raw.detail);
+          if (raw.status === "NOT_SENT") {
             const html = await receiptHtml(payload);
             await printHtml(html, deviceName);
           }
           if (isCircuito && termoEscpos) {
             const termoRawBuffer = Buffer.from(termoEscpos.commandsHex, "hex");
-            const printedTermoRaw = await printRawWindows(termoRawBuffer, deviceName);
-            if (!printedTermoRaw) {
+            const rawTermo = await printRawWindows(termoRawBuffer, deviceName);
+            if (rawTermo.status === "UNCERTAIN") throw new UncertainPrintError(rawTermo.detail);
+            if (rawTermo.status === "NOT_SENT") {
               const termoHtml = await circuitoTermoHtml(payload);
               await printHtml(termoHtml, deviceName);
             }
@@ -557,6 +571,18 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
       console.log(`[print-bridge] job ${job.id} (${job.kind}) impresso em "${deviceName}".`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof UncertainPrintError) {
+        // Os bytes podem ter chegado à impressora: NÃO tenta HTML/PDF nem deixa
+        // o job voltar a PENDING (seria uma via a mais). FAILED + aviso ao operador.
+        const { error: failErr } = await supabase
+          .from("fa_kiosk_print_jobs")
+          .update({ status: "FAILED", error: message })
+          .eq("id", job.id)
+          .eq("claimed_by_device_id", deviceId);
+        if (failErr) console.error(`[print-bridge] job ${job.id}: não foi possível gravar FAILED:`, failErr.message);
+        console.error(`[print-bridge] job ${job.id} (${job.kind}) com resultado INCERTO, sem reimpressão: ${message}`);
+        return;
+      }
       if (job.kind === "RECEIPT") {
         try {
           await handleReceiptPdfFallback(job, message, deviceId);
@@ -565,11 +591,12 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
           console.error(`[print-bridge] Falha no fallback para PDF do job ${job.id}:`, pdfErr);
         }
       }
-      await supabase
+      const { error: failErr } = await supabase
         .from("fa_kiosk_print_jobs")
         .update({ status: "FAILED", error: message })
         .eq("id", job.id)
         .eq("claimed_by_device_id", deviceId);
+      if (failErr) console.error(`[print-bridge] job ${job.id}: não foi possível gravar FAILED:`, failErr.message);
       console.error(`[print-bridge] job ${job.id} (${job.kind}) falhou: ${message}`);
     }
   }
@@ -602,21 +629,32 @@ export function startPrintBridge(db?: Db): PrintBridgeStartResult {
     return Array.from(getTerminalUnitIds(db)).sort();
   }
 
+  // Fila única: Realtime e sweep passam pela mesma fila serial com dedupe por
+  // job.id. Um job já tratado neste processo nunca imprime de novo, mesmo que
+  // a reserva stale do Postgres o devolva a PENDING durante um lote longo.
+  const printQueue = createPrintQueue<PrintJobRow>(handleJob);
+
   async function claimAndPrintBatch(): Promise<void> {
     if (sweeping) return;
     sweeping = true;
     try {
       const jobs = await claimPrintJobs(supabase, currentUnitIds(), getLocalDeviceId(db));
-      for (const job of jobs) await handleJob(job);
+      // Enfileira todos e espera: o próximo sweep só começa quando o lote acabou.
+      await Promise.all(jobs.map((job) => printQueue.enqueue(job)));
     } finally {
       sweeping = false;
     }
   }
 
   async function claimAndPrintOne(jobId: string): Promise<void> {
+    // Já em processamento/tratado aqui: nem gasta a reserva no banco.
+    if (printQueue.has(jobId)) {
+      console.warn(`[print-bridge] job ${jobId} ignorado: já tratado/em processamento neste processo.`);
+      return;
+    }
     const job = await claimPrintJob(supabase, jobId, currentUnitIds(), getLocalDeviceId(db));
     if (!job) return; // outro terminal já reservou — nada a fazer
-    await handleJob(job);
+    await printQueue.enqueue(job);
   }
 
   /**
