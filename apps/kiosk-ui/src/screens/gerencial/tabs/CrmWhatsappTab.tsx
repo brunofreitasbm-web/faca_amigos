@@ -308,7 +308,8 @@ function LifecycleCampaignsCard() {
   if (loading) return null;
   return (
     <Card style={{ padding: "12px", marginBottom: "12px" }}>
-      <strong>🚀 Automações de ciclo de vida (upsell, cross-sell, LTV, retenção)</strong>
+      <details>
+      <summary style={{ cursor: "pointer" }}><strong>🚀 Automações de ciclo de vida (upsell, cross-sell, LTV, retenção)</strong></summary>
       <HelpText style={{ margin: "4px 0 12px" }}>
         Últimos 30 dias. Cada uma só envia quando o template correspondente estiver aprovado no Twilio; as de categoria Marketing também exigem o
         aceite de ofertas do responsável (campanha de opt-in de marketing acima).
@@ -342,6 +343,7 @@ function LifecycleCampaignsCard() {
           );
         })}
       </div>
+      </details>
     </Card>
   );
 }

@@ -1776,23 +1776,30 @@ export function EntradaScreen({
       >
         {readiness && <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>{readiness}</span>}
         {startNow && (
-          <Checkbox
-            checked={whatsappConsent}
-            onChange={(v) => {
-              setWhatsappConsent(v);
-              if (!v) setMarketingConsent(false); // sem aceite geral, não faz sentido oferecer o de ofertas
-            }}
-            label="O responsável autoriza contato por WhatsApp (avisos da visita e pesquisa de satisfação)"
-            helpText="Já vem marcado — pergunte ao responsável e desmarque se ele não quiser. Pode pedir para parar a qualquer momento respondendo PARAR."
-          />
-        )}
-        {startNow && whatsappConsent && (
-          <Checkbox
-            checked={marketingConsent}
-            onChange={setMarketingConsent}
-            label="Também aceita receber ofertas e novidades (pacotes, promoções) de vez em quando"
-            helpText="Pergunta separada da anterior — desmarque se o responsável quiser receber só os avisos, sem ofertas."
-          />
+          <details style={{ fontSize: "14px" }}>
+            <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--text-muted)" }}>
+              Autorizações de contato (WhatsApp)
+            </summary>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+              <Checkbox
+                checked={whatsappConsent}
+                onChange={(v) => {
+                  setWhatsappConsent(v);
+                  if (!v) setMarketingConsent(false); // sem aceite geral, não faz sentido oferecer o de ofertas
+                }}
+                label="O responsável autoriza contato por WhatsApp (avisos da visita e pesquisa de satisfação)"
+                helpText="Já vem marcado — pergunte ao responsável e desmarque se ele não quiser. Pode pedir para parar a qualquer momento respondendo PARAR."
+              />
+              {whatsappConsent && (
+                <Checkbox
+                  checked={marketingConsent}
+                  onChange={setMarketingConsent}
+                  label="Também aceita receber ofertas e novidades (pacotes, promoções) de vez em quando"
+                  helpText="Pergunta separada da anterior — desmarque se o responsável quiser receber só os avisos, sem ofertas."
+                />
+              )}
+            </div>
+          </details>
         )}
         <Button
           variant="primary"

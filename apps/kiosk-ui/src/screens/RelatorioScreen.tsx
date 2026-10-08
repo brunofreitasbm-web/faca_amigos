@@ -92,7 +92,6 @@ export function RelatorioScreen() {
     { value: "SESSOES", label: "Sessões (auditoria)" },
     { value: "ANIVERSARIANTES", label: "Crianças (aniversário)" },
     { value: "TURNOS", label: "Movimentação de Caixa" },
-    { value: "PONTO", label: "Folha de Ponto" },
     ...(isQuiosque ? ([{ value: "FROTA", label: "Frota (mapa de calor)" }] as const) : []),
   ];
 

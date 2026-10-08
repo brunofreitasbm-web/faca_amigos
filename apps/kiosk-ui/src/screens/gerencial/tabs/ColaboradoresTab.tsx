@@ -330,9 +330,6 @@ export function ColaboradoresTab() {
             <Button variant="secondary" onClick={() => setShowInviteModal(true)} style={{ borderRadius: "9999px" }}>
               🔗 Gerar link de cadastro
             </Button>
-            <Button variant="secondary" onClick={() => setShowPjInviteModal(true)} style={{ borderRadius: "9999px" }}>
-              💼 Link Auto-Cadastro PJ
-            </Button>
             <Button variant="primary" onClick={() => setShowForm(true)} style={{ borderRadius: "9999px" }}>
               ⚡ + Novo colaborador rápido
             </Button>
@@ -340,7 +337,8 @@ export function ColaboradoresTab() {
         </div>
       )}
 
-      {!showForm && (
+      {/* Filtro por categoria oculto por decisão de produto (reativar trocando false por true). */}
+      {false && !showForm && (
         <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
           <Button
             variant={categoryFilter === "ALL" ? "primary" : "ghost"}
