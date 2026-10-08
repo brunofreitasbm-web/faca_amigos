@@ -40,6 +40,8 @@ export interface SessionForQuote {
    * horas não têm "preço do plano" a zerar — nesses, a cortesia só encurta o tempo.
    */
   courtesyZeroesPlan?: boolean;
+  /** Na tolerância de saída imediata, mantém o valor da linha (pacote comprado no ato). */
+  freeStayKeepsPlanValue?: boolean;
 }
 
 export type SessionPhase = "VERDE" | "AMARELO" | "VERMELHO" | "EXCEDENTE";

@@ -1020,6 +1020,8 @@ export interface ActiveSessionEntry {
     totalCents: number;
     timing: { phase: SessionPhase; elapsedMs: number; durationMs: number; overMinutes: number; isPaused: boolean; pausedForMs: number };
   };
+  /** Cotação do fechamento (já com a tolerância interna de saída imediata). Só o CheckoutModal usa. */
+  checkoutQuote?: ActiveSessionEntry["quote"];
 }
 
 export interface Shift {
@@ -1572,9 +1574,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
     const guardian = raw.guardianById.get(row.guardian_id as string);
     const assetRow = row.asset_id ? raw.assetById.get(row.asset_id as string) : undefined;
     const childRow = raw.childById.get(row.child_id as string);
-    const quote = quoteForSession(
-      plan,
-      {
+    const quoteInput = {
         checkinAtMs: row.checkin_at_ms as number,
         childName: row.child_name_snapshot as string,
         planId: row.plan_id as string,
@@ -1588,9 +1588,12 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         pausedMsTotal: (row.paused_ms_total as number) ?? 0,
         loyaltyCourtesyMinutes: (row.loyalty_courtesy_minutes as number | null) ?? 0,
         courtesyZeroesPlan: !usesHourBank && !usesPackage && !usesChildCredit && !row.rental_kind,
-      },
-      effectiveNowMs,
-    );
+        freeStayKeepsPlanValue: usesPackage,
+    };
+    const quote = quoteForSession(plan, quoteInput, effectiveNowMs);
+    // Cotação usada só no fechamento (CheckoutModal): aplica a tolerância
+    // interna de saída imediata. O painel ao vivo segue com `quote`.
+    const checkoutQuote = quoteForSession(plan, quoteInput, effectiveNowMs, { applyFreeStay: true });
     return {
       session: {
         id: row.id as string,
@@ -1629,6 +1632,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         rental_kind: (row.rental_kind as "PELUCIA" | null) ?? null,
       },
       quote,
+      checkoutQuote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
       asset: assetRow
         ? {

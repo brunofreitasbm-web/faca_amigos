@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSessionTiming } from "../src/time/session-timer.js";
+import { computeSessionTiming, isFreeStay } from "../src/time/session-timer.js";
 import type { Plan } from "../src/pricing/types.js";
 
 const plan: Plan = {
@@ -114,5 +114,16 @@ describe("computeSessionTiming", () => {
     expect(t.elapsedMs).toBe(5 * 60_000);
     expect(t.pausedForMs).toBe(20 * 60_000);
     expect(t.phase).toBe("VERDE");
+  });
+});
+
+describe("isFreeStay", () => {
+  const base = { checkinAtMs: 0, pausedAtMs: null, pausedMsTotal: 0 };
+  it("limite de 3 min", () => {
+    expect(isFreeStay(base, 180_000)).toBe(true);
+    expect(isFreeStay(base, 180_001)).toBe(false);
+  });
+  it("sessão pausada congela no instante da pausa", () => {
+    expect(isFreeStay({ ...base, pausedAtMs: 60_000 }, 3_600_000)).toBe(true);
   });
 });
