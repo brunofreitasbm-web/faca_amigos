@@ -7,6 +7,21 @@ export function planDurationMinutes(plan: Plan): number {
 /** Janela de tolerância (tempo de graça): 1 minuto (60.000 ms) antes do início da cobrança de excedente. */
 export const OVERAGE_GRACE_PERIOD_MS = 60_000;
 
+/**
+ * Tolerância interna (não exibida na interface): permanência líquida de até
+ * 3 minutos não gera cobrança. Espelha fa_checkout (20261008140000).
+ */
+const FREE_STAY_GRACE_MS = 3 * 60_000;
+
+/** Permanência líquida (sem pausas, sem cortesia de fidelidade) cabe na tolerância de saída imediata. */
+export function isFreeStay(
+  session: Pick<SessionForQuote, "checkinAtMs" | "pausedAtMs" | "pausedMsTotal">,
+  nowMs: number,
+): boolean {
+  const clockMs = session.pausedAtMs ?? nowMs;
+  return Math.max(0, clockMs - session.checkinAtMs - session.pausedMsTotal) <= FREE_STAY_GRACE_MS;
+}
+
 /** Janela do aviso VERMELHO: últimos 5 minutos antes do teto do plano. */
 export const VERMELHO_WINDOW_MS = 5 * 60_000;
 

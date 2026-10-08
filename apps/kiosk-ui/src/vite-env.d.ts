@@ -14,6 +14,7 @@ interface Window {
     getAppVersion: () => Promise<string>;
     getUpdateStatus: () => Promise<{ status: string; version?: string; progress?: number; error?: string }>;
     checkForUpdates: () => Promise<{ status: string; version?: string; progress?: number; error?: string }>;
+    saveTerminalKey: (key: string) => Promise<{ ok: boolean; error?: string }>;
     applyUpdate: () => Promise<void>;
     onUpdateStatusChange: (
       callback: (data: { status: string; version?: string; progress?: number; error?: string }) => void

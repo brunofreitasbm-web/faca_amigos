@@ -126,9 +126,9 @@ export function OcorrenciasTab() {
         <Input label="Observações (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
         <div>
           <label style={{ fontSize: "13px", fontWeight: "var(--weight-semibold)" as unknown as number, display: "block", marginBottom: "4px" }}>
-            Anexo (atestado etc. — opcional, imagem)
+            Anexo (atestado etc. — opcional, imagem ou PDF)
           </label>
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </div>
         {error && <p style={{ color: "var(--color-error-text)", margin: 0 }}>{error}</p>}
         <Button variant="primary" disabled={busy || !employeeId} onClick={registrar} style={{ alignSelf: "flex-start" }}>

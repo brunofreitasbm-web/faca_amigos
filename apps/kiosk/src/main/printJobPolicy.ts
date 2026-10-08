@@ -265,3 +265,24 @@ export async function releasePrintJob(client: ClaimRpcClient, jobId: string, dev
   }
   return data === true;
 }
+
+/**
+ * Decide se o cupom leva também o termo do Circuito. Sinais fortes primeiro
+ * (activity CARRINHO ou assetName); o nome da unidade só vale como legado
+ * quando o payload NÃO traz `activity` — com activity definida ela manda, para
+ * uma unidade cujo nome contém "circuito" não disparar o termo num cupom de
+ * Playground.
+ */
+export function isCircuitoReceipt(payload: {
+  accessCode?: string;
+  activity?: string;
+  assetName?: string;
+  unitName?: string;
+}): boolean {
+  if (!payload.accessCode) return false;
+  if (payload.activity === "PLAYGROUND") return false;
+  if (payload.activity === "CARRINHO") return true;
+  if (payload.assetName) return true;
+  if (payload.activity) return false;
+  return /\bcircuito\b/i.test(payload.unitName ?? "");
+}

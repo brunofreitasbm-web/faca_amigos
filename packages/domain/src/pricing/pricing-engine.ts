@@ -1,5 +1,5 @@
-import { computeSessionTiming } from "../time/session-timer.js";
-import type { Plan, QuoteLine, SessionForQuote, SessionQuote } from "./types.js";
+import { computeSessionTiming, isFreeStay } from "../time/session-timer.js";
+import type { Plan, QuoteLine, SessionForQuote, SessionQuote, SessionTiming } from "./types.js";
 
 export function money(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -12,9 +12,23 @@ export function money(cents: number): string {
  * sobrar, então aplicá-la antes do cupom esconderia o desconto do
  * cupom no comprovante (o cliente precisa ver os dois na linha).
  */
-export function quoteForSession(plan: Plan, session: SessionForQuote, nowMs: number): SessionQuote {
+export function quoteForSession(
+  plan: Plan,
+  session: SessionForQuote,
+  nowMs: number,
+  options: { applyFreeStay?: boolean } = {},
+): SessionQuote {
   const timing = computeSessionTiming(plan, session, nowMs);
   const lines: QuoteLine[] = [{ label: `${session.childName} — ${plan.name}`, cents: plan.valueCents }];
+
+  // Tolerância de saída imediata (interna, só no fechamento): a linha do plano
+  // sai zerada e nenhum excedente/cortesia entra. Pacote comprado no ato
+  // mantém o preço do pacote (compra, não tempo). Espelha fa_checkout.
+  if (options.applyFreeStay && isFreeStay(session, nowMs)) {
+    const baseCents = session.freeStayKeepsPlanValue ? plan.valueCents : 0;
+    lines[0] = { label: lines[0]!.label, cents: baseCents };
+    return finishQuote(plan, session, timing, lines, baseCents);
+  }
 
   if (timing.overMinutes > 0) {
     lines.push({
@@ -38,6 +52,18 @@ export function quoteForSession(plan: Plan, session: SessionForQuote, nowMs: num
       totalCents = 0;
     }
   }
+
+  return finishQuote(plan, session, timing, lines, totalCents);
+}
+
+function finishQuote(
+  plan: Plan,
+  session: SessionForQuote,
+  timing: SessionTiming,
+  lines: QuoteLine[],
+  startCents: number,
+): SessionQuote {
+  let totalCents = startCents;
 
   // Cupom percentual (o par 50% inclusivo / 40% padrão) recalcula sobre o
   // valor total ao vivo — que já inclui o excedente — em vez de reusar o

@@ -3,7 +3,7 @@ import type { EmployeeSector, SessionReportAnswers, PaperConsumptionSample } fro
 import { supabase } from "../lib/supabase/client.js";
 import { callResilient } from "../lib/supabase/offlineQueue.js";
 import { computeWorkedMinutes, monthRangeMs, type PontoKind } from "../lib/ponto.js";
-import { assertValidImageUpload, compressImageForUpload } from "../lib/imageCompression.js";
+import { assertValidDocumentUpload, assertValidImageUpload, prepareUpload, uploadFileName } from "../lib/imageCompression.js";
 import type { NpsCommentRow, NpsDashboardData } from "../lib/nps.js";
 import {
   apurarBonificacaoPorDia,
@@ -1020,6 +1020,8 @@ export interface ActiveSessionEntry {
     totalCents: number;
     timing: { phase: SessionPhase; elapsedMs: number; durationMs: number; overMinutes: number; isPaused: boolean; pausedForMs: number };
   };
+  /** Cotação do fechamento (já com a tolerância interna de saída imediata). Só o CheckoutModal usa. */
+  checkoutQuote?: ActiveSessionEntry["quote"];
 }
 
 export interface Shift {
@@ -1572,9 +1574,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
     const guardian = raw.guardianById.get(row.guardian_id as string);
     const assetRow = row.asset_id ? raw.assetById.get(row.asset_id as string) : undefined;
     const childRow = raw.childById.get(row.child_id as string);
-    const quote = quoteForSession(
-      plan,
-      {
+    const quoteInput = {
         checkinAtMs: row.checkin_at_ms as number,
         childName: row.child_name_snapshot as string,
         planId: row.plan_id as string,
@@ -1588,9 +1588,12 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         pausedMsTotal: (row.paused_ms_total as number) ?? 0,
         loyaltyCourtesyMinutes: (row.loyalty_courtesy_minutes as number | null) ?? 0,
         courtesyZeroesPlan: !usesHourBank && !usesPackage && !usesChildCredit && !row.rental_kind,
-      },
-      effectiveNowMs,
-    );
+        freeStayKeepsPlanValue: usesPackage,
+    };
+    const quote = quoteForSession(plan, quoteInput, effectiveNowMs);
+    // Cotação usada só no fechamento (CheckoutModal): aplica a tolerância
+    // interna de saída imediata. O painel ao vivo segue com `quote`.
+    const checkoutQuote = quoteForSession(plan, quoteInput, effectiveNowMs, { applyFreeStay: true });
     return {
       session: {
         id: row.id as string,
@@ -1629,6 +1632,7 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
         rental_kind: (row.rental_kind as "PELUCIA" | null) ?? null,
       },
       quote,
+      checkoutQuote,
       plan: { id: plan.id, name: plan.name, color: plan.color },
       asset: assetRow
         ? {
@@ -2084,9 +2088,10 @@ export const Api = {
   /** Upload da foto de rosto (cadastro OU marcação de ponto) — bucket privado `ponto-fotos`, path prefixado por employeeId. */
   uploadPontoFoto: async (employeeId: string, photo: Blob, kind: "enroll" | "punch"): Promise<string> => {
     assertValidImageUpload(photo);
-    const path = `${employeeId}/${kind}-${Date.now()}.jpg`;
-    const { error } = await supabase().storage.from("ponto-fotos").upload(path, photo, {
-      contentType: "image/jpeg",
+    const prepared = await prepareUpload(photo, "selfie");
+    const path = `${employeeId}/${kind}-${Date.now()}.${prepared.ext}`;
+    const { error } = await supabase().storage.from("ponto-fotos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (error) throw new Error(error.message);
@@ -2863,11 +2868,10 @@ export const Api = {
   // MB por envelope e inflava o Storage sem necessidade (ver imageCompression.ts).
   uploadEnvelopePhoto: async (unitId: string, file: File): Promise<string> => {
     assertValidImageUpload(file);
-    const optimized = await compressImageForUpload(file);
-    const ext = optimized.type === "image/png" ? "png" : "jpg";
-    const path = `${unitId}/${Date.now()}.${ext}`;
-    const { error } = await supabase().storage.from("envelope-fotos").upload(path, optimized, {
-      contentType: optimized.type,
+    const prepared = await prepareUpload(file, "documento"); // comprovante: texto/números precisam ficar legíveis
+    const path = `${unitId}/${Date.now()}.${prepared.ext}`;
+    const { error } = await supabase().storage.from("envelope-fotos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (error) throw new Error(error.message);
@@ -3173,13 +3177,11 @@ export const Api = {
     }),
   /** Upload do anexo (atestado etc.) — bucket privado `ocorrencia-documentos`, path prefixado por employeeId. */
   uploadOcorrenciaDocumento: async (employeeId: string, file: File): Promise<string> => {
-    assertValidImageUpload(file);
-    const optimized = (await compressImageForUpload(file)) as File;
-    const ext = optimized.type === "image/png" ? "png" : "jpg";
-    const fileName = optimized.name || file.name || "documento.jpg";
-    const path = `${employeeId}/${Date.now()}-${fileName.replace(/[^\w.\-]/g, "_")}`;
-    const { error } = await supabase().storage.from("ocorrencia-documentos").upload(path, optimized, {
-      contentType: optimized.type || "image/jpeg",
+    assertValidDocumentUpload(file);
+    const prepared = await prepareUpload(file, "documento");
+    const path = `${employeeId}/${Date.now()}-${uploadFileName(file.name, prepared.ext, "documento")}`;
+    const { error } = await supabase().storage.from("ocorrencia-documentos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (error) throw new Error(error.message);
@@ -3914,10 +3916,10 @@ export const Api = {
   // fora do escopo deste formulário.
   uploadChildPhoto: async (childId: string, photo: Blob): Promise<void> => {
     assertValidImageUpload(photo);
-    const optimized = await compressImageForUpload(photo);
-    const path = `${childId}/${Date.now()}.jpg`;
-    const { error: uploadError } = await supabase().storage.from("crianca-fotos").upload(path, optimized, {
-      contentType: "image/jpeg",
+    const prepared = await prepareUpload(photo, "foto");
+    const path = `${childId}/${Date.now()}.${prepared.ext}`;
+    const { error: uploadError } = await supabase().storage.from("crianca-fotos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (uploadError) throw new Error(uploadError.message);
@@ -3927,11 +3929,10 @@ export const Api = {
   // fa_kiosk_asset_photos) — comprimida antes do upload para economizar storage.
   uploadAssetPhoto: async (unitId: string, file: File): Promise<string> => {
     assertValidImageUpload(file);
-    const optimized = (await compressImageForUpload(file)) as File;
-    const ext = optimized.type === "image/png" ? "png" : "jpg";
-    const path = `${unitId}/${Date.now()}.${ext}`;
-    const { error } = await supabase().storage.from("carrinho-fotos").upload(path, optimized, {
-      contentType: optimized.type || "image/jpeg",
+    const prepared = await prepareUpload(file, "foto");
+    const path = `${unitId}/${Date.now()}.${prepared.ext}`;
+    const { error } = await supabase().storage.from("carrinho-fotos").upload(path, prepared.blob, {
+      contentType: prepared.contentType,
       upsert: false,
     });
     if (error) throw new Error(error.message);

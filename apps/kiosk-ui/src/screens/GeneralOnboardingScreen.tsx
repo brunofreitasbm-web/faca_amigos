@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, BrandLockup, Card, HelpText, Input, Checkbox, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import { useFaceCapture } from "../hooks/useFaceCapture.js";
+import { prepareUpload } from "../lib/imageCompression.js";
 
 type Status = "loading" | "invalid" | "ready" | "done";
 
@@ -41,7 +42,8 @@ function FaceCaptureModal({
         setCapturing(false);
         return;
       }
-      const base64 = await blobToBase64(result.photo);
+      const prepared = await prepareUpload(result.photo, "selfie");
+      const base64 = await blobToBase64(prepared.blob);
       const previewUrl = URL.createObjectURL(result.photo);
       stop();
       onCaptured(result.descriptor, base64, previewUrl);
