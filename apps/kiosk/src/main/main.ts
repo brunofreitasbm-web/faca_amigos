@@ -12,6 +12,7 @@ import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
 import { startVoiceWorker } from "./voiceWorker.js";
 import { classifyTerminalKey } from "../config/supabaseTerminalKey.js";
+import { isUsableTerminalKey, persistTerminalKey } from "../config/terminalKeyStore.js";
 import { initAutoUpdater, checkForUpdatesAndWait, getUpdateStatus, applyUpdate } from "./autoUpdater.js";
 
 /** Variáveis onde uma chave publicável colada por engano quebra tudo em silêncio. */
@@ -127,6 +128,21 @@ FACAAMIGOS_PUBLIC_APP_URL=https://app.institutofacaamigos.com.br
       console.log(`[main] Carregou variáveis de ambiente de: ${envPath}`);
     } catch (err) {
       console.warn(`[main] Erro ao ler ${envPath}:`, err);
+    }
+  }
+
+  // A chave achada num .env DENTRO da instalação (resources/ ou ao lado do
+  // .exe) é apagada na próxima atualização, e o aviso de "chave não
+  // configurada" voltava a cada versão. Copiar para o .env do userData, que
+  // o instalador não toca, faz a chave sobreviver às atualizações.
+  const chaveAtiva = process.env.FACAAMIGOS_SUPABASE_SECRET_KEY;
+  if (userDataEnv && isUsableTerminalKey(chaveAtiva)) {
+    try {
+      if (persistTerminalKey(userDataEnv, chaveAtiva as string)) {
+        console.log(`[main] Chave do terminal copiada para ${userDataEnv} (sobrevive a atualizações).`);
+      }
+    } catch (err) {
+      console.warn(`[main] Não foi possível gravar a chave em ${userDataEnv}:`, err);
     }
   }
 }
@@ -320,6 +336,26 @@ if (isPrimaryInstance) {
     });
 
     mainWindow = createWindow(protocol, splash);
+
+    // Permite colar a chave pela tela Configurações (sem editar .env à mão).
+    // IPC e não rota HTTP: o Fastify escuta em 0.0.0.0, e um segredo não pode
+    // ser gravável por qualquer tablet da LAN.
+    ipcMain.handle("save-terminal-key", (_event, key: unknown) => {
+      if (typeof key !== "string" || classifyTerminalKey(key) !== "secret") {
+        return { ok: false, error: "Cole a chave secreta que começa com sb_secret_ (não a publicável nem a eyJ...)." };
+      }
+      try {
+        persistTerminalKey(join(app.getPath("userData"), ".env"), key);
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+      // Reinicia para a ponte de impressão e o worker fiscal subirem com a chave nova.
+      setTimeout(() => {
+        app.relaunch();
+        app.exit(0);
+      }, 500);
+      return { ok: true };
+    });
 
     // Sem isto, a ponte de impressão falhava só com um console.warn: o
     // terminal parecia funcionar normalmente, mas nenhuma pulseira/recibo
