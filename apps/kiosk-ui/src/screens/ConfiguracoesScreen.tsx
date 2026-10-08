@@ -1448,6 +1448,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
     lastJobPrintedAtMs?: number | null;
   }
   const [bridgeStatus, setBridgeStatus] = useState<PrintBridgeStatus | null>(null);
+  const [terminalKeyInput, setTerminalKeyInput] = useState("");
 
   function refreshPrinters() {
     const list = window.facaamigos?.listPrinters;
@@ -1589,6 +1590,29 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       {bridgeStatus && !bridgeStatus.hasServiceRoleKey && (
         <HelpText icon="🛑" style={{ background: "#fff0f0", borderColor: "#f5c6cb", color: "#721c24", fontWeight: "bold" }}>
           Erro de Autenticação do Print Bridge: A chave de serviço (FACAAMIGOS_SUPABASE_SECRET_KEY) não está configurada no arquivo .env deste computador. Sem ela, o banco rejeita a reserva de cupons e a impressão não sai.
+          {typeof window.facaamigos?.saveTerminalKey === "function" && (
+            <form
+              style={{ display: "flex", gap: "8px", marginTop: "10px", fontWeight: "normal" }}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const res = await window.facaamigos!.saveTerminalKey(terminalKeyInput);
+                if (res.ok) toast.success("Chave salva. O sistema vai reiniciar.");
+                else toast.error(res.error ?? "Não foi possível salvar a chave.");
+              }}
+            >
+              <input
+                type="password"
+                autoComplete="off"
+                placeholder="Cole aqui a chave secreta (sb_secret_...)"
+                value={terminalKeyInput}
+                onChange={(e) => setTerminalKeyInput(e.target.value)}
+                style={{ flex: 1, padding: "6px 8px" }}
+              />
+              <button type="submit" disabled={!terminalKeyInput.trim()}>
+                Salvar e reiniciar
+              </button>
+            </form>
+          )}
         </HelpText>
       )}
       {bridgeStatus && bridgeStatus.hasServiceRoleKey && bridgeStatus.started && (

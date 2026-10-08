@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("facaamigos", {
   getAppVersion: () => ipcRenderer.invoke("get-app-version") as Promise<string>,
   getUpdateStatus: () => ipcRenderer.invoke("get-update-status") as Promise<unknown>,
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates") as Promise<unknown>,
+  saveTerminalKey: (key: string) => ipcRenderer.invoke("save-terminal-key", key) as Promise<{ ok: boolean; error?: string }>,
   applyUpdate: () => ipcRenderer.invoke("apply-update") as Promise<void>,
   onUpdateStatusChange: (callback: (data: unknown) => void) => {
     const handler = (_event: unknown, data: unknown) => callback(data);
