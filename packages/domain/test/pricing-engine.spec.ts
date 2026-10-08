@@ -97,3 +97,31 @@ describe("cortesia de fidelidade (10ª visita)", () => {
     expect(q.totalCents).toBe(3000);
   });
 });
+
+describe("quoteForSession — tolerância de saída imediata (interna)", () => {
+  const opts = { applyFreeStay: true };
+
+  it("zera o plano até 3 min de permanência (2:59 e 3:00)", () => {
+    expect(quoteForSession(plan, session(), 179_000, opts).totalCents).toBe(0);
+    expect(quoteForSession(plan, session(), 180_000, opts).totalCents).toBe(0);
+  });
+
+  it("cobra normalmente a partir de 3:01", () => {
+    expect(quoteForSession(plan, session(), 180_001, opts).totalCents).toBe(3000);
+  });
+
+  it("sem applyFreeStay (painel ao vivo) mantém o valor do plano", () => {
+    expect(quoteForSession(plan, session(), 60_000).totalCents).toBe(3000);
+  });
+
+  it("desconta pausas da permanência", () => {
+    const s = session({ pausedMsTotal: 5 * 60_000 });
+    expect(quoteForSession(plan, s, 7 * 60_000, opts).totalCents).toBe(0); // 2 min líquidos
+    expect(quoteForSession(plan, s, 9 * 60_000, opts).totalCents).toBe(3000); // 4 min líquidos
+  });
+
+  it("pacote comprado no ato mantém o preço do pacote", () => {
+    const q = quoteForSession(plan, session({ freeStayKeepsPlanValue: true }), 60_000, opts);
+    expect(q.totalCents).toBe(3000);
+  });
+});

@@ -76,7 +76,9 @@ export function CheckoutModal({
   // subindo enquanto ele escolhe a forma de pagamento. Por isso o valor é
   // congelado na primeira renderização e ignora atualizações da prop depois
   // disso; o servidor (fa_checkout) usa esse mesmo instante como corte real.
-  const [entries] = useState(liveEntries);
+  const [entries] = useState(() =>
+    liveEntries.map((e) => (e.checkoutQuote ? { ...e, quote: e.checkoutQuote } : e)),
+  );
   // Reconstrói o instante "agora" (já corrigido pro relógio do servidor)
   // que gerou o `elapsedMs` congelado acima: checkin + pausas + elapsed.
   // É o mesmo valor que fa_checkout vai usar como teto de cobrança — não
