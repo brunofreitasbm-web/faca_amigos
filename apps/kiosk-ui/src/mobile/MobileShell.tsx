@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useBackHandler } from "../hooks/useBackHandler.js";
 import type { Unit } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { usePendingRenewals } from "../api/renewalRequests.js";
@@ -57,14 +58,7 @@ export function MobileShell({
 
   // O gesto/botão "voltar" do Android fecha o check-in/pedidos em vez de
   // sair do app — sem isto o operador perde o lugar ao tocar por reflexo.
-  // Só empilha estado enquanto há para onde voltar.
-  useEffect(() => {
-    if (view !== "CHECKIN" && view !== "PEDIDOS") return;
-    history.pushState({ mobileShell: view }, "");
-    const onPop = () => setView("TURNO");
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [view]);
+  useBackHandler(view === "CHECKIN" || view === "PEDIDOS" ? 1 : 0, () => setView("TURNO"));
 
   const activeCount = status === "ready" ? entries.length : null;
 

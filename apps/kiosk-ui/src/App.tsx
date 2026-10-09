@@ -64,6 +64,7 @@ import { MobileShell } from "./mobile/MobileShell.js";
 import { MobileScreenFrame } from "./mobile/MobileScreenFrame.js";
 import { MobileGerencial } from "./mobile/MobileGerencial.js";
 import { MobileLogin } from "./mobile/MobileLogin.js";
+import { useBackHandler } from "./hooks/useBackHandler.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
 
 /**
@@ -263,6 +264,32 @@ export function App() {
       return prev.slice(0, -1);
     });
   }, [showConnectModal, navOpen, visibleScreens, screen]);
+
+  // Voltar do navegador/celular (botão, gesto de borda) navega dentro do app
+  // em vez de sair do site: fecha modal/menu, sai do Gerencial ou da tela
+  // completa aberta pela casca mobile, desfaz o histórico de telas e, por
+  // fim, cai no Painel.
+  const baseBackDepth = !employee || (!unit && !gerencial)
+    ? 0
+    : gerencial
+      ? 1
+      : mobile.active && mobileEscape === null
+        ? 0
+        : (mobileEscape ? 1 : 0) + screenHistory.length + (!mobileEscape && screenHistory.length === 0 && screen !== "PAINEL" ? 1 : 0);
+  const backDepth = baseBackDepth + (showConnectModal ? 1 : 0) + (navOpen ? 1 : 0);
+  useBackHandler(backDepth, () => {
+    if (showConnectModal) return setShowConnectModal(false);
+    if (navOpen) return setNavOpen(false);
+    if (gerencial) return setGerencial(false);
+    if (mobileEscape) return setMobileEscape(null);
+    if (screenHistory.length > 0) {
+      const last = screenHistory[screenHistory.length - 1];
+      setScreenHistory(screenHistory.slice(0, -1));
+      if (last) setScreen(last);
+      return;
+    }
+    setScreen("PAINEL");
+  });
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
