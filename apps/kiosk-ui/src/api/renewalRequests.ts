@@ -54,7 +54,43 @@ export async function resolveRenewal(sessionId: string, outcome: "APLICADA" | "D
     p_payload: {},
   });
   if (error) throw new Error(error.message);
+  notifyRenewalsChanged();
 }
+
+/** Evita o badge "fantasma" até o próximo poll de 10s. */
+export function notifyRenewalsChanged(): void {
+  for (const fn of refetchListeners) fn();
+}
+
+export type ApplyRenewalStatus =
+  | "OK"
+  | "SESSAO_NAO_ATIVA"
+  | "SEM_PEDIDO"
+  | "SEM_PLANO_EQUIVALENTE"
+  | "VARIOS_PLANOS";
+
+export interface ApplyRenewalResult {
+  status: ApplyRenewalStatus;
+  planName?: string;
+  minutes?: number;
+}
+
+/**
+ * "Dar OK": troca o plano para o de duração (atual + minutos pedidos) e só
+ * então grava RENOVACAO_APLICADA — tudo atômico no servidor
+ * (fa_kiosk_apply_renewal). Qualquer status diferente de OK não grava nada.
+ */
+export async function applyRenewal(sessionId: string, employeeId: string | null): Promise<ApplyRenewalResult> {
+  const { data, error } = await supabase().rpc("fa_kiosk_apply_renewal", {
+    p_session_id: sessionId,
+    p_employee_id: employeeId,
+  });
+  if (error) throw new Error(error.message);
+  notifyRenewalsChanged();
+  return data as ApplyRenewalResult;
+}
+
+const refetchListeners = new Set<() => void>();
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -79,10 +115,12 @@ export function usePendingRenewals(sessionIds: string[]): Map<string, PendingRen
       }
     }
     refetch();
+    refetchListeners.add(refetch);
     const interval = setInterval(refetch, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      refetchListeners.delete(refetch);
     };
   }, [key]);
 
