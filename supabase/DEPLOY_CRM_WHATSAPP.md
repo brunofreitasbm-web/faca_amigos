@@ -182,3 +182,10 @@ Passos:
 
 ### Pedido de avaliação no Google: retirado
 `NPS_PROMOTOR` (nota 9 ou 10 → convite para avaliar no Google) está desligado: flag `crm_lc_nps_promotor` = 0 e template `fa_lc_nps_promotor` inativo (migration `20261001140000_fa_crm_retire_google_review.sql`). O `crm-templates-bootstrap` não o recria nem o reativa. `NPS_DETRATOR` segue ligado. Para voltar a usar: remover o nome de `RETIRED`, recolocar a definição em `TEMPLATES`, religar a flag e ativar o template.
+
+## Entrega, bloqueio e custo (migration 20261009130000)
+
+- **Status por mensagem:** `crm-whatsapp-webhook` grava `delivered_at_ms`, `read_at_ms`, `failed_at_ms` e `error_code` em `fa_crm_messages` (além de `status`/`error`).
+- **Falha permanente** (63024, 63003, 21211, 21614): o número vira `opt_in = false` com `opt_out_reason = 'DELIVERY_FAILED'` em todos os canais — os dispatchers já pulam `opt_in = false`. Se o responsável escrever de volta, o webhook reativa. **63049 não bloqueia**: é a Meta recusando aquela mensagem, não o número.
+- **Custo:** `crm-whatsapp-cost-sync` (pg_cron, 30 min) copia o preço da Twilio para `fa_crm_messages.price` e confere na Meta a categoria real de cada template ativo (`fa_crm_templates.category`, `meta_status`). O card "Custo e entrega do WhatsApp" (Gerencial › CRM, `crm.admin`) lê `fa_crm_whatsapp_cost_stats`.
+- Deploy: aplicar a migration, `supabase functions deploy crm-whatsapp-webhook crm-whatsapp-cost-sync crm-templates-bootstrap`.
