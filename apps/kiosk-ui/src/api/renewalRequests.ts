@@ -54,7 +54,11 @@ export async function resolveRenewal(sessionId: string, outcome: "APLICADA" | "D
     p_payload: {},
   });
   if (error) throw new Error(error.message);
+  // Evita o badge "fantasma" até o próximo poll de 10s.
+  for (const fn of refetchListeners) fn();
 }
+
+const refetchListeners = new Set<() => void>();
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -79,10 +83,12 @@ export function usePendingRenewals(sessionIds: string[]): Map<string, PendingRen
       }
     }
     refetch();
+    refetchListeners.add(refetch);
     const interval = setInterval(refetch, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      refetchListeners.delete(refetch);
     };
   }, [key]);
 

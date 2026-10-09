@@ -365,8 +365,19 @@ export function PainelScreen() {
     try {
       await resolveRenewal(sessionId, outcome, employee?.id ?? null);
       if (outcome === "APLICADA") {
-        setPendingPlanId("");
+        // "Dar OK" só registra o pedido — o tempo só muda trocando o plano.
+        // Pré-seleciona o plano cuja duração = plano atual + minutos pedidos
+        // (o início da sessão não reinicia, então é isso que dá "+N min").
+        const entry = entries.find((e) => e.session.id === sessionId);
+        const current = planOptions.find((p) => p.id === entry?.plan.id);
+        const asMinutes = (p: Plan) => (p.durationUnit === "HORA" ? p.durationValue * 60 : p.durationValue);
+        const asked = pendingRenewals.get(sessionId)?.minutes ?? 0;
+        const target = current && asked > 0 ? asMinutes(current) + asked : null;
+        const match = target == null ? undefined : changePlanOptions.find((p) => !p.id.startsWith(PACKAGE_PREFIX) && asMinutes(p) === target);
+        setPendingPlanId(match?.id ?? "");
         setChangingPlanFor(sessionId);
+        if (match) toast.success(`Pedido registrado. Confirme a troca para "${match.name}" para somar o tempo.`);
+        else toast.success("Pedido registrado. Escolha o novo plano e confirme para somar o tempo.");
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não deu para atualizar o pedido de renovação.");
