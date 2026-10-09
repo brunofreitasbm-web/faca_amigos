@@ -138,6 +138,10 @@ export interface Unit {
   latitude?: number | null;
   longitude?: number | null;
   geofence_radius_m?: number | null;
+  opening_hour_mon_sat?: string | null;
+  closing_hour_mon_sat?: string | null;
+  opening_hour_sun?: string | null;
+  closing_hour_sun?: string | null;
 }
 
 /** Uma bobina de cupom (`fa_kiosk_paper_rolls`) — ver Gerencial > Bobinas. */
@@ -217,7 +221,7 @@ export interface Employee {
 }
 
 export type SessionReportWhatsappStatus =
-  | "PENDING" | "SENT" | "SKIPPED_NO_CONSENT" | "SKIPPED_OPT_OUT" | "SKIPPED_NO_PHONE"
+  | "PENDING" | "SENT" | "SENT_MANUAL" | "SKIPPED_NO_CONSENT" | "SKIPPED_OPT_OUT" | "SKIPPED_NO_PHONE"
   | "SKIPPED_NO_CHANNEL" | "SKIPPED_NO_TEMPLATE" | "FAILED";
 
 /** Sessão finalizada (plano >= 1h) ainda sem Olhar FaçaAmigos. Sem telefone, de propósito. */
@@ -4018,7 +4022,20 @@ export const Api = {
       : `https://wa.me/?text=${encodeURIComponent(defaultMsg)}`;
 
     window.open(waUrl, "_blank", "noopener");
+
+    // Marca como resolvido para o alerta piscante parar — o responsável já
+    // recebeu o PDF pela mão do operador, mesmo que a Twilio tenha recusado.
+    try {
+      await Api.sessionReportMarkSentManually(reportId);
+    } catch {
+      /* não bloqueia o fluxo: o WhatsApp já abriu, o operador já pode enviar */
+    }
   },
+  /** Confirma que o operador enviou o PDF manualmente pelo WhatsApp dele — ver uso acima. */
+  sessionReportMarkSentManually: (reportId: string) =>
+    unwrap<SessionReportWhatsappStatus>(
+      supabase().rpc("fa_session_report_mark_sent_manually", { p_report_id: reportId }),
+    ),
   /** Histórico do Gerencial. A RLS já limita a quem tem 'relatorio_sessao.read'. */
   sessionReportsList: (filters: { unitId?: string | null; sinceMs: number; untilMs: number }) => {
     let q = supabase()
@@ -4167,6 +4184,10 @@ export const Api = {
       latitude?: number | null;
       longitude?: number | null;
       geofenceRadiusM?: number | null;
+      openingHourMonSat?: string | null;
+      closingHourMonSat?: string | null;
+      openingHourSun?: string | null;
+      closingHourSun?: string | null;
     },
   ) => unwrap(supabase().rpc("fa_config_update_unit", { p_unit_id: unitId, p_payload: body })),
   unitFiscal: (unitId: string) =>

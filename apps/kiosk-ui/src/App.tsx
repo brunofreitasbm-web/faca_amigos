@@ -19,6 +19,7 @@ import { unitBrandFor } from "./branding/unitBrand.js";
 import { useSwipeNavigation } from "./hooks/useSwipeNavigation.js";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts.js";
 import { usePrintFailureAlerts } from "./hooks/usePrintFailureAlerts.js";
+import { useSessionReportFailureAlerts } from "./hooks/useSessionReportFailureAlerts.js";
 import { RecordingIndicator } from "./components/RecordingIndicator.js";
 import { voiceRecorder } from "./lib/voiceRecorder.js";
 import { useAppState } from "./state/AppState.js";
@@ -299,6 +300,7 @@ export function App() {
   });
 
   usePrintFailureAlerts(unit?.id ?? null);
+  useSessionReportFailureAlerts(unit?.id ?? null);
 
   const swipeHandlers = useSwipeNavigation(
     () => {

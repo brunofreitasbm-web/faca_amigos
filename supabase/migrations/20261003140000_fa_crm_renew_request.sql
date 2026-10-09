@@ -21,7 +21,7 @@ declare
   v_cents integer;
   v_last text;
 begin
-  v_cents := case p_minutes when 30 then 4800 when 60 then 9600 else null end;
+  v_cents := case p_minutes when 30 then 4800 when 60 then 9600 else (p_minutes * 160 / 100) * 100 end;
   if v_cents is null then return jsonb_build_object('status', 'INVALID'); end if;
 
   select coalesce(c.guardian_id, (select g.id from fa_kiosk_guardians g where g.phone_e164 = c.phone_e164 limit 1))

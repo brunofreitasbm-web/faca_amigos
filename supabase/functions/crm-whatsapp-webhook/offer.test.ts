@@ -69,6 +69,8 @@ Deno.test("pedido de renovação do botão da tela", () => {
   assertEquals(b?.minutes, 60);
   assertEquals(b?.childHint, "Noah");
   assertEquals(renewRequest("quero renovar 1 hora")?.minutes, 60);
+  assertEquals(renewRequest("quero renovar 15 min")?.minutes, 15);
+  assertEquals(renewRequest("Quero renovar +45")?.minutes, 45);
   assertEquals(renewRequest("Quero renovar")?.minutes, null, "sem duração");
   assertEquals(renewRequest("Quero renovar")?.childHint, null);
   assertEquals(renewRequest("Quero renovar +30 min da Maria!")?.childHint, "Maria", "pontuação final");

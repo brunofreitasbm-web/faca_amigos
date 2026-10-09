@@ -98,6 +98,8 @@ export function AcompanharScreen({ code }: { code: string }) {
           assetKind={sessao.plan.assetKind}
           timing={timing}
           isPausada={sessao.status === "PAUSADA"}
+          closingHourMonSat={"closingHourMonSat" in sessao ? sessao.closingHourMonSat : null}
+          closingHourSun={"closingHourSun" in sessao ? sessao.closingHourSun : null}
         />
       )}
     </div>
@@ -119,6 +121,8 @@ function AcompanharConteudo({
   assetKind,
   timing,
   isPausada,
+  closingHourMonSat,
+  closingHourSun,
 }: {
   childFirstName: string;
   childVisitCount?: number;
@@ -127,6 +131,8 @@ function AcompanharConteudo({
   assetKind: CircuitoAssetKind | null;
   timing: SessionTiming;
   isPausada: boolean;
+  closingHourMonSat: string | null;
+  closingHourSun: string | null;
 }) {
   const phase = isPausada ? "PAUSADA" : timing.phase;
   const color = isPausada ? "var(--color-teal)" : PHASE_COLOR[timing.phase];
@@ -142,6 +148,8 @@ function AcompanharConteudo({
     isPausada,
     childFirstName,
     remainingMs: timing.durationMs - timing.elapsedMs,
+    closingHourMonSat,
+    closingHourSun,
   });
 
   const oferta = ofertaParaSessao({

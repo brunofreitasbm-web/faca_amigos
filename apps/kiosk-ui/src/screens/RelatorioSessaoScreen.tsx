@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, HelpText } from "@facaamigos/ui";
 import { Api, type RecentSessionReport, type SessionReportWhatsappStatus } from "../api/client.js";
-import { usePendingSessionReports } from "../api/useSessionReports.js";
+import { startOfTodayMs, usePendingSessionReports } from "../api/useSessionReports.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { SessionReportForm, formatCountdown } from "../components/session-report/SessionReportForm.js";
@@ -9,6 +9,7 @@ import { SessionReportForm, formatCountdown } from "../components/session-report
 const STATUS_TEXT: Record<SessionReportWhatsappStatus, { label: string; tone: "teal" | "amber" | "neutral" | "solid_pink" }> = {
   PENDING: { label: "Aguardando envio", tone: "amber" },
   SENT: { label: "✅ Enviado ao responsável", tone: "teal" },
+  SENT_MANUAL: { label: "✅ Enviado manualmente (PDF)", tone: "teal" },
   SKIPPED_NO_CONSENT: { label: "Responsável não autorizou WhatsApp", tone: "neutral" },
   SKIPPED_OPT_OUT: { label: "Responsável pediu para não receber", tone: "neutral" },
   SKIPPED_NO_PHONE: { label: "Sem telefone cadastrado", tone: "neutral" },
@@ -21,12 +22,6 @@ const STATUS_TEXT: Record<SessionReportWhatsappStatus, { label: string; tone: "t
 const RETRYABLE: ReadonlySet<SessionReportWhatsappStatus> = new Set([
   "PENDING", "FAILED", "SKIPPED_NO_TEMPLATE", "SKIPPED_NO_CHANNEL", "SKIPPED_NO_CONSENT",
 ]);
-
-function startOfTodayMs(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
 
 const hhmm = (ms: number) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
@@ -98,6 +93,7 @@ export function RelatorioSessaoScreen() {
     [toast, loadRecent],
   );
 
+  const failedCount = recent.filter((r) => r.whatsapp_status === "FAILED").length;
   const selected = pending.find((p) => p.session_id === selectedId) ?? null;
 
   const handleSubmitted = (reportId: string | null) => {
@@ -110,6 +106,11 @@ export function RelatorioSessaoScreen() {
 
   return (
     <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px", overflow: "auto", height: "100%" }}>
+      <style>{`
+        @keyframes fa-session-report-banner-blink {
+          50% { opacity: 0.55; }
+        }
+      `}</style>
       <div>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Olhar FaçaAmigos</h2>
         <HelpText>
@@ -117,6 +118,32 @@ export function RelatorioSessaoScreen() {
           profissional ou estagiário pode preencher — não é dividido por especialidade. O responsável recebe um resumo no WhatsApp.
         </HelpText>
       </div>
+
+      {failedCount > 0 && (
+        <div
+          role="alert"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "10px 14px",
+            borderRadius: "8px",
+            background: "var(--color-error-text, #b3261e)",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "13px",
+            animation: "fa-session-report-banner-blink 1s step-start infinite",
+          }}
+        >
+          <span>⚠️</span>
+          <span>
+            {failedCount === 1
+              ? "1 Olhar FaçaAmigos não chegou pelo WhatsApp automático."
+              : `${failedCount} Olhares FaçaAmigos não chegaram pelo WhatsApp automático.`}{" "}
+            Envie o PDF manualmente abaixo, em "Enviados hoje", para o responsável não ficar sem receber.
+          </span>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ flex: "1 1 320px", minWidth: 0, maxWidth: selected ? 380 : undefined, display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -166,7 +193,9 @@ export function RelatorioSessaoScreen() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 600, flex: 1, minWidth: 0 }}>{r.child_name_snapshot}</div>
                   {r.late && <Badge variant="amber">fora do prazo</Badge>}
-                  <Badge variant={st.tone}>{busy ? "Enviando…" : st.label}</Badge>
+                  <span style={r.whatsapp_status === "FAILED" && !busy ? { animation: "fa-session-report-banner-blink 1s step-start infinite" } : undefined}>
+                    <Badge variant={st.tone}>{busy ? "Enviando…" : st.label}</Badge>
+                  </span>
                 </div>
                 <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                   {hhmm(r.filled_at_ms)} · por {r.filled_by_name}

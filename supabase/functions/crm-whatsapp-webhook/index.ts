@@ -333,7 +333,7 @@ function renewalChoice(buttonPayload: string | undefined, body: string): number 
 }
 
 type RenewalResult =
-  | { status: "OK"; minutes: number; cents: number }
+  | { status: "OK"; minutes: number; cents: number; closingHourMonSat: string | null; closingHourSun: string | null }
   | { status: "ALREADY" | "EXPIRED" | "NONE" };
 
 /** Pedido gravado como RENOVACAO_SOLICITADA (o balcão já consome); devolve a resposta automática ou null. */
@@ -344,16 +344,52 @@ async function handleRenewal(admin: ReturnType<typeof createClient>, contactId: 
     return null;
   }
   const result = data as RenewalResult;
-  return result.status === "NONE" ? null : renewalReplyText(result);
+  return result.status === "NONE" ? null : renewalReplyText(result, now);
 }
 
 const brl = (cents: number) => `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
 
-function renewalReplyText(result: RenewalResult): string {
+function getClosingReminder(nowMs: number, addedMinutes: number, closingHourMonSat: string | null, closingHourSun: string | null): string | null {
+  const expectedEndMs = nowMs + addedMinutes * 60 * 1000;
+  const belemFormatter = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Belem",
+    weekday: "short",
+    hour: "numeric",
+  });
+  const partsNow = belemFormatter.formatToParts(nowMs);
+  let isSunday = false;
+  for (const p of partsNow) {
+    if (p.type === "weekday" && p.value.toLowerCase().startsWith("dom")) isSunday = true;
+  }
+  
+  let closingHour = isSunday ? 21 : 22;
+  const configuredTime = isSunday ? closingHourSun : closingHourMonSat;
+  if (configuredTime) {
+    const [ch] = configuredTime.split(":").map(Number);
+    if (!isNaN(ch)) closingHour = ch;
+  }
+  
+  const partsEnd = belemFormatter.formatToParts(expectedEndMs);
+  let endHour = 0;
+  for (const p of partsEnd) {
+    if (p.type === "hour") endHour = parseInt(p.value, 10);
+  }
+  
+  if (endHour >= closingHour || endHour < 5) {
+    return `Lembrete: o shopping fecha às ${closingHour}h hoje, fique atento ao horário! 💛`;
+  }
+  return null;
+}
+
+function renewalReplyText(result: RenewalResult, now: number): string {
   // TODO(human): tom de voz de cada desfecho do pedido de renovação.
   switch (result.status) {
-    case "OK":
-      return `Combinado! Avisamos a recepção: +${result.minutes} min por ${brl(result.cents)}. O valor é acertado no balcão. 💛`;
+    case "OK": {
+      let msg = `Combinado! Avisamos a recepção: +${result.minutes} min por ${brl(result.cents)}. O valor é acertado no balcão. 💛`;
+      const reminder = getClosingReminder(now, result.minutes, result.closingHourMonSat, result.closingHourSun);
+      if (reminder) msg += `\n\n${reminder}`;
+      return msg;
+    }
     case "ALREADY":
       return "Já avisamos a recepção sobre o seu pedido. 💛";
     default:
@@ -365,7 +401,7 @@ function renewalReplyText(result: RenewalResult): string {
 const OVERAGE_RENEW_PAYLOAD = "RENOVAR_ATUAL";
 
 type OverageRenewalResult =
-  | { status: "OK"; minutes: number; cents: number }
+  | { status: "OK"; minutes: number; cents: number; closingHourMonSat: string | null; closingHourSun: string | null }
   | { status: "ALREADY" | "EXPIRED" | "NONE" };
 
 const planLabel = (minutes: number) =>
@@ -380,8 +416,12 @@ async function handleOverageRenewal(admin: ReturnType<typeof createClient>, cont
   }
   const result = data as OverageRenewalResult;
   switch (result.status) {
-    case "OK":
-      return `Combinado! Avisamos a recepção para renovar o plano: ${planLabel(result.minutes)} por ${brl(result.cents)}. Você recebe a confirmação assim que a equipe aplicar. 💛`;
+    case "OK": {
+      let msg = `Combinado! Avisamos a recepção para renovar o plano: ${planLabel(result.minutes)} por ${brl(result.cents)}. Você recebe a confirmação assim que a equipe aplicar. 💛`;
+      const reminder = getClosingReminder(now, result.minutes, result.closingHourMonSat, result.closingHourSun);
+      if (reminder) msg += `\n\n${reminder}`;
+      return msg;
+    }
     case "ALREADY":
       return "Já avisamos a recepção sobre o seu pedido. 💛";
     case "EXPIRED":
@@ -608,7 +648,7 @@ const RENEW_HELP =
   "Para renovar, toque em um dos botões na tela de acompanhamento ou responda “Quero renovar 30” (+30 min por R$ 48,00) ou “Quero renovar 60” (+60 min por R$ 96,00). 💛";
 
 type RenewRequestResult =
-  | { status: "OK"; minutes: number; cents: number }
+  | { status: "OK"; minutes: number; cents: number; closingHourMonSat: string | null; closingHourSun: string | null }
   | { status: "ALREADY" | "AMBIGUOUS" | "NO_SESSION" | "INVALID" };
 
 /**
@@ -619,7 +659,7 @@ type RenewRequestResult =
 async function handleRenewRequest(
   admin: ReturnType<typeof createClient>,
   contactId: string,
-  minutes: 30 | 60 | null,
+  minutes: number | null,
   childHint: string | null,
   now: number,
 ): Promise<string> {
@@ -633,8 +673,12 @@ async function handleRenewRequest(
   }
   const r = data as RenewRequestResult;
   switch (r.status) {
-    case "OK":
-      return `Combinado! Avisamos a recepção: +${r.minutes} min por ${brl(r.cents)}. O valor é acertado no balcão. 💛`;
+    case "OK": {
+      let msg = `Combinado! Avisamos a recepção: +${r.minutes} min por ${brl(r.cents)}. O valor é acertado no balcão. 💛`;
+      const reminder = getClosingReminder(now, r.minutes, r.closingHourMonSat, r.closingHourSun);
+      if (reminder) msg += `\n\n${reminder}`;
+      return msg;
+    }
     case "ALREADY":
       return "Já avisamos a recepção sobre o seu pedido. 💛";
     case "AMBIGUOUS":

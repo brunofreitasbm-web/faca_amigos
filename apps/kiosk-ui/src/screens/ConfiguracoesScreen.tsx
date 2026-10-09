@@ -1952,6 +1952,10 @@ function UnidadeTab({ unitId }: { unitId: string }) {
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [geofenceRadiusM, setGeofenceRadiusM] = useState("");
+  const [openingHourMonSat, setOpeningHourMonSat] = useState("");
+  const [closingHourMonSat, setClosingHourMonSat] = useState("");
+  const [openingHourSun, setOpeningHourSun] = useState("");
+  const [closingHourSun, setClosingHourSun] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1964,6 +1968,10 @@ function UnidadeTab({ unitId }: { unitId: string }) {
     setLatitude(unit.latitude != null ? String(unit.latitude) : "");
     setLongitude(unit.longitude != null ? String(unit.longitude) : "");
     setGeofenceRadiusM(unit.geofence_radius_m != null ? String(unit.geofence_radius_m) : "");
+    setOpeningHourMonSat(unit.opening_hour_mon_sat ?? "10:00");
+    setClosingHourMonSat(unit.closing_hour_mon_sat ?? "22:00");
+    setOpeningHourSun(unit.opening_hour_sun ?? "12:00");
+    setClosingHourSun(unit.closing_hour_sun ?? "21:00");
   }, [unit]);
 
   async function save() {
@@ -1978,6 +1986,10 @@ function UnidadeTab({ unitId }: { unitId: string }) {
         latitude: latitude.trim() ? Number(latitude) : null,
         longitude: longitude.trim() ? Number(longitude) : null,
         geofenceRadiusM: geofenceRadiusM.trim() ? Number(geofenceRadiusM) : null,
+        openingHourMonSat: openingHourMonSat.trim() || null,
+        closingHourMonSat: closingHourMonSat.trim() || null,
+        openingHourSun: openingHourSun.trim() || null,
+        closingHourSun: closingHourSun.trim() || null,
       });
       await refreshUnits();
       toast.success("Dados da unidade salvos com sucesso.");
@@ -2080,6 +2092,21 @@ function UnidadeTab({ unitId }: { unitId: string }) {
         <Button variant="secondary" onClick={usarLocalizacaoAtual} style={{ alignSelf: "flex-start" }}>
           📍 Usar localização atual deste dispositivo
         </Button>
+      </Card>
+
+      <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>Horário de Funcionamento</h2>
+        <HelpText>
+          Configure os horários de abertura e fechamento do shopping onde a unidade se localiza. O alerta automático de término e as opções de renovação dependem deste horário.
+        </HelpText>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <Input label="Abertura (Seg-Sáb)" type="time" value={openingHourMonSat} onChange={(e) => setOpeningHourMonSat(e.target.value)} style={{ flex: 1, minWidth: "140px" }} />
+          <Input label="Fechamento (Seg-Sáb)" type="time" value={closingHourMonSat} onChange={(e) => setClosingHourMonSat(e.target.value)} style={{ flex: 1, minWidth: "140px" }} />
+        </div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <Input label="Abertura (Domingo)" type="time" value={openingHourSun} onChange={(e) => setOpeningHourSun(e.target.value)} style={{ flex: 1, minWidth: "140px" }} />
+          <Input label="Fechamento (Domingo)" type="time" value={closingHourSun} onChange={(e) => setClosingHourSun(e.target.value)} style={{ flex: 1, minWidth: "140px" }} />
+        </div>
       </Card>
 
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>

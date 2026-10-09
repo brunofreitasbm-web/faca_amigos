@@ -43,6 +43,8 @@ export const acompanharSessaoSchema = z.discriminatedUnion("status", [
     plan: acompanharPlanoSchema,
     /** Contagem total de visitas acumuladas da criança no programa de fidelidade. */
     childVisitCount: z.number().int().nonnegative().optional().default(1).catch(1),
+    closingHourMonSat: z.string().nullable().optional().default(null).catch(null),
+    closingHourSun: z.string().nullable().optional().default(null).catch(null),
   }),
 ]);
 export type AcompanharSessao = z.infer<typeof acompanharSessaoSchema>;

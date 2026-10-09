@@ -93,19 +93,30 @@ export function phoneVariants(e164: string): string[] {
   return nine ? [e164, `+55${ddd}${rest}`] : [e164, `+55${ddd}9${rest}`];
 }
 
-export type RenewRequest ={ minutes: 30 | 60 | null; childHint: string | null };
+export type RenewRequest ={ minutes: number | null; childHint: string | null };
 
 /**
  * Pedido de renovação vindo do botão da tela de acompanhamento: o link wa.me
- * abre a conversa com "Quero renovar +30 min da Maria" (ou "+60 min"). Sem 30
- * nem 60 no texto, `minutes` vem null e o webhook explica como pedir. Mantenha
+ * abre a conversa com "Quero renovar +30 min da Maria" (ou "+60 min", ou "+15 min"). Sem
+ * indicação de tempo no texto, `minutes` vem null e o webhook explica como pedir. Mantenha
  * em sincronia com apps/kiosk-ui/src/screens/acompanhar/renovarSite.ts.
  */
 export function renewRequest(body: string): RenewRequest | null {
   if (body.length > SITE_KEYWORD_MAX_LENGTH) return null;
   const t = body.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   if (!/\brenov(ar|a[cç]ao)\b/.test(t)) return null;
-  const minutes = /\b60\b|\b1 ?h(ora)?\b/.test(t) ? 60 : /\b30\b/.test(t) ? 30 : null;
+  
+  let minutes: number | null = null;
+  const matchMin = t.match(/\b(\d+)\s*m(in)?/);
+  if (matchMin) {
+    minutes = parseInt(matchMin[1], 10);
+  } else if (/\b1 ?h(ora)?\b/.test(t)) {
+    minutes = 60;
+  } else {
+    const matchNum = t.match(/(?:\+)?(\d+)/);
+    if (matchNum) minutes = parseInt(matchNum[1], 10);
+  }
+  
   const hint = body.trim().match(/\bd[ao]\s+([^\s.,!?]+)\s*[.!?]*$/i);
   return { minutes, childHint: hint ? hint[1] : null };
 }
