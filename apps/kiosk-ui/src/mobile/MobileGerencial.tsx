@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useBackHandler } from "../hooks/useBackHandler.js";
 import type { Unit } from "../api/client.js";
 import { GerencialApp } from "../screens/gerencial/GerencialApp.js";
 import { MobileGerencialHome } from "./MobileGerencialHome.js";
@@ -27,6 +28,8 @@ type View = { kind: "HOME" } | { kind: "UNIT"; unit: Unit } | { kind: "RELATORIO
  */
 export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; onExit: () => void; onLogout: () => void | Promise<void> }) {
   const [view, setView] = useState<View>({ kind: "HOME" });
+  // Voltar do aparelho leva à home do Gerencial antes de sair dele.
+  useBackHandler(view.kind === "HOME" ? 0 : 1, () => setView({ kind: "HOME" }));
 
   if (view.kind === "FULL") {
     return <GerencialApp onExit={onExit} onLogout={onLogout} />;
