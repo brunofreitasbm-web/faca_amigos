@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- corpos JSON dinâmicos / mocks de teste */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { AppContext } from "../context.js";
 import { listUnits, getUnit, getAppSetting } from "@facaamigos/db-local";
@@ -286,7 +287,7 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
     for (const p of paymentRows) {
       const saleDate = saleDateByOrderId.get(p.order_id);
       const day = saleDate ? daysMap.get(saleDate) : undefined;
-      if (day && day.porMeioPagamento.hasOwnProperty(p.method)) {
+      if (day && Object.prototype.hasOwnProperty.call(day.porMeioPagamento, p.method)) {
         day.porMeioPagamento[p.method] += p.amount_cents;
       }
     }
@@ -294,7 +295,7 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
     for (const n of natureRows) {
       const saleDate = saleDateByOrderId.get(n.order_id);
       const day = saleDate ? daysMap.get(saleDate) : undefined;
-      if (day && day.porNatureza.hasOwnProperty(n.item_nature)) {
+      if (day && Object.prototype.hasOwnProperty.call(day.porNatureza, n.item_nature)) {
         day.porNatureza[n.item_nature] += n.total_cents;
       }
     }

@@ -69,7 +69,7 @@ export function OwnerAcompanhamentoTab() {
                 return nowMs > createdMs + durMs;
               }).length;
             }
-          } catch {}
+          } catch { /* melhor esforço: falha ignorada */ }
 
           return {
             unitId: unit.id,

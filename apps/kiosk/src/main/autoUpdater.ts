@@ -143,6 +143,7 @@ export function checkForUpdatesAndWait(timeoutMs = 5 * 60 * 1000): Promise<void>
 
   return new Promise((resolve) => {
     let settled = false;
+    // eslint-disable-next-line prefer-const -- atribuído depois de cleanup/onSettle (referência circular)
     let timer: ReturnType<typeof setTimeout>;
 
     const cleanup = () => {

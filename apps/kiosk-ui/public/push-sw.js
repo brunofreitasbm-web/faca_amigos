@@ -1,3 +1,4 @@
+/* global self */
 // Handler de Web Push, injetado no service worker gerado pelo Workbox via
 // `workbox.importScripts` (vite.config.ts) — o generateSW do vite-plugin-pwa
 // não dá espaço para eventos custom dentro do próprio config, então este

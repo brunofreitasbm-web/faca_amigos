@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- corpos JSON dinâmicos / mocks de teste */
 /**
  * Cliente e Serviço do Agente de IA Comercial (powered by Gemini API)
  * para o sistema FaçaAmigos.
@@ -573,8 +574,8 @@ Responda EXCLUSIVAMENTE em formato JSON:
   }
 
 function parseMetricsFromSummary(summary: string) {
-  const fatMatch = summary.match(/Faturamento total do período:\s*R\$\s*([\d\.,]+)/i);
-  const ticketMatch = summary.match(/Ticket médio:\s*R\$\s*([\d\.,]+)/i);
+  const fatMatch = summary.match(/Faturamento total do período:\s*R\$\s*([\d.,]+)/i);
+  const ticketMatch = summary.match(/Ticket médio:\s*R\$\s*([\d.,]+)/i);
   const ordersMatch = summary.match(/Pedidos pagos:\s*(\d+)/i);
   const visitsMatch = summary.match(/Total de visitas \(sessões\):\s*(\d+)/i);
   const periodMatch = summary.match(/Período real analisado:\s*([\d-]+)\s*a\s*([\d-]+)/i);

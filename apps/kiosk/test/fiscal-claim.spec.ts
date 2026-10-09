@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- corpos JSON dinâmicos / mocks de teste */
+import type * as FiscalModule from "@facaamigos/fiscal";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -52,7 +54,7 @@ vi.mock("../src/fiscal/vault.js", () => ({
 // claim.ts quanto transitivamente por nfse.ts) — só monta/assina o XML da
 // NFC-e são substituídos, porque exigiriam um certificado de verdade.
 vi.mock("@facaamigos/fiscal", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@facaamigos/fiscal")>();
+  const actual = await importOriginal<typeof FiscalModule>();
   return {
     ...actual,
     montarXmlNfce: montarXmlNfceMock,

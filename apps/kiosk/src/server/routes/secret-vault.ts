@@ -93,7 +93,7 @@ export function registerSecretVaultRoutes(app: FastifyInstance, ctx: AppContext)
     if (!secret) {
       const dbRow = ctx.db.prepare("SELECT value FROM app_settings WHERE key = ?").get(`secret_${id}`) as { value: string } | undefined;
       if (dbRow) {
-        try { secret = JSON.parse(dbRow.value) as SecretItem; } catch {}
+        try { secret = JSON.parse(dbRow.value) as SecretItem; } catch { /* melhor esforço: falha ignorada */ }
       }
     }
 

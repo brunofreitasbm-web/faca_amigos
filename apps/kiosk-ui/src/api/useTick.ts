@@ -76,7 +76,7 @@ export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
         if (ch.topic.includes("fa_kiosk_sessions")) {
           try {
             supabase().removeChannel(ch);
-          } catch (_) {}
+          } catch (_) { /* melhor esforço: falha ignorada */ }
         }
       }
 
@@ -94,7 +94,7 @@ export function useActiveSessions(unitId: string | null): ActiveSessionsResult {
       if (channel) {
         try {
           supabase().removeChannel(channel);
-        } catch (_) {}
+        } catch (_) { /* melhor esforço: falha ignorada */ }
       }
     };
   }, [unitId, refetch]);

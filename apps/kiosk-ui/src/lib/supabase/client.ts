@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- schema Postgres sem tipos gerados (ver nota abaixo) */
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Sem geração de tipos a partir do schema Postgres ainda (Fase 0 recém

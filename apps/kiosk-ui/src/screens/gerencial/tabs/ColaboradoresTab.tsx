@@ -338,6 +338,7 @@ export function ColaboradoresTab() {
       )}
 
       {/* Filtro por categoria oculto por decisão de produto (reativar trocando false por true). */}
+      {/* eslint-disable-next-line no-constant-binary-expression */}
       {false && !showForm && (
         <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
           <Button

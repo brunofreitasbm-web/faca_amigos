@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- corpos JSON dinâmicos / mocks de teste */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { authenticateShoppingRequest, createServiceClient, formatIsoTimezone, getShoppingUnitMetadata } from "../../../_shopping/common.js";
 
