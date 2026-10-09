@@ -76,20 +76,7 @@ export function PainelScreen() {
   const pendingRenewals = usePendingRenewals(entries.map((e) => e.session.id));
   const [renewalBusy, setRenewalBusy] = useState<Set<string>>(new Set());
 
-  async function handleRenewalOutcome(sessionId: string, outcome: "APLICADA" | "DISPENSADA") {
-    setRenewalBusy((prev) => new Set(prev).add(sessionId));
-    try {
-      await resolveRenewal(sessionId, outcome, employee?.id ?? null);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não deu para atualizar o pedido de renovação.");
-    } finally {
-      setRenewalBusy((prev) => {
-        const next = new Set(prev);
-        next.delete(sessionId);
-        return next;
-      });
-    }
-  }
+  // handleRenewalOutcome moved down
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionBusy, setActionBusy] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -371,6 +358,25 @@ export function PainelScreen() {
       "WHATSAPP",
       `URGENTE: ${guardianName}, por favor compareça ao parque — ${entry.session.child_name_snapshot} precisa de você (banheiro / quer ir embora).`,
     );
+  }
+
+  async function handleRenewalOutcome(sessionId: string, outcome: "APLICADA" | "DISPENSADA") {
+    setRenewalBusy((prev) => new Set(prev).add(sessionId));
+    try {
+      await resolveRenewal(sessionId, outcome, employee?.id ?? null);
+      if (outcome === "APLICADA") {
+        setPendingPlanId("");
+        setChangingPlanFor(sessionId);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não deu para atualizar o pedido de renovação.");
+    } finally {
+      setRenewalBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
   }
 
   async function confirmChangePlan(sessionId: string) {
