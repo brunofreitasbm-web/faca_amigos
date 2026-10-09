@@ -6,7 +6,7 @@ import type { ActiveSessionEntry, Plan, Package, Asset, BonusRule, VipFlag } fro
 import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO } from "../bonificacao.js";
 import type { BonusProgramConfig } from "../lib/apuracaoBonificacao.js";
 import { useActiveSessions } from "../api/useTick.js";
-import { usePendingRenewals, resolveRenewal } from "../api/renewalRequests.js";
+import { usePendingRenewals, resolveRenewal, applyRenewal } from "../api/renewalRequests.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useConfirm } from "../state/ConfirmContext.js";
@@ -363,22 +363,31 @@ export function PainelScreen() {
   async function handleRenewalOutcome(sessionId: string, outcome: "APLICADA" | "DISPENSADA") {
     setRenewalBusy((prev) => new Set(prev).add(sessionId));
     try {
-      await resolveRenewal(sessionId, outcome, employee?.id ?? null);
-      if (outcome === "APLICADA") {
-        // "Dar OK" só registra o pedido — o tempo só muda trocando o plano.
-        // Pré-seleciona o plano cuja duração = plano atual + minutos pedidos
-        // (o início da sessão não reinicia, então é isso que dá "+N min").
-        const entry = entries.find((e) => e.session.id === sessionId);
-        const current = planOptions.find((p) => p.id === entry?.plan.id);
-        const asMinutes = (p: Plan) => (p.durationUnit === "HORA" ? p.durationValue * 60 : p.durationValue);
-        const asked = pendingRenewals.get(sessionId)?.minutes ?? 0;
-        const target = current && asked > 0 ? asMinutes(current) + asked : null;
-        const match = target == null ? undefined : changePlanOptions.find((p) => !p.id.startsWith(PACKAGE_PREFIX) && asMinutes(p) === target);
-        setPendingPlanId(match?.id ?? "");
-        setChangingPlanFor(sessionId);
-        if (match) toast.success(`Pedido registrado. Confirme a troca para "${match.name}" para somar o tempo.`);
-        else toast.success("Pedido registrado. Escolha o novo plano e confirme para somar o tempo.");
+      if (outcome === "DISPENSADA") {
+        await resolveRenewal(sessionId, outcome, employee?.id ?? null);
+        return;
       }
+      // OK troca o plano sozinho (+N min). Sem plano equivalente único, cai no
+      // seletor com o melhor palpite já escolhido; o pedido só é marcado como
+      // aplicado quando a troca for confirmada (confirmChangePlan).
+      const result = await applyRenewal(sessionId, employee?.id ?? null);
+      if (result.status === "OK") {
+        toast.success(`Tempo renovado: plano trocado para "${result.planName}" (+${result.minutes} min).`);
+        return;
+      }
+      if (result.status === "SESSAO_NAO_ATIVA") {
+        toast.error("A sessão está pausada ou encerrada. Retome a sessão e dê OK de novo.");
+        return;
+      }
+      const entry = entries.find((e) => e.session.id === sessionId);
+      const current = planOptions.find((p) => p.id === entry?.plan.id);
+      const asMinutes = (p: Plan) => (p.durationUnit === "HORA" ? p.durationValue * 60 : p.durationValue);
+      const asked = pendingRenewals.get(sessionId)?.minutes ?? 0;
+      const target = current && asked > 0 ? asMinutes(current) + asked : null;
+      const matches = target == null ? [] : changePlanOptions.filter((p) => !p.id.startsWith(PACKAGE_PREFIX) && asMinutes(p) === target);
+      setPendingPlanId(matches.length === 1 ? matches[0]!.id : "");
+      setChangingPlanFor(sessionId);
+      toast.error("Não achei um plano único com esse tempo. Escolha o novo plano e confirme para somar o tempo.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não deu para atualizar o pedido de renovação.");
     } finally {
@@ -398,6 +407,10 @@ export function PainelScreen() {
       setChangingPlanFor(null);
       setPendingPlanId("");
       toast.success("Plano atualizado.");
+      // Pedido de renovação em aberto + plano trocado à mão = pedido atendido.
+      if (pendingRenewals.has(sessionId)) {
+        await resolveRenewal(sessionId, "APLICADA", employee?.id ?? null).catch(() => undefined);
+      }
       // fa_kiosk_sessions muda -> Realtime dispara refetch em useActiveSessions automaticamente.
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível trocar o plano.");
@@ -1188,9 +1201,9 @@ export function PainelScreen() {
 
               {/* Pedido de renovação feito pelo responsável no painel público
                   (?acompanhar=) — só aparece enquanto ninguém do balcão
-                  aplicar ou dispensar. "Aplicar" só marca o pedido como
-                  atendido; a troca de plano em si continua pelo fluxo normal
-                  (Trocar plano) ou pelo Caixa no fechamento. */}
+                  aplicar ou dispensar. "Dar OK" troca o plano na hora
+                  (fa_kiosk_apply_renewal); sem plano equivalente único abre o
+                  seletor abaixo e o pedido é baixado ao confirmar a troca. */}
               {pendingRenewals.has(session.id) && (
                 <div
                   onClick={(e) => e.stopPropagation()}
