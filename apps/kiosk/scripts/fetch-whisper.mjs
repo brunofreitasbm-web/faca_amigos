@@ -1,3 +1,4 @@
+/* global console, process, fetch, Buffer */
 // Baixa o binário Windows x64 (CPU, sem CUDA/BLAS — o PC do balcão não tem
 // GPU dedicada) do whisper.cpp e extrai para vendor/whisper/, de onde
 // electron-builder.yml o empacota via extraResources.

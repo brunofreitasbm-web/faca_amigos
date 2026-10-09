@@ -5,7 +5,7 @@ import { seedDevData } from "../src/server/seed-dev.js";
 import type { FastifyInstance } from "fastify";
 
 let app: FastifyInstance;
-let nowMs = 1_700_000_000_000;
+const nowMs = 1_700_000_000_000;
 const clock = () => nowMs;
 
 beforeEach(async () => {

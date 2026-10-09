@@ -128,7 +128,7 @@ export function listActivePrepaidPackages(
   childId?: string | null,
 ): PrepaidPackageRecord[] {
   let query = "SELECT * FROM prepaid_packages WHERE guardian_id = ? AND status = 'ATIVO'";
-  const args: any[] = [guardianId];
+  const args: (string | number | null)[] = [guardianId];
 
   if (childId) {
     query += " AND (child_id IS NULL OR child_id = ?)";

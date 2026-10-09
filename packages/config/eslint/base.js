@@ -10,7 +10,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist/**", "out/**", "build/**", ".turbo/**", "node_modules/**"],
+    ignores: ["dist/**", "out/**", "build/**", ".turbo/**", "node_modules/**", "**/vite.config.ts.timestamp-*.mjs"],
   },
   {
     rules: {

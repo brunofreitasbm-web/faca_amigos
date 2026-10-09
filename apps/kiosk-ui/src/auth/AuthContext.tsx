@@ -35,14 +35,14 @@ async function fetchCapabilities(): Promise<Set<Capability>> {
         roleFromCache = parsed[parsed.length - 1]?.role as Role | undefined;
       }
     }
-  } catch {}
+  } catch { /* melhor esforço: falha ignorada */ }
 
   try {
     const { data, error } = await supabase().from("fa_kiosk_my_capabilities").select("capability");
     if (!error && data && data.length > 0) {
       return new Set(data.map((row: { capability: string }) => row.capability as Capability));
     }
-  } catch {}
+  } catch { /* melhor esforço: falha ignorada */ }
 
   try {
     const { data: { session } } = await supabase().auth.getSession();
@@ -56,7 +56,7 @@ async function fetchCapabilities(): Promise<Set<Capability>> {
         return getDefaultCapabilitiesForRole(emp.role as Role);
       }
     }
-  } catch {}
+  } catch { /* melhor esforço: falha ignorada */ }
 
   if (roleFromCache) {
     return getDefaultCapabilitiesForRole(roleFromCache);

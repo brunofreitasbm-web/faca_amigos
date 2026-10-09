@@ -67,7 +67,7 @@ export function HistoricoTab() {
       const openShift = rows.find((s) => s.status === "ABERTO");
       setSelectedShiftId(openShift?.id ?? rows[0]?.id ?? "");
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [selectedUnit]);
 
   useEffect(() => {
