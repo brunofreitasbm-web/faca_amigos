@@ -22,6 +22,7 @@ const STATUS_LABEL: Record<SessionReportWhatsappStatus, string> = {
   SKIPPED_NO_CHANNEL: "Sem número da unidade",
   SKIPPED_NO_TEMPLATE: "Sem modelo aprovado",
   FAILED: "Falha no envio",
+  SENT_MANUAL: "Enviado manualmente",
 };
 
 const RETRYABLE: ReadonlySet<SessionReportWhatsappStatus> = new Set([
