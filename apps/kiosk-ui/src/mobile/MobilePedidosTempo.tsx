@@ -113,7 +113,7 @@ export function MobilePedidosTempo({
                     disabled={isBusy}
                     onClick={() => void resolve(entry.session.id, "APLICADA")}
                   >
-                    Já resolvi no balcão
+                    Dar OK (Ciente)
                   </button>
                 </div>
               )}

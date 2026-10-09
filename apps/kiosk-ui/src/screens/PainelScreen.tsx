@@ -951,7 +951,9 @@ export function PainelScreen() {
               // Sem animação: a marca proíbe loop infinito em UI (ver
               // print.css), então a urgência é só borda mais grossa +
               // selo de texto sempre visível (abaixo), nunca movimento.
-              className="painel-card"
+              // EXCEÇÃO: Pedido de tempo do responsável (renewal-attention) ganha movimento
+              // temporário para chamar a atenção do operador até que seja resolvido.
+              className={`painel-card ${pendingRenewals.has(session.id) ? "renewal-attention" : ""}`}
               // O respiro do card acompanha a largura do próprio card (cqi),
               // não a da janela — ver .painel-card em app.css. Vai em
               // bodyStyle porque é lá que os filhos ficam; `flex:1` é o que
@@ -1196,7 +1198,7 @@ export function PainelScreen() {
                     disabled={renewalBusy.has(session.id)}
                     onClick={() => handleRenewalOutcome(session.id, "APLICADA")}
                   >
-                    Já resolvi no balcão
+                    Dar OK (Ciente)
                   </Button>
                   <Button
                     variant="ghost"
