@@ -334,9 +334,11 @@ function Content() {
                   Reenviar ao responsável
                 </Button>
               )}
-              <Button variant="secondary" loading={resending} onClick={() => void resend(detail, true)}>
-                Regerar e reenviar
-              </Button>
+              {!isWhatsappRefusal63049(detail.whatsapp_error) && (
+                <Button variant="secondary" loading={resending} onClick={() => void resend(detail, true)}>
+                  Regerar e reenviar
+                </Button>
+              )}
             </div>
           </div>
         </Modal>
