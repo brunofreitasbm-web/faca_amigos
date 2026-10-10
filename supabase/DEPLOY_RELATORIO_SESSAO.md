@@ -143,7 +143,7 @@ Cada criança tem uma sequência de Olhares e cada um é diferente do anterior:
 
 ## Template `fa_relatorio_sessao_pdf_v3` (Utility)
 
-A Meta reclassificou o `fa_relatorio_sessao_pdf_v2` como **Marketing** (erro 63049 em 35 dos 64 envios): o destaque em `{{3}}` era um elogio gerado por IA e o texto era afetivo. A v3 é só o aviso transacional ("o relatório da visita de {{2}} está pronto") com o botão; o destaque fica dentro do documento e na mensagem de janela aberta. Variáveis: `{{1}}` responsável, `{{2}}` criança, `{{3}}` token no sufixo da URL.
+A Meta reclassificou o `fa_relatorio_sessao_pdf_v2` como **Marketing** (erro 63049 em 35 dos 64 envios): o destaque em `{{3}}` era um elogio gerado por IA e o texto era afetivo. A v3 é só o aviso transacional ("o Olhar FaçaAmigos de {{2}} sobre a visita de hoje está pronto") com o botão; o destaque fica dentro do documento e na mensagem de janela aberta. Variáveis: `{{1}}` responsável, `{{2}}` criança, `{{3}}` token no sufixo da URL.
 
 `session-report-dispatch` escolhe as variáveis pelo `variable_count` do template ativo (4 = v2, 3 = v3), então a troca não exige novo deploy no momento da ativação.
 
@@ -155,6 +155,10 @@ Passos:
 
 ## Template de texto `fa_relatorio_sessao_v4` (Utility, reserva sem botão)
 
-O `fa_relatorio_sessao_v3` (texto) também foi reclassificado pela Meta como Marketing. Ele só é usado quando **não há** template com botão (`RELATORIO_SESSAO_PDF`) ativo; até hoje teve 0 envios. A v4 segue o mesmo desenho do PDF v3: *"Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, acesse: {{3}} É um registro da visita, sem caráter de avaliação."*, com `{{3}}` = só o link.
+O `fa_relatorio_sessao_v3` (texto) também foi reclassificado pela Meta como Marketing. Ele só é usado quando **não há** template com botão (`RELATORIO_SESSAO_PDF`) ativo; até hoje teve 0 envios. A v4 segue o mesmo desenho do PDF v3: *"Olá, {{1}}. O Olhar FaçaAmigos de {{2}} sobre a visita de hoje está pronto. Para abrir o documento, acesse: {{3}} É um registro da brincadeira, sem caráter de avaliação."*, com `{{3}}` = só o link.
 
 `session-report-dispatch` manda "destaque + link" em `{{3}}` apenas para o nome `fa_relatorio_sessao_v3`; para a v4 e seguintes manda só o link. Mesma ordem: publicar o dispatch → `{"names": ["fa_relatorio_sessao_v4"]}` no bootstrap (cria/submete) → repetir após a aprovação (ativa) → desativar a v3 de texto se a v4 vier Utility.
+
+## Sem a palavra "relatório" no que chega à família
+
+"Sessão" e "relatório" são evitados de propósito (blindagem; ver `SESSION_REPORT_DOC_TITLE`). Os templates novos usam "Olhar FaçaAmigos" (botão "Abrir Olhar"). O `fa_pedido_autorizacao_v2` dizia "o relatório e os avisos da visita"; como está aprovado e em uso, não se edita: o catálogo ganhou `fa_pedido_autorizacao_v3` (mesmo texto, trocando só o nome do documento). Crie com `{"names": ["fa_pedido_autorizacao_v3"]}`; ao ser aprovado e ativado ele vira o template de autorização em uso (é o mais novo). Conferir `fa_crm_templates.category` depois: se a Meta reclassificar a v3 como Marketing, desative-a e a v2 volta a valer.
