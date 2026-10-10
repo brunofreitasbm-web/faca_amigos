@@ -5,8 +5,8 @@ export type SessionPhase = "VERDE" | "AMARELO" | "VERMELHO" | "EXCEDENTE";
 const LABELS: Record<SessionPhase, string> = {
   VERDE: "no prazo",
   AMARELO: "acabando",
-  VERMELHO: "estourou o tempo",
-  EXCEDENTE: "excedente cobrável",
+  VERMELHO: "últimos minutos",
+  EXCEDENTE: "estourou o tempo",
 };
 
 // Glifos simples em vez de dependência de ícone (Fase 0 não traz

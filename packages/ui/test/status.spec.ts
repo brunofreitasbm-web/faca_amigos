@@ -11,13 +11,13 @@ import { contrastRatio, WCAG_AA_NORMAL_TEXT } from "../src/tokens/contrast.js";
  */
 const STATUS_PAIRS: Array<[label: string, fg: string, bg: string]> = [
   ["verde preenchido", "#FFFFFF", "#17803F"],
-  ["amarelo preenchido", "#FFFFFF", "#A85D00"],
-  ["vermelho preenchido", "#FFFFFF", "#C21F3A"],
-  ["excedente preenchido", "#FFFFFF", "#7A0E24"],
+  ["amarelo preenchido", "#FFFFFF", "#8A6D00"],
+  ["vermelho preenchido", "#FFFFFF", "#C2410C"],
+  ["excedente preenchido", "#FFFFFF", "#A3162B"],
   ["verde texto sobre soft", "#136836", "#E4F5EA"],
-  ["amarelo texto sobre soft", "#8A4B00", "#FBEADB"],
-  ["vermelho texto sobre soft", "#B0142F", "#FBE3E7"],
-  ["excedente texto sobre soft", "#7A0E24", "#F3DDE1"],
+  ["amarelo texto sobre soft", "#6B5400", "#F7EFC9"],
+  ["vermelho texto sobre soft", "#9A3412", "#FFEDD5"],
+  ["excedente texto sobre soft", "#A3162B", "#FBE3E7"],
 ];
 
 describe("semáforo operacional — contraste WCAG AA", () => {
@@ -35,7 +35,7 @@ describe("semáforo operacional — contraste WCAG AA", () => {
   // ícone + rótulo textual, nunca expõe cor sozinha (ver StatusBadge.tsx).
 
   it("excedente é visivelmente mais escuro que vermelho (evita confundir os dois estados)", () => {
-    expect(contrastRatio("#7A0E24", "#FFFFFF")).toBeGreaterThan(contrastRatio("#C21F3A", "#FFFFFF"));
+    expect(contrastRatio("#A3162B", "#FFFFFF")).toBeGreaterThan(contrastRatio("#C2410C", "#FFFFFF"));
   });
 });
 

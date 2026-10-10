@@ -948,7 +948,10 @@ export function PainelScreen() {
         {entries.map((entry) => {
           const { session, quote, plan, asset } = closingSnapshot.get(entry.session.id) ?? entry;
           const isSelected = selected.has(session.id);
-          const isExceeded = quote.timing.phase === "EXCEDENTE" || quote.timing.phase === "VERMELHO";
+          // "Estourou" só depois de passar do tempo do plano — os últimos minutos
+          // (fase VERMELHO, antes do teto) são só aviso, não excedente.
+          const isExceeded = quote.timing.elapsedMs > quote.timing.durationMs;
+          const displayPhase = isExceeded ? "EXCEDENTE" : quote.timing.phase;
           const isPaused = quote.timing.isPaused;
           const isPausedTooLong = isPaused && quote.timing.pausedForMs >= PAUSE_ALERT_MS;
           const overageLine = quote.lines.find((l) => l.label.startsWith("Excedente"));
@@ -1176,7 +1179,7 @@ export function PainelScreen() {
               </div>
 
               <StatusBadge
-                phase={quote.timing.phase}
+                phase={displayPhase}
                 detail={formatElapsed(quote.timing.elapsedMs)}
                 size="lg"
                 title={isPaused ? "Tempo congelado enquanto a sessão está pausada" : "Tempo de permanência desde a entrada — base para a cobrança"}
