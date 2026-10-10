@@ -90,15 +90,21 @@ async function telegramCall(
     }
     if (res.ok) return { ok: true };
 
-    const data = await res.json().catch(() => null) as { description?: string; parameters?: { retry_after?: number } } | null;
-    const detail = `Telegram ${method} respondeu ${res.status}: ${data?.description ?? ""}`;
+    const data = await res.json().catch(() => null) as
+      | { description?: string; parameters?: { retry_after?: number; migrate_to_chat_id?: number } }
+      | null;
+    // Grupo promovido a supergrupo: o chat_id antigo morre e o Telegram informa o novo.
+    // Fica na resposta do cron e a notificação volta à fila até o secret ser corrigido.
+    const migrateTo = data?.parameters?.migrate_to_chat_id;
+    const detail = `Telegram ${method} respondeu ${res.status}: ${data?.description ?? ""}` +
+      (migrateTo ? ` — novo TELEGRAM_CHAT_ID: ${migrateTo}` : "");
 
     if (res.status === 429 && attempt === 0) {
       const wait = Math.min(data?.parameters?.retry_after ?? 1, MAX_RETRY_AFTER_S);
       await new Promise((r) => setTimeout(r, wait * 1000));
       continue;
     }
-    return { ok: false, retryable: res.status === 429 || res.status >= 500, detail };
+    return { ok: false, retryable: res.status === 429 || res.status >= 500 || Boolean(migrateTo), detail };
   }
   return { ok: false, retryable: true, detail: "429 persistente" };
 }
