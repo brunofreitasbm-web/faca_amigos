@@ -152,3 +152,9 @@ Passos:
 2. Rodar o bootstrap com `{"names": ["fa_relatorio_sessao_pdf_v3"]}` (cria na Twilio e submete à Meta; fica inativo).
 3. Em até 24 h, rodar de novo o mesmo comando: ativa quando a Meta aprovar. Conferir `fa_crm_templates.category`: a Meta decide a categoria pelo conteúdo, então aprovado não garante Utility.
 4. Só então desativar a v2: `update fa_crm_templates set active = false where name = 'fa_relatorio_sessao_pdf_v2'`. A v3 já passa a ser usada ao ativar (é a mais nova), mas a v2 ativa serviria de reserva silenciosa a custo de Marketing.
+
+## Template de texto `fa_relatorio_sessao_v4` (Utility, reserva sem botão)
+
+O `fa_relatorio_sessao_v3` (texto) também foi reclassificado pela Meta como Marketing. Ele só é usado quando **não há** template com botão (`RELATORIO_SESSAO_PDF`) ativo; até hoje teve 0 envios. A v4 segue o mesmo desenho do PDF v3: *"Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, acesse: {{3}} É um registro da visita, sem caráter de avaliação."*, com `{{3}}` = só o link.
+
+`session-report-dispatch` manda "destaque + link" em `{{3}}` apenas para o nome `fa_relatorio_sessao_v3`; para a v4 e seguintes manda só o link. Mesma ordem: publicar o dispatch → `{"names": ["fa_relatorio_sessao_v4"]}` no bootstrap (cria/submete) → repetir após a aprovação (ativa) → desativar a v3 de texto se a v4 vier Utility.
