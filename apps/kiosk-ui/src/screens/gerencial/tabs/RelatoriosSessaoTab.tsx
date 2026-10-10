@@ -8,6 +8,7 @@ import {
   type EmployeeSector,
 } from "@facaamigos/domain";
 import { Api, type SessionReportRow, type SessionReportWhatsappStatus } from "../../../api/client.js";
+import { isWhatsappRefusal63049 } from "../../../api/useSessionReports.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { RequireCapability } from "../../../auth/RequireCapability.js";
@@ -329,14 +330,16 @@ function Content() {
               {detail.public_token && detail.pdf_path && (
                 <Button variant="secondary" onClick={() => void copyLink(detail)}>Copiar link</Button>
               )}
-              {RETRYABLE.has(detail.whatsapp_status) && (
+              {RETRYABLE.has(detail.whatsapp_status) && !isWhatsappRefusal63049(detail.whatsapp_error) && (
                 <Button variant="secondary" loading={resending} onClick={() => void resend(detail)}>
                   Reenviar ao responsável
                 </Button>
               )}
-              <Button variant="secondary" loading={resending} onClick={() => void resend(detail, true)}>
-                Regerar e reenviar
-              </Button>
+              {!isWhatsappRefusal63049(detail.whatsapp_error) && (
+                <Button variant="secondary" loading={resending} onClick={() => void resend(detail, true)}>
+                  Regerar e reenviar
+                </Button>
+              )}
             </div>
           </div>
         </Modal>

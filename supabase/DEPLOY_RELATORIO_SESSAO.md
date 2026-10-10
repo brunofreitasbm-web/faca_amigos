@@ -140,3 +140,15 @@ Cada criança tem uma sequência de Olhares e cada um é diferente do anterior:
 - O nº e o tipo ficam gravados na 1ª geração (`olhar_seq`, `olhar_edition`); regerar não renumera.
 - Blindagem: o painel só soma momentos "fez com autonomia" (nunca cai), sem nota/média/percentual, com legenda fixa dizendo que não mede desempenho nem é indicador clínico/escolar.
 - Deploy: aplicar `20261001130000_fa_olhar_trail.sql` **antes** de publicar `session-report-dispatch` (o dispatch passa `p_olhar_seq`/`p_olhar_edition` ao RPC).
+
+## Template `fa_relatorio_sessao_pdf_v3` (Utility)
+
+A Meta reclassificou o `fa_relatorio_sessao_pdf_v2` como **Marketing** (erro 63049 em 35 dos 64 envios): o destaque em `{{3}}` era um elogio gerado por IA e o texto era afetivo. A v3 é só o aviso transacional ("o relatório da visita de {{2}} está pronto") com o botão; o destaque fica dentro do documento e na mensagem de janela aberta. Variáveis: `{{1}}` responsável, `{{2}}` criança, `{{3}}` token no sufixo da URL.
+
+`session-report-dispatch` escolhe as variáveis pelo `variable_count` do template ativo (4 = v2, 3 = v3), então a troca não exige novo deploy no momento da ativação.
+
+Passos:
+1. Deploy de `session-report-dispatch` e `crm-templates-bootstrap` (o `_shared/twilioWhatsapp.ts` vai junto com o primeiro).
+2. Rodar o bootstrap com `{"names": ["fa_relatorio_sessao_pdf_v3"]}` (cria na Twilio e submete à Meta; fica inativo).
+3. Em até 24 h, rodar de novo o mesmo comando: ativa quando a Meta aprovar. Conferir `fa_crm_templates.category`: a Meta decide a categoria pelo conteúdo, então aprovado não garante Utility.
+4. Só então desativar a v2: `update fa_crm_templates set active = false where name = 'fa_relatorio_sessao_pdf_v2'`. A v3 já passa a ser usada ao ativar (é a mais nova), mas a v2 ativa serviria de reserva silenciosa a custo de Marketing.
