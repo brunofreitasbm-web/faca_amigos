@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, Checkbox, HelpText, Input, Tag } from "@facaamigos/ui";
+import { Button, Checkbox, HelpText, Input, Tag } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { formatPhoneBr } from "@facaamigos/domain";
 import { Api } from "../../../api/client.js";
 import type { CrmContact, CrmMessage, CrmStage, CrmTemplate, UnitSettingKey } from "../../../api/client.js";
@@ -563,7 +564,6 @@ function CrmContent() {
   return (
     <div>
       <div style={{ marginBottom: "16px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>💬 CRM WhatsApp</h2>
         <HelpText style={{ margin: 0 }}>
           Conversas do Playground e do Circuito. {loading ? "carregando…" : `${contacts.length} contato(s) · ${unreadTotal} não lida(s)`}
         </HelpText>

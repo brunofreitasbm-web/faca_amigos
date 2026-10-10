@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, Card, Input, Select } from "@facaamigos/ui";
+import { Badge, Button, Input, Select } from "@facaamigos/ui";
+import { Card, FORM_GRID, FULL_ROW } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Plan, Unit } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -161,9 +162,9 @@ export function PlanosTab() {
 
   return (
     <div>
-      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>
+      <Card style={{ marginBottom: "12px" }} bodyStyle={FORM_GRID}>
+        <div style={{ ...FULL_ROW, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>
             {editingId ? "Editar plano" : "Novo plano"}
           </h2>
           {editingId && (
@@ -189,7 +190,7 @@ export function PlanosTab() {
           onBlur={() => markTouched("value")}
           error={touched.value ? valueError : undefined}
         />
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "contents" }}>
           <Input
             label="Duração"
             type="number"
@@ -215,7 +216,7 @@ export function PlanosTab() {
           onBlur={() => markTouched("overage")}
           error={touched.overage ? overageError : undefined}
         />
-        <div>
+        <div style={FULL_ROW}>
           <label id="plan-color-label">Cor no Painel</label>
           <div role="radiogroup" aria-labelledby="plan-color-label" style={{ display: "flex", gap: "4px" }}>
             {PLAN_COLOR_OPTIONS.map((c) => (
@@ -248,14 +249,16 @@ export function PlanosTab() {
           </div>
         </div>
         {!editingId && (
-          <UnitCheckboxGroup units={units} selected={unitIds} onChange={(next) => { setUnitIds(next); markTouched("units"); }} />
+          <div style={FULL_ROW}>
+            <UnitCheckboxGroup units={units} selected={unitIds} onChange={(next) => { setUnitIds(next); markTouched("units"); }} />
+          </div>
         )}
         {touched.units && unitsError && (
-          <span style={{ fontSize: "12px", color: "var(--color-error-text)", fontWeight: "var(--weight-medium)" as unknown as number }}>
+          <span style={{ ...FULL_ROW, fontSize: "12px", color: "var(--color-error-text)", fontWeight: "var(--weight-medium)" as unknown as number }}>
             {unitsError}
           </span>
         )}
-        <Button variant="primary" disabled={busy || !isValid} loading={busy} onClick={save}>
+        <Button variant="primary" style={{ ...FULL_ROW, justifySelf: "start" }} disabled={busy || !isValid} loading={busy} onClick={save}>
           {busy
             ? "Criando planos nas unidades…"
             : editingId

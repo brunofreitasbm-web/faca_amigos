@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, HelpText, Button, Input, Select } from "@facaamigos/ui";
+import { HelpText, Button, Input, Select } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { AuditLogEntry, Employee, Unit } from "../../../api/client.js";
 import { ROLE_LABEL } from "../../../auth/capabilities.js";
@@ -159,8 +160,7 @@ export function AuditoriaTab() {
   return (
     <div>
       <Card style={{ padding: "20px", marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>🔍 Auditoria</h2>
-        <HelpText style={{ marginBottom: "16px" }}>
+        <HelpText style={{ marginBottom: "8px" }}>
           Quem fez o quê, quando: log de ações sensíveis do sistema (login, alteração de colaborador, dados fiscais, unidades) para conferência e apuração.
         </HelpText>
 

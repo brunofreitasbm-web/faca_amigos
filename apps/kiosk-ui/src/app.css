@@ -406,3 +406,37 @@ body {
   box-shadow: 0 0 12px rgba(240, 25, 107, 0.4) !important;
   animation: renewal-attention-shake 2s infinite ease-in-out;
 }
+
+/* ---------- Gerencial (console do Owner): campos e botões compactos ----------
+
+   Os componentes do pacote ui têm altura de 48px/44px pensada para toque no
+   balcão. No console do Owner (mouse, tela grande) isso faz cada formulário
+   virar uma coluna comprida e empurra o conteúdo pra baixo. Só aqui, e só com
+   ponteiro fino em tela larga: o celular/tablet (toque) mantém o tamanho
+   original. `!important` porque os componentes definem altura/fonte inline. */
+@media (min-width: 1024px) and (pointer: fine) {
+  .gerencial-shell input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+  .gerencial-shell select {
+    height: 34px !important;
+    font-size: 14px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 10px !important;
+  }
+
+  .gerencial-shell select {
+    padding-right: 32px !important;
+    background-position: right 10px center !important;
+  }
+
+  .gerencial-shell label {
+    font-size: 12px !important;
+  }
+
+  .gerencial-shell button[style*="height: 44px"],
+  .gerencial-shell button[style*="height: 52px"] {
+    height: 34px !important;
+    padding: 0 18px !important;
+    font-size: 14px !important;
+  }
+}

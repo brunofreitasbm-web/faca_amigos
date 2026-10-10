@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, HelpText, Select } from "@facaamigos/ui";
+import { HelpText, Select } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Employee } from "../../../api/client.js";
 import { useToast } from "../../../state/ToastContext.js";
@@ -83,7 +84,6 @@ function PermissoesTabInner() {
   return (
     <div>
       <Card style={{ padding: "20px", marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>🔐 Permissões por Papel</h2>
         <HelpText>
           Para cada ação, escolha o nível mínimo de acesso que já pode fazê-la. Quem está acima na
           hierarquia (Operador → Líder → Owner) sempre herda tudo que os níveis abaixo podem — não é

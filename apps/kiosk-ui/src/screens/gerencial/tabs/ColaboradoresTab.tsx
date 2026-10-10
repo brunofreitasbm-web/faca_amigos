@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
+import { Button, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Employee, PersonalInfoStatus } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -323,7 +324,6 @@ export function ColaboradoresTab() {
       {!showForm && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
           <div>
-            <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>Equipe e Colaboradores</h2>
             <HelpText>{employees.length} colaboradores cadastrados, nas 3 unidades.</HelpText>
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>

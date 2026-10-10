@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card, HelpText, Input, Select } from "@facaamigos/ui";
+import { Button, HelpText, Input, Select } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Employee } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -92,7 +93,6 @@ export function OcorrenciasTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
         <div>
-          <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>Ocorrências</h2>
           <HelpText style={{ margin: 0 }}>Atestados e faltas lançados pelo RH, por unidade.</HelpText>
         </div>
         <div style={{ width: "220px" }}>

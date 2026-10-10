@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, HelpText, Input } from "@facaamigos/ui";
+import { Button, HelpText, Input } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Unit } from "../../../api/client.js";
 import { useToast } from "../../../state/ToastContext.js";

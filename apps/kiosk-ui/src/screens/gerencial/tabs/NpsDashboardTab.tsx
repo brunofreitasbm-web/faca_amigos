@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, HelpText, Select } from "@facaamigos/ui";
+import { Button, HelpText, Select } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { useAppState } from "../../../state/AppState.js";
 import { Api } from "../../../api/client.js";
 import {

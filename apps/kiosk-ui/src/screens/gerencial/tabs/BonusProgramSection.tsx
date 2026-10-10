@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, HelpText } from "@facaamigos/ui";
+import { Button, HelpText } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Unit } from "../../../api/client.js";
 import type { BonusProgramConfig, BonusProgramGoal, BonusProgramsByUnit } from "../../../lib/apuracaoBonificacao.js";

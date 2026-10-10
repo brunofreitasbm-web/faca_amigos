@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, DateInput, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
+import { Button, DateInput, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { SalesCompendiumRow, VoiceTranscript } from "../../../api/client.js";
 import { RequireCapability } from "../../../auth/RequireCapability.js";
@@ -175,7 +176,6 @@ function TranscricoesTabContent() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
         <div>
-          <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>🎙️ Atendimentos Gravados</h2>
           <HelpText style={{ margin: 0 }}>
             Transcrições de check-in e check-out para treinar a equipe de vendas. O áudio nunca fica guardado — só o texto, já sem CPF/telefone.
           </HelpText>

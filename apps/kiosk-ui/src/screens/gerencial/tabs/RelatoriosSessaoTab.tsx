@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Card, HelpText, Modal, Select } from "@facaamigos/ui";
+import { Badge, Button, HelpText, Modal, Select } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import {
   EMPLOYEE_SECTORS,
   EMPLOYEE_SECTOR_LABEL,
@@ -146,7 +147,6 @@ function Content() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Olhar FaçaAmigos</h2>
         <HelpText>
           Mapa de observação de cada sessão de 1h ou mais: quem preencheu, em qual setor, se foi no prazo de 40 minutos e a mensagem enviada ao responsável.
         </HelpText>

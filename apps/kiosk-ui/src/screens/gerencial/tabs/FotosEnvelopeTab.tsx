@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, HelpText, Button } from "@facaamigos/ui";
+import { HelpText, Button } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { EnvelopeMovement } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -46,8 +47,7 @@ export function FotosEnvelopeTab() {
       )}
 
       <Card style={{ padding: "20px", marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>✉️ Fotos de Envelope</h2>
-        <HelpText style={{ marginBottom: "16px" }}>
+        <HelpText style={{ marginBottom: "8px" }}>
           Registros de envelope de cada loja, com valor, operador responsável e foto (quando anexada no fechamento).
         </HelpText>
 

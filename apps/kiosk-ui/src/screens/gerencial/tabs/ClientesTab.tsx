@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, Input, Button, Tag, AsyncState, Badge } from "@facaamigos/ui";
+import { Input, Button, Tag, AsyncState, Badge } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { GerencialCliente, Unit } from "../../../api/client.js";
 import { formatPhoneBr, dateBrFromIso } from "@facaamigos/domain";
