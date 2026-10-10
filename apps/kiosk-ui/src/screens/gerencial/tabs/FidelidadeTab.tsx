@@ -53,8 +53,9 @@ export function FidelidadeTab() {
   }
 
   return (
-    <div>
-      <Card style={{ marginBottom: "12px" }} bodyStyle={FORM_GRID}>
+    <div className="g-split">
+      <aside>
+      <Card bodyStyle={FORM_GRID}>
         <h2 style={{ ...FULL_ROW, fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>Nova regra</h2>
         <Input label="A cada X visitas" type="number" value={triggerVisits} onChange={(e) => setTriggerVisits(e.target.value)} />
         <Select label="Recompensa" value={rewardKind} onChange={(e) => setRewardKind(e.target.value as LoyaltyRule["rewardKind"])}>
@@ -68,12 +69,15 @@ export function FidelidadeTab() {
           Criar regra em {unitIds.length} unidade(s)
         </Button>
       </Card>
+      </aside>
+      <div className="g-cards">
       {rules.map((r) => (
-        <Card key={r.id} style={{ padding: "12px", marginBottom: "8px" }}>
+        <Card key={r.id}>
           A cada {r.triggerVisits} visitas ({r.activity}) → {r.rewardKind} ({r.rewardValue})
           <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · {units.find((u) => u.id === r.unitId)?.name ?? "—"}</span>
         </Card>
       ))}
+      </div>
     </div>
   );
 }

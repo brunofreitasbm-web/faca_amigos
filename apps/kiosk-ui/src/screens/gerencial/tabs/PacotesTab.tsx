@@ -125,7 +125,8 @@ export function PacotesTab() {
   const canCreate = Boolean(name.trim()) && Boolean(benefitText.trim()) && priceCents > 0 && includedMinutes > 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <div className="g-split">
+      <aside>
       <Card bodyStyle={FORM_GRID}>
         <div style={{ ...FULL_ROW, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: "16px", margin: 0 }}>{editingId ? "Editar pacote" : "Novo pacote"}</h2>
@@ -173,11 +174,17 @@ export function PacotesTab() {
           {editingId ? "Salvar pacote" : `Criar pacote em ${unitIds.length} unidade(s)`}
         </Button>
       </Card>
+      <HelpText style={{ marginTop: "10px" }}>
+        Regras do motor VIP e cross-sell rápido continuam em Configurações › Pacotes, dentro de cada unidade — são
+        calibragem do terminal, não preço de catálogo.
+      </HelpText>
+      </aside>
 
+      <div className="g-cards">
       {packages.map((p) => {
         const hourly = Math.round((p.priceCents * 60) / p.includedMinutes);
         return (
-          <Card key={p.id} style={{ padding: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", opacity: p.active ? 1 : 0.5, flexWrap: "wrap" }}>
+          <Card key={p.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px", opacity: p.active ? 1 : 0.5 }}>
             <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
               <span style={{ width: "14px", height: "14px", borderRadius: "50%", background: p.color, display: "inline-block", flexShrink: 0 }} />
               <span>
@@ -189,8 +196,8 @@ export function PacotesTab() {
                 </span>
               </span>
             </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
-              <span style={{ textAlign: "right" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <span style={{ textAlign: "left", flex: "1 1 auto" }}>
                 <strong>{money(p.priceCents)}</strong>
                 <br />
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{money(hourly)}/h</span>
@@ -211,11 +218,7 @@ export function PacotesTab() {
           </Card>
         );
       })}
-
-      <HelpText>
-        Regras do motor VIP e cross-sell rápido continuam em Configurações › Pacotes, dentro de cada unidade — são
-        calibragem do terminal, não preço de catálogo.
-      </HelpText>
+      </div>
     </div>
   );
 }

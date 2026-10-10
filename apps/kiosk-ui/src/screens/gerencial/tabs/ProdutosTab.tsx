@@ -89,8 +89,9 @@ export function ProdutosTab() {
   }
 
   return (
-    <div>
-      <Card style={{ marginBottom: "12px" }} bodyStyle={FORM_GRID}>
+    <div className="g-split">
+      <aside>
+      <Card bodyStyle={FORM_GRID}>
         <div style={{ ...FULL_ROW, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>
             {editingId ? "Editar produto" : "Novo produto"}
@@ -124,14 +125,16 @@ export function ProdutosTab() {
           {editingId ? "Salvar produto" : `Criar produto em ${unitIds.length} unidade(s)`}
         </Button>
       </Card>
+      </aside>
+      <div className="g-cards">
       {products.map((p) => (
-        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: p.active ? 1 : 0.5, flexWrap: "wrap", gap: "8px" }}>
+        <Card key={p.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px", opacity: p.active ? 1 : 0.5 }}>
           <span>
             {p.emoji} {p.name}
             <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · {units.find((u) => u.id === p.unit_id)?.name ?? "—"}</span>
           </span>
-          <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span style={{ flex: "1 1 auto" }}>
               {money(p.price_cents)}
               {p.cost_cents != null && (
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> (custo {money(p.cost_cents)})</span>
@@ -154,6 +157,7 @@ export function ProdutosTab() {
           </span>
         </Card>
       ))}
+      </div>
     </div>
   );
 }

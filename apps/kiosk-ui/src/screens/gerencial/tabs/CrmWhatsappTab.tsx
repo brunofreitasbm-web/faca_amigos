@@ -563,19 +563,23 @@ function CrmContent() {
 
   return (
     <div>
-      <div style={{ marginBottom: "16px" }}>
+      <div style={{ marginBottom: "8px" }}>
         <HelpText style={{ margin: 0 }}>
           Conversas do Playground e do Circuito. {loading ? "carregando…" : `${contacts.length} contato(s) · ${unreadTotal} não lida(s)`}
         </HelpText>
       </div>
 
-      {can("crm.admin") && <OptinCampaignCard />}
-      {can("crm.admin") && <MarketingOptinCampaignCard />}
-      {can("crm.admin") && <LifecycleCampaignsCard />}
-      {can("crm.admin") && <WhatsappCostCard />}
+      {can("crm.admin") && (
+        <div className="g-cards g-cards-wide" style={{ alignItems: "start", marginBottom: "12px" }}>
+          <OptinCampaignCard />
+          <MarketingOptinCampaignCard />
+          <LifecycleCampaignsCard />
+          <WhatsappCostCard />
+        </div>
+      )}
 
       {/* Funil: contagem por etapa, também serve de filtro */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px", alignItems: "center" }}>
         <Button size="sm" variant={stageFilter === "TODOS" ? "primary" : "secondary"} onClick={() => setStageFilter("TODOS")}>
           Todos ({contacts.length})
         </Button>
@@ -584,19 +588,16 @@ function CrmContent() {
             {s.label} ({contacts.filter((c) => c.stage === s.value).length})
           </Button>
         ))}
-      </div>
-
-      {canWrite && filtered.length > 0 && (
-        <div style={{ marginBottom: "12px" }}>
-          <Button size="sm" variant="secondary" disabled={sending} onClick={() => void sendNps(filtered.slice(0, 100).map((c) => c.id), "Os contatos filtrados")}>
+        {canWrite && filtered.length > 0 && (
+          <Button size="sm" variant="secondary" disabled={sending} style={{ marginLeft: "auto" }} onClick={() => void sendNps(filtered.slice(0, 100).map((c) => c.id), "Os contatos filtrados")}>
             ⭐ Enviar NPS aos {Math.min(filtered.length, 100)} contato(s) listado(s)
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 340px) 1fr", gap: "12px", alignItems: "start" }}>
         {/* Lista */}
-        <Card style={{ padding: "8px", maxHeight: "70vh", overflowY: "auto" }}>
+        <Card style={{ maxHeight: "calc(100vh - 260px)", overflowY: "auto" }}>
           <Input placeholder="Buscar nome ou telefone" value={search} onChange={(e) => setSearch(e.target.value)} />
           {!loading && filtered.length === 0 && (
             <HelpText style={{ padding: "16px 8px" }}>

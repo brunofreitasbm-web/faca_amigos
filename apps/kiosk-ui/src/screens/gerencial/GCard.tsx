@@ -30,7 +30,7 @@ export function Card({ style, bodyStyle, ...rest }: CardProps) {
 /** Formulário em grade: campos lado a lado, quebrando conforme a largura. */
 export const FORM_GRID: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
   gap: "8px 12px",
   alignItems: "end",
 };

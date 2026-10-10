@@ -645,7 +645,7 @@ export function ColaboradoresTab() {
         </Modal>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div className="g-cards g-cards-wide">
         {employees
           .filter((e) => {
             if (categoryFilter === "CLT") return e.role !== "PRESTADOR_PJ" && e.contract_type !== "PJ";
@@ -675,7 +675,7 @@ export function ColaboradoresTab() {
                 border: e.active === false ? "1px dashed var(--border-subtle)" : "1px solid var(--border-subtle)",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                   <div
                     style={{
@@ -721,6 +721,7 @@ export function ColaboradoresTab() {
                 </div>
 
                 <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ flex: "1 1 140px", minWidth: 0 }}>
                   <Select
                     aria-label={`Nível de acesso de ${e.full_name}`}
                     title={ROLE_DESCRIPTION[e.role]}
@@ -734,7 +735,9 @@ export function ColaboradoresTab() {
                       </option>
                     ))}
                   </Select>
+                  </div>
 
+                  <div style={{ flex: "1 1 140px", minWidth: 0 }}>
                   <Select
                     aria-label={`Setor de ${e.full_name}`}
                     title="Setor de atuação: define qual bloco do Olhar FaçaAmigos abre primeiro para este colaborador"
@@ -749,6 +752,7 @@ export function ColaboradoresTab() {
                       </option>
                     ))}
                   </Select>
+                  </div>
 
                   <Button variant="ghost" size="sm" onClick={() => openUnitsModal(e)} title="Definir em quais unidades este colaborador atua">
                     🗂️ Unidades

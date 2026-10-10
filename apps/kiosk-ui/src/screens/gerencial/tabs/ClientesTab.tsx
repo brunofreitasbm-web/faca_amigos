@@ -124,32 +124,23 @@ export function ClientesTab() {
   const totalVisits = clientes.reduce((acc, c) => acc + (c.total_visits || 0), 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* Resumo de Indicadores da Base */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
-        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--surface-card)" }}>
-          <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Total de Responsáveis</span>
-          <strong style={{ display: "block", fontSize: "28px", marginTop: "4px", color: "var(--color-primary)" }}>
-            {totalGuardians}
-          </strong>
-        </Card>
-        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--surface-card)" }}>
-          <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Crianças Vinculadas</span>
-          <strong style={{ display: "block", fontSize: "28px", marginTop: "4px", color: "var(--text-primary)" }}>
-            {totalChildren}
-          </strong>
-        </Card>
-        <Card style={{ padding: "16px", borderRadius: "16px", background: "var(--surface-card)" }}>
-          <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Visitas Registradas</span>
-          <strong style={{ display: "block", fontSize: "28px", marginTop: "4px", color: "#10b981" }}>
-            {totalVisits}
-          </strong>
-        </Card>
-      </div>
-
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
       {/* Barra de Busca e Filtros */}
-      <Card style={{ padding: "20px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center" }}>
+      <Card style={{ borderRadius: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 16px", alignItems: "center" }}>
+          {/* Indicadores da base, em linha com a busca */}
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }} aria-label="Resumo da base">
+            {[
+              { label: "Responsáveis", value: totalGuardians, color: "var(--color-primary)" },
+              { label: "Crianças", value: totalChildren, color: "var(--text-primary)" },
+              { label: "Visitas", value: totalVisits, color: "#10b981" },
+            ].map((k) => (
+              <div key={k.label} style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{k.label}</span>
+                <strong style={{ fontSize: "20px", color: k.color }}>{k.value}</strong>
+              </div>
+            ))}
+          </div>
           <div style={{ flex: 1, minWidth: "260px" }}>
             <Input
               value={search}
@@ -163,7 +154,7 @@ export function ClientesTab() {
               value={selectedUnitId}
               onChange={(e) => setSelectedUnitId(e.target.value)}
               style={{
-                padding: "10px 14px",
+                padding: "0 12px",
                 borderRadius: "10px",
                 border: "1px solid var(--border-subtle)",
                 background: "var(--surface-card)",
@@ -209,11 +200,11 @@ export function ClientesTab() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", textAlign: "left" }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid var(--border-subtle)", color: "var(--text-muted)" }}>
-                  <th style={{ padding: "12px 8px" }}>Responsável</th>
-                  <th style={{ padding: "12px 8px" }}>Telefone / CPF</th>
-                  <th style={{ padding: "12px 8px" }}>Crianças Vinculadas</th>
-                  <th style={{ padding: "12px 8px", textAlign: "center" }}>Visitas</th>
-                  <th style={{ padding: "12px 8px", textAlign: "right" }}>Ações</th>
+                  <th style={{ padding: "6px 8px" }}>Responsável</th>
+                  <th style={{ padding: "6px 8px" }}>Telefone / CPF</th>
+                  <th style={{ padding: "6px 8px" }}>Crianças Vinculadas</th>
+                  <th style={{ padding: "6px 8px", textAlign: "center" }}>Visitas</th>
+                  <th style={{ padding: "6px 8px", textAlign: "right" }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,7 +214,7 @@ export function ClientesTab() {
                     style={{ borderBottom: "1px solid var(--border-subtle)", cursor: "pointer" }}
                     onClick={() => setSelectedCliente(c)}
                   >
-                    <td style={{ padding: "14px 8px", fontWeight: "600", color: "var(--text-primary)" }}>
+                    <td style={{ padding: "7px 8px", fontWeight: "600", color: "var(--text-primary)" }}>
                       <div>{c.guardian_name}</div>
                       {c.email && (
                         <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "normal" }}>
@@ -231,11 +222,11 @@ export function ClientesTab() {
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: "14px 8px", color: "var(--text-muted)" }}>
+                    <td style={{ padding: "7px 8px", color: "var(--text-muted)" }}>
                       <div>{c.phone_e164 ? formatPhoneBr(c.phone_e164) : "—"}</div>
                       {c.cpf && <span style={{ fontSize: "12px" }}>CPF: {c.cpf}</span>}
                     </td>
-                    <td style={{ padding: "14px 8px" }}>
+                    <td style={{ padding: "7px 8px" }}>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                         {c.children && c.children.length > 0 ? (
                           c.children.map((ch) => (
@@ -248,12 +239,12 @@ export function ClientesTab() {
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: "14px 8px", textAlign: "center" }}>
+                    <td style={{ padding: "7px 8px", textAlign: "center" }}>
                       <Badge variant={c.total_visits > 5 ? "green" : "neutral"}>
                         {c.total_visits} {c.total_visits === 1 ? "visita" : "visitas"}
                       </Badge>
                     </td>
-                    <td style={{ padding: "14px 8px", textAlign: "right" }}>
+                    <td style={{ padding: "7px 8px", textAlign: "right" }}>
                       <Button
                         size="sm"
                         variant="secondary"

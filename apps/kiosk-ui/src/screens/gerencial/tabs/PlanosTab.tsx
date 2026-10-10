@@ -161,8 +161,9 @@ export function PlanosTab() {
   }, [visiblePlans, units]);
 
   return (
-    <div>
-      <Card style={{ marginBottom: "12px" }} bodyStyle={FORM_GRID}>
+    <div className="g-split">
+      <aside>
+      <Card bodyStyle={FORM_GRID}>
         <div style={{ ...FULL_ROW, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>
             {editingId ? "Editar plano" : "Novo plano"}
@@ -266,13 +267,15 @@ export function PlanosTab() {
               : `Criar plano em ${unitIds.length} unidade(s)`}
         </Button>
       </Card>
+      </aside>
 
-      <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", flexWrap: "wrap", margin: "16px 0 8px" }}>
+      <div style={{ minWidth: 0 }}>
+      <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", flexWrap: "wrap", margin: "0 0 8px" }}>
+        <div style={{ width: "220px" }}>
         <Select
           label="Unidade"
           value={unitFilter}
           onChange={(e) => setUnitFilter(e.target.value)}
-          style={{ minWidth: "180px" }}
         >
           <option value="ALL">Todas as unidades</option>
           {units.map((u) => (
@@ -281,6 +284,7 @@ export function PlanosTab() {
             </option>
           ))}
         </Select>
+        </div>
         <div role="radiogroup" aria-label="Situação do plano" style={{ display: "flex", gap: "4px" }}>
           {(["ATIVOS", "INATIVOS"] as const).map((s) => (
             <Button
@@ -303,17 +307,18 @@ export function PlanosTab() {
       )}
 
       {plansByUnit.map(({ unit, items }) => (
-        <section key={unit.id} style={{ marginBottom: "20px" }}>
-          <h3 style={{ fontFamily: "var(--font-display)", fontSize: "15px", margin: "0 0 8px" }}>{unit.name}</h3>
+        <section key={unit.id} style={{ marginBottom: "14px" }}>
+          <h3 style={{ fontFamily: "var(--font-display)", fontSize: "14px", margin: "0 0 6px" }}>{unit.name}</h3>
+          <div className="g-cards">
           {items.map((p) => (
-            <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+            <Card key={p.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px" }}>
               <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ width: "14px", height: "14px", borderRadius: "50%", background: p.color, display: "inline-block" }} />
                 {p.name} — {p.durationValue} {p.durationUnit.toLowerCase()}
                 {!p.active && <Badge variant="neutral">Inativo</Badge>}
               </span>
-              <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span>
+              <span style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <span style={{ flex: "1 1 auto" }}>
                   {money(p.valueCents)} + {money(p.overageCentsPerMinute)}/min excedente
                 </span>
                 <Button variant="secondary" onClick={() => startEdit(p)} disabled={busy}>
@@ -331,8 +336,10 @@ export function PlanosTab() {
               </span>
             </Card>
           ))}
+          </div>
         </section>
       ))}
+      </div>
     </div>
   );
 }

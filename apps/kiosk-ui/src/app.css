@@ -440,3 +440,40 @@ body {
     font-size: 14px !important;
   }
 }
+
+/* ---------- Gerencial: layout em colunas ----------
+
+   .g-split  → formulário/filtros numa coluna fixa à esquerda e o conteúdo
+               à direita (só em tela larga; abaixo disso empilha, como antes).
+   .g-cards  → grade de cartões que ocupa 2-3 colunas conforme a largura,
+               em vez de uma lista de uma coluna só. Mobile-first: com pouco
+               espaço vira 1 coluna sozinha (auto-fill + minmax). */
+.g-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.g-cards > * {
+  margin-bottom: 0 !important;
+  min-width: 0;
+}
+
+@media (min-width: 1100px) {
+  .g-split {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .g-split > aside {
+    position: sticky;
+    top: 0;
+  }
+}
+
+.g-cards.g-cards-wide {
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+}

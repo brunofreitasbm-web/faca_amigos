@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, HelpText, Modal, Select } from "@facaamigos/ui";
-import { Card } from "../GCard.js";
 import {
   EMPLOYEE_SECTORS,
   EMPLOYEE_SECTOR_LABEL,
@@ -145,14 +144,15 @@ function Content() {
   const unitName = (id: string) => units.find((u) => u.id === id)?.name ?? "—";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <div>
         <HelpText>
           Mapa de observação de cada sessão de 1h ou mais: quem preencheu, em qual setor, se foi no prazo de 40 minutos e a mensagem enviada ao responsável.
         </HelpText>
       </div>
 
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "10px 20px", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <Select aria-label="Unidade" value={unitId} onChange={(e) => setUnitId(e.target.value)}>
           <option value="">Todas as unidades</option>
           {units.map((u) => (
@@ -178,17 +178,18 @@ function Content() {
         </Select>
       </div>
 
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "18px", flexWrap: "wrap" }}>
         {[
           { label: "Relatórios", value: String(kpi.total) },
           { label: "Dentro do prazo (40 min)", value: kpi.onTime },
           { label: "Enviados ao responsável", value: kpi.sent },
         ].map((k) => (
-          <Card key={k.label} style={{ flex: "1 1 160px" }}>
-            <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{k.label}</div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: "26px" }}>{k.value}</div>
-          </Card>
+          <div key={k.label} style={{ lineHeight: 1.1 }}>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{k.label}</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: "20px" }}>{k.value}</div>
+          </div>
         ))}
+      </div>
       </div>
 
       {error && (
