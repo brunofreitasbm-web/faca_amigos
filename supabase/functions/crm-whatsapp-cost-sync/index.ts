@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// Custo do WhatsApp (migration 20261009130000). Roda a cada 30 min (pg_cron):
+// Custo do WhatsApp (migration 20261009130002). Roda a cada 30 min (pg_cron):
 //   1) Preço: a Twilio só informa o preço da mensagem depois da entrega. Busca
 //      o Message de cada OUT já enviada/entregue/lida sem preço e grava
 //      price (valor absoluto) e price_unit em fa_crm_messages.
