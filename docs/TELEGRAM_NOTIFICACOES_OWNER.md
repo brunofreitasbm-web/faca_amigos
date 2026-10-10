@@ -72,10 +72,21 @@ exportado para cá sem alterações em `20261010045759` a `20261010045919`
 - **Botões:** `fa_owner_divergence_status` guarda Conferido / Pedir
   justificativa / Pendência por divergência; o clique chega em
   `owner-telegram-webhook`.
-- **Pendente de alinhamento:** a `owner-telegram-dispatch` deployada (esta, v6)
-  **não** registra o webhook nem manda os botões; o comentário do webhook diz
-  que isso é feito pelo dispatch. Se uma versão nova do dispatch for deployada
-  por outra sessão, ela substitui `format.ts` e o formato das mensagens.
+- **Botões das divergências:** o `owner-telegram-dispatch` anexa Conferido /
+  Pedir justificativa / Pendência às mensagens `DIVERGENCIA_FECHAMENTO` e
+  `DIVERGENCIA_ABERTURA` (`buttons.ts`; `callback_data` = `dv:<ação>:<uuid>`). O
+  clique chega ao `owner-telegram-webhook`, que grava em
+  `fa_owner_divergence_status` e troca o teclado.
+- **Registro do webhook:** `ensureWebhook` (no dispatch) chama `setWebhook` na
+  primeira execução e **sempre que o `TELEGRAM_BOT_TOKEN` mudar**: o segredo do
+  webhook é derivado do token, e a impressão digital dele fica em
+  `fa_owner_telegram_config('webhook')`. Com o webhook ativo, `getUpdates` deixa
+  de funcionar (erro 409) — para descobrir um `chat_id`, use o erro de
+  `migrate_to_chat_id` na resposta do cron ou `getChat`.
+- **Cuidado ao publicar o dispatch:** `owner-telegram-dispatch` é publicada por
+  mais de uma sessão. Antes de publicar, confira a versão atual com
+  `get_edge_function`; a ferramenta não guarda versões anteriores, então uma
+  publicação sobrescreve a outra sem aviso.
 - **Regra de sobra:** `20261010052328_fa_sobra_caixa_nao_e_divergencia.sql`
   (aplicada depois das v2) faz só a falta virar divergência, e `amount_cents`
   passa a medir só falta.
