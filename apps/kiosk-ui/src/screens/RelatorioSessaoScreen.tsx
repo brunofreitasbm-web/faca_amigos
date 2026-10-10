@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, HelpText } from "@facaamigos/ui";
 import { Api, type RecentSessionReport, type SessionReportWhatsappStatus } from "../api/client.js";
-import { startOfTodayMs, usePendingSessionReports, useUnsentSessionReports } from "../api/useSessionReports.js";
+import { isWhatsappRefusal63049, startOfTodayMs, usePendingSessionReports, useUnsentSessionReports } from "../api/useSessionReports.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { SessionReportForm, formatCountdown } from "../components/session-report/SessionReportForm.js";
@@ -219,7 +219,7 @@ export function RelatorioSessaoScreen() {
                   >
                     Enviar Olhar FaçaAmigos em PDF (MANUAL)
                   </Button>
-                  {!busy && RETRYABLE.has(r.whatsapp_status) && (
+                  {!busy && RETRYABLE.has(r.whatsapp_status) && !isWhatsappRefusal63049(r.whatsapp_error) && (
                     <Button variant="secondary" size="sm" onClick={() => void dispatch(r.id)}>
                       Reenviar
                     </Button>
