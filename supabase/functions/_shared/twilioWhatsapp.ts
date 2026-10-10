@@ -33,6 +33,7 @@ export interface CrmContact {
 
 export interface CrmTemplate {
   id: string;
+  name: string;
   content_sid: string;
   preview: string;
   variable_count: number;
@@ -114,7 +115,7 @@ export async function upsertCrmContact(
 export async function findActiveTemplate(admin: SupabaseClient, purpose: string): Promise<CrmTemplate | null> {
   const { data } = await admin
     .from("fa_crm_templates")
-    .select("id, content_sid, preview, variable_count")
+    .select("id, name, content_sid, preview, variable_count")
     .eq("purpose", purpose)
     .eq("active", true)
     .order("created_at_ms", { ascending: false })

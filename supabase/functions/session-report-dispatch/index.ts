@@ -502,7 +502,16 @@ Deno.serve(async (req) => {
       if (!plain) return mark("SKIPPED_NO_TEMPLATE", { contactId: contact.id, aiMessage: highlight, aiFallback });
       result = await sendWhatsapp(admin, creds, {
         ...common,
-        content: { kind: "TEMPLATE", template: plain, variables: { "1": guardianFirst, "2": childFirst, "3": `${highlight} Olhar FaçaAmigos completo: ${link}` } },
+        // fa_relatorio_sessao_v3 (Marketing para a Meta) leva destaque + link em {{3}}; a v4 e as seguintes só o link.
+        content: {
+          kind: "TEMPLATE",
+          template: plain,
+          variables: {
+            "1": guardianFirst,
+            "2": childFirst,
+            "3": plain.name === "fa_relatorio_sessao_v3" ? `${highlight} Olhar FaçaAmigos completo: ${link}` : link,
+          },
+        },
       });
     }
   }

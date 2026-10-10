@@ -125,6 +125,16 @@ const TEMPLATES: TemplateDef[] = [
     sample: { "1": "Ana", "2": "Miguel", "3": "Hoje Miguel passou 90 minutos com a gente e brilhou na coordenação motora e na interação social." },
   },
   {
+    // v4 (sem botão): a v3 foi reclassificada como MARKETING pela Meta — o recado em {{3}} era um
+    // elogio gerado por IA, com emoji e tom afetivo. Esta é a reserva usada só quando não há template
+    // com botão ativo (RELATORIO_SESSAO_PDF): avisa que o relatório está pronto e {{3}} é SÓ o link
+    // (sem texto livre). O destaque fica dentro do documento. O dispatcher manda "destaque + link" para
+    // o nome fa_relatorio_sessao_v3 e só o link para os demais.
+    purpose: "RELATORIO_SESSAO", name: "fa_relatorio_sessao_v4", category: "UTILITY", variableCount: 3,
+    body: "Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, acesse: {{3}} É um registro da visita, sem caráter de avaliação.",
+    sample: { "1": "Ana", "2": "Miguel", "3": "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdEFG" },
+  },
+  {
     // Olhar FaçaAmigos em PDF: 1 destaque + botão que abre o documento
     // (session-report-view?t=<token>). Numeração única entre corpo e botão.
     purpose: "RELATORIO_SESSAO_PDF", name: "fa_relatorio_sessao_pdf_v2", category: "UTILITY", variableCount: 4,
