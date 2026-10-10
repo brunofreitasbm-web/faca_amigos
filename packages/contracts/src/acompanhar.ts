@@ -54,7 +54,6 @@ export const acompanharEventoKindSchema = z.enum([
   "QR_ABERTO",
   "LEMBRETE_ATIVADO",
   "RENOVACAO_SOLICITADA",
-  "AVALIACAO_NPS",
 ]);
 export type AcompanharEventoKind = z.infer<typeof acompanharEventoKindSchema>;
 

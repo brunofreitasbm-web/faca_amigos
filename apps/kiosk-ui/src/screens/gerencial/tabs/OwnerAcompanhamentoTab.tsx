@@ -85,36 +85,8 @@ export function OwnerAcompanhamentoTab() {
       );
       setUnitMetrics(metrics);
 
-      // 2. Carrega histórico recente de NPS via fa_acompanhar_eventos ou rpc se existir
-      try {
-        const { data: npsData } = await supabase()
-          .from("fa_acompanhar_eventos")
-          .select("id, code, kind, payload, created_at")
-          .eq("kind", "AVALIACAO_NPS")
-          .order("created_at", { ascending: false })
-          .limit(20);
-
-        if (npsData) {
-          const parsed: NpsLogItem[] = npsData.map((item) => {
-            const payload = (item.payload || {}) as Record<string, unknown>;
-            return {
-              id: String(item.id),
-              code: String(item.code || ""),
-              playgroundScore: typeof payload.playgroundScore === "number" ? payload.playgroundScore : null,
-              circuitoScore: typeof payload.circuitoScore === "number" ? payload.circuitoScore : null,
-              feedback: typeof payload.feedback === "string" ? payload.feedback : "",
-              activity: typeof payload.activity === "string" ? payload.activity : null,
-              createdAt: String(item.created_at || ""),
-            };
-          });
-          setNpsLogs(parsed);
-        }
-      } catch {
-        // Tabela/RPC pode não ter permissão anon ou estar vazia
-      }
-
-      // 3. NPS respondido por WhatsApp (CRM) — a pesquisa saiu da tela de
-      // acompanhamento do responsável, então as notas novas chegam por aqui.
+      // NPS respondido por WhatsApp (CRM) — a pesquisa não é mais feita na tela
+      // de acompanhamento do responsável; todas as notas chegam por aqui.
       try {
         const crm = await Api.crmNpsFeed(20);
         const fromCrm: NpsLogItem[] = crm.map((r) => {
@@ -135,7 +107,7 @@ export function OwnerAcompanhamentoTab() {
           [...prev, ...fromCrm].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 30),
         );
       } catch {
-        // sem permissão de CRM ou migration ainda não aplicada: mantém só o histórico antigo
+        // sem permissão de CRM ou migration ainda não aplicada: lista de NPS fica vazia
       }
     } catch (err) {
       console.error("Erro ao carregar dados do painel do Owner:", err);
