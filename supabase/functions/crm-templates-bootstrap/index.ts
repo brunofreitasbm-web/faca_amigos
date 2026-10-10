@@ -82,6 +82,15 @@ const TEMPLATES: TemplateDef[] = [
     body: "Olá, {{1}}! Aqui é o FaçaAmigos. Para te enviar por aqui o relatório e os avisos da visita do seu filho, precisamos da sua autorização. Responda SIM para autorizar ou PARAR para não receber mensagens.",
     sample: { "1": "Ana" },
   },
+  // v3: troca "o relatório" por "o Olhar FaçaAmigos". O termo "relatório" é evitado de propósito no
+  // que chega à família (blindagem; ver SESSION_REPORT_DOC_TITLE). A v2 está aprovada e em uso, então
+  // não é editada: a v3 nasce inativa e, quando ativada, passa a ser a usada (é a mais nova). Mesmo
+  // texto e tom da v2 (que a Meta manteve como UTILITY) — só muda o nome do documento.
+  {
+    purpose: "OPTIN", name: "fa_pedido_autorizacao_v3", category: "UTILITY", variableCount: 1,
+    body: "Olá, {{1}}! Aqui é o FaçaAmigos. Para te enviar por aqui o Olhar FaçaAmigos e os avisos da visita do seu filho, precisamos da sua autorização. Responda SIM para autorizar ou PARAR para não receber mensagens.",
+    sample: { "1": "Ana" },
+  },
   // v2: só 2 botões (+30 e +60 min do Playground). A v1 tinha 3 botões
   // ("Opção 1/2/3") e o 3º ficaria morto. Preços vão na variável {{3}}, não nos
   // botões, para mudar a tabela sem reaprovar o template.
@@ -127,11 +136,11 @@ const TEMPLATES: TemplateDef[] = [
   {
     // v4 (sem botão): a v3 foi reclassificada como MARKETING pela Meta — o recado em {{3}} era um
     // elogio gerado por IA, com emoji e tom afetivo. Esta é a reserva usada só quando não há template
-    // com botão ativo (RELATORIO_SESSAO_PDF): avisa que o relatório está pronto e {{3}} é SÓ o link
+    // com botão ativo (RELATORIO_SESSAO_PDF): avisa que o Olhar está pronto e {{3}} é SÓ o link
     // (sem texto livre). O destaque fica dentro do documento. O dispatcher manda "destaque + link" para
     // o nome fa_relatorio_sessao_v3 e só o link para os demais.
     purpose: "RELATORIO_SESSAO", name: "fa_relatorio_sessao_v4", category: "UTILITY", variableCount: 3,
-    body: "Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, acesse: {{3}} É um registro da visita, sem caráter de avaliação.",
+    body: "Olá, {{1}}. O Olhar FaçaAmigos de {{2}} sobre a visita de hoje está pronto. Para abrir o documento, acesse: {{3}} É um registro da brincadeira, sem caráter de avaliação.",
     sample: { "1": "Ana", "2": "Miguel", "3": "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdEFG" },
   },
   {
@@ -145,15 +154,15 @@ const TEMPLATES: TemplateDef[] = [
   {
     // v3: reescrita para a Meta aceitar como UTILITY. A v2 foi reclassificada como MARKETING
     // (erro 63049 em 56% dos envios): o destaque em {{3}} era um elogio gerado por IA, e elogio,
-    // emoji e tom afetivo puxam a categoria. Aqui é só o aviso transacional de que o relatório da
+    // emoji e tom afetivo puxam a categoria. Aqui é só o aviso transacional de que o Olhar da
     // visita de hoje está pronto — sem texto livre variável, sem elogio, sem convite a nada. O
     // destaque continua dentro do documento e na mensagem de janela aberta (texto livre).
     // O dispatcher escolhe as variáveis pelo variable_count do template ativo (4 = v2, 3 = esta).
     // A Meta decide a categoria pelo conteúdo: conferir o resultado depois de aprovada.
     purpose: "RELATORIO_SESSAO_PDF", name: "fa_relatorio_sessao_pdf_v3", category: "UTILITY", variableCount: 3,
-    body: "Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, use o botão abaixo. É um registro da visita, sem caráter de avaliação.",
+    body: "Olá, {{1}}. O Olhar FaçaAmigos de {{2}} sobre a visita de hoje está pronto. Para abrir o documento, use o botão abaixo. É um registro da brincadeira, sem caráter de avaliação.",
     sample: { "1": "Ana", "2": "Miguel", "3": "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdEFG" },
-    urlButton: { title: "Abrir relatório", url: "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t={{3}}" },
+    urlButton: { title: "Abrir Olhar", url: "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t={{3}}" },
   },
   {
     purpose: "MAPEAMENTO", name: "fa_mapeamento_followup", category: "MARKETING", variableCount: 4,
