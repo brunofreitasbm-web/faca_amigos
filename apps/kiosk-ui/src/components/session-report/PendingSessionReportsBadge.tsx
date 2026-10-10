@@ -1,4 +1,4 @@
-import { useFailedSessionReportsCount, usePendingSessionReports } from "../../api/useSessionReports.js";
+import { useUnsentSessionReports, usePendingSessionReports } from "../../api/useSessionReports.js";
 
 /**
  * Contador na barra de navegação. Só é montado dentro do botão da tela, que já
@@ -11,13 +11,13 @@ import { useFailedSessionReportsCount, usePendingSessionReports } from "../../ap
  */
 export function PendingSessionReportsBadge({ unitId }: { unitId: string | null }) {
   const { pending, overdueCount } = usePendingSessionReports(unitId);
-  const { failedCount } = useFailedSessionReportsCount(unitId);
+  const { unsentCount: failedCount } = useUnsentSessionReports(unitId);
 
   if (failedCount > 0) {
     return (
       <span
         role="alert"
-        aria-label={`${failedCount} Olhar FaçaAmigos com falha no envio pelo WhatsApp — envie manualmente em PDF`}
+        aria-label={`${failedCount} Olhar FaçaAmigos sem envio ao responsável — reenvie ou mande o PDF manualmente`}
         style={{
           marginLeft: "6px",
           minWidth: "20px",
