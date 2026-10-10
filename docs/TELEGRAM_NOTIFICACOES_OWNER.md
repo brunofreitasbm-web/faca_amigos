@@ -37,7 +37,18 @@ notificações ficam na fila (o claim só acontece depois da checagem dos secret
 Valores de caixa e foto do envelope passam a existir no Telegram. Mantenha o
 grupo privado e revise os membros.
 
-## Desligar o e-mail depois
+## E-mail desligado
 
-Quando o Telegram estiver validado: `select cron.unschedule('fa-owner-email-dispatch');`
-(reversível reaplicando `20260829000004_fa_owner_email_dispatch_timeout.sql`).
+O cron `fa-owner-email-dispatch` foi desligado (migration
+`20261010130000_fa_owner_email_dispatch_off.sql`); o Owner recebe pelo
+Telegram e pelo push. Para religar o e-mail, reagende o cron como em
+`20260829000004_fa_owner_email_dispatch_timeout.sql` — e antes marque o
+acúmulo como enviado (`emailed_at_ms`), senão a primeira rodada manda tudo
+de uma vez.
+
+## Grupo promovido a supergrupo
+
+Se o Telegram responder `group chat was upgraded to a supergroup chat`, o
+`chat_id` mudou. A resposta do cron (`net._http_response`) traz
+`novo TELEGRAM_CHAT_ID: -100...`; atualize o secret. As notificações ficam
+na fila e saem na rodada seguinte.
