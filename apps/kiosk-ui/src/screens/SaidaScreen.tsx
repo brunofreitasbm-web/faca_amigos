@@ -11,7 +11,6 @@ import { CheckoutModal } from "../components/CheckoutModal.js";
 import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
 import { generateCheckoutSuggestions, type CheckoutOffer } from "../lib/geminiAgent.js";
 import { formatElapsed, money } from "../format.js";
-import { voiceRecorder } from "../lib/voiceRecorder.js";
 
 /**
  * Saída pela câmera do celular — o caminho padrão de check-out.
@@ -96,11 +95,6 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
         const result = await Api.resolveAccessCode(unit.id, rawValue, employee?.id);
         if (result.reason === "OK") {
           setResolved(result);
-          // Início da conversa de retenção no balcão — a cobrança em si
-          // vem depois, no CheckoutModal (que também tenta iniciar, é
-          // idempotente para a mesma unidade+momento).
-          if (employee) void voiceRecorder.start({ unitId: unit.id, employeeId: employee.id, momento: "CHECKOUT" });
-          if (result.sessionId) voiceRecorder.addSession(result.sessionId);
         } else {
           setResolved(null);
           setProblem(
@@ -185,9 +179,6 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
   }
 
   function clear() {
-    // Cancelou sem cobrar: ainda vale para treinamento (recusa/objeção),
-    // mas não deve ficar em aberto até a próxima leitura de pulseira.
-    void voiceRecorder.stop({ outcome: "ABANDONED" });
     setResolved(null);
     setProblem(null);
     setManualCode("");

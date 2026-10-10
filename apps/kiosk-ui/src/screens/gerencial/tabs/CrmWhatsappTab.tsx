@@ -50,7 +50,7 @@ function contactTitle(c: CrmContact): string {
  * Caixa de entrada + funil do WhatsApp do Playground e do Circuito. Todo
  * dado entra pela Edge Function crm-whatsapp-webhook (Twilio) e sai por
  * crm-whatsapp-send; esta tela só lê e edita a ficha do contato. Atualiza
- * por polling (mesmo padrão de TerminaisVozTab) — o realtime já está
+ * por polling — o realtime já está
  * publicado na migration caso se queira trocar depois.
  */
 export function CrmWhatsappTab() {

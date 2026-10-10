@@ -8,7 +8,6 @@ import { registerAuthRoutes } from "./routes/auth.js";
 import { registerShoppingRoutes } from "./routes/shopping.js";
 import { registerSecretVaultRoutes } from "./routes/secret-vault.js";
 import { registerSystemRoutes } from "./routes/system.js";
-import { registerVozRoutes } from "./routes/voz.js";
 import { registerTickChannel } from "./ws-tick.js";
 import { registerStaticSpa } from "./staticSpa.js";
 import { ValidationError, ConflictError } from "./validate.js";
@@ -82,7 +81,6 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}) {
   registerShoppingRoutes(app, ctx);
   registerSecretVaultRoutes(app, ctx);
   registerSystemRoutes(app, ctx);
-  registerVozRoutes(app, ctx);
   registerTickChannel(app, ctx);
 
   if (opts.uiDist) await registerStaticSpa(app, opts.uiDist);

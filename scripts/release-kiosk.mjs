@@ -9,7 +9,7 @@
 //
 // Uso: pnpm release:kiosk
 import { execSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -98,19 +98,6 @@ if (existsSync(envEmbutido)) {
     `O instalador levaria um .env embutido (${envEmbutido}) e o bucket "${BUCKET}" é público. ` +
       "Remova o extraResource `.env` de apps/kiosk/electron-builder.yml antes de publicar.",
   );
-}
-
-// 1c. Mesma checagem do CI (build-kiosk.yml) para o whisper.cpp: o
-// binário precisa estar no artefato (senão a transcrição de voz nunca
-// funciona, em silêncio) e o modelo .bin NUNCA pode estar (o bucket é
-// público com limite de 100MB/arquivo — o modelo é baixado em runtime).
-const whisperDir = join(kioskDir, "release", "win-unpacked", "resources", "whisper");
-if (!existsSync(join(whisperDir, "whisper-cli.exe"))) {
-  throw new Error(`whisper-cli.exe não está no artefato (${whisperDir}) — rode "pnpm fetch:whisper" em apps/kiosk antes de empacotar.`);
-}
-const modelosEmbutidos = existsSync(whisperDir) ? readdirSync(whisperDir).filter((f) => f.endsWith(".bin")) : [];
-if (modelosEmbutidos.length > 0) {
-  throw new Error(`Modelo(s) .bin embutido(s) no instalador: ${modelosEmbutidos.join(", ")}. O modelo é baixado em runtime, nunca vai no instalador.`);
 }
 
 // 2. Descobre a versão publicada a partir do latest.yml recém-gerado

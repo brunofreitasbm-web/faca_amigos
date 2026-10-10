@@ -41,10 +41,6 @@ export const CAPABILITIES = [
   "metas.ticket.write",
   "clientes.write",
   "bonificacao.self",
-  "treinamento.transcricoes.read",
-  "treinamento.transcricoes.write",
-  "treinamento.compendio.gerar",
-  "config.terminais.read",
   "crm.read",
   "crm.write",
   "crm.admin",
@@ -89,10 +85,6 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "metas.ticket.write": "Configurar meta de Ticket Médio (mínimo e alvo) de cada unidade",
   "clientes.write": "Editar dados de clientes (responsável e crianças vinculadas)",
   "bonificacao.self": "Ver a própria bonificação (menu Minha Bonificação)",
-  "treinamento.transcricoes.read": "Ver transcrições dos atendimentos gravados (treinamento de venda)",
-  "treinamento.transcricoes.write": "Anotar/analisar transcrições dos atendimentos gravados",
-  "treinamento.compendio.gerar": "Gerar o Compêndio de Vendas com IA para a Reunião de Alinhamento Mensal",
-  "config.terminais.read": "Ver o painel central de saúde dos terminais (whisper.cpp, modelo, fila de transcrição) de toda a rede",
   "crm.read": "Ver o CRM de WhatsApp (conversas e contatos do Playground e do Circuito)",
   "crm.write": "Responder clientes e editar a ficha no CRM de WhatsApp",
   "crm.admin": "Gerenciar números (canais) e templates do CRM de WhatsApp",
@@ -152,10 +144,7 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
           c !== "sessao.cancel" &&
           c !== "config.rbac.write" &&
           c !== "notificacoes.owner_push" &&
-          c !== "talentos.write" &&
-          c !== "treinamento.transcricoes.write" &&
-          c !== "treinamento.compendio.gerar" &&
-          c !== "config.terminais.read"
+          c !== "talentos.write"
       )
     );
   }

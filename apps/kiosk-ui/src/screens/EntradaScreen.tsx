@@ -16,7 +16,6 @@ import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { useAcompanhar } from "../api/useAcompanhar.js";
 import { getPublicAppUrl } from "../lib/appUrl.js";
-import { voiceRecorder } from "../lib/voiceRecorder.js";
 import {
   normalizePhoneE164,
   formatPhoneBr,
@@ -302,7 +301,6 @@ export function EntradaScreen({
   // transação (ver client.ts `checkin`).
   useEffect(() => {
     if (!prefill) return;
-    startVoice();
     setPreCheckinId(prefill.id);
     setPreCheckinChildIndex(prefill.childIndex);
     setMatchedChild(null);
@@ -381,13 +379,7 @@ export function EntradaScreen({
     return () => clearTimeout(handle);
   }, [query, matchedChild, unit?.id]);
 
-  /** Início da conversa de venda no balcão — gravada para a base de conhecimento de treinamento (ver plano de voz). No-op se desligado/indisponível nesta unidade. */
-  function startVoice() {
-    if (unit && employee) void voiceRecorder.start({ unitId: unit.id, employeeId: employee.id, momento: "CHECKIN" });
-  }
-
   function pickMatch(match: ChildMatch) {
-    startVoice();
     setMatchedChild(match);
     setShowNewForm(false);
     setChildName(match.full_name);
@@ -471,7 +463,6 @@ export function EntradaScreen({
   }
 
   function startNewChild() {
-    startVoice();
     setShowNewForm(true);
     setMatchedChild(null);
     setMatches([]);
@@ -480,7 +471,6 @@ export function EntradaScreen({
   }
 
   function addSiblingChild() {
-    startVoice(); // no-op se já gravando esta mesma conversa
     setQuery("");
     setChildName("");
     setBirthDate("");
@@ -526,11 +516,6 @@ export function EntradaScreen({
     setPreCheckinId(null);
     setStartNow(true);
     if (!keepGuardian) {
-      // Família encerrada (não vem irmão): a gravação desta conversa acaba
-      // aqui. Quando keepGuardian é true, quem chama decide (irmão a
-      // caminho não deve interromper a gravação; venda pré-paga que
-      // termina o atendimento já para explicitamente antes de chamar isto).
-      void voiceRecorder.stop({ outcome: "SUCCESS" });
       setCpf("");
       setGuardianName("");
       setPhone("");
@@ -773,11 +758,6 @@ export function EntradaScreen({
         onPrefillConsumed?.();
       }
 
-      // Não para a gravação aqui: um irmão pode vir a seguir na mesma
-      // conversa. Quem encerra é resetForNextChild(false) ou o dispensar
-      // do aviso "Entrada confirmada" mais abaixo.
-      voiceRecorder.addSession(res.sessionId);
-
       setDonePrepaid(null);
       setDone({
         sessionId: res.sessionId,
@@ -867,9 +847,6 @@ export function EntradaScreen({
   }
 
   function handlePrepaidSold(result: { minutesTotal: number }) {
-    // A venda pré-paga encerra o atendimento mesmo mantendo o responsável
-    // preenchido (resetForNextChild(true) não pararia sozinho).
-    void voiceRecorder.stop({ outcome: "SUCCESS" });
     setPrepaidModalOpen(false);
     setDonePrepaid({
       childName: childName.trim(),
