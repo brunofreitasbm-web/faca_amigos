@@ -12,10 +12,11 @@
 //
 // Secrets: TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID (grupo/chat do Owner).
 //
-// Helpers inline pelo mesmo motivo das outras dispatchers: nunca é chamada
-// por um navegador e o import relativo pro _shared quebrava o bundling.
+// Layout das mensagens por tipo em ./format.ts (puro, testado com Node). O
+// import é do mesmo diretório; só o ../_shared quebrava o bundling no deploy.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { formatMessage } from "./format.ts";
 
 const TELEGRAM_MAX_TEXT = 4096;
 const MAX_RETRY_AFTER_S = 10;
@@ -24,46 +25,8 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-// Corpo vem como texto simples, uma informação por linha — em geral
-// "Rótulo: valor" (às vezes várias por linha atrás de um "—"). Mesma regra de
-// owner-email-dispatch/formatBodyHtml, em texto para o Telegram.
-function formatBody(body: string): string {
-  const out: string[] = [];
-
-  for (const raw of body.split("\n")) {
-    const line = raw.trim();
-    if (!line) continue;
-
-    const dashSplit = line.split(" — ");
-    if (dashSplit.length === 2 && dashSplit[1].includes(": ")) {
-      const [prefix, rest] = dashSplit;
-      out.push(`\n<b>${escapeHtml(prefix)}</b>`);
-      for (const item of rest.split(", ")) {
-        const idx = item.indexOf(": ");
-        if (idx === -1) out.push(escapeHtml(item));
-        else out.push(`${escapeHtml(item.slice(0, idx))}: <b>${escapeHtml(item.slice(idx + 2))}</b>`);
-      }
-      continue;
-    }
-
-    const idx = line.indexOf(": ");
-    const label = idx > 0 ? line.slice(0, idx) : "";
-    if (idx > 0 && idx < 40 && !label.includes(" - ")) {
-      out.push(`${escapeHtml(label)}: <b>${escapeHtml(line.slice(idx + 2))}</b>`);
-    } else {
-      out.push(escapeHtml(line));
-    }
-  }
-
-  return out.join("\n");
-}
-
-function buildMessage(title: string, body: string): string {
-  const text = `<b>${escapeHtml(title)}</b>\n\n${formatBody(body)}`;
+function buildMessage(reportType: string, title: string, body: string): string {
+  const text = formatMessage(reportType, title, body);
   if (text.length <= TELEGRAM_MAX_TEXT) return text;
   // Corte por caractere pode partir uma tag aberta; cai para texto puro
   // truncado, que o Telegram aceita sem parse_mode.
@@ -146,7 +109,7 @@ Deno.serve(async (req) => {
 
   // Em série: o Telegram limita ~20 msgs/min por grupo e a ordem importa.
   for (const row of rows) {
-    const html = buildMessage(row.title, row.body);
+    const html = buildMessage(row.report_type, row.title, row.body);
     const payload = html
       ? { chat_id: chatId, text: html, parse_mode: "HTML", disable_web_page_preview: true }
       : {
