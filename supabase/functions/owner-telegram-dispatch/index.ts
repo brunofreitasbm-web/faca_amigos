@@ -1,5 +1,5 @@
 // Disparada a cada minuto pelo pg_cron (ver migration
-// 20261010120000_fa_owner_telegram.sql) — canal Telegram das notificações do
+// 20261010042613_fa_owner_telegram.sql) — canal Telegram das notificações do
 // Owner, irmã de owner-email-dispatch e owner-report-dispatch.
 // `fa_owner_telegram_claim_due` marca as notificações como enviadas dentro da
 // mesma instrução SQL (UPDATE...RETURNING), então invocações sobrepostas do

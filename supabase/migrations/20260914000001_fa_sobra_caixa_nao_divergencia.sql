@@ -13,7 +13,7 @@
 --   - fa_owner_report_build_divergencia: gravação de amount_cents (limiar de
 --     divergência do Telegram) some.
 -- A regra "sobra não é divergência" está em
--- 20261010140000_fa_sobra_caixa_nao_e_divergencia.sql, escrita sobre as
+-- 20261010052328_fa_sobra_caixa_nao_e_divergencia.sql, escrita sobre as
 -- definições vivas. Use aquela, não esta.
 -- Correção de sintaxe já feita: "order column_id desc" -> "order by at_ms desc".
 --
