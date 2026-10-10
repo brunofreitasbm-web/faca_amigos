@@ -6,7 +6,7 @@
 
    1. `--color-warning` e `--color-error` são a MESMA cor (#E83030) na
       paleta de marca. O painel de acompanhamento precisa distinguir
-      claramente "acabando" (AMARELO) de "estourou o tempo" (VERMELHO)
+      "acabando" (AMARELO) e "últimos minutos" (VERMELHO, laranja) de "estourou o tempo" (EXCEDENTE, vermelho)
       de "em excedente cobrável" (EXCEDENTE) — três estados que não
       podem colidir visualmente.
    2. `--color-yellow` (#FFE234) da marca, com texto branco em cima,
@@ -40,9 +40,9 @@
 :root {
   /* Fundo de badge/card preenchido — sempre com --status-*-fg em cima */
   --status-verde-bg:        #17803F;
-  --status-amarelo-bg:      #A85D00;
-  --status-vermelho-bg:     #C21F3A;
-  --status-excedente-bg:    #7A0E24;
+  --status-amarelo-bg:      #8A6D00;
+  --status-vermelho-bg:     #C2410C;
+  --status-excedente-bg:    #A3162B;
 
   /* Texto/ícone sobre os fundos acima — uma cor só, sempre branco,
      por design (ver racional acima) */
@@ -54,13 +54,13 @@
   /* Variante "texto colorido sobre superfície clara" (rótulos
      pequenos fora de um badge preenchido — ex. legenda, filtro) */
   --status-verde-text:      #136836;  /* 6.06:1 sobre --status-verde-soft */
-  --status-amarelo-text:    #8A4B00;  /* 6.29:1 sobre --surface-page */
-  --status-vermelho-text:   #B0142F;  /* 6.50:1 sobre --surface-page */
-  --status-excedente-text:  #7A0E24;
+  --status-amarelo-text:    #6B5400;
+  --status-vermelho-text:   #9A3412;
+  --status-excedente-text:  #A3162B;
 
   /* Fundo suave (chip/tag não preenchido, uso discreto) */
   --status-verde-soft:      #E4F5EA;
-  --status-amarelo-soft:    #FBEADB;
-  --status-vermelho-soft:   #FBE3E7;
-  --status-excedente-soft:  #F3DDE1;
+  --status-amarelo-soft:    #F7EFC9;
+  --status-vermelho-soft:   #FFEDD5;
+  --status-excedente-soft:  #FBE3E7;
 }
