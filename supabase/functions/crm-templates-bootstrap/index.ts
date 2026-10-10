@@ -367,6 +367,7 @@ Deno.serve(async (req) => {
       preview: def.body,
       variable_count: def.variableCount,
       purpose: def.purpose,
+      category: def.category,
       active: false, // só ativa quando a Meta aprovar (rodar esta function de novo depois confere e ativa)
     });
 

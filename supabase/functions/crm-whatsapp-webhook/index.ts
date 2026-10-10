@@ -70,6 +70,34 @@ const STATUS_MAP: Record<string, string> = {
   failed: "failed",
   undelivered: "undelivered",
 };
+const FAILED_STATUSES = new Set(["failed", "undelivered"]);
+// Erros que dizem respeito ao NÚMERO e não mudam sozinhos: 63024 destinatário inválido,
+// 63003 canal não achou o endereço (sem WhatsApp), 21211 número inválido, 21614 não é celular.
+// 63049 (Meta não entregou ESTA mensagem) e 63016/63018 etc. são da mensagem/template — não bloqueiam.
+const PERMANENT_FAILURE_CODES = new Set(["63024", "63003", "21211", "21614"]);
+
+/**
+ * Pausa o envio ao número: opt_in = false com motivo DELIVERY_FAILED em todos os canais (os
+ * dispatchers já pulam opt_in = false) e marca o responsável como WhatsApp inválido (filas de
+ * opt-in). Se a pessoa escrever de volta, o fluxo de mensagem recebida reativa tudo.
+ */
+async function blockUndeliverable(admin: ReturnType<typeof createClient>, contactId: string) {
+  const { data: contact } = await admin.from("fa_crm_contacts").select("phone_e164, guardian_id").eq("id", contactId).maybeSingle();
+  if (!contact) return;
+  await admin
+    .from("fa_crm_contacts")
+    .update({ opt_in: false, opt_out_reason: "DELIVERY_FAILED" })
+    .eq("phone_e164", contact.phone_e164)
+    .eq("opt_in", true);
+  if (contact.guardian_id) {
+    await admin
+      .from("fa_kiosk_guardians")
+      .update({ whatsapp_invalid_at_ms: Date.now() })
+      .eq("id", contact.guardian_id)
+      .is("whatsapp_invalid_at_ms", null);
+  }
+}
+
 // Só avança: um "sent" atrasado não pode rebaixar um "read" já gravado.
 const STATUS_RANK: Record<string, number> = { received: 0, queued: 1, sent: 2, delivered: 3, read: 4, failed: 5, undelivered: 5 };
 
@@ -100,25 +128,36 @@ Deno.serve(async (req) => {
   if (params.MessageStatus && params.SmsStatus !== "received") {
     const next = STATUS_MAP[params.MessageStatus.toLowerCase()];
     if (!next) return twiml();
-    const { data: msg } = await admin.from("fa_crm_messages").select("id, status, contact_id").eq("twilio_sid", sid).maybeSingle();
-    if (msg && (STATUS_RANK[next] ?? 0) > (STATUS_RANK[msg.status] ?? 0)) {
-      await admin
-        .from("fa_crm_messages")
-        .update({ status: next, error: params.ErrorCode ? `Twilio ${params.ErrorCode}` : null })
-        .eq("id", msg.id);
+    const { data: msg } = await admin
+      .from("fa_crm_messages")
+      .select("id, status, contact_id, delivered_at_ms, read_at_ms, failed_at_ms")
+      .eq("twilio_sid", sid)
+      .maybeSingle();
+    if (!msg) return twiml();
+
+    const now = Date.now();
+    const errorCode = params.ErrorCode || null;
+    // Os carimbos de entregue/lido/falha são gravados mesmo se o callback chegar
+    // fora de ordem (ex.: "delivered" depois de "read"); o status só avança.
+    const patch: Record<string, unknown> = {};
+    if (next === "delivered" && !msg.delivered_at_ms) patch.delivered_at_ms = now;
+    if (next === "read") {
+      if (!msg.read_at_ms) patch.read_at_ms = now;
+      if (!msg.delivered_at_ms) patch.delivered_at_ms = now; // leu ⇒ foi entregue
     }
-    // 63024 = número sem WhatsApp (ou sem aceitar os termos): tira o responsável
-    // das filas de opt-in para não gastar envio nem sujar o freio.
-    if (msg && params.ErrorCode === "63024") {
-      const { data: contact } = await admin.from("fa_crm_contacts").select("guardian_id").eq("id", msg.contact_id).maybeSingle();
-      if (contact?.guardian_id) {
-        await admin
-          .from("fa_kiosk_guardians")
-          .update({ whatsapp_invalid_at_ms: Date.now() })
-          .eq("id", contact.guardian_id)
-          .is("whatsapp_invalid_at_ms", null);
-      }
+    if (FAILED_STATUSES.has(next) && !msg.failed_at_ms) patch.failed_at_ms = now;
+    if (errorCode) {
+      patch.error_code = errorCode;
+      patch.error = `Twilio ${errorCode}`;
     }
+    if ((STATUS_RANK[next] ?? 0) > (STATUS_RANK[msg.status] ?? 0)) {
+      patch.status = next;
+      if (!errorCode) patch.error = null;
+    }
+    if (Object.keys(patch).length) await admin.from("fa_crm_messages").update(patch).eq("id", msg.id);
+
+    // Falha permanente (número sem WhatsApp/inválido): para de enviar a esse número.
+    if (errorCode && PERMANENT_FAILURE_CODES.has(errorCode)) await blockUndeliverable(admin, msg.contact_id);
     return twiml();
   }
 
@@ -156,7 +195,7 @@ Deno.serve(async (req) => {
   // Com/sem o 9º dígito: prefere o contato mais antigo (o que recebeu os avisos).
   let { data: contact } = await admin
     .from("fa_crm_contacts")
-    .select("id, name, unread_count, stage, opt_in, guardian_id")
+    .select("id, name, unread_count, stage, opt_in, guardian_id, opt_out_reason")
     .eq("channel_id", channel.id)
     .in("phone_e164", phoneVariants(from))
     .order("created_at_ms", { ascending: true })
@@ -167,7 +206,7 @@ Deno.serve(async (req) => {
     const { data: created, error } = await admin
       .from("fa_crm_contacts")
       .insert({ channel_id: channel.id, phone_e164: from, name: params.ProfileName || null })
-      .select("id, name, unread_count, stage, opt_in, guardian_id")
+      .select("id, name, unread_count, stage, opt_in, guardian_id, opt_out_reason")
       .single();
     if (error) {
       console.error("erro ao criar contato:", error);
@@ -205,6 +244,10 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (!optOut && contact!.opt_out_reason === "DELIVERY_FAILED" && contact!.guardian_id) {
+    await admin.from("fa_kiosk_guardians").update({ whatsapp_invalid_at_ms: null }).eq("id", contact!.guardian_id);
+  }
+
   const { error: msgError } = await admin.from("fa_crm_messages").insert({
     contact_id: contact!.id,
     direction: "IN",
@@ -227,7 +270,12 @@ Deno.serve(async (req) => {
       last_message_preview: preview,
       unread_count: (contact!.unread_count ?? 0) + 1,
       stage: contact!.stage === "NOVO" ? "EM_CONVERSA" : contact!.stage === "INATIVO" ? "EM_CONVERSA" : contact!.stage,
-      ...(optOut ? { opt_in: false } : optIn ? { opt_in: true } : {}),
+      // Quem escreve tem WhatsApp funcionando: desfaz a pausa por falha de entrega.
+      ...(optOut
+        ? { opt_in: false, opt_out_reason: "USER_STOP" }
+        : optIn || contact!.opt_out_reason === "DELIVERY_FAILED"
+          ? { opt_in: true, opt_out_reason: null }
+          : {}),
     })
     .eq("id", contact!.id);
 
