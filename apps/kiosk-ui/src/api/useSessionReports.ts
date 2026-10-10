@@ -3,6 +3,16 @@ import { Api, type PendingSessionReport, type RecentSessionReport } from "./clie
 
 const POLL_MS = 60_000;
 
+/**
+ * Olhares preenchidos até 07/10/2026 (horário de Belém, UTC-3, inclusive) saem da tela do operador:
+ * as falhas antigas de entrega (63049) não são mais acionáveis e faziam o selo da navegação piscar.
+ * O registro continua no banco e no Gerencial. 08/10/2026 00:00 em Belém = 03:00 UTC.
+ */
+export const OLHAR_HIDDEN_BEFORE_MS = Date.UTC(2026, 9, 8, 3, 0, 0);
+
+/** A Meta recusou ESTA mensagem (63049): reenviar o mesmo modelo falha de novo, então o botão Reenviar não aparece. */
+export const isWhatsappRefusal63049 = (error: string | null | undefined): boolean => !!error && error.includes("63049");
+
 /** Meia-noite local de hoje, em ms — mesma janela usada em "Enviados hoje". */
 export function startOfTodayMs(): number {
   const d = new Date();
@@ -63,7 +73,8 @@ export function useUnsentSessionReports(unitId: string | null) {
   const refetch = useCallback(async () => {
     if (!unitId) return;
     try {
-      setUnsent(await Api.sessionReportsUnsent(unitId));
+      const rows = await Api.sessionReportsUnsent(unitId);
+      setUnsent(rows.filter((r) => r.filled_at_ms >= OLHAR_HIDDEN_BEFORE_MS));
     } catch {
       /* mantém o último valor: um soluço de rede não deve apagar o alerta */
     }

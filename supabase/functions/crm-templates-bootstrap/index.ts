@@ -133,6 +133,19 @@ const TEMPLATES: TemplateDef[] = [
     urlButton: { title: "Abrir Olhar", url: "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t={{4}}" },
   },
   {
+    // v3: reescrita para a Meta aceitar como UTILITY. A v2 foi reclassificada como MARKETING
+    // (erro 63049 em 56% dos envios): o destaque em {{3}} era um elogio gerado por IA, e elogio,
+    // emoji e tom afetivo puxam a categoria. Aqui é só o aviso transacional de que o relatório da
+    // visita de hoje está pronto — sem texto livre variável, sem elogio, sem convite a nada. O
+    // destaque continua dentro do documento e na mensagem de janela aberta (texto livre).
+    // O dispatcher escolhe as variáveis pelo variable_count do template ativo (4 = v2, 3 = esta).
+    // A Meta decide a categoria pelo conteúdo: conferir o resultado depois de aprovada.
+    purpose: "RELATORIO_SESSAO_PDF", name: "fa_relatorio_sessao_pdf_v3", category: "UTILITY", variableCount: 3,
+    body: "Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, use o botão abaixo. É um registro da visita, sem caráter de avaliação.",
+    sample: { "1": "Ana", "2": "Miguel", "3": "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdEFG" },
+    urlButton: { title: "Abrir relatório", url: "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t={{3}}" },
+  },
+  {
     purpose: "MAPEAMENTO", name: "fa_mapeamento_followup", category: "MARKETING", variableCount: 4,
     body: "Oi {{1}}! Faz uma semana que {{2}} brincou com a gente 💛 {{3}} O FaçaAmigos existe para que toda criança aprenda a fazer amigos, se expressar e crescer com segurança. E isso começa por entender como ela é. Por isso criamos o Mapeamento Comportamental: 5 minutos de perguntas e um direcionamento gratuito, feito por psicólogas. Faça aqui: {{4}} Se quiser conversar sobre o resultado, é só responder esta mensagem.",
     sample: { "1": "Ana", "2": "Miguel", "3": "Nessa fase, entender como Miguel se comunica e reage ao mundo faz toda diferença.", "4": "https://institutofacaamigos.com.br/teste" },
