@@ -134,6 +134,9 @@ Deno.serve(async (req) => {
   let sent = 0;
   let failed = 0;
   let requeued = 0;
+  // Motivos das falhas voltam na resposta (fica em net._http_response do pg_cron),
+  // já que o log da function é difícil de consultar.
+  const errors: string[] = [];
 
   // Em série: o Telegram limita ~20 msgs/min por grupo e a ordem importa.
   for (const row of rows) {
@@ -150,13 +153,16 @@ Deno.serve(async (req) => {
     if (!result.ok) {
       failed++;
       console.error(`Falha ao enviar ${row.report_type} (${row.notification_id}) ao Telegram:`, result.detail);
+      errors.push(`${row.report_type}: ${result.retryable ? "retry" : "perm"} ${result.detail}`.slice(0, 200));
       if (result.retryable) {
         const { error: requeueError } = await adminClient
           .from("fa_kiosk_owner_notifications")
           .update({ telegram_sent_at_ms: null })
           .eq("id", row.notification_id);
-        if (requeueError) console.error("Falha ao reenfileirar:", requeueError.message);
-        else requeued++;
+        if (requeueError) {
+          console.error("Falha ao reenfileirar:", requeueError.message);
+          errors.push(`requeue: ${requeueError.message}`.slice(0, 200));
+        } else requeued++;
       }
       continue;
     }
@@ -173,5 +179,5 @@ Deno.serve(async (req) => {
     }
   }
 
-  return jsonResponse({ checked: rows.length, sent, failed, requeued });
+  return jsonResponse({ checked: rows.length, sent, failed, requeued, ...(errors.length ? { errors: errors.slice(0, 5) } : {}) });
 });
