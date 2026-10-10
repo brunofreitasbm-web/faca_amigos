@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Button, BrandLockup, HelpText } from "@facaamigos/ui";
+import { Button, BrandLockup } from "@facaamigos/ui";
 import { useAppState } from "../../state/AppState.js";
 import { RequireCapability } from "../../auth/RequireCapability.js";
 import { ROLE_LABEL } from "../../auth/capabilities.js";
@@ -209,7 +209,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--background-default, #f8fafc)" }}>
-      <div style={{ flexShrink: 0, height: "4px", background: "linear-gradient(90deg, #6366f1 0%, #3b82f6 50%, #10b981 100%)" }} />
+      <div style={{ flexShrink: 0, height: "3px", background: "linear-gradient(90deg, #6366f1 0%, #3b82f6 50%, #10b981 100%)" }} />
 
       {/* Header Desktop Full Width */}
       <header
@@ -217,8 +217,8 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
-          gap: "16px",
-          padding: "12px 32px",
+          gap: "12px",
+          padding: "6px 20px",
           borderBottom: "1px solid var(--border-subtle, #e2e8f0)",
           background: "var(--surface-card, #ffffff)",
           flexWrap: "wrap",
@@ -228,7 +228,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
         <BrandLockup operation="Gerencial" accent="var(--color-primary)" size="sm" title="🗂️ Painel Gerencial" />
 
         {/* Omnibox Busca Rápida */}
-        <div style={{ position: "relative", minWidth: "280px", maxWidth: "420px", flex: 1, margin: "0 16px" }}>
+        <div style={{ position: "relative", minWidth: "280px", maxWidth: "420px", flex: 1, margin: "0 8px" }}>
           <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
             <span style={{ position: "absolute", left: "12px", color: "var(--text-secondary, #64748b)", fontSize: "14px" }}>🔎</span>
             <input
@@ -238,7 +238,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: "100%",
-                padding: "8px 12px 8px 36px",
+                padding: "5px 12px 5px 36px",
                 fontSize: "13px",
                 borderRadius: "8px",
                 border: "1px solid var(--border-subtle, #cbd5e1)",
@@ -334,171 +334,113 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
         </div>
       </header>
 
-      {/* Main Container Aproveitando Tela Inteira (Desktop Full Width) */}
-      <main style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-        <RequireCapability capability="config.write">
-          <div className="gerencial-shell" style={{ width: "100%", padding: "20px 32px", margin: "0 auto", boxSizing: "border-box" }}>
-            
-            {/* Macro Categorias Principais (Top Navigation Cards) */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: "12px",
-                marginBottom: "20px",
-              }}
-            >
-              {CATEGORIES.map((cat) => {
-                const isActive = activeCategory === cat.id;
-                const hasSelectedTab = cat.items.some((i) => i.value === tab);
+      {/* Navegação compacta e fixa: só o conteúdo rola */}
+      <RequireCapability capability="config.write">
+        <nav
+          aria-label="Menu gerencial"
+          style={{
+            flexShrink: 0,
+            padding: "8px 20px 0",
+            background: "var(--surface-card, #ffffff)",
+            borderBottom: "1px solid var(--border-subtle, #e2e8f0)",
+          }}
+        >
+          {/* Categorias: uma linha de abas */}
+          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+            {CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => handleSelectCategory(cat.id)}
+                  title={`${cat.description} (${cat.items.length} itens)`}
+                  aria-pressed={isActive}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "6px 14px",
+                    fontSize: "13px",
+                    fontWeight: isActive ? 700 : 500,
+                    border: "none",
+                    borderBottom: isActive ? "3px solid #3b82f6" : "3px solid transparent",
+                    background: "transparent",
+                    color: isActive ? "#1e40af" : "var(--text-secondary, #475569)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleSelectCategory(cat.id)}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-start",
-                      padding: "12px 16px",
-                      borderRadius: "12px",
-                      border: isActive ? "2px solid #3b82f6" : "1px solid var(--border-subtle, #e2e8f0)",
-                      background: isActive
-                        ? "linear-gradient(135deg, #ffffff 0%, #eff6ff 100%)"
-                        : "var(--surface-card, #ffffff)",
-                      boxShadow: isActive ? "0 4px 12px rgba(59, 130, 246, 0.15)" : "0 1px 3px rgba(0,0,0,0.02)",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      transition: "all 0.2s ease",
-                      position: "relative",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "20px" }}>{cat.icon}</span>
-                      {cat.badge && (
-                        <span
-                          style={{
-                            fontSize: "10px",
-                            fontWeight: 700,
-                            padding: "2px 6px",
-                            borderRadius: "10px",
-                            background: isActive ? "#3b82f6" : "#f1f5f9",
-                            color: isActive ? "#ffffff" : "#64748b",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          {cat.badge}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: isActive ? "#1e40af" : "var(--text-primary, #0f172a)" }}>
-                      {cat.label}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary, #64748b)", marginTop: "2px" }}>
-                      {cat.items.length} sub-módulos
-                      {hasSelectedTab && !isActive && <span style={{ color: "#3b82f6", fontWeight: "bold" }}> • Ativo</span>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Sub-Abas da Categoria Ativa (Horizontal Pills) */}
-            <div
-              style={{
-                background: "var(--surface-card, #ffffff)",
-                borderRadius: "12px",
-                padding: "16px 20px",
-                border: "1px solid var(--border-subtle, #e2e8f0)",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                marginBottom: "20px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", color: "#0f172a" }}>
-                    <span>{currentCategory.icon}</span> {currentCategory.label}
-                  </h3>
-                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#64748b" }}>{currentCategory.description}</p>
-                </div>
-              </div>
-
-              {/* Sub-menu Pills list */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                }}
-              >
-                {currentCategory.items.map((subItem) => {
-                  const isSelected = tab === subItem.value;
-                  return (
-                    <button
-                      key={subItem.value}
-                      onClick={() => handleSelectTab(subItem.value)}
+          {/* Sub-itens da categoria ativa */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", padding: "8px 0" }}>
+            {currentCategory.items.map((subItem) => {
+              const isSelected = tab === subItem.value;
+              return (
+                <button
+                  key={subItem.value}
+                  type="button"
+                  onClick={() => handleSelectTab(subItem.value)}
+                  title={subItem.description}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: isSelected ? 700 : 500,
+                    border: isSelected ? "1px solid #3b82f6" : "1px solid var(--border-subtle, #cbd5e1)",
+                    background: isSelected ? "#3b82f6" : "var(--surface-input, #f8fafc)",
+                    color: isSelected ? "#ffffff" : "var(--text-primary, #334155)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span>{subItem.icon}</span>
+                  <span>{subItem.label}</span>
+                  {subItem.tag && (
+                    <span
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "8px 14px",
-                        borderRadius: "8px",
-                        fontSize: "13px",
-                        fontWeight: isSelected ? 700 : 500,
-                        border: isSelected ? "1px solid #3b82f6" : "1px solid var(--border-subtle, #cbd5e1)",
-                        background: isSelected ? "#3b82f6" : "var(--surface-input, #f8fafc)",
-                        color: isSelected ? "#ffffff" : "var(--text-primary, #334155)",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                        boxShadow: isSelected ? "0 2px 6px rgba(59, 130, 246, 0.3)" : "none",
+                        fontSize: "9px",
+                        padding: "0 4px",
+                        borderRadius: "4px",
+                        background: isSelected ? "rgba(255,255,255,0.25)" : "#e2e8f0",
+                        color: isSelected ? "#ffffff" : "#475569",
+                        fontWeight: 700,
                       }}
                     >
-                      <span>{subItem.icon}</span>
-                      <span>{subItem.label}</span>
-                      {subItem.tag && (
-                        <span
-                          style={{
-                            fontSize: "10px",
-                            padding: "1px 5px",
-                            borderRadius: "4px",
-                            background: isSelected ? "rgba(255,255,255,0.25)" : "#e2e8f0",
-                            color: isSelected ? "#ffffff" : "#475569",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {subItem.tag}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Header da Aba Ativa & Dica Contextual */}
-            <div
+                      {subItem.tag}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {/* Descrição da aba ativa na mesma linha, em vez de uma faixa própria */}
+            <span
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "12px 18px",
-                background: "linear-gradient(90deg, #f1f5f9 0%, #ffffff 100%)",
-                borderRadius: "10px",
-                borderLeft: "4px solid #3b82f6",
-                marginBottom: "20px",
+                marginLeft: "8px",
+                flex: "1 1 240px",
+                minWidth: 0,
+                fontSize: "11px",
+                color: "var(--text-secondary, #64748b)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
+              title={currentItem.description}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "22px" }}>{currentItem.icon}</span>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>{currentItem.label}</h2>
-                  <HelpText style={{ margin: 0, fontSize: "12px" }}>{currentItem.description}</HelpText>
-                </div>
-              </div>
-            </div>
+              {currentItem.description}
+            </span>
+          </div>
+        </nav>
 
+        <main style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+          <div className="gerencial-shell" style={{ width: "100%", padding: "12px 20px 16px", margin: "0 auto", boxSizing: "border-box" }}>
             {/* ÁREA DE CONTEÚDO EXPANDIDA (DESKTOP FULL WIDTH) */}
             <div role="tabpanel" style={{ width: "100%", flex: 1 }}>
               {tab === "ACOMPANHAMENTO_OWNER" && <OwnerAcompanhamentoTab />}
@@ -532,8 +474,8 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
             </div>
 
           </div>
-        </RequireCapability>
-      </main>
+        </main>
+      </RequireCapability>
     </div>
   );
 }
