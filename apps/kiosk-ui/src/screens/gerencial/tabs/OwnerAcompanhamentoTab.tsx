@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Badge, HelpText, Select } from "@facaamigos/ui";
+import { Button, Badge, HelpText, Select } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { useAppState } from "../../../state/AppState.js";
 import { Api, businessDateFor } from "../../../api/client.js";
 import { money } from "../../../format.js";

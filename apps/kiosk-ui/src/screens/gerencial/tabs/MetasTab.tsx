@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Input } from "@facaamigos/ui";
+import { Button, Input } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { TicketGoal, Unit } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";

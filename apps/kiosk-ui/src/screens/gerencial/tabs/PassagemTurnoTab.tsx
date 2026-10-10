@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card, HelpText, Tag } from "@facaamigos/ui";
+import { Button, HelpText, Tag } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { HandoverHistoryRow } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -61,8 +62,7 @@ export function PassagemTurnoTab() {
   return (
     <div>
       <Card style={{ padding: "20px", marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>📓 Passagem de Turno</h2>
-        <HelpText style={{ marginBottom: "16px" }}>
+        <HelpText style={{ marginBottom: "8px" }}>
           O livro de registro diário entre operadores. Quem fecha o caixa é obrigado a registrar o que precisa ser
           repassado (ou declarar que não houve nada), e quem abre no dia seguinte é obrigado a ler antes de operar. O
           tempo de leitura mostra quanto tempo a pessoa ficou com o texto aberto antes de confirmar a ciência.

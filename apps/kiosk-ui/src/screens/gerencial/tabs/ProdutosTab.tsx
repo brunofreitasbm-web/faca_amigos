@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input } from "@facaamigos/ui";
+import { Button, Input } from "@facaamigos/ui";
+import { Card, FORM_GRID, FULL_ROW } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Product } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -88,10 +89,11 @@ export function ProdutosTab() {
   }
 
   return (
-    <div>
-      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>
+    <div className="g-split">
+      <aside>
+      <Card bodyStyle={FORM_GRID}>
+        <div style={{ ...FULL_ROW, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>
             {editingId ? "Editar produto" : "Novo produto"}
           </h2>
           {editingId && (
@@ -111,26 +113,28 @@ export function ProdutosTab() {
           title="Quanto custou comprar este produto. Deixe em branco se ainda não souber — não é obrigatório pra vender."
         />
         {costReais.trim() !== "" && (
-          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+          <span style={{ ...FULL_ROW, fontSize: "12px", color: "var(--text-muted)" }}>
             Margem: {money(Math.round(Number(priceReais) * 100) - Math.round(Number(costReais) * 100))}
             {Number(priceReais) > 0 &&
               ` (${Math.round(((Math.round(Number(priceReais) * 100) - Math.round(Number(costReais) * 100)) / Math.round(Number(priceReais) * 100)) * 100)}%)`}
           </span>
         )}
         <Input label="Estoque" type="number" value={stock} onChange={(e) => setStock(e.target.value)} />
-        {!editingId && <UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} />}
-        <Button variant="primary" disabled={busy || !name || (!editingId && unitIds.length === 0)} onClick={save}>
+        {!editingId && <div style={FULL_ROW}><UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} /></div>}
+        <Button variant="primary" style={{ ...FULL_ROW, justifySelf: "start" }} disabled={busy || !name || (!editingId && unitIds.length === 0)} onClick={save}>
           {editingId ? "Salvar produto" : `Criar produto em ${unitIds.length} unidade(s)`}
         </Button>
       </Card>
+      </aside>
+      <div className="g-cards">
       {products.map((p) => (
-        <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: p.active ? 1 : 0.5, flexWrap: "wrap", gap: "8px" }}>
+        <Card key={p.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px", opacity: p.active ? 1 : 0.5 }}>
           <span>
             {p.emoji} {p.name}
             <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · {units.find((u) => u.id === p.unit_id)?.name ?? "—"}</span>
           </span>
-          <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span style={{ flex: "1 1 auto" }}>
               {money(p.price_cents)}
               {p.cost_cents != null && (
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> (custo {money(p.cost_cents)})</span>
@@ -153,6 +157,7 @@ export function ProdutosTab() {
           </span>
         </Card>
       ))}
+      </div>
     </div>
   );
 }

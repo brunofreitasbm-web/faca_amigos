@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input, Select } from "@facaamigos/ui";
+import { Button, Input, Select } from "@facaamigos/ui";
+import { Card, FORM_GRID, FULL_ROW } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { LoyaltyRule, Unit } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -52,9 +53,10 @@ export function FidelidadeTab() {
   }
 
   return (
-    <div>
-      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>Nova regra</h2>
+    <div className="g-split">
+      <aside>
+      <Card bodyStyle={FORM_GRID}>
+        <h2 style={{ ...FULL_ROW, fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>Nova regra</h2>
         <Input label="A cada X visitas" type="number" value={triggerVisits} onChange={(e) => setTriggerVisits(e.target.value)} />
         <Select label="Recompensa" value={rewardKind} onChange={(e) => setRewardKind(e.target.value as LoyaltyRule["rewardKind"])}>
           <option value="ENTRADA_GRATIS">Entrada grátis</option>
@@ -62,17 +64,20 @@ export function FidelidadeTab() {
           <option value="MINUTOS_EXTRA">Minutos extras</option>
         </Select>
         <Input label="Valor" type="number" value={rewardValue} onChange={(e) => setRewardValue(e.target.value)} />
-        <UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} />
-        <Button variant="primary" disabled={busy || unitIds.length === 0} onClick={create}>
+        <div style={FULL_ROW}><UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} /></div>
+        <Button variant="primary" style={{ ...FULL_ROW, justifySelf: "start" }} disabled={busy || unitIds.length === 0} onClick={create}>
           Criar regra em {unitIds.length} unidade(s)
         </Button>
       </Card>
+      </aside>
+      <div className="g-cards">
       {rules.map((r) => (
-        <Card key={r.id} style={{ padding: "12px", marginBottom: "8px" }}>
+        <Card key={r.id}>
           A cada {r.triggerVisits} visitas ({r.activity}) → {r.rewardKind} ({r.rewardValue})
           <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · {units.find((u) => u.id === r.unitId)?.name ?? "—"}</span>
         </Card>
       ))}
+      </div>
     </div>
   );
 }

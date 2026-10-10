@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, Button, Badge } from "@facaamigos/ui";
+import { Button, Badge } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { JobApplication } from "../../../api/client.js";
 import { useToast } from "../../../state/ToastContext.js";

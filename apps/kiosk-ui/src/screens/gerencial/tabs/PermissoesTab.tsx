@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, HelpText, Select } from "@facaamigos/ui";
+import { HelpText, Select } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Employee } from "../../../api/client.js";
 import { useToast } from "../../../state/ToastContext.js";
@@ -83,7 +84,6 @@ function PermissoesTabInner() {
   return (
     <div>
       <Card style={{ padding: "20px", marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>🔐 Permissões por Papel</h2>
         <HelpText>
           Para cada ação, escolha o nível mínimo de acesso que já pode fazê-la. Quem está acima na
           hierarquia (Operador → Líder → Owner) sempre herda tudo que os níveis abaixo podem — não é
@@ -96,10 +96,11 @@ function PermissoesTabInner() {
           <p style={{ color: "var(--text-muted)" }}>Carregando…</p>
         </Card>
       ) : (
-        Array.from(groups.entries()).map(([group, caps]) => (
-          <Card key={group} style={{ padding: "20px", marginBottom: "16px" }}>
-            <h3 style={{ fontSize: "15px", marginTop: 0, marginBottom: "12px" }}>{group}</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+        <div style={{ columns: "440px", columnGap: "8px" }}>
+        {Array.from(groups.entries()).map(([group, caps]) => (
+          <Card key={group} style={{ breakInside: "avoid", marginBottom: "8px" }}>
+            <h3 style={{ fontSize: "14px", marginTop: 0, marginBottom: "8px" }}>{group}</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {caps.map((capability) => {
                 const role = matrix[capability];
                 return (
@@ -109,19 +110,19 @@ function PermissoesTabInner() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      gap: "16px",
-                      flexWrap: "wrap",
+                      gap: "10px",
+                      flexWrap: "nowrap",
                       opacity: savingCapability === capability ? 0.6 : 1,
                     }}
                   >
-                    <span style={{ fontSize: "14px", flex: "1 1 260px" }}>
+                    <span style={{ fontSize: "13px", flex: "1 1 0", minWidth: 0 }}>
                       {CAPABILITY_LABEL[capability as keyof typeof CAPABILITY_LABEL] ?? capability}
                     </span>
                     <Select
                       value={role ?? "OPERADOR"}
                       disabled={!role || savingCapability === capability}
                       onChange={(e) => changeRole(capability, e.target.value as EditableRole)}
-                      style={{ width: "160px" }}
+                      style={{ width: "140px", flexShrink: 0 }}
                     >
                       {EDITABLE_ROLES.map((r) => (
                         <option key={r} value={r}>
@@ -134,7 +135,8 @@ function PermissoesTabInner() {
               })}
             </div>
           </Card>
-        ))
+        ))}
+        </div>
       )}
     </div>
   );

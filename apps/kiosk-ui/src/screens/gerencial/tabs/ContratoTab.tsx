@@ -89,7 +89,8 @@ export function ContratoTab() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+    <div className="g-split">
+      <aside style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
       <HelpText>
         Este é o contrato impresso na <strong>Entrada</strong> quando a família compra um plano acima de 2h — ele
         formaliza o banco de horas (validade de 45 dias, uso em qualquer unidade) e sai em A4, com timbre FaçaAmigos e
@@ -111,26 +112,7 @@ export function ContratoTab() {
         )}
       </div>
 
-      <textarea
-        value={template}
-        onChange={(e) => setTemplate(e.target.value)}
-        disabled={loading}
-        spellCheck={false}
-        style={{
-          width: "100%",
-          minHeight: "480px",
-          boxSizing: "border-box",
-          padding: "14px",
-          borderRadius: "14px",
-          border: "1px solid var(--border-subtle)",
-          font: "13px/1.6 'Consolas', monospace",
-          resize: "vertical",
-          background: "var(--surface-card)",
-          color: "inherit",
-        }}
-      />
-
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <Button variant="primary" onClick={save} loading={saving} disabled={saving || loading || !unitId} style={{ borderRadius: "9999px" }}>
           Salvar modelo desta unidade
         </Button>
@@ -151,7 +133,7 @@ export function ContratoTab() {
         <summary style={{ cursor: "pointer", fontWeight: "bold", fontSize: "14px" }}>
           Campos preenchidos automaticamente
         </summary>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "6px", marginTop: "10px", fontSize: "13px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px", marginTop: "10px", fontSize: "13px" }}>
           {CONTRACT_PLACEHOLDERS.map((p) => (
             <div key={p.key}>
               <code style={{ background: "var(--surface-sunken)", padding: "1px 6px", borderRadius: "6px" }}>{"{{" + p.key + "}}"}</code>{" "}
@@ -160,6 +142,26 @@ export function ContratoTab() {
           ))}
         </div>
       </details>
+      </aside>
+
+      <textarea
+        value={template}
+        onChange={(e) => setTemplate(e.target.value)}
+        disabled={loading}
+        spellCheck={false}
+        style={{
+          width: "100%",
+          minHeight: "calc(100vh - 230px)",
+          boxSizing: "border-box",
+          padding: "14px",
+          borderRadius: "14px",
+          border: "1px solid var(--border-subtle)",
+          font: "13px/1.6 'Consolas', monospace",
+          resize: "vertical",
+          background: "var(--surface-card)",
+          color: "inherit",
+        }}
+      />
     </div>
   );
 }

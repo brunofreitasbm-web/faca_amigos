@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input, Select } from "@facaamigos/ui";
+import { Button, Input, Select } from "@facaamigos/ui";
+import { Card, FORM_GRID, FULL_ROW } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Coupon, Plan } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -106,8 +107,9 @@ export function CuponsTab() {
   const totalReviewUsed = reviewCoupons.reduce((acc, c) => acc + c.used_count, 0);
 
   return (
-    <div>
-      <Card style={{ padding: "16px", marginBottom: "16px", background: "var(--surface-sunken)", borderLeft: "4px solid var(--color-primary)", borderRadius: "12px" }}>
+    <div className="g-split">
+      <aside>
+      <Card style={{ marginBottom: "10px", background: "var(--surface-sunken)", borderLeft: "4px solid var(--color-primary)", borderRadius: "12px" }}>
         <h3 style={{ fontSize: "16px", margin: "0 0 8px 0", color: "var(--text-primary)" }}>⭐ Desempenho: Avaliações do Google</h3>
         <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>
           <strong>{totalReviewIssued}</strong> descontos (cupons) emitidos <br/>
@@ -115,9 +117,9 @@ export function CuponsTab() {
         </p>
       </Card>
 
-      <Card style={{ padding: "16px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 4px" }}>
+      <Card bodyStyle={FORM_GRID}>
+        <div style={{ ...FULL_ROW, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>
             {editingId ? "Editar cupom" : "Novo cupom"}
           </h2>
           {editingId && (
@@ -134,7 +136,7 @@ export function CuponsTab() {
         </Select>
         <Input label="Valor" type="number" value={value} onChange={(e) => setValue(e.target.value)} />
         <Input label="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} />
-        {!editingId && <UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} />}
+        {!editingId && <div style={FULL_ROW}><UnitCheckboxGroup units={units} selected={unitIds} onChange={setUnitIds} /></div>}
         {planRestrictionUnitId ? (
           <Select label="Restringir a um plano" value={allowedPlanId} onChange={(e) => setAllowedPlanId(e.target.value)}>
             <option value="">Vale para todos os planos da unidade</option>
@@ -146,17 +148,19 @@ export function CuponsTab() {
           </Select>
         ) : (
           !editingId && unitIds.length > 1 && (
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
+            <p style={{ ...FULL_ROW, fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
               Restrição de plano só pode ser definida ao criar o cupom em uma única unidade.
             </p>
           )
         )}
-        <Button variant="primary" disabled={busy || !code || (!editingId && unitIds.length === 0)} onClick={save}>
+        <Button variant="primary" style={{ ...FULL_ROW, justifySelf: "start" }} disabled={busy || !code || (!editingId && unitIds.length === 0)} onClick={save}>
           {editingId ? "Salvar cupom" : `Criar cupom em ${unitIds.length} unidade(s)`}
         </Button>
       </Card>
+      </aside>
+      <div className="g-cards">
       {coupons.map((c) => (
-        <Card key={c.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: c.active ? 1 : 0.5, flexWrap: "wrap", gap: "8px" }}>
+        <Card key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px", opacity: c.active ? 1 : 0.5 }}>
           <span>
             <strong>{c.code}</strong> — {c.kind} ({c.value}) — usado {c.used_count}× {c.description ? `— ${c.description}` : ""}
             <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · {units.find((u) => u.id === c.unitId)?.name ?? "—"}</span>
@@ -167,7 +171,7 @@ export function CuponsTab() {
               </span>
             )}
           </span>
-          <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
             <Button variant="secondary" onClick={() => startEdit(c)} disabled={busy}>
               Editar
             </Button>
@@ -183,6 +187,7 @@ export function CuponsTab() {
           </span>
         </Card>
       ))}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, HelpText, Button } from "@facaamigos/ui";
+import { HelpText, Button } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { UnitShiftRow } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -56,8 +57,7 @@ export function AberturaFechamentoTab() {
   return (
     <div>
       <Card style={{ padding: "20px", marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>🕒 Abertura e Fechamento</h2>
-        <HelpText style={{ marginBottom: "16px" }}>
+        <HelpText style={{ marginBottom: "8px" }}>
           Horário de abertura e fechamento do caixa de cada loja, quem abriu/fechou e a conciliação do fundo de caixa: o
           fundo contado na abertura é comparado ao fundo declarado no fechamento anterior; no fechamento, o dinheiro contado
           na gaveta é comparado ao calculado (quebra/sobra), com o fundo que fica para o dia seguinte e o valor do envelope.

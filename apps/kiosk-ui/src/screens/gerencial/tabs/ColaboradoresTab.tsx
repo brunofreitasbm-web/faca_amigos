@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
+import { Button, HelpText, Input, Modal, Select, Tag } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Employee, PersonalInfoStatus } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -323,7 +324,6 @@ export function ColaboradoresTab() {
       {!showForm && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
           <div>
-            <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>Equipe e Colaboradores</h2>
             <HelpText>{employees.length} colaboradores cadastrados, nas 3 unidades.</HelpText>
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -645,7 +645,7 @@ export function ColaboradoresTab() {
         </Modal>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div className="g-cards g-cards-wide">
         {employees
           .filter((e) => {
             if (categoryFilter === "CLT") return e.role !== "PRESTADOR_PJ" && e.contract_type !== "PJ";
@@ -675,7 +675,7 @@ export function ColaboradoresTab() {
                 border: e.active === false ? "1px dashed var(--border-subtle)" : "1px solid var(--border-subtle)",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                   <div
                     style={{
@@ -721,6 +721,7 @@ export function ColaboradoresTab() {
                 </div>
 
                 <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ flex: "1 1 140px", minWidth: 0 }}>
                   <Select
                     aria-label={`Nível de acesso de ${e.full_name}`}
                     title={ROLE_DESCRIPTION[e.role]}
@@ -734,7 +735,9 @@ export function ColaboradoresTab() {
                       </option>
                     ))}
                   </Select>
+                  </div>
 
+                  <div style={{ flex: "1 1 140px", minWidth: 0 }}>
                   <Select
                     aria-label={`Setor de ${e.full_name}`}
                     title="Setor de atuação: define qual bloco do Olhar FaçaAmigos abre primeiro para este colaborador"
@@ -749,6 +752,7 @@ export function ColaboradoresTab() {
                       </option>
                     ))}
                   </Select>
+                  </div>
 
                   <Button variant="ghost" size="sm" onClick={() => openUnitsModal(e)} title="Definir em quais unidades este colaborador atua">
                     🗂️ Unidades
