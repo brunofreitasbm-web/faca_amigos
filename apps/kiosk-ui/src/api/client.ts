@@ -3965,6 +3965,9 @@ export const Api = {
   // ── Olhar FaçaAmigos (planos >= 1h; internamente relatorio_sessao) ──
   sessionReportsPending: (unitId: string) =>
     unwrap<PendingSessionReport[]>(supabase().rpc("fa_session_reports_pending", { p_unit_id: unitId })),
+  /** Preenchidos e ainda não entregues (de qualquer dia) — persistem até virar SENT/SENT_MANUAL. */
+  sessionReportsUnsent: (unitId: string) =>
+    unwrap<RecentSessionReport[]>(supabase().rpc("fa_session_reports_unsent", { p_unit_id: unitId })),
   sessionReportsRecent: (unitId: string, sinceMs: number) =>
     unwrap<RecentSessionReport[]>(supabase().rpc("fa_session_reports_recent", { p_unit_id: unitId, p_since_ms: sinceMs })),
   /**

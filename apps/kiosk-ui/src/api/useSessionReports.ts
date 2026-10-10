@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Api, type PendingSessionReport } from "./client.js";
+import { Api, type PendingSessionReport, type RecentSessionReport } from "./client.js";
 
 const POLL_MS = 60_000;
 
@@ -51,18 +51,19 @@ export function usePendingSessionReports(unitId: string | null) {
 }
 
 /**
- * Quantos relatórios de hoje ficaram com `FAILED` (Twilio recusou o envio
- * automático). Alimenta o badge piscante do Olhar FaçaAmigos na navegação —
- * sem isso, uma recusa só aparecia pra quem já estivesse na tela certa.
+ * Relatórios preenchidos que ainda não chegaram ao responsável (Twilio recusou,
+ * sem modelo/canal, ou envio parado), de qualquer dia: ficam aqui até serem
+ * enviados — automático ou manual. Alimenta o badge piscante da navegação e o
+ * banner da tela do Olhar; antes só contava os de "hoje", então a pendência
+ * sumia à meia-noite.
  */
-export function useFailedSessionReportsCount(unitId: string | null) {
-  const [failedCount, setFailedCount] = useState(0);
+export function useUnsentSessionReports(unitId: string | null) {
+  const [unsent, setUnsent] = useState<RecentSessionReport[]>([]);
 
   const refetch = useCallback(async () => {
     if (!unitId) return;
     try {
-      const recent = await Api.sessionReportsRecent(unitId, startOfTodayMs());
-      setFailedCount(recent.filter((r) => r.whatsapp_status === "FAILED").length);
+      setUnsent(await Api.sessionReportsUnsent(unitId));
     } catch {
       /* mantém o último valor: um soluço de rede não deve apagar o alerta */
     }
@@ -81,5 +82,5 @@ export function useFailedSessionReportsCount(unitId: string | null) {
     };
   }, [refetch]);
 
-  return { failedCount, refetch };
+  return { unsent, unsentCount: unsent.length, refetch };
 }
