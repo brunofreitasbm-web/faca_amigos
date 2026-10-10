@@ -10,7 +10,6 @@ import { startPrintBridge } from "./printBridge.js";
 import { listWindowsPrinters } from "./listPrinters.js";
 import { splashDataUrl } from "./splash.js";
 import { startFiscalWorker } from "../fiscal/index.js";
-import { startVoiceWorker } from "./voiceWorker.js";
 import { classifyTerminalKey } from "../config/supabaseTerminalKey.js";
 import { isUsableTerminalKey, persistTerminalKey } from "../config/terminalKeyStore.js";
 import { initAutoUpdater, checkForUpdatesAndWait, getUpdateStatus, applyUpdate } from "./autoUpdater.js";
@@ -208,12 +207,9 @@ async function startLocalServer() {
   // Tablets da LAN precisam de HTTPS (câmera exige contexto seguro); o
   // próprio Electron carrega de 127.0.0.1 e pode continuar em HTTP.
   const tls = process.env.FACAAMIGOS_TLS === "true" ? loadOrCreateTls(`${app.getPath("userData")}/certs`) : undefined;
-  // Função de gravação/transcrição de voz desativada por padrão em toda a
-  // rede — só liga se alguém setar FACAAMIGOS_VOZ_ENABLED=true explicitamente.
-  const voiceDir = process.env.FACAAMIGOS_VOZ_ENABLED === "true" ? join(app.getPath("userData"), "voz") : undefined;
-  const server = await buildApp({ db, hmacKey, nowMs: () => Date.now(), voiceDir }, { tls, uiDist: resolveUiDist() });
+  const server = await buildApp({ db, hmacKey, nowMs: () => Date.now() }, { tls, uiDist: resolveUiDist() });
   await server.listen({ port: PORT, host: "0.0.0.0" });
-  return { tls, db, voiceDir };
+  return { tls, db };
 }
 
 function createWindow(protocol: "http" | "https", splash?: BrowserWindow) {
@@ -378,17 +374,6 @@ if (isPrimaryInstance) {
     process.on("unhandledRejection", (reason) => {
       console.error("[fiscal] rejeição não tratada no worker fiscal:", reason);
     });
-
-    // Transcrição das gravações de voz de check-in/check-out. Mesmo
-    // cuidado do worker fiscal acima: um erro aqui nunca pode derrubar a
-    // impressão de pulseira/cupom, que é o que trava o balcão na hora.
-    if (serverRes.voiceDir) {
-      try {
-        startVoiceWorker(serverRes.db, app.getPath("userData"), ensureDeviceId(serverRes.db, Date.now()), serverRes.voiceDir);
-      } catch (err) {
-        console.error("[voz] falha ao iniciar o worker de transcrição — gravações ficarão na fila até o próximo reinício:", err);
-      }
-    }
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow(protocol);

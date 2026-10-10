@@ -810,16 +810,6 @@ export type UnitSettingKey =
   | "hour_bank_contract_template"
   // Validade do banco de horas em dias (padrão 45 — mesmo default do banco).
   | "hour_bank_validity_days"
-  // Gravação de voz do check-in/check-out para a base de conhecimento de
-  // venda adicional (transcrição local via whisper.cpp — ver
-  // apps/kiosk/src/main/voiceWorker.ts). '1' liga, ausente/'0' desliga.
-  | "voice_recording_enabled"
-  // Nome do modelo ggml usado pelo worker de transcrição desta unidade
-  // (ex.: 'ggml-small'). Lido pelo worker no PC do quiosque, não pela SPA.
-  | "voice_whisper_model"
-  // 'always' transcreve assim que a fila chega; 'closed' só fora do
-  // horário de funcionamento (menos disputa de CPU com o balcão).
-  | "voice_transcribe_hours"
   // Catálogo de ciclo de vida (upsell/cross-sell/LTV/retenção): um kind por
   // ação, '1' liga em todas as unidades. Ver crm-lifecycle-dispatch e
   // migration fa_crm_lifecycle_campaigns. Cada um só dispara de verdade
@@ -1879,63 +1869,6 @@ async function fetchApuracaoDias(
   return { dias, units: rawUnits, employees: rawEmployees, programs };
 }
 
-/** Estado do worker de transcrição de voz deste terminal — GET /api/voz/status (apps/kiosk/src/server/routes/voz.ts). */
-export interface VoiceStatus {
-  available: boolean;
-  worker: {
-    started: boolean;
-    reason?: string;
-    whisperCliFound: boolean;
-    model: { name: string; state: "ready" | "downloading" | "missing" | "error"; progressPct?: number; error?: string };
-    hasServiceRoleKey: boolean;
-    processingJobId?: string;
-    lastError?: string;
-    lastUploadedAtMs?: number;
-  };
-  queue: { pending: number; processing: number; transcribed: number; uploaded: number; failed: number; lastError: string | null; lastUploadedAtMs: number | null };
-}
-
-/** Uma linha de fa_kiosk_voice_transcripts, já com os joins de nome do operador/unidade. */
-export interface VoiceTranscript {
-  id: string;
-  unit_id: string;
-  employee_id: string | null;
-  session_ids: string[];
-  order_id: string | null;
-  momento: "CHECKIN" | "CHECKOUT";
-  outcome: "SUCCESS" | "ABANDONED" | "CAPPED" | null;
-  started_at_ms: number;
-  duration_ms: number;
-  transcript: string;
-  status: "DONE" | "EMPTY" | "FAILED";
-  fa_kiosk_employees: { full_name: string } | null;
-  fa_kiosk_units: { name: string } | null;
-}
-
-/** Compêndio de vendas (interpretação por IA das transcrições) para a Reunião de Alinhamento Mensal — fa_kiosk_sales_compendiums. */
-export interface SalesCompendiumRow {
-  id: string;
-  unit_id: string | null;
-  period_start_ms: number;
-  period_end_ms: number;
-  generated_by_employee_id: string | null;
-  transcript_count: number;
-  gemini_model: string;
-  status: "DONE" | "EMPTY" | "FAILED";
-  error: string | null;
-  compendium: {
-    resumoExecutivo: string;
-    totalAtendimentos: number;
-    pontosFortes: string[];
-    objecoesRecorrentes: Array<{ objecao: string; frequencia: string; sugestaoResposta: string }>;
-    ofertasEficazes: Array<{ oferta: string; porque: string }>;
-    porOperador: Array<{ nomeOperador: string; destaque: string; pontoDeAtencao: string }>;
-    planoAcaoReuniao: string[];
-  } | null;
-  created_at_ms: number;
-}
-
-/** Uma linha de fa_kiosk_voice_terminal_status — heartbeat do worker de voz de UM terminal (painel central, Gerencial > Terminais). */
 export type CrmStage = "NOVO" | "EM_CONVERSA" | "INTERESSADO" | "CLIENTE" | "INATIVO";
 
 export interface CrmContact {
@@ -1971,26 +1904,6 @@ export interface CrmTemplate {
   name: string;
   preview: string;
   variable_count: number;
-}
-
-export interface VoiceTerminalStatus {
-  terminal_id: string;
-  unit_id: string | null;
-  worker_version: string | null;
-  has_service_role_key: boolean;
-  whisper_cli_found: boolean;
-  model_name: string | null;
-  model_state: "ready" | "downloading" | "missing" | "error" | null;
-  model_progress_pct: number | null;
-  model_error: string | null;
-  queue_pending: number;
-  queue_processing: number;
-  queue_transcribed: number;
-  queue_uploaded: number;
-  queue_failed: number;
-  last_error: string | null;
-  last_heartbeat_ms: number;
-  fa_kiosk_units: { name: string } | null;
 }
 
 export const Api = {
@@ -3367,96 +3280,6 @@ export const Api = {
   registerRollChange: (unitId: string, rollLengthMm = 30000): Promise<string> =>
     unwrap<string>(supabase().rpc("fa_kiosk_register_roll_change", { p_unit_id: unitId, p_roll_length_mm: rollLengthMm })),
 
-  /**
-   * Estado do worker de transcrição de voz DESTE terminal (whisper-cli
-   * achado, modelo pronto/baixando/ausente, fila de jobs) — vem da rota
-   * local /api/voz/status (apps/kiosk/src/server/routes/voz.ts), nunca do
-   * Supabase. `null` fora do kiosk (Vercel, ou rota ainda não configurada
-   * neste terminal) — quem chama trata como "gravação indisponível aqui".
-   */
-  voiceStatus: async (): Promise<VoiceStatus | null> => {
-    try {
-      const res = await fetch("/api/voz/status", { signal: AbortSignal.timeout(1500) });
-      if (!res.ok) return null;
-      return (await res.json()) as VoiceStatus;
-    } catch {
-      return null;
-    }
-  },
-
-  /** Transcrições de atendimentos gravados — Gerencial > Atendimentos Gravados. Exige 'treinamento.transcricoes.read' (RLS). */
-  voiceTranscripts: async (filters: {
-    unitId?: string;
-    employeeId?: string;
-    momento?: "CHECKIN" | "CHECKOUT";
-    fromMs?: number;
-    toMs?: number;
-    query?: string;
-    page?: number;
-    pageSize?: number;
-  }): Promise<{ rows: VoiceTranscript[]; count: number }> => {
-    const pageSize = filters.pageSize ?? 50;
-    const page = filters.page ?? 0;
-    let q = supabase()
-      .from("fa_kiosk_voice_transcripts")
-      .select(
-        "id, unit_id, employee_id, session_ids, order_id, momento, outcome, started_at_ms, duration_ms, transcript, status, fa_kiosk_employees(full_name), fa_kiosk_units(name)",
-        { count: "exact" },
-      )
-      .order("started_at_ms", { ascending: false })
-      .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (filters.unitId) q = q.eq("unit_id", filters.unitId);
-    if (filters.employeeId) q = q.eq("employee_id", filters.employeeId);
-    if (filters.momento) q = q.eq("momento", filters.momento);
-    if (filters.fromMs) q = q.gte("started_at_ms", filters.fromMs);
-    if (filters.toMs) q = q.lt("started_at_ms", filters.toMs);
-    if (filters.query?.trim()) q = q.textSearch("search_tsv", filters.query.trim(), { type: "websearch", config: "portuguese" });
-
-    const { data, error, count } = await q;
-    if (error) throw new Error(error.message);
-    return { rows: (data ?? []) as unknown as VoiceTranscript[], count: count ?? 0 };
-  },
-
-  /** Sessões e oferta VIP ligadas a uma transcrição, para o painel de detalhe. */
-  voiceTranscriptSessions: async (sessionIds: string[]) => {
-    if (sessionIds.length === 0) return { sessions: [], offers: [] };
-    const [sessions, offers] = await Promise.all([
-      unwrap<Array<{ id: string; child_name_snapshot: string; status: string; plan_id: string | null }>>(
-        supabase().from("fa_kiosk_sessions").select("id, child_name_snapshot, status, plan_id").in("id", sessionIds),
-      ),
-      unwrap<Array<{ session_id: string; outcome: string | null; offer_title: string | null }>>(
-        supabase().from("fa_kiosk_upsell_offers").select("session_id, outcome, offer_title").in("session_id", sessionIds),
-      ).catch(() => []),
-    ]);
-    return { sessions, offers };
-  },
-
-  /** Compêndios de vendas já gerados (automático mensal ou sob demanda) — Gerencial > Atendimentos Gravados > Reunião de Alinhamento. */
-  salesCompendiums: (unitId: string | null, limit = 12) => {
-    let q = supabase().from("fa_kiosk_sales_compendiums").select("*").order("period_start_ms", { ascending: false }).limit(limit);
-    q = unitId ? q.eq("unit_id", unitId) : q.is("unit_id", null);
-    return unwrap<SalesCompendiumRow[]>(q);
-  },
-
-  /**
-   * Gera sob demanda o Compêndio de Vendas de um período (interpretação
-   * das transcrições pela API Gemini, no servidor) — para o gestor ter
-   * material pronto antes da Reunião de Alinhamento Mensal sem esperar o
-   * cron do dia 1. Exige 'treinamento.compendio.gerar' (checado na Edge
-   * Function, não só na tela).
-   */
-  generateSalesCompendium: (unitId: string | null, periodStartMs: number, periodEndMs: number) =>
-    unwrap<SalesCompendiumRow>(
-      supabase().functions.invoke("sales-compendium-generate", { body: { unitId, periodStartMs, periodEndMs } }),
-    ),
-
-  /**
-   * Painel central de terminais (Gerencial > Caixa & Auditoria > Terminais):
-   * status do worker de voz (whisper.cpp) de cada PC/tablet da rede, vindo
-   * do heartbeat que apps/kiosk/src/main/voiceWorker.ts manda a cada 30s.
-   * Exige 'config.terminais.read' (RLS) — visão de infraestrutura da rede
-   * inteira, não de conteúdo de uma unidade só.
-   */
   // ── CRM de WhatsApp (Gerencial > CRM WhatsApp) ──
   crmContacts: () =>
     unwrap<CrmContact[]>(
@@ -3522,14 +3345,6 @@ export const Api = {
   crmMarkRead: (contactId: string) => unwrap<null>(supabase().rpc("fa_crm_mark_read", { p_contact_id: contactId })),
   crmSend: (body: { contactId: string; body?: string; templateId?: string; variables?: Record<string, string> }) =>
     unwrap<{ ok: boolean; sid: string }>(supabase().functions.invoke("crm-whatsapp-send", { body })),
-
-  voiceTerminals: () =>
-    unwrap<VoiceTerminalStatus[]>(
-      supabase()
-        .from("fa_kiosk_voice_terminal_status")
-        .select("*, fa_kiosk_units(name)")
-        .order("last_heartbeat_ms", { ascending: false }),
-    ),
 
   /**
    * Meta diária de faturamento por dia da semana (1=segunda … 7=domingo),

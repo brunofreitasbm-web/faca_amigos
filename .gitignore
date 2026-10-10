@@ -121,9 +121,3 @@ view-source_*.html
 !.env.example
 !**/.env.example
 
-
-# Gravação/transcrição de voz (check-in/check-out): binário do whisper.cpp
-# baixado em build (scripts/fetch-whisper.mjs) e fila local de dev.
-apps/kiosk/vendor/whisper/
-apps/kiosk/.voz/
-.voz/

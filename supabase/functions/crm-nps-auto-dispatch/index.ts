@@ -6,7 +6,7 @@ import { loadUnitOptions, npsVariables, renderNpsPreview, templateAsksUnit } fro
 // unidades com fa_kiosk_app_settings.crm_nps_auto = '1' (padrão desligado).
 //
 // verify_jwt = false (config.toml): só o pg_cron chama, sem JWT — mesmo
-// padrão de sales-compendium-dispatch. Rodar a mais não causa envio a
+// padrão de ponto-photo-retention-dispatch. Rodar a mais não causa envio a
 // mais: a janela de checkout é fixa e há cooldown de 30 dias por contato.
 // Inline (sem _shared) pelo mesmo motivo das demais functions de cron.
 

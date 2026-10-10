@@ -20,8 +20,6 @@ import { useSwipeNavigation } from "./hooks/useSwipeNavigation.js";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts.js";
 import { usePrintFailureAlerts } from "./hooks/usePrintFailureAlerts.js";
 import { useSessionReportFailureAlerts } from "./hooks/useSessionReportFailureAlerts.js";
-import { RecordingIndicator } from "./components/RecordingIndicator.js";
-import { voiceRecorder } from "./lib/voiceRecorder.js";
 import { useAppState } from "./state/AppState.js";
 import { useConfirm } from "./state/ConfirmContext.js";
 import { useAuth } from "./auth/AuthContext.js";
@@ -151,27 +149,6 @@ export function App() {
       ensureOwnerPushSubscription(Api).catch(() => {});
     }
   }, [employee, can]);
-
-  // Encerra qualquer gravação de voz em andamento quando o colaborador
-  // desloga/troca (o singleton sobrevive à troca de tela de propósito —
-  // sem isto, uma conversa gravada pelo operador anterior ficaria em
-  // aberto até o próximo check-in/check-out de outra pessoa).
-  const lastEmployeeIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (lastEmployeeIdRef.current && lastEmployeeIdRef.current !== (employee?.id ?? null)) {
-      void voiceRecorder.stop({ outcome: "ABANDONED" });
-    }
-    lastEmployeeIdRef.current = employee?.id ?? null;
-  }, [employee]);
-
-  // pagehide (fechamento/recarregamento da aba, incluindo o redirect do
-  // InfiniteTap que NÃO passou por stop({wait:true})): não há tempo de
-  // converter+enviar, então descarta em vez de arriscar um upload truncado.
-  useEffect(() => {
-    const onPageHide = () => voiceRecorder.discard();
-    window.addEventListener("pagehide", onPageHide);
-    return () => window.removeEventListener("pagehide", onPageHide);
-  }, []);
 
   // Tela inicial padrão do Owner no celular: abre direto no modo Gerencial
   // (a home "as 3 operações numa tela") em vez de cair na grade de módulos.
@@ -508,11 +485,6 @@ export function App() {
       {/* Régua da operação: a faixa de cor mais persistente da tela, para
           o operador saber em que unidade está sem precisar ler nada. */}
       <div style={{ flexShrink: 0, height: "3px", background: brand.accent }} />
-
-      {/* Fora do fluxo de qualquer tela de propósito: o singleton voiceRecorder
-          sobrevive à troca de tela (Entrada -> Painel -> Saída), e o indicador
-          precisa continuar visível durante toda a travessia. */}
-      <RecordingIndicator />
 
       {/* Volta para a casca mobile depois de um desvio para a tela completa.
           Sem isto o operador que tocou em "Saída" no celular fica preso nas

@@ -58,12 +58,6 @@ verify_jwt = false
 [functions.nfse-certificate-fetch]
 verify_jwt = false
 
-# Compêndio mensal de vendas (reunião de alinhamento): disparada 1x/dia
-# pelo pg_cron/pg_net, nunca por um navegador — mesma razão de
-# ponto-photo-retention-dispatch/owner-report-dispatch acima.
-[functions.sales-compendium-dispatch]
-verify_jwt = false
-
 # Webhook do WhatsApp do CRM: quem chama é a Twilio, que não manda JWT. A
 # autorização real é a assinatura X-Twilio-Signature (HMAC-SHA1 com o Auth
 # Token da subconta), conferida dentro da function. crm-whatsapp-send NÃO
@@ -72,7 +66,7 @@ verify_jwt = false
 verify_jwt = false
 
 # NPS automático pós-visita: disparada só pelo pg_cron/pg_net (a cada 15 min),
-# nunca por navegador — mesma razão de sales-compendium-dispatch. Desligada por
+# nunca por navegador — mesma razão de ponto-photo-retention-dispatch. Desligada por
 # padrão em cada unidade (app_settings crm_nps_auto) e idempotente (janela de
 # checkout fixa + cooldown de 30 dias por contato).
 [functions.crm-nps-auto-dispatch]
