@@ -12,8 +12,9 @@
 --     na gaveta;
 --   - fa_owner_report_build_divergencia: gravação de amount_cents (limiar de
 --     divergência do Telegram) some.
--- Para aplicar a regra "sobra não é divergência", reescreva sobre as
--- definições vivas (pg_get_functiondef), não sobre este arquivo.
+-- A regra "sobra não é divergência" está em
+-- 20261010140000_fa_sobra_caixa_nao_e_divergencia.sql, escrita sobre as
+-- definições vivas. Use aquela, não esta.
 -- Correção de sintaxe já feita: "order column_id desc" -> "order by at_ms desc".
 --
 -- Regra de negócio: Sobras de caixa na abertura ou no fechamento não acionam
