@@ -125,12 +125,35 @@ const TEMPLATES: TemplateDef[] = [
     sample: { "1": "Ana", "2": "Miguel", "3": "Hoje Miguel passou 90 minutos com a gente e brilhou na coordenação motora e na interação social." },
   },
   {
+    // v4 (sem botão): a v3 foi reclassificada como MARKETING pela Meta — o recado em {{3}} era um
+    // elogio gerado por IA, com emoji e tom afetivo. Esta é a reserva usada só quando não há template
+    // com botão ativo (RELATORIO_SESSAO_PDF): avisa que o relatório está pronto e {{3}} é SÓ o link
+    // (sem texto livre). O destaque fica dentro do documento. O dispatcher manda "destaque + link" para
+    // o nome fa_relatorio_sessao_v3 e só o link para os demais.
+    purpose: "RELATORIO_SESSAO", name: "fa_relatorio_sessao_v4", category: "UTILITY", variableCount: 3,
+    body: "Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, acesse: {{3}} É um registro da visita, sem caráter de avaliação.",
+    sample: { "1": "Ana", "2": "Miguel", "3": "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdEFG" },
+  },
+  {
     // Olhar FaçaAmigos em PDF: 1 destaque + botão que abre o documento
     // (session-report-view?t=<token>). Numeração única entre corpo e botão.
     purpose: "RELATORIO_SESSAO_PDF", name: "fa_relatorio_sessao_pdf_v2", category: "UTILITY", variableCount: 4,
     body: "Oi {{1}}, tudo bem? Aqui é a equipe do FaçaAmigos com o Olhar FaçaAmigos de hoje sobre {{2}}. Um destaque: {{3}} O documento completo, com o que a nossa equipe viu enquanto {{2}} brincava, está no botão abaixo. É um registro observacional da brincadeira, sem caráter de avaliação. Qualquer dúvida, é só responder esta mensagem. 💛",
     sample: { "1": "Ana", "2": "Miguel", "3": "Miguel brilhou ao dividir os brinquedos e entrar no faz de conta com as outras crianças!", "4": "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdEFG" },
     urlButton: { title: "Abrir Olhar", url: "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t={{4}}" },
+  },
+  {
+    // v3: reescrita para a Meta aceitar como UTILITY. A v2 foi reclassificada como MARKETING
+    // (erro 63049 em 56% dos envios): o destaque em {{3}} era um elogio gerado por IA, e elogio,
+    // emoji e tom afetivo puxam a categoria. Aqui é só o aviso transacional de que o relatório da
+    // visita de hoje está pronto — sem texto livre variável, sem elogio, sem convite a nada. O
+    // destaque continua dentro do documento e na mensagem de janela aberta (texto livre).
+    // O dispatcher escolhe as variáveis pelo variable_count do template ativo (4 = v2, 3 = esta).
+    // A Meta decide a categoria pelo conteúdo: conferir o resultado depois de aprovada.
+    purpose: "RELATORIO_SESSAO_PDF", name: "fa_relatorio_sessao_pdf_v3", category: "UTILITY", variableCount: 3,
+    body: "Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, use o botão abaixo. É um registro da visita, sem caráter de avaliação.",
+    sample: { "1": "Ana", "2": "Miguel", "3": "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdEFG" },
+    urlButton: { title: "Abrir relatório", url: "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/session-report-view?t={{3}}" },
   },
   {
     purpose: "MAPEAMENTO", name: "fa_mapeamento_followup", category: "MARKETING", variableCount: 4,
@@ -367,6 +390,7 @@ Deno.serve(async (req) => {
       preview: def.body,
       variable_count: def.variableCount,
       purpose: def.purpose,
+      category: def.category,
       active: false, // só ativa quando a Meta aprovar (rodar esta function de novo depois confere e ativa)
     });
 

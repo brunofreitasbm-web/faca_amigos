@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Card, HelpText, Modal, Select } from "@facaamigos/ui";
+import { Badge, Button, HelpText, Modal, Select } from "@facaamigos/ui";
 import {
   EMPLOYEE_SECTORS,
   EMPLOYEE_SECTOR_LABEL,
@@ -8,6 +8,7 @@ import {
   type EmployeeSector,
 } from "@facaamigos/domain";
 import { Api, type SessionReportRow, type SessionReportWhatsappStatus } from "../../../api/client.js";
+import { isWhatsappRefusal63049 } from "../../../api/useSessionReports.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { RequireCapability } from "../../../auth/RequireCapability.js";
@@ -144,15 +145,15 @@ function Content() {
   const unitName = (id: string) => units.find((u) => u.id === id)?.name ?? "—";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Olhar FaçaAmigos</h2>
         <HelpText>
           Mapa de observação de cada sessão de 1h ou mais: quem preencheu, em qual setor, se foi no prazo de 40 minutos e a mensagem enviada ao responsável.
         </HelpText>
       </div>
 
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "10px 20px", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <Select aria-label="Unidade" value={unitId} onChange={(e) => setUnitId(e.target.value)}>
           <option value="">Todas as unidades</option>
           {units.map((u) => (
@@ -178,17 +179,18 @@ function Content() {
         </Select>
       </div>
 
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "18px", flexWrap: "wrap" }}>
         {[
           { label: "Relatórios", value: String(kpi.total) },
           { label: "Dentro do prazo (40 min)", value: kpi.onTime },
           { label: "Enviados ao responsável", value: kpi.sent },
         ].map((k) => (
-          <Card key={k.label} style={{ flex: "1 1 160px" }}>
-            <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{k.label}</div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: "26px" }}>{k.value}</div>
-          </Card>
+          <div key={k.label} style={{ lineHeight: 1.1 }}>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{k.label}</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: "20px" }}>{k.value}</div>
+          </div>
         ))}
+      </div>
       </div>
 
       {error && (
@@ -328,14 +330,16 @@ function Content() {
               {detail.public_token && detail.pdf_path && (
                 <Button variant="secondary" onClick={() => void copyLink(detail)}>Copiar link</Button>
               )}
-              {RETRYABLE.has(detail.whatsapp_status) && (
+              {RETRYABLE.has(detail.whatsapp_status) && !isWhatsappRefusal63049(detail.whatsapp_error) && (
                 <Button variant="secondary" loading={resending} onClick={() => void resend(detail)}>
                   Reenviar ao responsável
                 </Button>
               )}
-              <Button variant="secondary" loading={resending} onClick={() => void resend(detail, true)}>
-                Regerar e reenviar
-              </Button>
+              {!isWhatsappRefusal63049(detail.whatsapp_error) && (
+                <Button variant="secondary" loading={resending} onClick={() => void resend(detail, true)}>
+                  Regerar e reenviar
+                </Button>
+              )}
             </div>
           </div>
         </Modal>

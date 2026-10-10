@@ -31,19 +31,35 @@ create or replace function fa_session_report_mark_sent_manually(p_report_id uuid
 returns text as $$
 declare
   v_emp uuid := fa_kiosk_current_employee_id();
+  v_owner uuid;
   v_status text;
 begin
-  -- TODO(human): confira a permissão e o estado atual antes de gravar.
-  -- Padrão de permissão: igual a fa_session_reports_recent (acima neste
-  -- arquivo) — exige fa_kiosk_can('relatorio_sessao.write'), e só deixa
-  -- quem preencheu o relatório (filled_by_employee_id = v_emp) ou quem tem
-  -- fa_kiosk_can('relatorio_sessao.read') marcar como enviado.
-  -- Padrão de update: igual a fa_session_report_mark_dispatch (acima) —
-  -- UPDATE fa_kiosk_session_reports SET whatsapp_status = 'SENT_MANUAL',
-  -- whatsapp_error = null, sent_at_ms = (extract(epoch from now())*1000)::bigint
-  -- WHERE id = p_report_id. Importante: não sobrescreva se o status atual já
-  -- for 'SENT' (o envio automático pode ter funcionado nesse meio-tempo) —
-  -- use essa condição no WHERE e devolva o whatsapp_status final em v_status.
+  if not fa_kiosk_can('relatorio_sessao.write') then
+    raise exception 'sem permissão' using errcode = '42501';
+  end if;
+
+  select r.filled_by_employee_id, r.whatsapp_status into v_owner, v_status
+    from fa_kiosk_session_reports r where r.id = p_report_id
+    for update;
+  if not found then
+    raise exception 'relatório não encontrado' using errcode = 'P0002';
+  end if;
+
+  if v_owner is distinct from v_emp and not fa_kiosk_can('relatorio_sessao.read') then
+    raise exception 'sem permissão' using errcode = '42501';
+  end if;
+
+  -- O envio automático pode ter funcionado nesse meio-tempo: não sobrescreve.
+  if v_status = 'SENT' then
+    return v_status;
+  end if;
+
+  update fa_kiosk_session_reports set
+    whatsapp_status = 'SENT_MANUAL',
+    whatsapp_error = null,
+    sent_at_ms = (extract(epoch from now()) * 1000)::bigint
+  where id = p_report_id
+  returning whatsapp_status into v_status;
 
   return v_status;
 end;

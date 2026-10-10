@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, HelpText, Modal, Select, Tabs } from "@facaamigos/ui";
+import { Button, HelpText, Modal, Select, Tabs } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Employee } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -118,7 +119,6 @@ export function FrequenciaTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
         <div>
-          <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>Controle de Frequência</h2>
           <HelpText style={{ margin: 0 }}>Marcações de ponto ao vivo — CLT e Estagiários, por unidade e período.</HelpText>
         </div>
         <Button variant="secondary" size="sm" disabled={records.length === 0} onClick={() => exportFrequenciaCsv(records, unitTimezones)}>

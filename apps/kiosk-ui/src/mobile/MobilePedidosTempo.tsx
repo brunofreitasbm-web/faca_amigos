@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ActiveSessionEntry } from "../api/client.js";
 import type { PendingRenewal } from "../api/renewalRequests.js";
-import { resolveRenewal } from "../api/renewalRequests.js";
+import { resolveRenewal, applyRenewal } from "../api/renewalRequests.js";
 import { useToast } from "../state/ToastContext.js";
 import { money } from "../format.js";
 
@@ -10,9 +10,8 @@ import { money } from "../format.js";
  * próprio celular, no painel de acompanhamento (AcompanharScreen).
  *
  * Espelha o badge que já existe no Painel do balcão (PainelScreen.tsx):
- * "Já resolvi no balcão" só MARCA o pedido como atendido — não estende a
- * sessão nem cobra nada sozinho. A troca de plano continua pelo Painel
- * (mudar o plano) ou é acertada no Caixa no fechamento. Os rótulos são
+ * "Dar OK" troca o plano (fa_kiosk_apply_renewal) e o valor é acertado no
+ * Caixa no fechamento. Os rótulos são
  * os mesmos do balcão de propósito — um operador que já usa a versão
  * completa não deve aprender um segundo vocabulário pra mesma ação.
  */
@@ -44,7 +43,19 @@ export function MobilePedidosTempo({
   async function resolve(sessionId: string, outcome: "APLICADA" | "DISPENSADA") {
     setBusy((prev) => new Set(prev).add(sessionId));
     try {
-      await resolveRenewal(sessionId, outcome, employeeId);
+      if (outcome === "DISPENSADA") {
+        await resolveRenewal(sessionId, outcome, employeeId);
+      } else {
+        const result = await applyRenewal(sessionId, employeeId);
+        if (result.status !== "OK") {
+          toast.error(
+            result.status === "SESSAO_NAO_ATIVA"
+              ? "A sessão está pausada ou encerrada. Retome a sessão e tente de novo."
+              : "Não achei um plano único com esse tempo. Troque o plano pelo Painel do balcão.",
+          );
+          return;
+        }
+      }
       setResolved((prev) => new Map(prev).set(sessionId, outcome));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não deu para atualizar o pedido.");
@@ -60,8 +71,8 @@ export function MobilePedidosTempo({
   return (
     <div className="m-scroll">
       <p style={{ margin: "0 0 16px", fontSize: 12.5, lineHeight: 1.5, fontWeight: 600, color: "var(--text-muted)" }}>
-        Aqui você só marca o pedido como resolvido. Trocar o plano de verdade continua no Painel — ou fica pra
-        acertar no Caixa, no fechamento.
+        "Dar OK" já troca o plano da criança para somar o tempo pedido. Se não houver um plano com esse tempo
+        exato, a troca é feita pelo Painel do balcão.
       </p>
 
       {rows.length === 0 && (
@@ -93,7 +104,7 @@ export function MobilePedidosTempo({
 
               {done ? (
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: done === "APLICADA" ? "#1D8273" : "var(--text-muted)" }}>
-                  {done === "APLICADA" ? "✓ Marcado como resolvido" : "Dispensado"}
+                  {done === "APLICADA" ? "✓ Plano trocado, tempo somado" : "Dispensado"}
                 </p>
               ) : (
                 <div className="m-row" style={{ gap: 10 }}>

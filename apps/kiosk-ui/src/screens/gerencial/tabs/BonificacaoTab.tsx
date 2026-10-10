@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, HelpText } from "@facaamigos/ui";
+import { HelpText } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import { mesAtualValue, rangeDoMes, type ApuracaoOperador } from "../../../lib/apuracaoBonificacao.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -48,8 +49,7 @@ export function BonificacaoTab() {
   return (
     <div>
       <Card style={{ padding: "16px", marginBottom: "16px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px" }}>💰 Bonificação por Operador</h2>
-        <HelpText style={{ marginBottom: "12px" }}>
+        <HelpText style={{ marginBottom: "8px" }}>
           Acumulado do mês por operador, já com o teto de R$200 aplicado — meta de faturamento/locações batida, produtos
           vendidos e a trava de abertura/fechamento de caixa (mesmas regras de docs/bonificacao/apuracao_bonificacao.sql).
           O Bônus de Planos Longos (2 horas, Day Use, Porto Seguro) tem teto próprio e não depende das travas de caixa; a

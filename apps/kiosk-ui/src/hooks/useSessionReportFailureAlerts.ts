@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { supabase } from "../lib/supabase/client.js";
 import { useToast } from "../state/ToastContext.js";
+import { OLHAR_HIDDEN_BEFORE_MS } from "../api/useSessionReports.js";
 
 /**
  * Antes disso, quando a Twilio recusava o envio do Olhar FaçaAmigos (ex.
@@ -23,8 +24,8 @@ export function useSessionReportFailureAlerts(unitId: string | null | undefined)
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "fa_kiosk_session_reports", filter: `unit_id=eq.${unitId}` },
         (payload) => {
-          const row = payload.new as { whatsapp_status?: string; child_name_snapshot?: string };
-          if (row.whatsapp_status === "FAILED") {
+          const row = payload.new as { whatsapp_status?: string; child_name_snapshot?: string; filled_at_ms?: number };
+          if (row.whatsapp_status === "FAILED" && (row.filled_at_ms ?? Infinity) >= OLHAR_HIDDEN_BEFORE_MS) {
             toast.error(
               `WhatsApp recusou o envio do Olhar FaçaAmigos de ${row.child_name_snapshot ?? "criança"}. Envie o PDF manualmente em "Olhar FaçaAmigos".`,
             );

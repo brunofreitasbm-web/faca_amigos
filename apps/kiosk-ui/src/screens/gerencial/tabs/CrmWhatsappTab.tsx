@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, Checkbox, HelpText, Input, Tag } from "@facaamigos/ui";
+import { Button, Checkbox, HelpText, Input, Tag } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { formatPhoneBr } from "@facaamigos/domain";
 import { Api } from "../../../api/client.js";
 import type { CrmContact, CrmMessage, CrmStage, CrmTemplate, UnitSettingKey } from "../../../api/client.js";
@@ -348,6 +349,76 @@ function LifecycleCampaignsCard() {
   );
 }
 
+interface CostStatRow {
+  category: string;
+  period: "current" | "previous";
+  sent: number;
+  delivered: number;
+  read_count: number;
+  failed: number;
+  priced: number;
+  price_total: number;
+  price_unit: string | null;
+}
+
+const COST_CATEGORY_LABEL: Record<string, string> = {
+  UTILITY: "Utilidade",
+  MARKETING: "Marketing",
+  AUTHENTICATION: "Autenticação",
+  SERVICE: "Conversa (janela 24h)",
+  DESCONHECIDA: "Sem categoria",
+};
+
+const COST_DAYS = 30;
+
+/**
+ * Entrega e custo do WhatsApp por categoria de template (só Owner, crm.admin).
+ * O preço é o informado pela Twilio por mensagem (preenchido horas depois da
+ * entrega por crm-whatsapp-cost-sync); cada linha traz o comparativo com os
+ * {COST_DAYS} dias anteriores.
+ */
+function WhatsappCostCard() {
+  const [rows, setRows] = useState<CostStatRow[] | null>(null);
+
+  useEffect(() => {
+    void supabase()
+      .rpc("fa_crm_whatsapp_cost_stats", { p_days: COST_DAYS })
+      .then(({ data, error }) => {
+        if (!error) setRows(((data ?? []) as CostStatRow[]).map((r) => ({ ...r, price_total: Number(r.price_total) })));
+      });
+  }, []);
+
+  if (!rows) return null;
+  const categories = [...new Set(rows.map((r) => r.category))].sort();
+  const pick = (cat: string, period: "current" | "previous") => rows.find((r) => r.category === cat && r.period === period);
+  const unit = rows.find((r) => r.price_unit)?.price_unit ?? "USD";
+  const money = (v: number) => `${unit} ${v.toFixed(2)}`;
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
+  const delta = (cur: number, prev: number) => (prev > 0 ? `${cur >= prev ? "+" : ""}${Math.round(((cur - prev) / prev) * 100)}% vs ${COST_DAYS}d anteriores` : "sem período anterior");
+
+  return (
+    <Card style={{ padding: "12px", marginBottom: "12px" }}>
+      <strong>💸 Custo e entrega do WhatsApp (últimos {COST_DAYS} dias)</strong>
+      {categories.length === 0 ? (
+        <HelpText style={{ margin: 0 }}>Nenhum envio no período.</HelpText>
+      ) : (
+        categories.map((cat) => {
+          const cur = pick(cat, "current");
+          const prev = pick(cat, "previous");
+          return (
+            <HelpText key={cat} style={{ margin: "4px 0 0" }}>
+              <strong>{COST_CATEGORY_LABEL[cat] ?? cat}</strong>: {cur?.sent ?? 0} enviadas ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · entregues{" "}
+              {pct(cur?.delivered ?? 0, cur?.sent ?? 0)} · lidas {pct(cur?.read_count ?? 0, cur?.sent ?? 0)} · falhas {cur?.failed ?? 0} · custo{" "}
+              {money(cur?.price_total ?? 0)} ({delta(cur?.price_total ?? 0, prev?.price_total ?? 0)})
+              {cur && cur.priced < cur.sent - cur.failed && ` · ${cur.sent - cur.failed - cur.priced} aguardando preço`}
+            </HelpText>
+          );
+        })
+      )}
+    </Card>
+  );
+}
+
 function CrmContent() {
   const { can } = useAuth();
   const toast = useToast();
@@ -492,19 +563,23 @@ function CrmContent() {
 
   return (
     <div>
-      <div style={{ marginBottom: "16px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>💬 CRM WhatsApp</h2>
+      <div style={{ marginBottom: "8px" }}>
         <HelpText style={{ margin: 0 }}>
           Conversas do Playground e do Circuito. {loading ? "carregando…" : `${contacts.length} contato(s) · ${unreadTotal} não lida(s)`}
         </HelpText>
       </div>
 
-      {can("crm.admin") && <OptinCampaignCard />}
-      {can("crm.admin") && <MarketingOptinCampaignCard />}
-      {can("crm.admin") && <LifecycleCampaignsCard />}
+      {can("crm.admin") && (
+        <div className="g-cards g-cards-wide" style={{ alignItems: "start", marginBottom: "12px" }}>
+          <OptinCampaignCard />
+          <MarketingOptinCampaignCard />
+          <LifecycleCampaignsCard />
+          <WhatsappCostCard />
+        </div>
+      )}
 
       {/* Funil: contagem por etapa, também serve de filtro */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px", alignItems: "center" }}>
         <Button size="sm" variant={stageFilter === "TODOS" ? "primary" : "secondary"} onClick={() => setStageFilter("TODOS")}>
           Todos ({contacts.length})
         </Button>
@@ -513,19 +588,16 @@ function CrmContent() {
             {s.label} ({contacts.filter((c) => c.stage === s.value).length})
           </Button>
         ))}
-      </div>
-
-      {canWrite && filtered.length > 0 && (
-        <div style={{ marginBottom: "12px" }}>
-          <Button size="sm" variant="secondary" disabled={sending} onClick={() => void sendNps(filtered.slice(0, 100).map((c) => c.id), "Os contatos filtrados")}>
+        {canWrite && filtered.length > 0 && (
+          <Button size="sm" variant="secondary" disabled={sending} style={{ marginLeft: "auto" }} onClick={() => void sendNps(filtered.slice(0, 100).map((c) => c.id), "Os contatos filtrados")}>
             ⭐ Enviar NPS aos {Math.min(filtered.length, 100)} contato(s) listado(s)
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 340px) 1fr", gap: "12px", alignItems: "start" }}>
         {/* Lista */}
-        <Card style={{ padding: "8px", maxHeight: "70vh", overflowY: "auto" }}>
+        <Card style={{ maxHeight: "calc(100vh - 260px)", overflowY: "auto" }}>
           <Input placeholder="Buscar nome ou telefone" value={search} onChange={(e) => setSearch(e.target.value)} />
           {!loading && filtered.length === 0 && (
             <HelpText style={{ padding: "16px 8px" }}>

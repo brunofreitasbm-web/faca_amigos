@@ -1,6 +1,6 @@
 // "Olhar FaçaAmigos" em PDF (A4) com a marca FaçaAmigos, desenhado com
-// pdf-lib (puro JS — a Edge Function não tem Chromium). Fontes e logo vêm de
-// brandAssets.ts em base64.
+// pdf-lib (puro JS — a Edge Function não tem Chromium). Fontes e logo são
+// baixados do app do kiosk por brandAssets.ts (conferidos por SHA-256).
 //
 // O que vem da IA (`SessionReportDoc`) é só prosa. Os itens observados e os
 // níveis (pílulas) vêm de `answers` + catálogo — fato, nunca da IA. A nota de
@@ -8,7 +8,7 @@
 
 import { PDFArray, PDFDocument, type PDFFont, PDFName, type PDFPage, PDFString, type RGB, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
-import { FREDOKA_B64, LOGO_PNG_B64, NUNITO_BOLD_B64, NUNITO_REG_B64 } from "./assets/brandAssets.ts";
+import { loadBrandAssets } from "./brandAssets.ts";
 import {
   SESSION_REPORT_CATALOG,
   SESSION_REPORT_DISCLAIMER,
@@ -48,7 +48,6 @@ export interface SessionReportPdfInput {
   trail: OlharTrail;
 }
 
-const b64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 const PINK = rgb(0xf0 / 255, 0x19 / 255, 0x6b / 255);
 const TEAL = rgb(0x2e / 255, 0xcf / 255, 0xb5 / 255);
@@ -153,10 +152,11 @@ export async function buildSessionReportPdf(input: SessionReportPdfInput): Promi
   doc.setAuthor("FaçaAmigos");
   doc.setSubject(SESSION_REPORT_DISCLAIMER_SHORT);
 
-  const display = await doc.embedFont(b64(FREDOKA_B64), { subset: true });
-  const body = await doc.embedFont(b64(NUNITO_REG_B64), { subset: true });
-  const bold = await doc.embedFont(b64(NUNITO_BOLD_B64), { subset: true });
-  const logo = await doc.embedPng(b64(LOGO_PNG_B64));
+  const assets = await loadBrandAssets();
+  const display = await doc.embedFont(assets.fredoka, { subset: true });
+  const body = await doc.embedFont(assets.nunitoReg, { subset: true });
+  const bold = await doc.embedFont(assets.nunitoBold, { subset: true });
+  const logo = await doc.embedPng(assets.logo);
 
   let page!: PDFPage;
   let y = 0;

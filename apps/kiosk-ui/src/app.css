@@ -406,3 +406,74 @@ body {
   box-shadow: 0 0 12px rgba(240, 25, 107, 0.4) !important;
   animation: renewal-attention-shake 2s infinite ease-in-out;
 }
+
+/* ---------- Gerencial (console do Owner): campos e botões compactos ----------
+
+   Os componentes do pacote ui têm altura de 48px/44px pensada para toque no
+   balcão. No console do Owner (mouse, tela grande) isso faz cada formulário
+   virar uma coluna comprida e empurra o conteúdo pra baixo. Só aqui, e só com
+   ponteiro fino em tela larga: o celular/tablet (toque) mantém o tamanho
+   original. `!important` porque os componentes definem altura/fonte inline. */
+@media (min-width: 1024px) and (pointer: fine) {
+  .gerencial-shell input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+  .gerencial-shell select {
+    height: 34px !important;
+    font-size: 14px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 10px !important;
+  }
+
+  .gerencial-shell select {
+    padding-right: 32px !important;
+    background-position: right 10px center !important;
+  }
+
+  .gerencial-shell label {
+    font-size: 12px !important;
+  }
+
+  .gerencial-shell button[style*="height: 44px"],
+  .gerencial-shell button[style*="height: 52px"] {
+    height: 34px !important;
+    padding: 0 18px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* ---------- Gerencial: layout em colunas ----------
+
+   .g-split  → formulário/filtros numa coluna fixa à esquerda e o conteúdo
+               à direita (só em tela larga; abaixo disso empilha, como antes).
+   .g-cards  → grade de cartões que ocupa 2-3 colunas conforme a largura,
+               em vez de uma lista de uma coluna só. Mobile-first: com pouco
+               espaço vira 1 coluna sozinha (auto-fill + minmax). */
+.g-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.g-cards > * {
+  margin-bottom: 0 !important;
+  min-width: 0;
+}
+
+@media (min-width: 1100px) {
+  .g-split {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .g-split > aside {
+    position: sticky;
+    top: 0;
+  }
+}
+
+.g-cards.g-cards-wide {
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+}

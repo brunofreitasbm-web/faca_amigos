@@ -48,6 +48,7 @@ function fit(value: string, max: number): string {
  */
 export function generateGainschaGS2208DTSPL(data: WristbandPrintPayload): string {
   const nowStr = tsplSafe(
+    // eslint-disable-next-line no-restricted-syntax -- fallback só de exibição da hora impressa na pulseira
     data.entryTime || new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
   );
   const raw = data.wristbandCode.replace(/^#/, "").trim();

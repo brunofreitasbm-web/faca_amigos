@@ -122,7 +122,7 @@ Migration `20260930000000_fa_session_report_pdf.sql` + functions `session-report
 
 **Blindagem:** o PDF traz nota fixa (fora da IA) de que é registro meramente observacional da brincadeira — não é sessão terapêutica, atendimento, avaliação, diagnóstico, laudo ou parecer — na 1ª página e resumida no rodapé de todas. O documento se chama "Olhar FaçaAmigos"; o prompt e o filtro `FORBIDDEN` também barram sessão/atendimento/evolução/desenvolvimento/habilidade/etc. Os itens e níveis (pílulas) vêm do catálogo, nunca da IA.
 
-**Assets:** fontes OFL (Fredoka One, Nunito 400/700) e logo em base64 em `_shared/assets/brandAssets.ts`. Para trocar, coloque os arquivos em `_shared/assets/src/` e rode `node scripts/build-brand-assets.mjs` (o `static_files` do Supabase é descartado no deploy sem Docker, por isso base64).
+**Assets:** fontes OFL (Fredoka One, Nunito 400/700) e logo ficam em `apps/kiosk-ui/public/olhar-assets/` (servidos em `https://app.institutofacaamigos.com.br/olhar-assets/`). `_shared/brandAssets.ts` baixa os 4 arquivos na primeira geração de PDF de cada instância, confere o SHA-256 de cada um e guarda em memória; se algum falhar, o PDF não é gerado e o relatório fica `FAILED` (reenviável). Antes eram 475 KB de base64 no bundle, o que impedia publicar a function por ferramentas que exigem o conteúdo de cada arquivo. Para trocar um arquivo: substitua-o em `public/olhar-assets/`, atualize o `sha256` em `brandAssets.ts` e publique **primeiro o app, depois a function** (`OLHAR_ASSETS_BASE_URL` é um secret opcional para apontar para um preview).
 
 **Gerencial:** no detalhe do relatório: "Abrir PDF" (signed URL de 60 s pela policy `relatorio_sessao.read`), "Copiar link" (o mesmo do WhatsApp), contador de aberturas e "Regerar e reenviar" (`regenerate: true` refaz texto e PDF).
 
@@ -140,3 +140,21 @@ Cada criança tem uma sequência de Olhares e cada um é diferente do anterior:
 - O nº e o tipo ficam gravados na 1ª geração (`olhar_seq`, `olhar_edition`); regerar não renumera.
 - Blindagem: o painel só soma momentos "fez com autonomia" (nunca cai), sem nota/média/percentual, com legenda fixa dizendo que não mede desempenho nem é indicador clínico/escolar.
 - Deploy: aplicar `20261001130000_fa_olhar_trail.sql` **antes** de publicar `session-report-dispatch` (o dispatch passa `p_olhar_seq`/`p_olhar_edition` ao RPC).
+
+## Template `fa_relatorio_sessao_pdf_v3` (Utility)
+
+A Meta reclassificou o `fa_relatorio_sessao_pdf_v2` como **Marketing** (erro 63049 em 35 dos 64 envios): o destaque em `{{3}}` era um elogio gerado por IA e o texto era afetivo. A v3 é só o aviso transacional ("o relatório da visita de {{2}} está pronto") com o botão; o destaque fica dentro do documento e na mensagem de janela aberta. Variáveis: `{{1}}` responsável, `{{2}}` criança, `{{3}}` token no sufixo da URL.
+
+`session-report-dispatch` escolhe as variáveis pelo `variable_count` do template ativo (4 = v2, 3 = v3), então a troca não exige novo deploy no momento da ativação.
+
+Passos:
+1. Deploy de `session-report-dispatch` e `crm-templates-bootstrap` (o `_shared/twilioWhatsapp.ts` vai junto com o primeiro).
+2. Rodar o bootstrap com `{"names": ["fa_relatorio_sessao_pdf_v3"]}` (cria na Twilio e submete à Meta; fica inativo).
+3. Em até 24 h, rodar de novo o mesmo comando: ativa quando a Meta aprovar. Conferir `fa_crm_templates.category`: a Meta decide a categoria pelo conteúdo, então aprovado não garante Utility.
+4. Só então desativar a v2: `update fa_crm_templates set active = false where name = 'fa_relatorio_sessao_pdf_v2'`. A v3 já passa a ser usada ao ativar (é a mais nova), mas a v2 ativa serviria de reserva silenciosa a custo de Marketing.
+
+## Template de texto `fa_relatorio_sessao_v4` (Utility, reserva sem botão)
+
+O `fa_relatorio_sessao_v3` (texto) também foi reclassificado pela Meta como Marketing. Ele só é usado quando **não há** template com botão (`RELATORIO_SESSAO_PDF`) ativo; até hoje teve 0 envios. A v4 segue o mesmo desenho do PDF v3: *"Olá, {{1}}. O relatório da visita de {{2}} ao FaçaAmigos hoje está pronto. Para abrir o documento, acesse: {{3}} É um registro da visita, sem caráter de avaliação."*, com `{{3}}` = só o link.
+
+`session-report-dispatch` manda "destaque + link" em `{{3}}` apenas para o nome `fa_relatorio_sessao_v3`; para a v4 e seguintes manda só o link. Mesma ordem: publicar o dispatch → `{"names": ["fa_relatorio_sessao_v4"]}` no bootstrap (cria/submete) → repetir após a aprovação (ativa) → desativar a v3 de texto se a v4 vier Utility.

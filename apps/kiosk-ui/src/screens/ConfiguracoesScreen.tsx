@@ -165,7 +165,7 @@ function NotificacoesTab() {
     const locallyEnabled = localStorage.getItem(OWNER_PUSH_STORAGE_KEY) === "true";
 
     try {
-      let existing = await getExistingPushSubscription();
+      const existing = await getExistingPushSubscription();
       let keys = existing ? pushSubscriptionToKeys(existing) : null;
 
       // Se ativado localmente e permissão concedida, mas a inscrição push expirou ou perdeu do SW, tenta renovar

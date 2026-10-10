@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, HelpText, Button } from "@facaamigos/ui";
+import { HelpText, Button } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { UnitEnvelopeBalance, UnitCashStatus } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -56,7 +57,6 @@ export function SaldoEnvelopesTab() {
       <Card style={{ padding: "20px", marginBottom: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
           <div>
-            <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>✉️ Saldo em Envelopes</h2>
             <HelpText>
               Quanto cada loja tem guardado em envelopes de sangria ainda não recolhidos. Ao retirar os envelopes da loja, use "Marcar como
               recolhidos" para zerar o saldo.

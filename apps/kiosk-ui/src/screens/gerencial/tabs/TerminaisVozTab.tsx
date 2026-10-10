@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, HelpText, Tag } from "@facaamigos/ui";
+import { HelpText, Tag } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { VoiceTerminalStatus } from "../../../api/client.js";
 import { RequireCapability } from "../../../auth/RequireCapability.js";
@@ -75,7 +76,6 @@ function TerminaisVozTabContent() {
   return (
     <div>
       <div style={{ marginBottom: "16px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "20px" }}>🖥️ Terminais — Transcrição de Voz</h2>
         <HelpText style={{ margin: 0 }}>
           Rollout do whisper.cpp em cada PC/tablet da rede: binário, modelo baixado e fila de transcrição. Atualiza sozinho a cada {POLL_INTERVAL_MS / 1000}s.
         </HelpText>

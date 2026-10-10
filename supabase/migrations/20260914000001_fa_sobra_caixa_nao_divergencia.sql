@@ -1,4 +1,22 @@
 -- Migration: 20260914000001_fa_sobra_caixa_nao_divergencia.sql
+--
+-- ATENÇÃO — NÃO APLICAR NA PRODUÇÃO COMO ESTÁ. Esta migration nunca foi
+-- aplicada e foi escrita sobre versões antigas das três funções abaixo. Em
+-- 2026-10-10 a produção já tem versões mais novas (20260902000001 e as
+-- migrations owner_telegram_v2_*, que não estão neste repositório), e
+-- aplicar este arquivo as sobrescreveria, revertendo:
+--   - fa_owner_report_build_fechamento: faturado por fa_kiosk_payments (aqui
+--     vira expected_json), visitas por dia útil (aqui, janela do turno), meta
+--     por fa_kiosk_daily_goal_cents com "% atingida" (aqui, tabela de metas
+--     com "faltou/META BATEDA"), fundo legado por fundo_caixa_cents, "conferido"
+--     na gaveta;
+--   - fa_owner_report_build_divergencia: gravação de amount_cents (limiar de
+--     divergência do Telegram) some.
+-- A regra "sobra não é divergência" está em
+-- 20261010052328_fa_sobra_caixa_nao_e_divergencia.sql, escrita sobre as
+-- definições vivas. Use aquela, não esta.
+-- Correção de sintaxe já feita: "order column_id desc" -> "order by at_ms desc".
+--
 -- Regra de negócio: Sobras de caixa na abertura ou no fechamento não acionam
 -- notificações de DIVERGENCIA nem são tratadas como erro de divergência.
 -- Permanece a gravação dos valores reais e detalhamento da sobra nos relatórios do Owner.
@@ -139,7 +157,7 @@ begin
   select photo_url into v_envelope_photo_url
     from fa_kiosk_cash_movements
    where shift_id = p_shift_id and kind = 'SANGRIA' and envelope_number is not null and photo_url is not null
-   order column_id desc limit 1;
+   order by at_ms desc limit 1;
 
   select amount_cents into v_fundo_legado_cents
     from fa_kiosk_cash_movements

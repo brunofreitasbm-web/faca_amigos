@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, HelpText } from "@facaamigos/ui";
 import { Api, type RecentSessionReport, type SessionReportWhatsappStatus } from "../api/client.js";
-import { startOfTodayMs, usePendingSessionReports } from "../api/useSessionReports.js";
+import { isWhatsappRefusal63049, startOfTodayMs, usePendingSessionReports, useUnsentSessionReports } from "../api/useSessionReports.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { SessionReportForm, formatCountdown } from "../components/session-report/SessionReportForm.js";
@@ -30,7 +30,8 @@ export function RelatorioSessaoScreen() {
   const toast = useToast();
   const { pending, loading, error, refetch } = usePendingSessionReports(unit?.id ?? null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [recent, setRecent] = useState<RecentSessionReport[]>([]);
+  const [todayReports, setTodayReports] = useState<RecentSessionReport[]>([]);
+  const { unsent, refetch: refetchUnsent } = useUnsentSessionReports(unit?.id ?? null);
   const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
 
@@ -42,11 +43,17 @@ export function RelatorioSessaoScreen() {
   const loadRecent = useCallback(async () => {
     if (!unit?.id) return;
     try {
-      setRecent(await Api.sessionReportsRecent(unit.id, startOfTodayMs()));
+      setTodayReports(await Api.sessionReportsRecent(unit.id, startOfTodayMs()));
     } catch {
       /* mantém a lista anterior */
     }
-  }, [unit?.id]);
+    void refetchUnsent();
+  }, [unit?.id, refetchUnsent]);
+
+  // Os de hoje + os não enviados de dias anteriores (que não somem à meia-noite).
+  const recent = [...unsent.filter((u) => !todayReports.some((t) => t.id === u.id)), ...todayReports].sort(
+    (a, b) => b.filled_at_ms - a.filled_at_ms,
+  );
 
   useEffect(() => {
     void loadRecent();
@@ -93,14 +100,14 @@ export function RelatorioSessaoScreen() {
     [toast, loadRecent],
   );
 
-  const failedCount = recent.filter((r) => r.whatsapp_status === "FAILED").length;
+  const failedCount = unsent.length;
   const selected = pending.find((p) => p.session_id === selectedId) ?? null;
 
   const handleSubmitted = (reportId: string | null) => {
     setSelectedId(null);
     void refetch();
     void loadRecent();
-    // Envio ao responsável não bloqueia o balcão: o status aparece em "Enviados hoje".
+    // Envio ao responsável não bloqueia o balcão: o status aparece em "Enviados".
     if (reportId) void dispatch(reportId);
   };
 
@@ -138,9 +145,9 @@ export function RelatorioSessaoScreen() {
           <span>⚠️</span>
           <span>
             {failedCount === 1
-              ? "1 Olhar FaçaAmigos não chegou pelo WhatsApp automático."
-              : `${failedCount} Olhares FaçaAmigos não chegaram pelo WhatsApp automático.`}{" "}
-            Envie o PDF manualmente abaixo, em "Enviados hoje", para o responsável não ficar sem receber.
+              ? "1 Olhar FaçaAmigos não foi enviado ao responsável."
+              : `${failedCount} Olhares FaçaAmigos não foram enviados ao responsável.`}{" "}
+            Reenvie ou mande o PDF manualmente abaixo; o aviso só some quando o envio der certo.
           </span>
         </div>
       )}
@@ -183,8 +190,8 @@ export function RelatorioSessaoScreen() {
             );
           })}
 
-          <h3 style={{ margin: "12px 0 0", fontSize: "15px" }}>Enviados hoje ({recent.length})</h3>
-          {recent.length === 0 && <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Nada enviado ainda hoje.</div>}
+          <h3 style={{ margin: "12px 0 0", fontSize: "15px" }}>Enviados ({recent.length})</h3>
+          {recent.length === 0 && <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Nada enviado ainda.</div>}
           {recent.map((r) => {
             const st = STATUS_TEXT[r.whatsapp_status];
             const busy = busyIds.has(r.id);
@@ -193,12 +200,12 @@ export function RelatorioSessaoScreen() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 600, flex: 1, minWidth: 0 }}>{r.child_name_snapshot}</div>
                   {r.late && <Badge variant="amber">fora do prazo</Badge>}
-                  <span style={r.whatsapp_status === "FAILED" && !busy ? { animation: "fa-session-report-banner-blink 1s step-start infinite" } : undefined}>
+                  <span style={unsent.some((u) => u.id === r.id) && !busy ? { animation: "fa-session-report-banner-blink 1s step-start infinite" } : undefined}>
                     <Badge variant={st.tone}>{busy ? "Enviando…" : st.label}</Badge>
                   </span>
                 </div>
                 <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                  {hhmm(r.filled_at_ms)} · por {r.filled_by_name}
+                  {new Date(r.filled_at_ms).toLocaleDateString("pt-BR") !== new Date().toLocaleDateString("pt-BR") ? `${new Date(r.filled_at_ms).toLocaleDateString("pt-BR")} ` : ""}{hhmm(r.filled_at_ms)} · por {r.filled_by_name}
                 </div>
                 {r.whatsapp_error && (
                   <div style={{ fontSize: "12px", color: "var(--color-error-text)" }}>{r.whatsapp_error}</div>
@@ -212,7 +219,7 @@ export function RelatorioSessaoScreen() {
                   >
                     Enviar Olhar FaçaAmigos em PDF (MANUAL)
                   </Button>
-                  {!busy && RETRYABLE.has(r.whatsapp_status) && (
+                  {!busy && RETRYABLE.has(r.whatsapp_status) && !isWhatsappRefusal63049(r.whatsapp_error) && (
                     <Button variant="secondary" size="sm" onClick={() => void dispatch(r.id)}>
                       Reenviar
                     </Button>

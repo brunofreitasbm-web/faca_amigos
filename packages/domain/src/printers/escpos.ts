@@ -294,6 +294,7 @@ function wrap(str: string, width = WIDTH): string[] {
  *     quem entregou a criança e a regra de retirada.
  */
 export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: string; commandsHex: string; estimatedLengthMm: number } {
+  // eslint-disable-next-line no-restricted-syntax -- fallback só de exibição; os chamadores de produção devem informar dateTime
   const dateTime = payload.dateTime || new Date().toLocaleString("pt-BR");
   const isGuardReceipt = Boolean(payload.accessCode);
   const isFiscalReceipt = Boolean(payload.fiscalQrUrl);
@@ -505,6 +506,7 @@ export function generateEscPosReceipt(payload: ReceiptPrintPayload): { text: str
  * Impresso em via separada retida no balcão para assinatura física do responsável.
  */
 export function generateEscPosCircuitoTermo(payload: ReceiptPrintPayload): { text: string; commandsHex: string; estimatedLengthMm: number } {
+  // eslint-disable-next-line no-restricted-syntax -- fallback só de exibição; os chamadores de produção devem informar dateTime
   const dateTime = payload.dateTime || new Date().toLocaleString("pt-BR");
   const lines: string[] = [];
 

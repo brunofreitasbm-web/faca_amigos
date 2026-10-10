@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, HelpText } from "@facaamigos/ui";
+import { HelpText } from "@facaamigos/ui";
+import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { CashMovement, UnitShiftRow } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
@@ -67,7 +68,7 @@ export function HistoricoTab() {
       const openShift = rows.find((s) => s.status === "ABERTO");
       setSelectedShiftId(openShift?.id ?? rows[0]?.id ?? "");
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [selectedUnit]);
 
   useEffect(() => {
@@ -168,8 +169,7 @@ export function HistoricoTab() {
       )}
 
       <Card style={{ padding: "20px", marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "18px", margin: "0 0 8px 0" }}>🔀 Histórico — Fluxo de Dinheiro</h2>
-        <HelpText style={{ marginBottom: "16px" }}>
+        <HelpText style={{ marginBottom: "8px" }}>
           De onde o dinheiro do turno veio (troco, vendas, suprimentos) e para onde foi (sangrias/envelopes, ajustes, saldo que ficou na gaveta).
         </HelpText>
 

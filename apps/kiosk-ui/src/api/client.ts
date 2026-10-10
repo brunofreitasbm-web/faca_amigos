@@ -1415,16 +1415,17 @@ async function unwrap<T>(promise: PromiseLike<{ data: T | null; error: { message
   const { data, error } = await promise;
   if (error) {
     let detail = error.message;
-    if ("context" in error && (error as any).context instanceof Response) {
+    const errCtx = (error as { context?: unknown }).context;
+    if (errCtx instanceof Response) {
       try {
-        const text = await (error as any).context.clone().text();
+        const text = await errCtx.clone().text();
         try {
           const parsed = JSON.parse(text);
           if (parsed?.error) detail = parsed.error;
           else if (parsed?.message) detail = parsed.message;
-          else if (text) detail = `HTTP ${(error as any).context.status}: ${text}`;
+          else if (text) detail = `HTTP ${errCtx.status}: ${text}`;
         } catch {
-          if (text) detail = `HTTP ${(error as any).context.status}: ${text}`;
+          if (text) detail = `HTTP ${errCtx.status}: ${text}`;
         }
       } catch {
         // mantém a mensagem original
@@ -2020,7 +2021,7 @@ export const Api = {
   applySystemUpdate: async () => {
     try {
       await fetch("/api/system/update/apply", { method: "POST" });
-    } catch {}
+    } catch { /* melhor esforço: falha ignorada */ }
   },
   units: () =>
     unwrap<Unit[]>(
@@ -3209,7 +3210,7 @@ export const Api = {
         if (cached) {
           try {
             return JSON.parse(cached) as BonusRule[];
-          } catch {}
+          } catch { /* melhor esforço: falha ignorada */ }
         }
       }
       return [];
@@ -3231,7 +3232,7 @@ export const Api = {
         if (cached) {
           try {
             return JSON.parse(cached) as BonusRule[];
-          } catch {}
+          } catch { /* melhor esforço: falha ignorada */ }
         }
       }
       return [];
@@ -3964,6 +3965,9 @@ export const Api = {
   // ── Olhar FaçaAmigos (planos >= 1h; internamente relatorio_sessao) ──
   sessionReportsPending: (unitId: string) =>
     unwrap<PendingSessionReport[]>(supabase().rpc("fa_session_reports_pending", { p_unit_id: unitId })),
+  /** Preenchidos e ainda não entregues (de qualquer dia) — persistem até virar SENT/SENT_MANUAL. */
+  sessionReportsUnsent: (unitId: string) =>
+    unwrap<RecentSessionReport[]>(supabase().rpc("fa_session_reports_unsent", { p_unit_id: unitId })),
   sessionReportsRecent: (unitId: string, sinceMs: number) =>
     unwrap<RecentSessionReport[]>(supabase().rpc("fa_session_reports_recent", { p_unit_id: unitId, p_since_ms: sinceMs })),
   /**
@@ -4416,7 +4420,7 @@ export const Api = {
         if (cached) {
           try {
             return JSON.parse(cached) as TicketGoal;
-          } catch {}
+          } catch { /* melhor esforço: falha ignorada */ }
         }
       }
       return null;
@@ -4434,7 +4438,7 @@ export const Api = {
     );
   },
   reportBirthdays: async (month?: number, day?: number) => {
-    let query = supabase().from("fa_kiosk_children").select("id, full_name, birth_date");
+    const query = supabase().from("fa_kiosk_children").select("id, full_name, birth_date");
     const children = await unwrap<Record<string, unknown>[]>(query);
     const filtered = children.filter((c) => {
       if (!c.birth_date) return false;
@@ -4479,7 +4483,7 @@ export const Api = {
         .order("opened_at_ms", { ascending: false }),
     ),
   reportAssetUsage: async (unitId: string, from: string, to: string) => {
-    let sessionsQuery = supabase()
+    const sessionsQuery = supabase()
       .from("fa_kiosk_sessions")
       .select("asset_id, checkin_at_ms, checkout_at_ms")
       .eq("unit_id", unitId)

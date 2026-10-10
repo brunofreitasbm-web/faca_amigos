@@ -130,3 +130,13 @@ verify_jwt = false
 # o religue sem querer.
 [functions.session-report-dispatch]
 verify_jwt = false
+
+# Conferência de preço/categoria do WhatsApp: só o pg_cron chama (a cada 30 min).
+[functions.crm-whatsapp-cost-sync]
+verify_jwt = false
+
+# Webhook do bot do Telegram (botões das divergências do Owner): quem chama é o
+# Telegram, que não manda JWT. A autenticação é o header
+# X-Telegram-Bot-Api-Secret-Token (derivado do token do bot) + checagem do chat.
+[functions.owner-telegram-webhook]
+verify_jwt = false
