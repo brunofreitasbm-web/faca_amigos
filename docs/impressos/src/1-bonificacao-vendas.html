@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Balcão — Bonificação e vendas</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .rule { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
+  .types { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3.5mm; flex: 1; min-height: 0; }
+  .type { display: flex; flex-direction: column; gap: 1.8mm; }
+  .type .what { font-size: 12pt; line-height: 1.25; }
+  .type .say { font-size: 12pt; }
+  .type .pays { margin-top: auto; display: flex; flex-wrap: wrap; gap: 1.2mm; }
+  .letter {
+    font-family: 'Fredoka One', sans-serif; font-size: 23pt; line-height: 1; color: var(--pink);
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- ═════════ METADE 1 — BONIFICAÇÃO ═════════ -->
+  <section class="half">
+    <div class="head">
+      <img src="logo.png" alt="FaçaAmigos">
+      <span class="tag">Meu bônus · Playground</span>
+    </div>
+    <h1>O que eu faço <span class="hl">todo dia</span> pra ganhar</h1>
+
+    <div class="cols c2">
+      <div class="box pink">
+        <h2>Sem isso, o bônus do dia é zero</h2>
+        <ul class="steps">
+          <li><span class="num">1</span><span><b>Caixa aberto até 10h15</b> (domingo até 12h15).</span></li>
+          <li><span class="num">2</span><span><b>Check-in na hora, no meu PIN.</b> Fora do kiosk não conta.</span></li>
+          <li><span class="num">3</span><span><b>Fechamento sem diferença acima de R$ 20.</b> Se tiver, escreva o motivo.</span></li>
+          <li><span class="num">4</span><span><b>Olhar FaçaAmigos enviado em até 40 min</b> depois da saída (1 hora ou mais).</span></li>
+        </ul>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:3mm;">
+        <div class="box line" style="padding:2mm 2.5mm;">
+          <h2 style="font-size:13pt;">Meta do dia (faturamento)</h2>
+          <table>
+            <thead><tr><th>Dia</th><th>Meta</th><th>Super</th><th>Ganho</th></tr></thead>
+            <tbody>
+              <tr><td>Seg a qui</td><td>R$ 900</td><td>R$ 1.100</td><td class="money">R$ 8 / 12</td></tr>
+              <tr><td>Sexta</td><td>R$ 1.500</td><td>R$ 1.800</td><td class="money">R$ 12 / 16</td></tr>
+              <tr><td>Sábado</td><td>R$ 2.400</td><td>R$ 2.800</td><td class="money">R$ 12 / 16</td></tr>
+              <tr><td>Domingo</td><td>R$ 2.200</td><td>R$ 2.600</td><td class="money">R$ 12 / 16</td></tr>
+            </tbody>
+          </table>
+          <p class="small" style="margin-top:1mm;">+ R$ 2 no dia se <b>45%</b> das crianças forem de 1 hora ou mais. Produto (meia, água): R$ 2.</p>
+        </div>
+        <div class="box teal" style="padding:2mm 2.5mm;">
+          <h2 style="font-size:13pt;">Por criança vendida (no mês)</h2>
+          <table>
+            <tbody>
+              <tr><td>1 hora + Olhar</td><td class="money">R$ 1</td><td class="small">100 = + R$ 20</td></tr>
+              <tr><td>2 horas</td><td class="money">R$ 3</td><td class="small">12 = + R$ 15</td></tr>
+              <tr><td>Day Use</td><td class="money">R$ 10</td><td class="small">2 = + R$ 10</td></tr>
+              <tr><td>Porto Seguro</td><td class="money">R$ 25</td><td class="small">1 = + R$ 15</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>Teto: R$ 200 metas + produtos · R$ 200 planos</span>
+      <span>Placar toda segunda · Paga na folha do mês seguinte</span>
+    </div>
+  </section>
+
+  <!-- ═════════ METADE 2 — VENDA ATIVA / CONSULTIVA / ADICIONAL ═════════ -->
+  <section class="half">
+    <span class="cut">✂ CORTE AQUI</span>
+    <div class="head">
+      <img src="logo.png" alt="FaçaAmigos">
+      <span class="tag">3 jeitos de vender</span>
+    </div>
+    <h1>Quem <span class="hl">pergunta</span>, vende.</h1>
+
+    <div class="types">
+      <div class="box pink type">
+        <div class="letter">Ativa</div>
+        <p class="what"><b>Eu chamo a família.</b> Não espero ela perguntar. Sorrio, falo primeiro com a criança e já apresento os planos.</p>
+        <p class="say">"Oi! Vão brincar hoje? Me conta quanto tempo vocês têm."</p>
+        <p class="small">Movimento fraco? Vá até a porta. Família olhando de fora é venda.</p>
+        <div class="pays"><span class="pill pink">Meta do dia</span></div>
+      </div>
+
+      <div class="box teal type">
+        <div class="letter" style="color:var(--teal-text)">Consultiva</div>
+        <p class="what"><b>Eu pergunto antes de oferecer.</b> Descubro o tempo e o que mais vão fazer, e recomendo <b>um</b> plano.</p>
+        <p class="say teal">"Vão fazer mais alguma coisa no shopping? Cinema, almoço?"</p>
+        <p class="small">Rapidinho → 30 min · Uma hora → 1 h · Almoço/cinema → 2 h · Adulto sai → Day Use · Vem sempre → Porto Seguro.</p>
+        <div class="pays"><span class="pill teal">2 h R$ 3</span><span class="pill teal">Day Use R$ 10</span><span class="pill teal">Porto R$ 25</span></div>
+      </div>
+
+      <div class="box orange type">
+        <div class="letter" style="color:var(--orange-text)">Adicional</div>
+        <p class="what"><b>Eu somo ao que já foi pedido.</b> Mais tempo, o irmão junto, a meia, a água.</p>
+        <p class="say orange">"Posso sugerir 1 hora? Vem com o Olhar FaçaAmigos de cortesia."</p>
+        <p class="small">Sem meia antiderrapante? Ofereça na hora do check-in. Irmão? Mesmo plano para os dois.</p>
+        <div class="pays"><span class="pill orange">1 h + Olhar R$ 1</span><span class="pill orange">Produto R$ 2</span></div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>Ofereça <b>uma vez</b>. Recusou? Sorria, faça o check-in e toque em "Recusado" ou "Manter".</span>
+      <span>Fale a diferença, não o preço.</span>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

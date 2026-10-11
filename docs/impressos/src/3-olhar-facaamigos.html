@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Balcão — Olhar FaçaAmigos</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .areas { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm; }
+  .area { border-radius: 3mm; padding: 3.5mm 4mm; }
+  .area h2 { font-size: 14pt; margin: 0 0 .6mm; }
+  .area p { font-size: 12pt; line-height: 1.25; }
+  .levels { display: flex; gap: 2mm; }
+  .levels span { flex: 1; text-align: center; font-weight: 900; font-size: 11.5pt; padding: 2.2mm 1mm; border-radius: 99mm; background: #F5F6F7; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5mm; }
+  .fact { background: var(--dark); color: #fff; border-radius: 3mm; padding: 3mm 3.5mm; }
+  .fact .lbl { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .08em; opacity: .75; font-weight: 900; }
+  .fact .val { font-family: 'Fredoka One', sans-serif; font-size: 16pt; line-height: 1.1; }
+  .qa { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5mm 5mm; flex: 1; min-height: 0; align-content: start; }
+  .qa div { font-size: 12pt; line-height: 1.28; }
+  .qa .q { display: block; font-family: 'Fredoka One', sans-serif; font-weight: 400; font-size: 13pt; color: var(--pink-text); margin-bottom: .6mm; }
+  .words { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .words div { border-radius: 3mm; padding: 2.2mm 3.5mm; font-size: 11pt; line-height: 1.3; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- ═════════ METADE 1 — O QUE É ═════════ -->
+  <section class="half">
+    <div class="head">
+      <img src="logo.png" alt="FaçaAmigos">
+      <span class="tag">O que é o Olhar</span>
+    </div>
+    <h1><span class="hl">Olhar FaçaAmigos</span> em uma frase</h1>
+    <p class="say" style="font-size:14pt;">"É o resumo de como seu filho brincou hoje, feito pela nossa equipe e enviado no seu WhatsApp. É cortesia a partir de 1 hora."</p>
+
+    <div class="areas">
+      <div class="area pink" style="background:#FDE6EF;"><h2>Movimento</h2><p>Correr, pular, equilíbrio, circuitos.</p></div>
+      <div class="area" style="background:#FFF8C9;"><h2>Emoções e amizades</h2><p>Brincar junto, esperar a vez, se acalmar.</p></div>
+      <div class="area" style="background:#E2F8F4;"><h2>Mãos e sentidos</h2><p>Coisas pequenas, barulho, texturas, trocar de brinquedo.</p></div>
+      <div class="area" style="background:#FFF0E0;"><h2>Atenção e comunicação</h2><p>Combinados, se comunicar do seu jeito, tentar de novo.</p></div>
+    </div>
+
+    <div class="levels">
+      <span>🤝 Com apoio</span><span>🌱 Desenvolvendo</span><span>⭐ Fez com autonomia</span>
+    </div>
+
+    <div class="facts">
+      <div class="fact"><div class="lbl">Quem recebe</div><div class="val">1 hora ou mais</div></div>
+      <div class="fact"><div class="lbl">Quanto custa</div><div class="val">Cortesia</div></div>
+      <div class="fact"><div class="lbl">Quando chega</div><div class="val">Até 40 min da saída</div></div>
+    </div>
+  </section>
+
+  <!-- ═════════ METADE 2 — RESPOSTAS RÁPIDAS ═════════ -->
+  <section class="half">
+    <span class="cut">✂ CORTE AQUI</span>
+    <div class="head">
+      <img src="logo.png" alt="FaçaAmigos">
+      <span class="tag">Responda sem hesitar</span>
+    </div>
+    <h1>A família perguntou? <span class="hl">Responda assim.</span></h1>
+
+    <div class="qa">
+      <div><span class="q">"Quanto custa?"</span>"Nada a mais. É cortesia no plano de 1 hora ou mais."</div>
+      <div><span class="q">"E no de 30 minutos?"</span>"Em 30 minutos não dá pra observar com calma. Com 1 hora a gente vê ele(a) em várias brincadeiras."</div>
+      <div><span class="q">"Como eu recebo?"</span>"No seu WhatsApp, em até 40 minutos depois da saída. Também abre pelo QR da entrada."</div>
+      <div><span class="q">"Quem observa?"</span>"A nossa equipe que está brincando com ele(a) aqui dentro."</div>
+      <div><span class="q">"É uma avaliação?"</span>"Não. É um olhar sobre a brincadeira de hoje, não é laudo. Se quiser, mostre a quem acompanha seu filho."</div>
+      <div><span class="q">"Meu filho é atípico. Serve?"</span>"Serve, sim. O Olhar mostra o jeito dele(a), sem comparar com nenhuma outra criança."</div>
+    </div>
+
+    <div class="words">
+      <div style="background:#E2F8F4;"><b style="color:var(--teal-text)">Diga:</b> Olhar FaçaAmigos · visita · brincadeira · resumo · cortesia</div>
+      <div style="background:#FDE6EF;"><b style="color:var(--pink-text)">Não diga:</b> relatório · sessão · avaliação · diagnóstico · grátis</div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

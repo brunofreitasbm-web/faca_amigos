@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Balcão — Scripts 1 hora e 2 horas</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .math { display: flex; gap: 2.5mm; align-items: stretch; }
+  .math .opt { flex: 1; border-radius: 3mm; padding: 2mm 2.5mm; background: #fff; border: 0.5mm solid var(--line); }
+  .math .opt.win { border-color: var(--pink); background: #FDE6EF; }
+  .math .lbl { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .05em; color: var(--gray); font-weight: 900; }
+  .math .val { font-family: 'Fredoka One', sans-serif; font-size: 21pt; line-height: 1.1; }
+  .spin { display: grid; grid-template-columns: 8mm 1fr; gap: 3mm 2.5mm; align-items: start; font-size: 12pt; line-height: 1.28; }
+  .spin .k { font-family: 'Fredoka One', sans-serif; font-size: 13pt; color: #fff; background: var(--teal-text); border-radius: 2mm; text-align: center; line-height: 8mm; height: 8mm; }
+  .obj { font-size: 11.5pt; line-height: 1.3; }
+  .obj b { color: var(--pink-text); }
+  .when { font-size: 11.5pt; line-height: 1.3; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- ═════════ METADE 1 — 30 MIN → 1 HORA + OLHAR ═════════ -->
+  <section class="half">
+    <div class="head">
+      <img src="logo.png" alt="FaçaAmigos">
+      <span class="tag">Script · pediu 30 min</span>
+    </div>
+    <h1>30 min → <span class="hl">1 hora + Olhar FaçaAmigos</span></h1>
+
+    <div class="cols" style="grid-template-columns: 1.35fr 1fr;">
+      <div style="display:flex;flex-direction:column;gap:3mm;">
+        <div class="box orange">
+          <h2 style="color:var(--orange-text)">Fale assim</h2>
+          <p class="say orange" style="font-size:13.5pt;">"Posso sugerir 1 hora? No plano de 1 hora a nossa equipe acompanha a brincadeira e manda no seu WhatsApp o <b>Olhar FaçaAmigos</b>: como ele(a) brincou, fez amigos e se virou nas atividades. É cortesia, só a partir de 1 hora. E se passar dos 30 minutos, sai mais caro do que a hora."</p>
+        </div>
+        <div class="math">
+          <div class="opt"><div class="lbl">30 min + 30 no relógio</div><div class="val strike">R$ 114</div><div class="small">meia inclusiva R$ 95</div></div>
+          <div class="opt win"><div class="lbl">1 hora + Olhar</div><div class="val" style="color:var(--pink-text)">R$ 108</div><div class="small">meia inclusiva R$ 90</div></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:3mm;">
+        <div class="box yellow when">
+          <h2>Quando oferecer</h2>
+          Pediu 30 min e <b>não está com pressa</b> · tem <b>irmão</b> junto · chegou entre <b>14h e 20h</b>.<br>
+          <span class="small">"Rapidinho, vou só no banco"? Não ofereça.</span>
+        </div>
+        <div class="box line obj">
+          <h2>Se ouvir…</h2>
+          <b>"Ele não fica tudo isso."</b> "Se sair antes, sem problema. E o Olhar vem do mesmo jeito, porque o plano é de 1 hora."<br>
+          <b>"Só 30 mesmo."</b> "Combinado! Bom brincar!" → toque em <b>Manter 30 min</b>.
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>Ofereça <b>uma vez</b>. Sorriso igual no sim e no não.</span>
+      <span>Minuto no relógio: R$ 1,80 (meia R$ 1,50)</span>
+    </div>
+  </section>
+
+  <!-- ═════════ METADE 2 — 1 HORA → 2 HORAS ═════════ -->
+  <section class="half">
+    <span class="cut">✂ CORTE AQUI</span>
+    <div class="head">
+      <img src="logo.png" alt="FaçaAmigos">
+      <span class="tag">Script · pediu 1 hora</span>
+    </div>
+    <h1>1 hora → <span class="hl">2 horas</span></h1>
+
+    <div class="cols" style="grid-template-columns: 1fr 1.35fr;">
+      <div class="box teal">
+        <h2 style="color:var(--teal-text)">Pergunte primeiro, uma de cada vez</h2>
+        <div class="spin">
+          <span class="k">S</span><span>"Vão ficar quanto tempo? Vão fazer mais alguma coisa no shopping?"</span>
+          <span class="k">P</span><span>"Costuma dar tempo de brincar com calma?"</span>
+          <span class="k">I</span><span>"E se acabar no meio da brincadeira? Cada minuto a mais é R$ 1,80."</span>
+          <span class="k">N</span><span>"Se o tempo fosse garantido, ajudaria?"</span>
+        </div>
+        <p class="small" style="margin-top:2mm;">Fila no balcão? Só S e N. Fale do relógio, <b>nunca</b> do comportamento da criança.</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:3mm;">
+        <div class="box pink">
+          <h2 style="color:var(--pink-text)">Disse que ajudaria? Fale assim</h2>
+          <p class="say" style="font-size:13.5pt;">"Pelo que você me falou, 1 hora vai ficar apertado. O plano de 2 horas sai <b>R$ 192</b>. Com 1 hora e mais 1 no relógio, dá <b>R$ 216</b>. Você economiza, não fica olhando o celular, e o <b>Olhar FaçaAmigos</b> vem junto."</p>
+        </div>
+        <div class="box line obj">
+          <b>"E se a gente sair antes?"</b> "Aí você usou menos, mas não pagou mais. A maioria fica mais do que planejou."<br>
+          <b>Adulto vai sair do playground?</b> Ofereça o <b>Day Use</b>: R$ 270 o dia inteiro, entra e sai.
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>Meia inclusiva: 2 horas R$ 160 · 1 h + 1 h no relógio R$ 180</span>
+      <span>Melhor hora: 14h–16h · sexta a domingo</span>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
