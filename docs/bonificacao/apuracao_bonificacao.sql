@@ -23,6 +23,8 @@
 -- e, com escada e teto do mês, na segunda consulta ao final do arquivo
 -- ("Resumo mensal — planos longos"). Mesma lógica de
 -- apps/kiosk-ui/src/lib/apuracaoBonificacao.ts.
+-- Regra com exige_olhar_no_prazo (o "1 hora + Olhar") só conta a sessão com
+-- Olhar FaçaAmigos preenchido em até 40 min da saída (fa_kiosk_session_reports.late = false).
 --
 -- Aluguel avulso de pelúcia no Playground (fa_kiosk_sessions.rental_kind,
 -- migrations 20260919120*): NÃO é sessão para a meta — fica fora de
@@ -129,7 +131,7 @@ prod as (
   group by 1, 2, 3
 ),
 plan_rules as (
-  select r.unit_id, r.kind, r.ref_id, r.label, r.bonus_cents
+  select r.unit_id, r.kind, r.ref_id, r.label, r.bonus_cents, r.exige_olhar_no_prazo
   from fa_kiosk_bonus_plan_rules r
   where r.active and r.unit_id in (select id from units)
 ),
@@ -141,6 +143,8 @@ planos_venda as (
   join fa_kiosk_orders o on o.id = s.order_id and o.status = 'PAGA'
   join plan_rules r on r.unit_id = s.unit_id and r.kind = 'PLANO' and r.ref_id = s.plan_id
   where s.uses_package is not true and s.employee_id is not null
+    and (not r.exige_olhar_no_prazo or exists (
+      select 1 from fa_kiosk_session_reports sr where sr.session_id = s.session_id and not sr.late))
   union all
   -- Pacotes (Day Use, Porto Seguro): uma unidade por linha de guardian_packages,
   -- para quem vendeu (sold_by) ou, sem isso, quem fechou o pedido. Pedido estornado sai.
@@ -306,6 +310,8 @@ vendas as (
   join plan_rules r on r.unit_id = s.unit_id and r.kind = 'PLANO' and r.ref_id = s.plan_id
   where s.rental_kind is null and s.uses_package is not true and s.checkin_by_employee_id is not null
     and not exists (select 1 from fa_kiosk_session_events e where e.session_id = s.id and e.kind = 'CANCELADA')
+    and (not r.exige_olhar_no_prazo or exists (
+      select 1 from fa_kiosk_session_reports sr where sr.session_id = s.id and not sr.late))
   union all
   select gp.unit_id, coalesce(gp.sold_by_employee_id, o.closed_by_employee_id), r.kind, r.ref_id
   from fa_kiosk_guardian_packages gp
