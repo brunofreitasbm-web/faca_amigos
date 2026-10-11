@@ -15,6 +15,22 @@
   .obj { font-size: 11.5pt; line-height: 1.3; }
   .obj b { color: var(--pink-text); }
   .when { font-size: 11.5pt; line-height: 1.3; }
+  .go { display: flex; flex-direction: column; gap: 2.4mm; }
+  .go .row { display: flex; gap: 3mm; align-items: flex-start; border-radius: 4mm; padding: 2.2mm 3mm; background: #F5F6F7; }
+  .go .row.hot { background: #FFF0E0; border-left: 1.6mm solid var(--orange); }
+  .go .n { flex: none; width: 8mm; height: 8mm; border-radius: 50%; background: var(--pink); color: #fff; font-family: 'Fredoka One', sans-serif; font-size: 13pt; line-height: 8mm; text-align: center; }
+  .go .t { font-family: 'Fredoka One', sans-serif; font-weight: 400; font-size: 11pt; color: var(--gray); text-transform: uppercase; letter-spacing: .06em; }
+  .go p { font-size: 15pt; line-height: 1.28; margin: .4mm 0 0; font-weight: 700; }
+  .go .row.hot p { font-size: 17pt; }
+  .go .row > div { flex: 1; min-width: 0; }
+  .obj p { margin: 0 0 1.6mm; } .obj h2 { margin-bottom: 1mm; }
+  .obj .pk { color: var(--pink-text); }
+  .num3 { padding: 2mm 2.5mm; }
+  .num3 .t3 { font-family: 'Fredoka One', sans-serif; font-size: 11pt; color: var(--gray); text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: 2mm; margin-bottom: 1.5mm; }
+  .num3 .n { width: 8mm; height: 8mm; border-radius: 50%; background: var(--pink); color: #fff; font-size: 13pt; line-height: 8mm; text-align: center; }
+  .num3 .math { flex-direction: column; gap: 1.5mm; }
+  .num3 .opt { display: flex; align-items: baseline; gap: 2mm; justify-content: space-between; padding: .8mm 2.5mm; }
+  .num3 .lbl { flex: 1; } .num3 .val { font-size: 17pt; } .num3 .small { white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -26,37 +42,39 @@
       <img src="logo.png" alt="FaçaAmigos">
       <span class="tag">Script · pediu 30 min</span>
     </div>
-    <h1>30 min → <span class="hl">1 hora + Olhar FaçaAmigos</span></h1>
+    <h1>Pediu 30 min? Ofereça <span class="hl">1 hora + Olhar</span></h1>
 
-    <div class="cols" style="grid-template-columns: 1.35fr 1fr;">
-      <div style="display:flex;flex-direction:column;gap:3mm;">
-        <div class="box orange">
-          <h2 style="color:var(--orange-text)">Fale assim</h2>
-          <p class="say orange" style="font-size:13.5pt;">"Posso sugerir 1 hora? No plano de 1 hora a nossa equipe acompanha a brincadeira e manda no seu WhatsApp o <b>Olhar FaçaAmigos</b>: como ele(a) brincou, fez amigos e se virou nas atividades. É cortesia, só a partir de 1 hora. E se passar dos 30 minutos, sai mais caro do que a hora."</p>
+    <div class="cols" style="grid-template-columns: 1.6fr 1fr; gap: 4mm;">
+      <div class="go">
+        <div class="row">
+          <span class="n">1</span>
+          <div><b class="t">Pergunte</b><p>"Vão ficar só 30 minutos? Vão fazer mais alguma coisa no shopping?"</p></div>
         </div>
-        <div class="math">
-          <div class="opt"><div class="lbl">30 min + 30 no relógio</div><div class="val strike">R$ 114</div><div class="small">meia inclusiva R$ 95</div></div>
-          <div class="opt win"><div class="lbl">1 hora + Olhar</div><div class="val" style="color:var(--pink-text)">R$ 108</div><div class="small">meia inclusiva R$ 90</div></div>
+        <div class="row hot">
+          <span class="n">2</span>
+          <div><b class="t">Fale</b><p>"Posso sugerir 1 hora? Nela a nossa equipe acompanha a brincadeira e manda no seu WhatsApp o <b>Olhar FaçaAmigos</b>: como ele(a) brincou e fez amigos. <b>É cortesia</b>, só a partir de 1 hora."</p></div>
         </div>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:3mm;">
-        <div class="box yellow when">
-          <h2>Quando oferecer</h2>
-          Pediu 30 min e <b>não está com pressa</b> · tem <b>irmão</b> junto · chegou entre <b>14h e 20h</b>.<br>
-          <span class="small">"Rapidinho, vou só no banco"? Não ofereça.</span>
+      <div class="box line num3">
+        <div class="t3"><span class="n">3</span> Mostre o número</div>
+        <div class="math">
+          <div class="opt"><div class="lbl">30 min + 30 no relógio</div><div class="val strike">R$ 114</div><div class="small">meia R$ 95</div></div>
+          <div class="opt win"><div class="lbl">1 hora + Olhar</div><div class="val">R$ 108</div><div class="small">meia R$ 90</div></div>
         </div>
-        <div class="box line obj">
-          <h2>Se ouvir…</h2>
-          <b>"Ele não fica tudo isso."</b> "Se sair antes, sem problema. E o Olhar vem do mesmo jeito, porque o plano é de 1 hora."<br>
-          <b>"Só 30 mesmo."</b> "Combinado! Bom brincar!" → toque em <b>Manter 30 min</b>.
-        </div>
+      </div>
+      <div class="box line obj">
+        <h2>Se ouvir…</h2>
+        <p><b>"Ele não fica tudo isso."</b><br>"Sem problema. O Olhar vem igual: o plano é de 1 hora."</p>
+        <p><b>"Só 30 mesmo."</b><br>"Combinado!" e toque em <b class="pk">Manter 30 min</b>.</p>
+      </div>
       </div>
     </div>
 
     <div class="foot">
-      <span>Ofereça <b>uma vez</b>. Sorriso igual no sim e no não.</span>
-      <span>Minuto no relógio: R$ 1,80 (meia R$ 1,50)</span>
+      <span>Ofereça se: sem pressa · irmão junto · 14h às 20h. "Rapidinho"? Não.</span>
+      <span>Ofereça uma vez só.</span>
     </div>
   </section>
 
