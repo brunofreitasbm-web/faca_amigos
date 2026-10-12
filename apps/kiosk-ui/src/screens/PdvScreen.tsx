@@ -229,7 +229,8 @@ export function PdvScreen() {
               loading={busy}
               disabled={busy || cart.length === 0 || hasOpenShift === false}
               onClick={confirm}
-              title="Confirmar a venda com o método selecionado"
+              data-save-button
+              title="Confirmar a venda com o método selecionado (Ctrl+S)"
             >
               Confirmar venda
             </Button>

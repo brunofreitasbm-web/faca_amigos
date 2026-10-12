@@ -899,7 +899,7 @@ export function EntradaScreen({
   const phoneInvalid = phoneLooksComplete && !isValidPhoneBr(phone);
 
   return (
-    <div style={{ maxWidth: "720px", margin: "0 auto", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+    <div className="entrada-shell" style={{ maxWidth: "720px", margin: "0 auto", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
         <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Entrada</h1>
         <HelpText>
@@ -1024,6 +1024,8 @@ export function EntradaScreen({
       {/* ---------------------------------------------------------------- */}
       {/* 1. Quem é a criança                                              */}
       {/* ---------------------------------------------------------------- */}
+      <div className="entrada-cols">
+      <div className="entrada-col">
       <section style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>1. Quem é a criança</h2>
 
@@ -1326,6 +1328,8 @@ export function EntradaScreen({
       {/* ---------------------------------------------------------------- */}
       {/* 2. Plano                                                         */}
       {/* ---------------------------------------------------------------- */}
+      </div>
+      <div className="entrada-col">
       <section>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px 0" }}>2. Plano de permanência</h2>
         {matchedChild && foreignPackages.length > 0 && (
@@ -1757,6 +1761,8 @@ export function EntradaScreen({
         )}
       </section>
       )}
+      </div>
+      </div>
 
       {error && <p style={{ color: "var(--color-error-text)", margin: 0, fontWeight: "bold" }}>{error}</p>}
 
@@ -1807,6 +1813,7 @@ export function EntradaScreen({
           loading={submitting}
           disabled={submitting || Boolean(readiness)}
           onClick={submit}
+          data-save-button
           style={{ borderRadius: "9999px", padding: "16px" }}
           title={
             startNow

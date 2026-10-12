@@ -477,3 +477,86 @@ body {
 .g-cards.g-cards-wide {
   grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
 }
+
+/* ---------- Desktop (mouse/teclado): aproveitar a largura ----------
+
+   O balcão roda num PC com mouse e teclado, mas várias telas herdaram
+   containers de 560–950px pensados para celular/tablet e ficavam como uma
+   coluna estreita no meio do monitor. Só aqui, e só com ponteiro fino em
+   tela larga: touch e telas pequenas mantêm o layout de antes.
+   `!important` porque as larguras vêm de style inline. */
+@media (min-width: 1100px) and (pointer: fine) {
+  /* Caixa e Relatórios: conteúdo/tabelas ocupam o monitor, com teto para
+     não esticar linhas de tabela além do legível. */
+  .desk-wide {
+    max-width: min(1400px, 100%) !important;
+  }
+
+  /* Entrada: "quem é a criança" à esquerda, plano/carrinho/cupom à direita —
+     o operador vê o fluxo inteiro sem rolar. */
+  .entrada-shell {
+    max-width: 1280px !important;
+  }
+
+  .entrada-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .entrada-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  /* PDV: grade mais densa e carrinho que acompanha a rolagem da grade. */
+  .pdv-shell {
+    max-width: 1500px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  .pdv-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+  }
+
+  .pdv-cart {
+    position: sticky;
+    top: 16px;
+    flex: 0 0 380px !important;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+  }
+
+  /* Tabelas de relatório: densidade de desktop, cabeçalho fixo e números
+     alinhados em coluna (tabular-nums) para comparar valores. */
+  .report-table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .report-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .report-table tbody td,
+  .report-table thead th {
+    padding: 7px 12px;
+  }
+
+  /* Mouse tem hover/foco preciso: foco visível em linhas navegáveis. */
+  .report-table tbody tr:focus-within td {
+    background: var(--surface-sunken);
+  }
+}
+
+/* Tela ampla (monitor grande / Full HD+): aproveita sem esticar demais. */
+@media (min-width: 1700px) and (pointer: fine) {
+  .entrada-shell {
+    max-width: 1500px !important;
+  }
+}
