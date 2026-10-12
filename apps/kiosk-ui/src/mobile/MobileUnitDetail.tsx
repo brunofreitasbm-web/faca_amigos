@@ -5,30 +5,13 @@ import { useActiveSessions } from "../api/useTick.js";
 import { unitBrandFor } from "../branding/unitBrand.js";
 import { money } from "../format.js";
 
-type FrequenciaRow = Awaited<ReturnType<typeof Api.frequenciaRecords>>[number];
-
-function pontoStatusLabel(kind: FrequenciaRow["kind"]): { label: string; color: string } {
-  switch (kind) {
-    case "ENTRADA":
-      return { label: "no turno", color: "#1D8273" };
-    case "INTERVALO_FIM":
-      return { label: "voltou do intervalo", color: "#1D8273" };
-    case "INTERVALO_INICIO":
-      return { label: "em intervalo", color: "#996D18" };
-    case "SAIDA":
-      return { label: "saiu", color: "var(--text-muted)" };
-  }
-}
-
 function fmtTime(ms: number): string {
   return new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 /**
  * Detalhe de uma operação — aberto a partir de um card da home do Owner
- * (MobileGerencialHome). Só números com fonte real: quem bateu ponto hoje
- * (frequenciaRecords, o último registro de cada um decide o status atual),
- * caixa e envelope (as mesmas RPCs da home). Sem "Meta %" e sem "quem
+ * (MobileGerencialHome). Só números com fonte real: caixa e envelope (as mesmas RPCs da home). Sem "Meta %" e sem "quem
  * ainda não chegou" — nenhum dos dois existe no banco (não há meta de
  * faturamento nem agenda de turnos futuros), então inventar aqui seria
  * dado fictício numa tela de decisão real.
@@ -38,7 +21,6 @@ export function MobileUnitDetail({ unit, onBack }: { unit: Unit; onBack: () => v
   const [revenueCents, setRevenueCents] = useState<number | null>(null);
   const [cash, setCash] = useState<UnitCashStatus | null>(null);
   const [envelope, setEnvelope] = useState<UnitEnvelopeBalance | null>(null);
-  const [equipe, setEquipe] = useState<FrequenciaRow[] | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -50,20 +32,6 @@ export function MobileUnitDetail({ unit, onBack }: { unit: Unit; onBack: () => v
       .catch(() => {});
     Api.unitsEnvelopeBalance()
       .then((rows) => alive && setEnvelope(rows.find((r) => r.unit_id === unit.id) ?? null))
-      .catch(() => {});
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    Api.frequenciaRecords(unit.id, startOfDay.getTime(), Date.now())
-      .then((rows) => {
-        if (!alive) return;
-        // A consulta já vem mais recente primeiro — a primeira ocorrência
-        // de cada colaborador é o status de agora.
-        const lastByEmployee = new Map<string, FrequenciaRow>();
-        for (const row of rows) {
-          if (!lastByEmployee.has(row.employee_id)) lastByEmployee.set(row.employee_id, row);
-        }
-        setEquipe(Array.from(lastByEmployee.values()).sort((a, b) => b.at_ms - a.at_ms));
-      })
       .catch(() => {});
     return () => {
       alive = false;
@@ -108,22 +76,6 @@ export function MobileUnitDetail({ unit, onBack }: { unit: Unit; onBack: () => v
               {leavingSoon === 1 ? "1 criança saindo" : `${leavingSoon} crianças saindo`} nos próximos 5 minutos
             </p>
           )}
-
-          <p className="m-eyebrow" style={{ margin: "22px 0 10px" }}>Equipe no turno</p>
-          <div className="m-stack" style={{ gap: 8 }}>
-            {(equipe ?? []).map((row) => {
-              const st = pontoStatusLabel(row.kind);
-              return (
-                <div key={row.employee_id} className="m-row" style={{ justifyContent: "space-between", background: "var(--surface-card)", border: "1px solid var(--color-gray-200)", borderRadius: 16, padding: "11px 14px" }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{row.full_name}</span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: st.color }}>{st.label} · {fmtTime(row.at_ms)}</span>
-                </div>
-              );
-            })}
-            {equipe !== null && equipe.length === 0 && (
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Ninguém bateu ponto ainda hoje.</p>
-            )}
-          </div>
 
           <p className="m-eyebrow" style={{ margin: "22px 0 10px" }}>Caixa</p>
           <div className="m-card" style={{ borderRadius: 20 }}>

@@ -134,7 +134,7 @@ export interface Unit {
   phone?: string | null;
   cnpj?: string | null;
   timezone?: string | null;
-  /** Geofence opcional (ver migration fa_kiosk_units_geofence) — null = ponto não valida GPS nesta unidade. */
+  /** Geofence opcional (ver migration fa_kiosk_units_geofence). */
   latitude?: number | null;
   longitude?: number | null;
   geofence_radius_m?: number | null;
@@ -214,7 +214,7 @@ export interface Employee {
   active?: boolean;
   /** Unidades em que o colaborador atua — só preenchido por `Api.allEmployees()` (Gerencial). */
   unitIds?: string[];
-  /** Path no bucket `ponto-fotos` da última foto de cadastro do rosto — não confundir com o descriptor (ver `Api.myFaceDescriptor`). */
+  /** Path no bucket `ponto-fotos` da última foto de cadastro do rosto. */
   face_enrolled_photo_path?: string | null;
   /** Setor de atuação (Olhar FaçaAmigos). Editável em Gerencial > Colaboradores. */
   sector?: EmployeeSector | null;
@@ -491,45 +491,6 @@ export interface NewEmployeeInput {
   position?: string;
   contractType?: NonNullable<Employee["contract_type"]>;
   weeklyHoursContracted?: number;
-}
-
-export interface EspelhoPontoRecord {
-  atMs: number;
-  kind: "ENTRADA" | "SAIDA" | "INTERVALO_INICIO" | "INTERVALO_FIM";
-  nsr: number;
-}
-
-export interface EspelhoPontoUnit {
-  name: string;
-  razaoSocial: string | null;
-  nomeFantasia: string | null;
-  cnpj: string | null;
-  address: string | null;
-  phone: string | null;
-}
-
-export interface EspelhoPonto {
-  employee: {
-    id: string;
-    full_name: string;
-    cpf: string | null;
-    position: string | null;
-    role: Employee["role"];
-    contract_type?: Employee["contract_type"];
-    admission_date: string | null;
-    weekly_hours_contracted: number | null;
-    birth_date: string | null;
-    rg_numero: string | null;
-    rg_orgao_emissor: string | null;
-    ctps_numero: string | null;
-    ctps_serie: string | null;
-    ctps_uf: string | null;
-  };
-  units: EspelhoPontoUnit[];
-  records: EspelhoPontoRecord[];
-  year: number;
-  month: number;
-  timezone: string;
 }
 
 export interface Plan {
@@ -1231,15 +1192,6 @@ export interface SessionEvent {
   payload: Record<string, unknown> | null;
 }
 
-export interface PontoRecord {
-  id: string;
-  employee_id: string;
-  kind: "ENTRADA" | "SAIDA" | "INTERVALO_INICIO" | "INTERVALO_FIM";
-  nsr: number;
-  at_ms: number;
-  punch_photo_path?: string | null;
-}
-
 export interface DailySales {
   business_date: string;
   orders_count: number;
@@ -1286,15 +1238,6 @@ export interface ShiftSummary {
   status: "ABERTO" | "FECHADO";
   declared_json: string | null;
   expected_json: string | null;
-}
-export interface FolhaPontoRow {
-  employee_id: string;
-  unit_id: string;
-  full_name: string;
-  weekly_hours_contracted: number | null;
-  kind: PontoKind;
-  at_ms: number;
-  nsr: number;
 }
 export interface PlanSold {
   plan_id: string;
@@ -2046,61 +1989,6 @@ export const Api = {
     if (links.length === 0) return employees;
     const linkedEmployeeIds = new Set(links.map((l) => l.employee_id));
     return employees.filter((e) => linkedEmployeeIds.has(e.id));
-  },
-  /** Descriptor facial do PRÓPRIO colaborador autenticado, pra comparar no cliente antes de bater o ponto. */
-  myFaceDescriptor: async (employeeId: string): Promise<number[] | null> => {
-    const row = await unwrap<{ face_descriptor: number[] | null }>(
-      supabase().from("fa_kiosk_employees").select("face_descriptor").eq("id", employeeId).single(),
-    );
-    return row.face_descriptor ?? null;
-  },
-  /** Retorna todos os colaboradores ativos da unidade com descriptor facial cadastrado para reconhecimento rápido. */
-  allEnrolledFaceDescriptors: async (unitId?: string): Promise<{ id: string; full_name: string; role: string; face_descriptor: number[] }[]> => {
-    const rows = await unwrap<{ id: string; full_name: string; role: string; face_descriptor: number[] | null }[]>(
-      supabase()
-        .from("fa_kiosk_employees")
-        .select("id, full_name, role, face_descriptor")
-        .eq("active", true)
-        .not("face_descriptor", "is", null),
-    );
-    const valid = rows.filter((r): r is { id: string; full_name: string; role: string; face_descriptor: number[] } => Array.isArray(r.face_descriptor) && r.face_descriptor.length > 0);
-    if (!unitId) return valid;
-    const links = await unwrap<{ employee_id: string }[]>(
-      supabase().from("fa_kiosk_employee_units").select("employee_id").eq("unit_id", unitId),
-    );
-    if (links.length === 0) return valid;
-    const linkedIds = new Set(links.map((l) => l.employee_id));
-    return valid.filter((v) => linkedIds.has(v.id));
-  },
-
-  /** Cadastra/atualiza o rosto de um colaborador — RPC fa_kiosk_enroll_face (self ou config.employees.write). */
-  enrollFace: (employeeId: string, descriptor: number[], photoPath: string) =>
-    unwrap(
-      supabase().rpc("fa_kiosk_enroll_face", {
-        p_employee_id: employeeId,
-        p_descriptor: descriptor,
-        p_photo_path: photoPath,
-      }),
-    ),
-
-  /** Reseta a biometria facial de um colaborador — RPC fa_kiosk_reset_face (self ou config.employees.write). */
-  resetFace: (employeeId: string) =>
-    unwrap(
-      supabase().rpc("fa_kiosk_reset_face", {
-        p_employee_id: employeeId,
-      }),
-    ),
-  /** Upload da foto de rosto (cadastro OU marcação de ponto) — bucket privado `ponto-fotos`, path prefixado por employeeId. */
-  uploadPontoFoto: async (employeeId: string, photo: Blob, kind: "enroll" | "punch"): Promise<string> => {
-    assertValidImageUpload(photo);
-    const prepared = await prepareUpload(photo, "selfie");
-    const path = `${employeeId}/${kind}-${Date.now()}.${prepared.ext}`;
-    const { error } = await supabase().storage.from("ponto-fotos").upload(path, prepared.blob, {
-      contentType: prepared.contentType,
-      upsert: false,
-    });
-    if (error) throw new Error(error.message);
-    return path;
   },
   allEmployees: async () => {
     const [employees, links] = await Promise.all([
@@ -3067,24 +2955,6 @@ export const Api = {
     });
   },
 
-  ponto: (body: {
-    unitId: string;
-    employeeId: string;
-    kind: PontoRecord["kind"];
-    registeredByEmployeeId: string;
-    lat?: number | null;
-    lng?: number | null;
-    punchPhotoPath?: string | null;
-  }) =>
-    callResilient<{ id: string; nsr: number; atMs: number }>("fa_register_ponto", {
-      p_employee_id: body.employeeId,
-      p_unit_id: body.unitId,
-      p_kind: body.kind,
-      p_registered_by_employee_id: body.registeredByEmployeeId,
-      p_lat: body.lat ?? null,
-      p_lng: body.lng ?? null,
-      p_punch_photo_path: body.punchPhotoPath ?? null,
-    }),
   /** Linha do tempo de uma sessão (pausas, retomadas, troca de plano, notificações) — botão "Sessão" no Painel. */
   sessionEvents: async (sessionId: string) => {
     const rows = await unwrap<Record<string, unknown>[]>(
@@ -3102,15 +2972,6 @@ export const Api = {
       payload: (r.payload_json as Record<string, unknown> | null) ?? null,
     })) as SessionEvent[];
   },
-  pontoHistory: (employeeId: string, fromMs: number, toMs: number) =>
-    unwrap<PontoRecord[]>(
-      supabase()
-        .from("fa_kiosk_ponto_records")
-        .select("id, employee_id, kind, nsr, at_ms, punch_photo_path")
-        .eq("employee_id", employeeId)
-        .gte("at_ms", fromMs)
-        .lte("at_ms", toMs),
-    ),
   /** Ocorrências (atestado/falta) de uma unidade — Gerencial > Ocorrências, exige `ocorrencias.read`. */
   ocorrencias: async (unitId: string) => {
     const rows = await unwrap<Record<string, unknown>[]>(
@@ -3131,37 +2992,6 @@ export const Api = {
       created_at_ms: r.created_at_ms as number,
       fa_kiosk_employees: (r.fa_kiosk_employees as unknown as { full_name: string } | null) ?? null,
     }));
-  },
-  /** Marcações de um período pro módulo Controle de Frequência (Gerencial > Frequência) — unitId null agrega as unidades todas. Exige `relatorio.ponto`. */
-  frequenciaRecords: async (unitId: string | null, fromMs: number, toMs: number) => {
-    let query = supabase()
-      .from("fa_kiosk_ponto_records")
-      .select("id, employee_id, unit_id, kind, nsr, at_ms, punch_photo_path, fa_kiosk_employees!fa_kiosk_ponto_records_employee_id_fkey(full_name, role)")
-      .gte("at_ms", fromMs)
-      .lte("at_ms", toMs)
-      .order("at_ms", { ascending: false });
-    if (unitId) query = query.eq("unit_id", unitId);
-    const rows = await unwrap<Record<string, unknown>[]>(query);
-    return rows.map((r) => {
-      const emp = r.fa_kiosk_employees as unknown as { full_name: string; role: Employee["role"] } | null;
-      return {
-        id: r.id as string,
-        employee_id: r.employee_id as string,
-        unit_id: r.unit_id as string,
-        kind: r.kind as PontoRecord["kind"],
-        nsr: r.nsr as number,
-        at_ms: r.at_ms as number,
-        punch_photo_path: r.punch_photo_path as string | null,
-        full_name: emp?.full_name ?? "—",
-        role: emp?.role ?? null,
-      };
-    });
-  },
-  /** URL assinada (60s) pra exibir uma foto do bucket privado `ponto-fotos` — cadastro do rosto ou marcação. */
-  pontoFotoSignedUrl: async (path: string): Promise<string | null> => {
-    const { data, error } = await supabase().storage.from("ponto-fotos").createSignedUrl(path, 60);
-    if (error) return null;
-    return data.signedUrl;
   },
   /** Lança uma ocorrência (atestado/falta) — RPC fa_kiosk_register_ocorrencia, exige `ocorrencias.write`. */
   registerOcorrencia: (body: {
@@ -4059,13 +3889,6 @@ export const Api = {
   /** Substitui o conjunto de unidades em que o colaborador atua — Gerencial. */
   setEmployeeUnits: (employeeId: string, unitIds: string[]) =>
     unwrap(supabase().rpc("fa_config_set_employee_units", { p_employee_id: employeeId, p_unit_ids: unitIds })),
-  // Espelho de ponto mensal — a RPC já confere `relatorio.ponto` no banco;
-  // aqui só repassa os parâmetros e devolve o jsonb pronto para impressão.
-  espelhoPonto: (employeeId: string, year: number, month: number) =>
-    unwrap<EspelhoPonto>(
-      supabase().rpc("fa_kiosk_espelho_ponto", { p_employee_id: employeeId, p_year: year, p_month: month }),
-    ),
-
   /** Quem já completou o cadastro via convite — Gerencial > Colaboradores, exige `folha_pagamento.read`. */
   personalInfoStatus: async (): Promise<PersonalInfoStatus[]> => {
     const rows = await unwrap<Array<{ employee_id: string; completed: boolean }>>(
@@ -4510,46 +4333,6 @@ export const Api = {
       const usage = usageByAsset.get(a.id as string) ?? { sessions_count: 0, total_minutes: 0 };
       return { id: a.id as string, name: a.name as string, emoji: a.emoji as string, color: a.color as string, ...usage };
     }) as AssetUsage[];
-  },
-  reportPonto: async (fromMs: number, toMs: number, unitId?: string | null) => {
-    let query = supabase()
-      .from("fa_kiosk_ponto_records")
-      .select("employee_id, unit_id, kind, at_ms, nsr")
-      .gte("at_ms", fromMs)
-      .lte("at_ms", toMs)
-      .order("at_ms", { ascending: false });
-
-    if (unitId) {
-      query = query.eq("unit_id", unitId);
-    }
-
-    const pontoRows = await unwrap<Record<string, unknown>[]>(query);
-    if (pontoRows.length === 0) return [] as FolhaPontoRow[];
-
-    const employeeIds = [...new Set(pontoRows.map((r) => r.employee_id as string).filter(Boolean))];
-    const employees = employeeIds.length === 0
-      ? []
-      : await unwrap<Record<string, unknown>[]>(
-          supabase()
-            .from("fa_kiosk_employees")
-            .select("id, full_name, weekly_hours_contracted")
-            .in("id", employeeIds),
-        );
-
-    const empMap = new Map(employees.map((e) => [e.id as string, e]));
-
-    return pontoRows.map((r) => {
-      const emp = empMap.get(r.employee_id as string);
-      return {
-        employee_id: r.employee_id as string,
-        unit_id: r.unit_id as string,
-        full_name: (emp?.full_name as string) ?? "Colaborador",
-        weekly_hours_contracted: (emp?.weekly_hours_contracted as number | null) ?? null,
-        kind: r.kind as PontoKind,
-        at_ms: r.at_ms as number,
-        nsr: r.nsr as number,
-      } satisfies FolhaPontoRow;
-    });
   },
   // Saldo de bonificação acumulado por operador no mês (aba Gerencial >
   // Bonificação, e o menu individual "Minha Bonificação"), mesma lógica de

@@ -60,6 +60,8 @@ faca_amigos/
 - **Emissão Fiscal (NFC-e):** Integração com SEFAZ/PA para emissão automática de Nota Fiscal ao Consumidor Eletrônica.
 
 ### 3.3. Módulo de Ponto Eletrônico de Colaboradores
+> **Fora da interface:** o ponto eletrônico passou a ocorrer em outro sistema. As telas de marcação, Espelho de Ponto, Controle de Frequência e cadastro/obrigatoriedade de rosto foram removidas do `kiosk-ui`. A descrição abaixo é histórica; as tabelas e RPCs no Supabase não foram alteradas, e a Folha de Pagamento ainda lê as marcações de `fa_kiosk_ponto_records`.
+
 - **Marcação Imutável:** Registro de entradas, saídas e intervalos por PIN do colaborador com geração de NSR (Número Sequencial de Registro).
 - **Relatórios Gerenciais:** Espelho de Ponto mensal para conferência e assinatura física.
 

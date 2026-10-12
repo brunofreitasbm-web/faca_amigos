@@ -27,8 +27,6 @@ interface AppStateValue {
   logout: () => Promise<void>;
   /** true até a sessão salva no navegador ter sido conferida. */
   restoring: boolean;
-  hasFaceEnrolled: boolean | null;
-  setHasFaceEnrolled: (val: boolean) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -40,26 +38,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [employee, setEmployee] = useState<TerminalEmployee | null>(null);
   const [terminalEmployees, setTerminalEmployees] = useState<TerminalEmployee[]>(listTerminalEmployees());
   const [restoring, setRestoring] = useState(true);
-  const [hasFaceEnrolled, setHasFaceEnrolled] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!employee) {
-      setHasFaceEnrolled(null);
-      return;
-    }
-    let isCancelled = false;
-    Api.myFaceDescriptor(employee.id)
-      .then((desc) => {
-        if (isCancelled) return;
-        setHasFaceEnrolled(Array.isArray(desc) && desc.length > 0);
-      })
-      .catch(() => {
-        if (!isCancelled) setHasFaceEnrolled(false);
-      });
-    return () => {
-      isCancelled = true;
-    };
-  }, [employee]);
 
   // As unidades só podem ser lidas com sessão (as policies de leitura são
   // `to authenticated` desde a migration 20260807000003), então a busca
@@ -224,7 +202,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setUnitId(null);
     setGerencial(false);
     autoSelectedForEmployeeId.current = null;
-    setHasFaceEnrolled(null);
   };
 
   // Encerra a sessão automaticamente às 23h30 de cada dia, para que o
@@ -280,8 +257,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       employee,
       terminalEmployees,
       restoring,
-      hasFaceEnrolled,
-      setHasFaceEnrolled,
       switchEmployee: async (employeeId, pin) => {
         const emp = await pinLogin(employeeId, pin);
         clearStepUpCache();
@@ -294,7 +269,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
       logout: doLogout,
     }),
-    [units, unitId, gerencial, employee, terminalEmployees, restoring, hasFaceEnrolled],
+    [units, unitId, gerencial, employee, terminalEmployees, restoring],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

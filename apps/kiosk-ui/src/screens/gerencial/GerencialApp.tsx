@@ -12,7 +12,6 @@ import { MetasTab } from "./tabs/MetasTab.js";
 import { BonificacaoTab } from "./tabs/BonificacaoTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
 import { OcorrenciasTab } from "./tabs/OcorrenciasTab.js";
-import { FrequenciaTab } from "./tabs/FrequenciaTab.js";
 import { PermissoesTab } from "./tabs/PermissoesTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
 import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
@@ -50,7 +49,6 @@ export type GerencialTab =
   | "FIDELIDADE"
   | "METAS"
   | "COLABORADORES"
-  | "FREQUENCIA"
   | "OCORRENCIAS"
   | "PERMISSOES"
   | "CLIENTES"
@@ -132,7 +130,7 @@ const CATEGORIES: ModuleCategory[] = [
     label: "Equipe & Clientes",
     icon: "👥",
     badge: "RH & CRM",
-    description: "Gestão da equipe, controle legal de ponto, recrutamento e clientes",
+    description: "Gestão da equipe, recrutamento e clientes",
     items: [
       { value: "COLABORADORES", label: "Equipe & Operadores", icon: "👤", description: "Cadastro unificado da equipe e permissões por unidade." },
       { value: "CLIENTES", label: "Base de Clientes", icon: "🧑‍🤝‍🧑", description: "Consulta e histórico centralizado de responsáveis e crianças da rede." },
@@ -241,7 +239,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
             <span style={{ position: "absolute", left: "12px", color: "var(--text-secondary, #64748b)", fontSize: "14px" }}>🔎</span>
             <input
               type="text"
-              placeholder="Buscar menu gerencial... (ex: Ponto, Zoe, Planos, Bonificação)"
+              placeholder="Buscar menu gerencial... (ex: Zoe, Planos, Bonificação)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -483,7 +481,6 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "FIDELIDADE" && <FidelidadeTab />}
               {tab === "METAS" && <MetasTab />}
               {tab === "COLABORADORES" && <ColaboradoresTab />}
-              {tab === "FREQUENCIA" && <FrequenciaTab />}
               {tab === "OCORRENCIAS" && <OcorrenciasTab />}
               {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}

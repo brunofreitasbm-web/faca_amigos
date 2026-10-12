@@ -42,7 +42,6 @@ import { RelatorioSessaoScreen } from "./screens/RelatorioSessaoScreen.js";
 import { PendingSessionReportsBadge } from "./components/session-report/PendingSessionReportsBadge.js";
 import { PdvScreen } from "./screens/PdvScreen.js";
 import { CaixaScreen } from "./screens/CaixaScreen.js";
-import { PontoScreen } from "./screens/PontoScreen.js";
 import { MinhaBonificacaoScreen } from "./screens/MinhaBonificacaoScreen.js";
 import { RelatorioScreen } from "./screens/RelatorioScreen.js";
 import { ConfiguracoesScreen } from "./screens/ConfiguracoesScreen.js";
@@ -51,7 +50,6 @@ import { GerencialApp } from "./screens/gerencial/GerencialApp.js";
 import { TapReturnScreen } from "./screens/TapReturnScreen.js";
 import { parseTapReturn } from "./lib/infinitepayTap.js";
 import { ConnectDeviceModal } from "./components/ConnectDeviceModal.js";
-import { FaceEnrollmentModal } from "./components/FaceEnrollmentModal.js";
 import { ConnectionStatusChip } from "./components/ConnectionStatusChip.js";
 import { InstallPwaBanner } from "./components/InstallPwaBanner.js";
 import { UpdatePwaBanner } from "./components/UpdatePwaBanner.js";
@@ -112,7 +110,7 @@ const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon:
   { value: "PDV", label: "PDV", help: "Vender produtos avulsos (loja/lanchonete), sem estar ligado a uma entrada", icon: <ShoppingCartIcon /> },
   { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento", icon: <WalletIcon /> },
   { value: "MINHA_BONIFICACAO", label: "Minha Bonificação", help: "Consultar só os seus números do programa de bonificação: ticket médio, progresso da meta e acumulado do mês. Somente consulta.", icon: <span>🎮</span> },
-  { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa e folha de ponto de períodos anteriores", icon: <ChartBarIcon /> },
+  { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa de períodos anteriores", icon: <ChartBarIcon /> },
   { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, colaboradores, unidade, dados fiscais e termos de uso", icon: <GearIcon /> },
 ];
 
@@ -124,14 +122,13 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
   PDV: PdvScreen,
   CAIXA: CaixaScreen,
   ANIVERSARIOS: AniversariosScreen,
-  PONTO: PontoScreen,
   MINHA_BONIFICACAO: MinhaBonificacaoScreen,
   RELATORIO: RelatorioScreen,
   CONFIGURACOES: ConfiguracoesScreen,
 };
 
 export function App() {
-  const { units, unit, setUnitId, gerencial, setGerencial, employee, logout, restoring, hasFaceEnrolled, setHasFaceEnrolled } = useAppState();
+  const { units, unit, setUnitId, gerencial, setGerencial, employee, logout, restoring } = useAppState();
   const { can, loading: loadingCapabilities } = useAuth();
   const confirm = useConfirm();
   const [screen, setScreen] = useState<Screen>("PAINEL");
@@ -229,15 +226,7 @@ export function App() {
   // Calculado antes dos retornos antecipados abaixo (tela de login, seleção
   // de módulo etc.) porque o gesto de arrastar já precisa dele — hooks não
   // podem vir depois de um `return` condicional.
-  // Estagiário não "bate ponto" no vocabulário do RH — é "Controle de
-  // Frequência". O papel é o único gate: a tela e a capacidade continuam
-  // as mesmas (PONTO / ponto.self), só o rótulo muda pra quem só tem esse
-  // acesso.
-  const visibleScreens = SCREENS.filter((s) => can(SCREEN_CAPABILITY[s.value])).map((s) =>
-    s.value === "PONTO" && employee?.role === "ESTAGIARIO"
-      ? { ...s, label: "Controle de Frequência", help: "Registrar entrada, intervalo e saída" }
-      : s,
-  );
+  const visibleScreens = SCREENS.filter((s) => can(SCREEN_CAPABILITY[s.value]));
 
   const handleGoBack = useCallback(() => {
     if (showConnectModal) {
@@ -478,16 +467,11 @@ export function App() {
     );
   }
 
-  // Saída, Caixa e Ponto continuam sendo a MESMA SaidaScreen/CaixaScreen/
-  // PontoScreen do balcão — não uma segunda implementação — só vestidas com
-  // a casca do modo celular em vez do cabeçalho de balcão (marca + menu
-  // hambúrguer). Ponto entrou nesse grupo (e não foi reconstruído do zero)
-  // porque é registro legal de jornada (Portaria MTP 671/2021) com câmera
-  // de reconhecimento facial e conferência de geolocalização — o tipo de
-  // tela onde uma segunda implementação diverge da primeira do jeito mais
-  // caro possível. As demais telas de escape (Entrada completa, PDV,
-  // Relatórios, Configurações) ainda caem no fallback abaixo, com o botão
-  // flutuante "Voltar ao modo celular" — ainda não vestidas.
+  // Saída e Caixa continuam sendo a MESMA SaidaScreen/CaixaScreen do balcão —
+  // não uma segunda implementação — só vestidas com a casca do modo celular
+  // em vez do cabeçalho de balcão (marca + menu hambúrguer). As demais telas
+  // de escape (Entrada completa, PDV, Relatórios, Configurações) ainda caem
+  // no fallback abaixo, com o botão flutuante "Voltar ao modo celular".
   const MOBILE_FRAMED_TITLE: Partial<Record<Screen, string>> = { SAIDA: "Saída", CAIXA: "Caixa", PDV: "PDV", RELATORIO_SESSAO: "Olhar FaçaAmigos" };
   if (mobile.active && mobileEscape != null && mobileEscape in MOBILE_FRAMED_TITLE && employee) {
     const FramedComponent = SCREEN_COMPONENTS[mobileEscape];
@@ -677,15 +661,6 @@ export function App() {
       </header>
 
       {showConnectModal && <ConnectDeviceModal onClose={() => setShowConnectModal(false)} />}
-      {employee && (employee.role === "OPERADOR" || employee.role === "GERENTE") && hasFaceEnrolled === false && (
-        <FaceEnrollmentModal
-          employeeId={employee.id}
-          employeeName={employee.full_name}
-          required={true}
-          onClose={() => {}}
-          onEnrolled={() => setHasFaceEnrolled(true)}
-        />
-      )}
 
       <InstallPwaBanner />
       <UpdatePwaBanner />

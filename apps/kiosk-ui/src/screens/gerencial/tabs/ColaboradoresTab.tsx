@@ -5,24 +5,18 @@ import { Api } from "../../../api/client.js";
 import type { Employee, PersonalInfoStatus } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
-import { useAuth } from "../../../auth/AuthContext.js";
 import { ROLE_LABEL, ROLE_DESCRIPTION, ROLE_OPTIONS, type Role } from "../../../auth/capabilities.js";
-import { EspelhoPontoModal } from "../../../components/EspelhoPontoModal.js";
-import { FaceEnrollmentModal } from "../../../components/FaceEnrollmentModal.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
 import { dateBrFromIso, EMPLOYEE_SECTORS, EMPLOYEE_SECTOR_LABEL, type EmployeeSector } from "@facaamigos/domain";
 import { getPublicAppUrl } from "../../../lib/appUrl.js";
 
 export function ColaboradoresTab() {
   const toast = useToast();
-  const { can } = useAuth();
   const { units } = useAppState();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [cadastroStatus, setCadastroStatus] = useState<Map<string, boolean>>(new Map());
   const [showForm, setShowForm] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
-  const [espelhoTarget, setEspelhoTarget] = useState<Employee | null>(null);
-  const [faceEnrollTarget, setFaceEnrollTarget] = useState<Employee | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -486,7 +480,7 @@ export function ColaboradoresTab() {
         <Modal onClose={() => setUnitsTarget(null)} title={`🗂️ Unidades de ${unitsTarget.full_name}`}>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
-              Em quais unidades este colaborador atua? Aparece na Configurações e no Ponto só das unidades marcadas.
+              Em quais unidades este colaborador atua? Aparece na Configurações só das unidades marcadas.
             </p>
             <UnitCheckboxGroup units={units} selected={unitsTargetIds} onChange={setUnitsTargetIds} />
             <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
@@ -762,25 +756,6 @@ export function ColaboradoresTab() {
                     🔑 PIN
                   </Button>
 
-                  {can("relatorio.ponto") && (
-                    <Button variant="ghost" size="sm" onClick={() => setEspelhoTarget(e)} title="Gerar e imprimir o espelho de ponto mensal deste colaborador">
-                      📄 Ponto
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFaceEnrollTarget(e)}
-                    title={
-                      e.face_enrolled_photo_path
-                        ? "Recadastrar o rosto usado no reconhecimento facial do quiosque"
-                        : "Cadastrar o rosto para reconhecimento facial no quiosque"
-                    }
-                  >
-                    🙂 {e.face_enrolled_photo_path ? "Recadastrar rosto" : "Cadastrar rosto"}
-                  </Button>
-
                   <Button variant={e.active === false ? "secondary" : "ghost"} size="sm" onClick={() => toggleActive(e)} title={e.active === false ? "Ativar acesso do colaborador" : "Desativar acesso do colaborador"}>
                     {e.active === false ? "Reativar" : "Desativar"}
                   </Button>
@@ -790,17 +765,6 @@ export function ColaboradoresTab() {
           );
         })}
       </div>
-
-      {espelhoTarget && <EspelhoPontoModal employee={espelhoTarget} onClose={() => setEspelhoTarget(null)} />}
-
-      {faceEnrollTarget && (
-        <FaceEnrollmentModal
-          employeeId={faceEnrollTarget.id}
-          employeeName={faceEnrollTarget.full_name}
-          onClose={() => setFaceEnrollTarget(null)}
-          onEnrolled={load}
-        />
-      )}
     </div>
   );
 }
