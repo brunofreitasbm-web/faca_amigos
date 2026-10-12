@@ -4,6 +4,7 @@ import { useAppState } from "../state/AppState.js";
 import { Api } from "../api/client.js";
 import { PinPad } from "../components/PinPad.js";
 import { ROLE_LABEL } from "../auth/capabilities.js";
+import { ChatUnreadHint } from "../components/ChatUnreadHint.js";
 
 /**
  * Quem aparece na tela de login. Só id + nome: o PAPEL não é mostrado aqui
@@ -48,6 +49,7 @@ export function LoginScreen() {
     return (
       <div style={{ maxWidth: "480px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
         <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center" }}>Selecione seu nome</h1>
+        <ChatUnreadHint />
         {error && <p style={{ color: "var(--color-error-text)", textAlign: "center" }}>{error}</p>}
         {allEmployees === null && <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Carregando…</p>}
         {allEmployees?.map((emp) => (
@@ -93,6 +95,7 @@ export function LoginScreen() {
     <div style={{ maxWidth: "480px", margin: "80px auto", display: "flex", flexDirection: "column", gap: "12px" }}>
       <BrandMark size={96} style={{ alignSelf: "center" }} />
       <h1 style={{ fontFamily: "var(--font-display)", textAlign: "center", margin: 0 }}>Quem está operando?</h1>
+      <ChatUnreadHint />
       <HelpText>Toque no seu nome para confirmar com o PIN deste terminal. Se ainda não apareceu na lista, toque em "outro colaborador".</HelpText>
       {terminalEmployees.map((emp) => (
         <Card key={emp.id} style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

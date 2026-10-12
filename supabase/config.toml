@@ -140,3 +140,12 @@ verify_jwt = false
 # X-Telegram-Bot-Api-Secret-Token (derivado do token do bot) + checagem do chat.
 [functions.owner-telegram-webhook]
 verify_jwt = false
+
+# Chat interno: chamadas sem JWT. chat-telegram-notify só age sobre mensagens existentes e
+# ainda não avisadas (claim atômico no banco); chat-telegram-webhook confere o segredo do
+# Telegram e o id do dono. Ver docs/TELEGRAM_CHAT_INTERNO.md.
+[functions.chat-telegram-notify]
+verify_jwt = false
+
+[functions.chat-telegram-webhook]
+verify_jwt = false

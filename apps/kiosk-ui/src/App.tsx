@@ -55,6 +55,7 @@ import { InstallPwaBanner } from "./components/InstallPwaBanner.js";
 import { UpdatePwaBanner } from "./components/UpdatePwaBanner.js";
 import { GlobalPdfReceiptModalListener } from "./components/PdfReceiptModal.js";
 import { OwnerFloatingDashboard } from "./components/OwnerFloatingDashboard.js";
+import { ChatFab } from "./components/ChatFab.js";
 import { isElectronLocal } from "./pwa.js";
 import { ensureOwnerPushSubscription } from "./lib/push.js";
 import { Api } from "./api/client.js";
@@ -623,6 +624,7 @@ export function App() {
       <UpdatePwaBanner />
       <GlobalPdfReceiptModalListener />
       <OwnerFloatingDashboard />
+      <ChatFab screen={screen} />
 
       {/* flex:1 + minHeight:0 é o que faz o filho poder ser 100% de altura
           sem estourar o pai — sem minHeight:0 um flex item nunca encolhe

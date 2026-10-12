@@ -50,6 +50,8 @@ export const CAPABILITIES = [
   "crm.admin",
   "relatorio_sessao.write",
   "relatorio_sessao.read",
+  "chat.usar",
+  "chat.admin",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -98,6 +100,8 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "crm.admin": "Gerenciar números (canais) e templates do CRM de WhatsApp",
   "relatorio_sessao.write": "Preencher o Olhar FaçaAmigos (crianças com plano de 1h ou mais)",
   "relatorio_sessao.read": "Ver o histórico do Olhar FaçaAmigos no Gerencial",
+  "chat.usar": "Usar o chat interno com o Owner (botão flutuante)",
+  "chat.admin": "Ver todas as conversas do chat interno e responder como Owner",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
@@ -155,7 +159,8 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
           c !== "talentos.write" &&
           c !== "treinamento.transcricoes.write" &&
           c !== "treinamento.compendio.gerar" &&
-          c !== "config.terminais.read"
+          c !== "config.terminais.read" &&
+          c !== "chat.admin"
       )
     );
   }
@@ -183,11 +188,12 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
       "nfse.emit",
       "nfce.retry",
       "relatorio_sessao.write",
+      "chat.usar",
     ]);
   }
 
   if (role === "ESTAGIARIO") {
-    return new Set(["ponto.self", "bonificacao.self", "relatorio_sessao.write"]);
+    return new Set(["ponto.self", "bonificacao.self", "relatorio_sessao.write", "chat.usar"]);
   }
 
   if (role === "PRESTADOR_PJ") {
