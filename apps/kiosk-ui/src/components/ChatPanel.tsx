@@ -84,7 +84,7 @@ export function ChatPanel({ messages, loading, error, onSend, onRetry, onClose }
   return (
     <aside className="chat-panel" role="dialog" aria-label="Chat com os donos">
       <header className="chat-panel__head">
-        <strong>Chat com os donos 👑</strong>
+        <strong>CHAT</strong>
         <button type="button" className="chat-panel__close" onClick={onClose} aria-label="Fechar chat">
           <XIcon />
         </button>
