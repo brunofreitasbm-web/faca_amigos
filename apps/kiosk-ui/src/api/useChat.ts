@@ -210,6 +210,27 @@ export function useChat({ enabled, panelOpen, getContext }: Options) {
   return { threadId, messages, unread, loading, error, send, retry, markRead };
 }
 
+/**
+ * true se o colaborador logado é admin do chat (Bruno/Isabella): lê todas as conversas e responde
+ * pelo Telegram, então não usa o botão flutuante. null enquanto carrega. A decisão real é do banco
+ * (fa_chat_is_admin na RLS); isto só esconde o botão.
+ */
+export function useChatIsAdmin(employeeId: string | null | undefined): boolean | null {
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  useEffect(() => {
+    setIsAdmin(null);
+    if (!employeeId) return;
+    let alive = true;
+    rpc<boolean>("fa_chat_is_admin")
+      .then((v) => alive && setIsAdmin(!!v))
+      .catch(() => alive && setIsAdmin(false));
+    return () => {
+      alive = false;
+    };
+  }, [employeeId]);
+  return isAdmin;
+}
+
 /** Quantidade de conversas com resposta do dono pendente, para a tela de PIN (sem login). */
 export function useChatUnreadHint(): number {
   const [n, setN] = useState(0);

@@ -42,7 +42,7 @@ create unique index if not exists idx_fa_chat_messages_tg on fa_kiosk_chat_messa
 create index if not exists idx_fa_chat_messages_unsent on fa_kiosk_chat_messages (created_at_ms)
   where from_owner = false and telegram_sent_at_ms is null;
 
--- Configuração do chat (ex.: owner_employee_id usado como remetente das respostas do Telegram).
+-- Configuração interna do chat (ex.: impressão digital do webhook do Telegram).
 create table if not exists fa_chat_config (
   key text primary key,
   value text not null
@@ -57,9 +57,24 @@ insert into fa_kiosk_role_capabilities (role, capability) values
   ('ESTAGIARIO', 'chat.usar'),
   ('OPERADOR', 'chat.usar'),
   ('GERENTE', 'chat.usar'),
-  ('ADMIN', 'chat.usar'),
-  ('ADMIN', 'chat.admin')
+  ('ADMIN', 'chat.usar')
 on conflict do nothing;
+
+-- Quem lê todas as conversas e responde como Owner. Lista própria (não o papel ADMIN
+-- inteiro): nem todo ADMIN deve ler a conversa dos colaboradores. tg_user_id liga a
+-- conta do Telegram (quem responde pelo bot) ao colaborador.
+create table if not exists fa_chat_admins (
+  employee_id uuid primary key references fa_kiosk_employees (id),
+  tg_user_id bigint unique
+);
+alter table fa_chat_admins enable row level security;
+-- sem policy: só service_role / funções security definer
+
+create or replace function fa_chat_is_admin() returns boolean as $$
+  select exists (select 1 from fa_chat_admins where employee_id = fa_kiosk_current_employee_id());
+$$ language sql stable security definer set search_path = public, pg_temp;
+revoke execute on function fa_chat_is_admin() from public, anon;
+grant execute on function fa_chat_is_admin() to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. RLS (leitura). Sem policy de insert/update/delete: append-only por RPC.
@@ -70,7 +85,7 @@ alter table fa_kiosk_chat_messages enable row level security;
 drop policy if exists fa_chat_threads_read on fa_kiosk_chat_threads;
 create policy fa_chat_threads_read on fa_kiosk_chat_threads
   for select to authenticated
-  using (employee_id = fa_kiosk_current_employee_id() or fa_kiosk_can('chat.admin'));
+  using (employee_id = fa_kiosk_current_employee_id() or fa_chat_is_admin());
 
 drop policy if exists fa_chat_messages_read on fa_kiosk_chat_messages;
 create policy fa_chat_messages_read on fa_kiosk_chat_messages
@@ -79,7 +94,7 @@ create policy fa_chat_messages_read on fa_kiosk_chat_messages
     exists (
       select 1 from fa_kiosk_chat_threads t
       where t.id = thread_id
-        and (t.employee_id = fa_kiosk_current_employee_id() or fa_kiosk_can('chat.admin'))
+        and (t.employee_id = fa_kiosk_current_employee_id() or fa_chat_is_admin())
     )
   );
 
@@ -97,23 +112,6 @@ end $$;
 -- ---------------------------------------------------------------------
 -- 4. Funções
 -- ---------------------------------------------------------------------
-create or replace function fa_chat_owner_employee_id() returns uuid as $$
-declare
-  v_cfg text;
-  v_id uuid;
-  v_n integer;
-begin
-  select value into v_cfg from fa_chat_config where key = 'owner_employee_id';
-  if v_cfg is not null then return v_cfg::uuid; end if;
-  select count(*), min(id::text)::uuid into v_n, v_id
-    from fa_kiosk_employees where role = 'ADMIN' and active;
-  if v_n = 1 then return v_id; end if;
-  return null;
-end;
-$$ language plpgsql stable security definer set search_path = public, pg_temp;
-revoke execute on function fa_chat_owner_employee_id() from public, anon, authenticated;
-grant execute on function fa_chat_owner_employee_id() to service_role;
-
 -- Núcleo da gravação, compartilhado pela RPC do app e pelo webhook do Telegram.
 -- Não confere permissão: quem chama já conferiu.
 create or replace function fa_chat_insert_message(
@@ -197,7 +195,7 @@ create or replace function fa_chat_send(
 ) returns jsonb as $$
 declare
   v_emp uuid := fa_kiosk_current_employee_id();
-  v_is_admin boolean := fa_kiosk_can('chat.admin');
+  v_is_admin boolean := fa_chat_is_admin();
   v_thread_emp uuid;
   v_row fa_kiosk_chat_messages;
 begin
@@ -243,7 +241,7 @@ begin
   if v_thread_emp is null then return 0; end if;
   if v_thread_emp = v_emp then
     update fa_kiosk_chat_threads set employee_last_read_ms = v_now_ms where id = p_thread_id;
-  elsif fa_kiosk_can('chat.admin') then
+  elsif fa_chat_is_admin() then
     update fa_kiosk_chat_threads set owner_last_read_ms = v_now_ms where id = p_thread_id;
   else
     raise exception 'conversa de outro colaborador' using errcode = '42501';
@@ -278,23 +276,26 @@ $$ language sql stable security definer set search_path = public, pg_temp;
 revoke execute on function fa_chat_unread_hint() from public;
 grant execute on function fa_chat_unread_hint() to anon, authenticated;
 
--- Dono respondeu pelo Telegram -> grava como mensagem do dono. Só service_role.
+-- Admin respondeu pelo Telegram -> grava como mensagem do dono, assinada por quem
+-- respondeu (tg_user_id em fa_chat_admins). Só service_role.
 create or replace function fa_chat_owner_reply(
   p_thread_id uuid,
   p_body text,
-  p_telegram_message_id bigint
+  p_telegram_message_id bigint,
+  p_tg_user_id bigint
 ) returns fa_kiosk_chat_messages as $$
 declare
-  v_owner uuid := fa_chat_owner_employee_id();
+  v_admin uuid;
 begin
-  if v_owner is null then
-    raise exception 'owner_employee_id não configurado' using errcode = '22023';
+  select employee_id into v_admin from fa_chat_admins where tg_user_id = p_tg_user_id;
+  if v_admin is null then
+    raise exception 'usuário do Telegram não é admin do chat' using errcode = '42501';
   end if;
-  return fa_chat_insert_message(null, p_thread_id, v_owner, true, p_body, null, null, p_telegram_message_id);
+  return fa_chat_insert_message(null, p_thread_id, v_admin, true, p_body, null, null, p_telegram_message_id);
 end;
 $$ language plpgsql security definer set search_path = public, pg_temp;
-revoke execute on function fa_chat_owner_reply(uuid, text, bigint) from public, anon, authenticated;
-grant execute on function fa_chat_owner_reply(uuid, text, bigint) to service_role;
+revoke execute on function fa_chat_owner_reply(uuid, text, bigint, bigint) from public, anon, authenticated;
+grant execute on function fa_chat_owner_reply(uuid, text, bigint, bigint) to service_role;
 
 -- ---------------------------------------------------------------------
 -- 5. Aviso ao dono (Telegram): disparo imediato por trigger + varredura
@@ -419,7 +420,7 @@ create policy fa_chat_attachments_write on storage.objects for insert to authent
     and exists (
       select 1 from fa_kiosk_chat_threads t
       where t.id::text = (storage.foldername(name))[1]
-        and (t.employee_id = fa_kiosk_current_employee_id() or fa_kiosk_can('chat.admin'))
+        and (t.employee_id = fa_kiosk_current_employee_id() or fa_chat_is_admin())
     )
   );
 
@@ -430,7 +431,7 @@ create policy fa_chat_attachments_read on storage.objects for select to authenti
     and exists (
       select 1 from fa_kiosk_chat_threads t
       where t.id::text = (storage.foldername(name))[1]
-        and (t.employee_id = fa_kiosk_current_employee_id() or fa_kiosk_can('chat.admin'))
+        and (t.employee_id = fa_kiosk_current_employee_id() or fa_chat_is_admin())
     )
   );
 -- Sem policy de update/delete: anexo também é imutável. Tamanho (≤5 MB) e tipo

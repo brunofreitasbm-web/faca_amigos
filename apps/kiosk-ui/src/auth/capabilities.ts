@@ -51,7 +51,6 @@ export const CAPABILITIES = [
   "relatorio_sessao.write",
   "relatorio_sessao.read",
   "chat.usar",
-  "chat.admin",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -101,7 +100,6 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "relatorio_sessao.write": "Preencher o Olhar FaçaAmigos (crianças com plano de 1h ou mais)",
   "relatorio_sessao.read": "Ver o histórico do Olhar FaçaAmigos no Gerencial",
   "chat.usar": "Usar o chat interno com o Owner (botão flutuante)",
-  "chat.admin": "Ver todas as conversas do chat interno e responder como Owner",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
@@ -159,8 +157,7 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
           c !== "talentos.write" &&
           c !== "treinamento.transcricoes.write" &&
           c !== "treinamento.compendio.gerar" &&
-          c !== "config.terminais.read" &&
-          c !== "chat.admin"
+          c !== "config.terminais.read"
       )
     );
   }

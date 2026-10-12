@@ -12,7 +12,7 @@ import {
 //   { message_id }      -> trigger do banco: avisa o dono de uma mensagem nova
 //   {}                  -> varredura do cron: reenvia o que falhou e garante o webhook
 //   { read_thread_id }  -> colaborador leu: troca a reação das respostas do dono para 👀
-// Secrets: CHAT_TELEGRAM_BOT_TOKEN, CHAT_TELEGRAM_OWNER_ID (id numérico do dono no Telegram).
+// Secrets: CHAT_TELEGRAM_BOT_TOKEN e CHAT_TELEGRAM_CHAT_ID (id do grupo dos admins, ou do chat direto).
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -61,7 +61,8 @@ async function ensureWebhook(admin: any, token: string, supabaseUrl: string): Pr
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method" }, 405);
   const token = Deno.env.get("CHAT_TELEGRAM_BOT_TOKEN");
-  const ownerTgId = Deno.env.get("CHAT_TELEGRAM_OWNER_ID");
+  // Destino: grupo dos admins (id negativo) ou conversa direta. OWNER_ID fica como alias antigo.
+  const ownerTgId = Deno.env.get("CHAT_TELEGRAM_CHAT_ID") ?? Deno.env.get("CHAT_TELEGRAM_OWNER_ID");
   // Sem secrets nada é reivindicado: as mensagens ficam no banco e saem quando configurar.
   if (!token || !ownerTgId) return json({ error: "not configured" }, 500);
 

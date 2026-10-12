@@ -5,7 +5,9 @@ import {
   answeredKeyboard,
   chatWebhookSecret,
   escapeHtml,
+  firstName,
   formatEmployeeMessage,
+  idReply,
   parseQuickReply,
   quickReplyKeyboard,
   TELEGRAM_MAX_TEXT,
@@ -57,10 +59,20 @@ test("parseQuickReply rejeita lixo", () => {
 });
 
 test("answeredKeyboard troca os botões por um rótulo inerte", () => {
-  const kb = answeredKeyboard("res", "12/10 14:32");
+  const kb = answeredKeyboard("res", "Bruno", "12/10 14:32");
   assert.equal(kb.inline_keyboard.length, 1);
   assert.equal(kb.inline_keyboard[0]![0]!.callback_data, "noop");
-  assert.match(kb.inline_keyboard[0]![0]!.text, /Resolvido/);
+  assert.match(kb.inline_keyboard[0]![0]!.text, /Bruno: Resolvido/);
+});
+
+test("idReply mostra só o id de quem perguntou", () => {
+  assert.match(idReply(123), /<code>123<\/code>/);
+});
+
+test("firstName pega o primeiro nome e tem fallback", () => {
+  assert.equal(firstName("Isabella goncalves"), "Isabella");
+  assert.equal(firstName("  "), "Owner");
+  assert.equal(firstName(null, "Admin"), "Admin");
 });
 
 test("chatWebhookSecret é estável e diferente do segredo do bot do caixa", async () => {

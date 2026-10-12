@@ -61,9 +61,9 @@ export function parseQuickReply(data: string): { action: QuickReplyAction; messa
   return m ? { action: m[1] as QuickReplyAction, messageId: m[2]! } : null;
 }
 
-/** Teclado depois do clique: mostra o que foi respondido e some com os botões. */
-export function answeredKeyboard(action: QuickReplyAction, when: string): InlineKeyboard {
-  return { inline_keyboard: [[{ text: `Respondido: ${QUICK_REPLIES[action]} · ${when}`, callback_data: "noop" }]] };
+/** Teclado depois do clique: mostra o que foi respondido, por quem, e some com os botões. */
+export function answeredKeyboard(action: QuickReplyAction, who: string, when: string): InlineKeyboard {
+  return { inline_keyboard: [[{ text: `${who}: ${QUICK_REPLIES[action]} · ${when}`, callback_data: "noop" }]] };
 }
 
 /** Segredo do webhook derivado do token do bot (mesma ideia do owner-telegram-webhook). */
@@ -75,6 +75,17 @@ export async function chatWebhookSecret(token: string): Promise<string> {
 
 export const HELP_TEXT =
   "Para responder, use <b>Responder</b> (deslize) na mensagem do colaborador, ou toque num dos botões abaixo dela.";
+
+/** Resposta ao comando /id: só revela o id de quem perguntou. */
+export function idReply(userId: number | string): string {
+  return `Seu id no Telegram: <code>${userId}</code>`;
+}
+
+/** Nome curto para assinar a resposta (primeiro nome). */
+export function firstName(full: string | null | undefined, fallback = "Owner"): string {
+  const f = (full ?? "").trim().split(/\s+/)[0];
+  return f || fallback;
+}
 
 export function belemStamp(d: Date): string {
   const parts = new Intl.DateTimeFormat("pt-BR", {
