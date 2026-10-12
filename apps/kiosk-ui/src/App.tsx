@@ -165,13 +165,15 @@ export function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [simScreen, setSimScreen] = useState<SimScreen>(() => {
     try {
-      const p = new URLSearchParams(window.location.search).get("tela");
-      if (p === "principal" || p === "modulos") return "PRINCIPAL";
-      if (p === "turno" || p === "1") return "TURNO";
-      if (p === "gerencial" || p === "2") return "GERENCIAL";
+      const p = new URLSearchParams(window.location.search);
+      const isSim = p.get("emulador") === "1" || p.get("sim") === "1";
+      if (!isSim) return "AUTO";
+      const tela = p.get("tela");
+      if (tela === "principal" || tela === "modulos") return "PRINCIPAL";
+      if (tela === "turno" || tela === "1") return "TURNO";
+      return "GERENCIAL";
     } catch {}
-    // Padrão solicitado: Abrir como tela principal no GERENCIAL (metas + NPS)
-    return "GERENCIAL";
+    return "AUTO";
   });
   // Casca mobile: no celular o operador entra por ela, e `mobileEscape`
   // guarda a tela completa que ele pediu de dentro dela (Saída, Caixa…).

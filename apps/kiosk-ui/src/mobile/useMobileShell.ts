@@ -12,27 +12,20 @@ const STORAGE_KEY = "fa.mobileShell";
  * bolso, andando pela pista — não para o tablet apoiado no balcão.
  */
 const PHONE_MAX_WIDTH = 640;
-const FORCE_MOBILE_KEY = "fa.forceMobile";
 
-function isMobileRequested(): boolean {
+function isExplicitMobileParam(): boolean {
   if (typeof window === "undefined") return false;
   try {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("mobile") === "1" || params.get("mobile") === "true" || params.get("emulador") === "1") {
-      return true;
-    }
-    if (window.localStorage.getItem(FORCE_MOBILE_KEY) === "1") {
-      return true;
-    }
+    return params.get("mobile") === "1" || params.get("mobile") === "true";
   } catch {
-    // Modo privado / ambiente sem storage
+    return false;
   }
-  return false;
 }
 
 function phoneWidth(): boolean {
   if (typeof window === "undefined") return false;
-  if (isMobileRequested()) return true;
+  if (isExplicitMobileParam()) return true;
   return window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).matches;
 }
 
@@ -59,7 +52,7 @@ export function useMobileShell(): MobileShellState {
   const [isPhone, setIsPhone] = useState(phoneWidth);
   const [optedOut, setOptedOut] = useState(() => {
     try {
-      if (isMobileRequested()) return false;
+      window.localStorage.removeItem("fa.forceMobile");
       return window.localStorage.getItem(STORAGE_KEY) === "off";
     } catch {
       return false;
@@ -77,10 +70,8 @@ export function useMobileShell(): MobileShellState {
     try {
       if (value === null) {
         window.localStorage.removeItem(STORAGE_KEY);
-        window.localStorage.setItem(FORCE_MOBILE_KEY, "1");
       } else {
         window.localStorage.setItem(STORAGE_KEY, value);
-        window.localStorage.removeItem(FORCE_MOBILE_KEY);
       }
     } catch {
       // Modo privado / storage cheio: a escolha vale só para esta aba.
@@ -96,8 +87,8 @@ export function useMobileShell(): MobileShellState {
   const useMobileVersion = useCallback(() => {
     persist(null);
     setOptedOut(false);
-    setIsPhone(true);
+    setIsPhone(phoneWidth());
   }, [persist]);
 
-  return { active: (isPhone || isMobileRequested()) && !optedOut, isPhone, useFullVersion, useMobileVersion };
+  return { active: (isPhone || isExplicitMobileParam()) && !optedOut, isPhone, useFullVersion, useMobileVersion };
 }
