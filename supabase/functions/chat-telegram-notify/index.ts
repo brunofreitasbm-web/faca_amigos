@@ -12,7 +12,8 @@ import {
 //   { message_id }      -> trigger do banco: avisa o dono de uma mensagem nova
 //   {}                  -> varredura do cron: reenvia o que falhou e garante o webhook
 //   { read_thread_id }  -> colaborador leu: troca a reação das respostas do dono para 👀
-// Secrets: CHAT_TELEGRAM_BOT_TOKEN e CHAT_TELEGRAM_CHAT_ID (id do grupo dos admins, ou do chat direto).
+// Secrets: CHAT_TELEGRAM_BOT_TOKEN e CHAT_TELEGRAM_CHAT_ID (grupo PADRÃO: usado quando a unidade da mensagem não tem grupo próprio).
+// Cada unidade pode ter o seu grupo em fa_chat_unit_groups (unit_id -> tg_chat_id).
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -78,9 +79,9 @@ Deno.serve(async (req) => {
     const { data: rows, error } = await admin.rpc("fa_chat_claim_read_reactions", { p_thread_id: body.read_thread_id });
     if (error) return json({ error: error.message }, 500);
     let reacted = 0;
-    for (const m of (rows ?? []) as Array<{ id: string; telegram_message_id: number }>) {
+    for (const m of (rows ?? []) as Array<{ id: string; telegram_message_id: number; telegram_chat_id: number | null }>) {
       const r = await tg(token, "setMessageReaction", {
-        chat_id: ownerTgId,
+        chat_id: m.telegram_chat_id ?? ownerTgId,
         message_id: m.telegram_message_id,
         reaction: [{ type: "emoji", emoji: REACTION_READ }],
       });
@@ -104,6 +105,14 @@ Deno.serve(async (req) => {
 
   let sent = 0;
   const errors: string[] = webhookError ? [`webhook: ${webhookError}`] : [];
+  // Grupo da unidade da mensagem; sem unidade ou sem grupo cadastrado, cai no grupo padrão.
+  const destinationFor = async (unitId?: string | null): Promise<string> => {
+    if (unitId) {
+      const { data } = await admin.from("fa_chat_unit_groups").select("tg_chat_id").eq("unit_id", unitId).maybeSingle();
+      if (data?.tg_chat_id) return String(data.tg_chat_id);
+    }
+    return ownerTgId;
+  };
   const unclaim = (id: string) =>
     admin.from("fa_kiosk_chat_messages").update({ telegram_claimed_at_ms: null }).eq("id", id);
 
@@ -111,6 +120,7 @@ Deno.serve(async (req) => {
     id: string; thread_id: string; sender_employee_id: string; body: string;
     attachment_path: string | null; context: ChatContext | null;
   }>) {
+    const dest = await destinationFor(m.context?.unit_id);
     const { data: emp } = await admin.from("fa_kiosk_employees").select("full_name").eq("id", m.sender_employee_id).maybeSingle();
     let unitName: string | null = null;
     if (m.context?.unit_id) {
@@ -123,7 +133,7 @@ Deno.serve(async (req) => {
     if (m.attachment_path) {
       const { data: signed } = await admin.storage.from("fa-chat-attachments").createSignedUrl(m.attachment_path, 300);
       if (signed?.signedUrl) {
-        const p = await tg(token, "sendPhoto", { chat_id: ownerTgId, photo: signed.signedUrl });
+        const p = await tg(token, "sendPhoto", { chat_id: dest, photo: signed.signedUrl });
         if (!p.ok) {
           errors.push(p.detail);
           if (p.retryable) { await unclaim(m.id); continue; }
@@ -132,7 +142,7 @@ Deno.serve(async (req) => {
     }
 
     const r = await tg(token, "sendMessage", {
-      chat_id: ownerTgId,
+      chat_id: dest,
       text: formatEmployeeMessage({
         employeeName: emp?.full_name ?? "Colaborador",
         unitName,
@@ -152,7 +162,7 @@ Deno.serve(async (req) => {
     }
     const { error: upErr } = await admin
       .from("fa_kiosk_chat_messages")
-      .update({ telegram_message_id: r.data.message_id, telegram_sent_at_ms: Date.now() })
+      .update({ telegram_message_id: r.data.message_id, telegram_chat_id: Number(dest), telegram_sent_at_ms: Date.now() })
       .eq("id", m.id);
     if (upErr) errors.push(`update: ${upErr.message}`);
     else sent++;

@@ -10,6 +10,8 @@ import {
   idReply,
   parseQuickReply,
   quickReplyKeyboard,
+  replyPromptHtml,
+  TEXT_REPLY_LABEL,
   TELEGRAM_MAX_TEXT,
 } from "./chatTelegram.ts";
 
@@ -58,11 +60,31 @@ test("parseQuickReply rejeita lixo", () => {
   assert.equal(parseQuickReply("cr:rec:nao-e-uuid"), null);
 });
 
-test("answeredKeyboard troca os botões por um rótulo inerte", () => {
-  const kb = answeredKeyboard("res", "Bruno", "12/10 14:32");
-  assert.equal(kb.inline_keyboard.length, 1);
+test("answeredKeyboard mostra quem respondeu e mantém o Responder por texto", () => {
+  const kb = answeredKeyboard("res", "Bruno", "12/10 14:32", ID);
+  assert.equal(kb.inline_keyboard.length, 2);
   assert.equal(kb.inline_keyboard[0]![0]!.callback_data, "noop");
   assert.match(kb.inline_keyboard[0]![0]!.text, /Bruno: Resolvido/);
+  assert.equal(kb.inline_keyboard[1]![0]!.text, TEXT_REPLY_LABEL);
+  assert.deepEqual(parseQuickReply(kb.inline_keyboard[1]![0]!.callback_data), { action: "txt", messageId: ID });
+});
+
+test("answeredKeyboard sem id não oferece o Responder por texto", () => {
+  assert.equal(answeredKeyboard("rec", "Isa", "x").inline_keyboard.length, 1);
+});
+
+test("o teclado inicial tem Responder por texto e parseQuickReply entende txt", () => {
+  const all = quickReplyKeyboard(ID).inline_keyboard.flat();
+  const txt = all.find((b) => b.text === TEXT_REPLY_LABEL);
+  assert.ok(txt);
+  assert.equal(parseQuickReply(txt!.callback_data)?.action, "txt");
+});
+
+test("replyPromptHtml menciona o admin por id e escapa nomes", () => {
+  const html = replyPromptHtml({ adminName: "Bruno <x>", adminTgId: 6728797176, employeeName: "Maria & Cia", unitName: "Playground" });
+  assert.match(html, /tg:\/\/user\?id=6728797176/);
+  assert.match(html, /Bruno &lt;x&gt;/);
+  assert.match(html, /<b>Maria &amp; Cia<\/b> \(Playground\)/);
 });
 
 test("idReply mostra o id de quem perguntou e, se informado, o do chat", () => {
