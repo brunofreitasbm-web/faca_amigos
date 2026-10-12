@@ -29,6 +29,8 @@ import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/W
 import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
 import { money } from "../format.js";
 import { AutoUpdateCard } from "../components/AutoUpdateCard.js";
+import { SideTabs, type SideTabGroup } from "../components/SideTabs.js";
+import { DESKTOP_POINTER_QUERY, useMediaQuery } from "../hooks/useMediaQuery.js";
 import { getPublicAppUrl } from "../lib/appUrl.js";
 
 type Tab =
@@ -75,11 +77,32 @@ const TAB_CAPABILITY: Record<Tab, Capability> = {
   NOTIFICACOES: "notificacoes.owner_push",
 };
 
+/**
+ * Agrupamento do menu lateral (desktop). O `Record<Tab, …>` quebra o build se
+ * uma aba nova nascer sem grupo, em vez de sumir do menu em silêncio.
+ */
+const TAB_GROUP: Record<Tab, string> = {
+  PLANOS: "Catálogo e vendas",
+  PACOTES: "Catálogo e vendas",
+  PRODUTOS: "Catálogo e vendas",
+  CUPONS: "Catálogo e vendas",
+  FIDELIDADE: "Catálogo e vendas",
+  FROTA: "Catálogo e vendas",
+  UNIDADE: "Operação",
+  IMPRESSORAS: "Operação",
+  PONTO: "Operação",
+  NOTIFICACOES: "Operação",
+  FISCAL: "Fiscal e legal",
+  TERMOS: "Fiscal e legal",
+};
+const GROUP_ORDER = ["Catálogo e vendas", "Operação", "Fiscal e legal"];
+
 export function ConfiguracoesScreen() {
   const { unit } = useAppState();
   const { can } = useAuth();
   const isQuiosque = unit?.kind === "QUIOSQUE";
   const [tab, setTab] = useState<Tab>("PLANOS");
+  const desktop = useMediaQuery(DESKTOP_POINTER_QUERY);
 
   if (!unit) return null;
 
@@ -115,13 +138,15 @@ export function ConfiguracoesScreen() {
     NOTIFICACOES: "Ative para receber no seu celular/computador os relatórios automáticos de abertura, acompanhamento (17h e 20h) e fechamento de caixa desta unidade.",
   };
 
-  return (
-    <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações</h1>
-      <HelpText>Ajustes da operação — o que é cadastrado aqui aparece depois nas outras telas do sistema.</HelpText>
-      <Tabs value={tab} onChange={setTab} tabs={tabs} />
-      <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
+  const groups: SideTabGroup<Tab>[] = GROUP_ORDER.map((label) => ({
+    label,
+    tabs: tabs.filter((t) => TAB_GROUP[t.value] === label),
+  })).filter((g) => g.tabs.length > 0);
 
+  // Mesmo painel nos dois layouts: só muda o menu (lateral no desktop com
+  // mouse, barra de abas no resto).
+  const panel = (
+    <>
       {/* Cada painel é guardado individualmente, e não só a tela inteira: as
           abas têm capacidades diferentes entre si, e o estado `tab` sobrevive
           a uma troca de colaborador no terminal. */}
@@ -141,6 +166,28 @@ export function ConfiguracoesScreen() {
           {tab === "NOTIFICACOES" && <NotificacoesTab />}
         </RequireCapability>
       </div>
+    </>
+  );
+
+  return (
+    <div style={{ padding: "24px", maxWidth: desktop ? "1280px" : "900px", margin: "0 auto" }}>
+      <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações</h1>
+      <HelpText>Ajustes da operação — o que é cadastrado aqui aparece depois nas outras telas do sistema.</HelpText>
+      {desktop ? (
+        <div className="config-body">
+          <SideTabs value={tab} onChange={setTab} groups={groups} label="Seções de configurações" />
+          <div className="config-content">
+            <HelpText style={{ margin: "0 0 12px" }}>{TAB_HELP[tab]}</HelpText>
+            {panel}
+          </div>
+        </div>
+      ) : (
+        <>
+          <Tabs value={tab} onChange={setTab} tabs={tabs} />
+          <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
+          {panel}
+        </>
+      )}
     </div>
   );
 }
