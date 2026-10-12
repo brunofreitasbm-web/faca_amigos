@@ -68,6 +68,12 @@ depois de configurar.
 - O Telegram passa a guardar uma cópia do conteúdo das conversas. Os colaboradores veem o aviso
   fixo "As conversas ficam gravadas no sistema" no topo do painel.
 
+## Admins também usam o botão
+
+O botão de chat aparece para todos com a permissão `chat.usar`, inclusive Bruno e Isabella. Quando um
+admin escreve por ele, é a conversa do próprio admin: chega ao grupo do Telegram com o nome dele,
+como a de qualquer colaborador, e qualquer admin pode responder ali.
+
 ## Limites conhecidos
 
 - Sem push para o colaborador: a resposta do Owner só aparece quando alguém logar no tablet

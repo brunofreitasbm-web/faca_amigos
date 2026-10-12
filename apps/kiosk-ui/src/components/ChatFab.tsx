@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useChat, useChatIsAdmin } from "../api/useChat.js";
+import { useChat } from "../api/useChat.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { useAppState } from "../state/AppState.js";
 import { buildChatContext } from "../lib/chat.js";
@@ -27,13 +27,13 @@ function Bubble() {
 
 /**
  * O painel abre POR CIMA da tela atual (sem navegar), então o operador volta ao ponto
- * exato em que estava. Os admins do chat (fa_chat_admins) respondem pelo Telegram e não veem o botão.
+ * exato em que estava. Todos com `chat.usar` veem o botão, inclusive os admins do chat (fa_chat_admins):
+ * para eles é a conversa deles, que chega ao grupo do Telegram como a de qualquer colaborador.
  */
 export function ChatFab({ screen }: { screen: string }) {
   const { can } = useAuth();
   const { employee, unit } = useAppState();
-  const isChatAdmin = useChatIsAdmin(employee?.id);
-  const enabled = !!employee && can("chat.usar") && isChatAdmin === false;
+  const enabled = !!employee && can("chat.usar");
   const [open, setOpen] = useState(false);
 
   const getContext = useCallback(
