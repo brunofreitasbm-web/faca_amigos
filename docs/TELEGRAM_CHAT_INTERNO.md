@@ -22,7 +22,7 @@ Isabella) recebem num grupo do Telegram e respondem ali mesmo, sem abrir o app. 
    lidas; a tela de PIN mostra "Há mensagens novas do Owner no chat" (sem nomes).
 5. Mensagem que falhar no Telegram é reenviada por varredura a cada 2 min (até 24 h).
 
-Status que o colaborador vê: *Enviando… → Enviada → Entregue ao Owner* (a mensagem chegou ao
+Status que o colaborador vê: *Enviando… → Enviada → Entregue aos donos* (a mensagem chegou ao
 Telegram dele). "Lido pelo Owner" não existe: o Telegram não informa isso.
 
 ## Ativação (uma vez)
@@ -53,9 +53,31 @@ as mensagens e as respostas um do outro, e o botão tocado por um vira "Bruno: R
 Sem os secrets, `chat-telegram-notify` responde 500 e as mensagens ficam no banco; saem sozinhas
 depois de configurar.
 
+## Um grupo por unidade
+
+Cada unidade pode ter o seu próprio grupo do Telegram (Bruno, Isabella e o bot). A mensagem de um funcionário
+vai para o grupo da **unidade em que ele está logado**; o grupo padrão (secret `CHAT_TELEGRAM_CHAT_ID`) recebe as
+mensagens de quem não tem unidade (ex.: um admin sem unidade escolhida) e de unidades sem grupo cadastrado.
+
+Para ligar uma unidade ao seu grupo:
+1. Crie o grupo, adicione o `@ZoeFA_bot` e mande `/id@ZoeFA_bot` nele. O bot responde "Id deste chat: -100…".
+2. Cadastre:
+   ```sql
+   insert into fa_chat_unit_groups (unit_id, tg_chat_id) values ('<uuid da unidade>', -100...)
+   on conflict (unit_id) do update set tg_chat_id = excluded.tg_chat_id;
+   ```
+   (`select id, name from fa_kiosk_units;` lista as unidades.) O bot passa a aceitar respostas desse grupo na hora.
+
+## Respondendo com texto livre
+
+Sob cada mensagem há o botão **✍️ Responder por texto**. Ao tocar, o bot abre uma caixa "Bruno, digite abaixo a
+resposta para Maria (unidade) e envie"; o que você digitar ali vai para a Maria. Deslizar a mensagem do funcionário
+(Responder) continua funcionando. Texto solto no grupo, sem uma dessas duas formas, é ignorado de propósito: os
+admins também conversam entre si ali.
+
 ## Segurança
 
-- Só responde quem estiver em `fa_chat_admins.tg_user_id`, **e** só dentro do chat configurado. Estar no
+- Só responde quem estiver em `fa_chat_admins.tg_user_id`, **e** só dentro de um chat autorizado (grupo padrão ou grupo de unidade). Estar no
   grupo não basta: se alguém não-admin entrar, pode ler, mas as respostas e os botões dele são ignorados.
   Mantenha o grupo só com os admins, porque o grupo mostra o conteúdo das conversas.
 - `/id` responde a qualquer pessoa o **próprio** id; não concede acesso.

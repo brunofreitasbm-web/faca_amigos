@@ -43,6 +43,11 @@ export function formatEmployeeMessage(input: {
 
 export type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> };
 
+export const TEXT_REPLY_LABEL = "✍️ Responder por texto";
+
+/** Ação de um botão do teclado: resposta pronta ou abrir a caixa de resposta digitada. */
+export type ButtonAction = QuickReplyAction | "txt";
+
 /** callback_data = `cr:<ação>:<uuid>` (43 bytes, cabe nos 64 do Telegram). */
 export function quickReplyKeyboard(messageId: string): InlineKeyboard {
   return {
@@ -52,18 +57,35 @@ export function quickReplyKeyboard(messageId: string): InlineKeyboard {
         { text: QUICK_REPLIES.res, callback_data: `cr:res:${messageId}` },
       ],
       [{ text: QUICK_REPLIES.lig, callback_data: `cr:lig:${messageId}` }],
+      [{ text: TEXT_REPLY_LABEL, callback_data: `cr:txt:${messageId}` }],
     ],
   };
 }
 
-export function parseQuickReply(data: string): { action: QuickReplyAction; messageId: string } | null {
-  const m = /^cr:(rec|res|lig):([0-9a-f-]{36})$/.exec(data);
-  return m ? { action: m[1] as QuickReplyAction, messageId: m[2]! } : null;
+export function parseQuickReply(data: string): { action: ButtonAction; messageId: string } | null {
+  const m = /^cr:(rec|res|lig|txt):([0-9a-f-]{36})$/.exec(data);
+  return m ? { action: m[1] as ButtonAction, messageId: m[2]! } : null;
 }
 
-/** Teclado depois do clique: mostra o que foi respondido, por quem, e some com os botões. */
-export function answeredKeyboard(action: QuickReplyAction, who: string, when: string): InlineKeyboard {
-  return { inline_keyboard: [[{ text: `${who}: ${QUICK_REPLIES[action]} · ${when}`, callback_data: "noop" }]] };
+/**
+ * Teclado depois de um clique numa resposta pronta: mostra o que foi respondido e por quem, e MANTÉM o
+ * "Responder por texto" (quem respondeu "Recebi" ainda pode escrever algo depois).
+ */
+export function answeredKeyboard(action: QuickReplyAction, who: string, when: string, messageId?: string): InlineKeyboard {
+  const rows: InlineKeyboard["inline_keyboard"] = [
+    [{ text: `${who}: ${QUICK_REPLIES[action]} · ${when}`, callback_data: "noop" }],
+  ];
+  if (messageId) rows.push([{ text: TEXT_REPLY_LABEL, callback_data: `cr:txt:${messageId}` }]);
+  return { inline_keyboard: rows };
+}
+
+/**
+ * Caixa de resposta aberta: mensagem do bot com "force_reply" seletivo. A menção ao admin (tg://user) faz o
+ * Telegram abrir a caixa de digitação SÓ para quem tocou no botão.
+ */
+export function replyPromptHtml(input: { adminName: string; adminTgId: number; employeeName: string; unitName?: string | null }): string {
+  const unit = input.unitName ? ` (${escapeHtml(input.unitName)})` : "";
+  return `✍️ <a href="tg://user?id=${input.adminTgId}">${escapeHtml(input.adminName)}</a>, digite abaixo a resposta para <b>${escapeHtml(input.employeeName)}</b>${unit} e envie.`;
 }
 
 /** Segredo do webhook derivado do token do bot (mesma ideia do owner-telegram-webhook). */

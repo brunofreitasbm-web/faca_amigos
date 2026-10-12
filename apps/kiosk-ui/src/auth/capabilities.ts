@@ -99,7 +99,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "crm.admin": "Gerenciar números (canais) e templates do CRM de WhatsApp",
   "relatorio_sessao.write": "Preencher o Olhar FaçaAmigos (crianças com plano de 1h ou mais)",
   "relatorio_sessao.read": "Ver o histórico do Olhar FaçaAmigos no Gerencial",
-  "chat.usar": "Usar o chat interno com o Owner (botão flutuante)",
+  "chat.usar": "Usar o chat interno com os donos (botão flutuante)",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */

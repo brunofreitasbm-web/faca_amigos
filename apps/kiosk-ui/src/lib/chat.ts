@@ -51,7 +51,7 @@ export const STATUS_LABEL = {
   FAILED: "Não enviada. Toque para tentar de novo",
   SENDING: "Enviando…",
   SENT: "Enviada",
-  DELIVERED: "Entregue ao Owner",
+  DELIVERED: "Entregue aos donos",
 } as const;
 
 export type ChatContextInput = { screen: string; unitId?: string | null; appVersion?: string; userAgent?: string };
