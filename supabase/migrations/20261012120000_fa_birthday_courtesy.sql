@@ -101,9 +101,14 @@ alter table fa_kiosk_birthday_courtesies enable row level security;
 -- Escrita só pelas funções security definer abaixo. Leitura direta para quem
 -- enxerga CRM ou relatórios; o relatório com nomes passa por
 -- fa_birthday_courtesy_report().
-drop policy if exists fa_birthday_courtesies_read on fa_kiosk_birthday_courtesies;
-create policy fa_birthday_courtesies_read on fa_kiosk_birthday_courtesies
-  for select to authenticated using (fa_kiosk_can('crm.read') or fa_kiosk_can('relatorio.read'));
+do $$
+begin
+  if not exists (select 1 from pg_policies where tablename = 'fa_kiosk_birthday_courtesies' and policyname = 'fa_birthday_courtesies_read') then
+    create policy fa_birthday_courtesies_read on fa_kiosk_birthday_courtesies
+      for select to authenticated using (fa_kiosk_can('crm.read') or fa_kiosk_can('relatorio.read'));
+  end if;
+end
+$$;
 
 -- ---------------------------------------------------------------------
 -- 3. Plano da cortesia (inativo de propósito, ver cabeçalho)
@@ -122,7 +127,7 @@ select distinct on (p.unit_id)
  where p.activity = 'PLAYGROUND' and p.asset_kind is null and p.active
    and p.duration_unit = 'MINUTO' and p.duration_value = 30 and not p.birthday_courtesy
    and not exists (select 1 from fa_kiosk_plans b where b.unit_id = p.unit_id and b.birthday_courtesy)
- order by p.unit_id, p.value_cents desc, p.created_at_ms;
+ order by p.unit_id, p.value_cents desc, p.id;
 
 -- ---------------------------------------------------------------------
 -- 4. Cortesia utilizável agora (única fonte da regra: tela e trigger usam)
@@ -200,8 +205,7 @@ $$;
 
 revoke execute on function fa_birthday_courtesy_on_checkin() from public, anon, authenticated;
 
-drop trigger if exists trg_fa_birthday_courtesy_checkin on fa_kiosk_sessions;
-create trigger trg_fa_birthday_courtesy_checkin
+create or replace trigger trg_fa_birthday_courtesy_checkin
   after insert on fa_kiosk_sessions
   for each row execute function fa_birthday_courtesy_on_checkin();
 
@@ -220,8 +224,7 @@ $$;
 
 revoke execute on function fa_birthday_courtesy_block_plan_swap() from public, anon, authenticated;
 
-drop trigger if exists trg_fa_birthday_courtesy_plan_swap on fa_kiosk_sessions;
-create trigger trg_fa_birthday_courtesy_plan_swap
+create or replace trigger trg_fa_birthday_courtesy_plan_swap
   before update of plan_id on fa_kiosk_sessions
   for each row execute function fa_birthday_courtesy_block_plan_swap();
 
@@ -268,7 +271,7 @@ begin
    where c.birth_date is not null
      and fa_birthday_cohort(c.birth_date) = 'CONTROLE'
      and nb.d between v_today and v_today + 7
-     and c.created_at_ms <= p_now_ms - 60 * 86400000::bigint
+     and c.created_at <= to_timestamp(p_now_ms / 1000.0) - interval '60 days'
      and g.marketing_consent_at_ms is not null and g.phone_e164 is not null
   on conflict (child_id, birthday_date) do nothing;
   get diagnostics v_count = row_count;
@@ -289,10 +292,11 @@ grant execute on function fa_crm_birthday_register_control(bigint) to service_ro
 --    7 dias entre mensagens de marketing (senão quem recebeu uma oferta na
 --    semana anterior perderia a cortesia e o grupo tratado ficaria
 --    enviesado), mas continua contando no teto de 3 por 30 dias.
+--    Assinatura nova de 4 argumentos AO LADO da de 3 (que segue valendo para
+--    os outros chamadores, como crm-whatsapp-webhook): só o
+--    crm-lifecycle-dispatch passa o kind. Sem DROP, de propósito.
 -- ---------------------------------------------------------------------
-drop function if exists fa_crm_can_send(uuid, text, bigint);
-
-create or replace function fa_crm_can_send(p_contact_id uuid, p_category text, p_now_ms bigint, p_kind text default null)
+create or replace function fa_crm_can_send(p_contact_id uuid, p_category text, p_now_ms bigint, p_kind text)
 returns boolean
 language sql stable security definer set search_path = public, pg_temp as $$
   select case when p_category <> 'MARKETING' then true else (

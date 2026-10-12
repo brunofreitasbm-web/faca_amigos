@@ -261,7 +261,7 @@ language sql security definer set search_path = public, pg_temp as $$
     where c.birth_date is not null
       and nb.d between fa_birthday_belem_date(p_now_ms) and fa_birthday_belem_date(p_now_ms) + 7
       and fa_birthday_cohort(c.birth_date) = 'TRATAMENTO'
-      and c.created_at_ms <= p_now_ms - 60 * 86400000::bigint
+      and c.created_at <= to_timestamp(p_now_ms / 1000.0) - interval '60 days'
       and g.marketing_consent_at_ms is not null and g.phone_e164 is not null
       and not exists (
         select 1 from fa_kiosk_birthday_sends bs
