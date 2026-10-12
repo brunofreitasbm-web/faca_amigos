@@ -79,7 +79,8 @@ Centralizado na interface do quiosque sob a aba **Gerencial**, acessível por ad
    - Extrato mensal automatizado integrando horas trabalhadas via ponto eletrônico, salários-base e proventos/descontos.
    - Fechamento mensal atômico (`fa_kiosk_close_payroll_run`) com preservação histórica imutável dos valores e dados dos colaboradores no momento do fechamento.
    - Exportação de relatórios bancários em CSV formatados para conferência e envio ao **Bradesco Net Empresa (Multipag)**.
-9. **Relatórios Agregados:** Consolidação de vendas, ticket médio, visitas e mapa de calor do uso de frotas de carrinhos entre todas as unidades.
+9. **Cortesia de Aniversário:** 30 min grátis no Playground para a criança aniversariante. O CRM envia a mensagem 7 dias antes e emite a cortesia (válida até o último dia do mês de aniversário, de segunda a sexta); na Entrada ela aparece como o card "Cortesia de aniversário (30min)" e o que passar de 30 min é cobrado como minuto adicional. Grupo de controle (aniversário em dia terminado em 0/5) e relatório de uso no Gerencial. Ver `supabase/DEPLOY_CRM_WHATSAPP.md`.
+10. **Relatórios Agregados:** Consolidação de vendas, ticket médio, visitas e mapa de calor do uso de frotas de carrinhos entre todas as unidades.
 
 ---
 

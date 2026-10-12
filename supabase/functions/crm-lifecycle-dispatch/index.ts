@@ -16,6 +16,12 @@ import { type Candidate, PREVIEW_LABEL, PURPOSE, variablesFor } from "./variable
 // Ordem: fa_crm_lc_candidates já devolve os candidatos por prioridade, com
 // no máximo um de marketing por responsável (migration 20261001130000).
 //
+// ANIVERSARIO (cortesia de 30 min no Playground, migration 20261012120000):
+// a cortesia é emitida em fa_kiosk_birthday_courtesies ANTES do envio e
+// estornada se a Twilio recusar, para a família nunca receber a mensagem sem
+// o cupom no caixa (nem o contrário). O grupo de controle (aniversário em dia
+// terminado em 0/5) é registrado a cada rodada, sem mensagem.
+//
 // Janela de envio: só das 10h às 20h de Belém (UTC-3), como o restante do
 // CRM de marketing. Trava-antes-do-envio em fa_crm_automation_sends
 // (unique kind+ref_key): 5xx solta a trava (tenta nos próximos 15 min),
@@ -63,6 +69,23 @@ Deno.serve(async () => {
   if (!channels?.length) return json({ ok: true, skipped: "sem canal ativo" });
   const channelFor = (unitId: string | null) =>
     (unitId && channels.find((c) => c.unit_id === unitId)) || channels.find((c) => c.unit_id == null) || channels[0];
+
+  // Grupo de controle do aniversário: só registra com a campanha de fato
+  // ligada (flag + template de 3 variáveis ativo). Antes disso quem faz anos não receberia
+  // nada de qualquer jeito, e o "controle" nasceria sem o tratado do lado.
+  const birthdayTemplate = templateByPurpose.get("ANIVERSARIO");
+  if (birthdayTemplate && birthdayTemplate.variable_count === 3) {
+    const { data: birthdayFlag } = await admin
+      .from("fa_kiosk_app_settings")
+      .select("unit_id")
+      .eq("key", "crm_lc_aniversario")
+      .eq("value", "1")
+      .limit(1);
+    if (birthdayFlag?.length) {
+      const { error: controlErr } = await admin.rpc("fa_crm_birthday_register_control", { p_now_ms: now });
+      if (controlErr) console.error("grupo de controle do aniversário:", controlErr);
+    }
+  }
 
   const { data: candidates, error } = await admin.rpc("fa_crm_lc_candidates", { p_now_ms: now });
   if (error) {
@@ -125,7 +148,7 @@ Deno.serve(async () => {
     }
 
     const { data: canSend } = await admin.rpc("fa_crm_can_send", {
-      p_contact_id: contact!.id, p_category: cand.category, p_now_ms: now,
+      p_contact_id: contact!.id, p_category: cand.category, p_now_ms: now, p_kind: cand.kind,
     });
     if (canSend !== true) {
       skipped++;
@@ -144,6 +167,24 @@ Deno.serve(async () => {
     if (claimErr || !claim) {
       skipped++;
       continue;
+    }
+
+    // Cortesia de aniversário: emite antes de enviar. Sem a cortesia gravada
+    // a mensagem não sai (soltar a trava deixa a próxima rodada tentar de novo).
+    const birthdayChildId = cand.kind === "ANIVERSARIO" ? (cand.extra?.childId as string | undefined) : undefined;
+    const birthdayDate = cand.kind === "ANIVERSARIO" ? (cand.extra?.birthdayDate as string | undefined) : undefined;
+    if (cand.kind === "ANIVERSARIO") {
+      const { error: issueErr } = birthdayChildId && birthdayDate
+        ? await admin.rpc("fa_crm_birthday_issue", {
+            p_child_id: birthdayChildId, p_guardian_id: cand.guardian_id, p_birthday: birthdayDate, p_now_ms: Date.now(),
+          })
+        : { error: new Error("candidato sem criança/data de aniversário") };
+      if (issueErr) {
+        console.error("emissão da cortesia de aniversário:", issueErr);
+        await admin.from("fa_crm_automation_sends").delete().eq("id", claim.id);
+        failed++;
+        continue;
+      }
     }
 
     let res: Response | null = null;
@@ -170,6 +211,9 @@ Deno.serve(async () => {
 
     if (!res || !res.ok) {
       failed++;
+      if (birthdayChildId && birthdayDate) {
+        await admin.rpc("fa_crm_birthday_void", { p_child_id: birthdayChildId, p_birthday: birthdayDate });
+      }
       if (!res || res.status >= 500) {
         await admin.from("fa_crm_automation_sends").delete().eq("id", claim.id);
       } else {

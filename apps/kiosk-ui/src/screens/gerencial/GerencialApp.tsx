@@ -26,6 +26,7 @@ import { BobinasTab } from "./tabs/BobinasTab.js";
 import { BancoTalentosTab } from "./tabs/BancoTalentosTab.js";
 import { ClientesTab } from "./tabs/ClientesTab.js";
 import { CrmWhatsappTab } from "./tabs/CrmWhatsappTab.js";
+import { AniversarioCortesiaTab } from "./tabs/AniversarioCortesiaTab.js";
 import { RelatoriosSessaoTab } from "./tabs/RelatoriosSessaoTab.js";
 import { OwnerAcompanhamentoTab } from "./tabs/OwnerAcompanhamentoTab.js";
 import { NpsDashboardTab } from "./tabs/NpsDashboardTab.js";
@@ -53,6 +54,7 @@ export type GerencialTab =
   | "PERMISSOES"
   | "CLIENTES"
   | "CRM_WHATSAPP"
+  | "ANIVERSARIO_CORTESIA"
   | "RELATORIOS_SESSAO"
   | "RELATORIOS"
   | "FOLHA"
@@ -135,6 +137,7 @@ const CATEGORIES: ModuleCategory[] = [
       { value: "COLABORADORES", label: "Equipe & Operadores", icon: "👤", description: "Cadastro unificado da equipe e permissões por unidade." },
       { value: "CLIENTES", label: "Base de Clientes", icon: "🧑‍🤝‍🧑", description: "Consulta e histórico centralizado de responsáveis e crianças da rede." },
       { value: "CRM_WHATSAPP", label: "CRM WhatsApp", icon: "💬", tag: "Novo", description: "Conversas e funil de clientes do Playground e do Circuito pelo WhatsApp." },
+      { value: "ANIVERSARIO_CORTESIA", label: "Cortesia de aniversário", icon: "🎂", tag: "Novo", description: "30 min grátis no Playground: quem recebeu, quem usou, minutos adicionais cobrados, quem comprou depois e a comparação com o grupo de controle." },
       { value: "RELATORIOS_SESSAO", label: "Olhar FaçaAmigos", icon: "📝", tag: "Novo", description: "Mapa de observação de cada visita de 1h+, quem preencheu, prazo de 40 min e a mensagem enviada ao responsável." },
       { value: "PERMISSOES", label: "Permissões de Acesso", icon: "🔒", description: "Nível de acesso (Operador, Líder ou Owner) exigido por ação." },
     ],
@@ -485,6 +488,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}
               {tab === "CRM_WHATSAPP" && <CrmWhatsappTab />}
+              {tab === "ANIVERSARIO_CORTESIA" && <AniversarioCortesiaTab />}
               {tab === "RELATORIOS_SESSAO" && <RelatoriosSessaoTab />}
               {tab === "TALENTOS" && <BancoTalentosTab />}
               {tab === "FOLHA" && <FolhaPagamentoTab />}

@@ -464,6 +464,7 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
           <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ width: "14px", height: "14px", borderRadius: "50%", background: p.color, display: "inline-block" }} />
             {p.name} — {p.durationValue} {p.durationUnit.toLowerCase()}
+            {p.birthdayCourtesy && <Tag color="var(--color-teal)">Cortesia de aniversário</Tag>}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <span>
@@ -472,7 +473,7 @@ function PlanosTab({ unitId, activity }: { unitId: string; activity: "PLAYGROUND
             <Button variant="secondary" onClick={() => startEdit(p)} disabled={busy}>
               Editar
             </Button>
-            {p.active ? (
+            {p.birthdayCourtesy ? null : p.active ? (
               <Button variant="secondary" style={isOwner ? { color: "#d32f2f", borderColor: "#d32f2f" } : undefined} onClick={() => handleToggleActive(p)} disabled={busy}>
                 {isOwner ? "Excluir" : "Inativar"}
               </Button>
