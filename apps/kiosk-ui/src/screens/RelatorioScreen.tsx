@@ -108,7 +108,7 @@ export function RelatorioScreen() {
   };
 
   return (
-    <div style={{ padding: "24px", maxWidth: "950px", margin: "0 auto" }}>
+    <div className="desk-wide" style={{ padding: "24px", maxWidth: "950px", margin: "0 auto" }}>
       <h1 style={{ fontFamily: "var(--font-display)", fontSize: "28px", margin: "0 0 4px" }}>Relatórios Gerais</h1>
       <HelpText>Consulte o histórico de vendas, visitas, planos e movimentações — selecione o período e a origem dos dados (Local/Safoplay).</HelpText>
 
