@@ -1,6 +1,6 @@
 # FaçaAmigos
 
-Sistema operacional do **FaçaAmigos**, playground inclusivo no Parque Shopping (Belém/PA). Cobre PDV e controle de caixa, check-in/check-out de crianças, ponto eletrônico de colaboradores, emissão fiscal (NFC-e/NFS-e) e um back-office gerencial — tudo rodando sobre um quiosque offline-first no balcão e Supabase na nuvem.
+Sistema operacional do **FaçaAmigos**, playground inclusivo no Parque Shopping (Belém/PA). Cobre PDV e controle de caixa, check-in/check-out de crianças, emissão fiscal (NFC-e/NFS-e) e um back-office gerencial — tudo rodando sobre um quiosque offline-first no balcão e Supabase na nuvem.
 
 Ver [`ESPECIFICACOES_SISTEMA.md`](ESPECIFICACOES_SISTEMA.md) para a especificação funcional completa (módulos, regras de negócio, fluxos).
 

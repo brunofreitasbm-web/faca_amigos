@@ -39,13 +39,11 @@ export function MobileGerencialHome({
   onAbrirPainelCompleto,
   onAbrirUnidade,
   onAbrirRelatorios,
-  onAbrirEquipe,
 }: {
   units: Unit[];
   onAbrirPainelCompleto: () => void;
   onAbrirUnidade: (unit: Unit) => void;
   onAbrirRelatorios: () => void;
-  onAbrirEquipe: () => void;
 }) {
   const [unitRows, setUnitRows] = useState<UnitFullStatus[]>([]);
   const [npsSummary, setNpsSummary] = useState<NpsSummaryQuick>({
@@ -379,13 +377,9 @@ export function MobileGerencialHome({
         <p style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Carregando dados unificados das operações…</p>
       )}
 
-      {/* Ações Gerenciais */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 22 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 22 }}>
         <button type="button" className="m-pill" onClick={onAbrirRelatorios}>
           Relatórios / fechamento
-        </button>
-        <button type="button" className="m-pill" onClick={onAbrirEquipe}>
-          Equipe hoje
         </button>
       </div>
 

@@ -15,7 +15,7 @@ import { MobilePainel } from "./MobilePainel.js";
 import { MobilePedidosTempo } from "./MobilePedidosTempo.js";
 import "./mobile.css";
 
-export type EscapeScreen = "ENTRADA" | "SAIDA" | "PAINEL" | "RELATORIO_SESSAO" | "CAIXA" | "PONTO" | "PDV" | "MINHA_BONIFICACAO" | "RELATORIO" | "CONFIGURACOES";
+export type EscapeScreen = "ENTRADA" | "SAIDA" | "PAINEL" | "RELATORIO_SESSAO" | "CAIXA" | "PDV" | "MINHA_BONIFICACAO" | "RELATORIO" | "CONFIGURACOES";
 
 type Tab = "TURNO" | "PAINEL" | "MAIS";
 type View = Tab | "CHECKIN" | "PEDIDOS";
@@ -188,7 +188,7 @@ function MobileMais({
     { screen: "PDV", titulo: "PDV", ajuda: "vender produto avulso", show: can("pdv.sell") },
     { screen: "CAIXA", titulo: "Caixa", ajuda: "abrir turno, sangria, fechar", show: can("caixa.open_close") },
     { screen: "MINHA_BONIFICACAO", titulo: "Minha Bonificação", ajuda: "seu ticket médio e o acumulado do mês, só seu", show: can("bonificacao.self") },
-    { screen: "RELATORIO", titulo: "Relatórios", ajuda: "vendas, visitas e folha de ponto", show: can("relatorio.read") },
+    { screen: "RELATORIO", titulo: "Relatórios", ajuda: "vendas, visitas e planos", show: can("relatorio.read") },
     { screen: "CONFIGURACOES", titulo: "Configurações", ajuda: "planos, produtos, equipe, unidade", show: can("config.read") },
   ];
 

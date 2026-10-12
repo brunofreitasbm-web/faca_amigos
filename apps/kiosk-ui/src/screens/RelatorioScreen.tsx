@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, DateInput, Input, Select, Tabs, contrastRatio, HelpText, Button, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { AssetUsage, BirthdayChild, CheckinsByHour, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, SessionAudit, ShiftSummary } from "../api/client.js";
+import type { AssetUsage, BirthdayChild, CheckinsByHour, DailySales, DailyVisits, PlanSold, RevenueByMethod, SessionAudit, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { IfCan } from "../auth/RequireCapability.js";
@@ -9,10 +9,10 @@ import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import { money } from "../format.js";
 import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { AssetUsageChart, CheckinsByHourChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
-import { exportFrequenciaCsv } from "../lib/csvExport.js";
-import { computeWorkedMinutes, dateTimeLabelsInTz } from "../lib/ponto.js";
+import { SortTh, TableFilter, useTableView } from "../components/ReportTable.js";
+import type { TableColumn } from "../lib/tableView.js";
 
-type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
+type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "FROTA";
 export type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
 
 export function isoDate(d: Date): string {
@@ -103,12 +103,11 @@ export function RelatorioScreen() {
     SESSOES: "Registro de cada entrada individual — horário, criança, responsável que acompanhou e quem atendeu no balcão. Para consulta e rastreio posterior, inclusive para fins jurídicos.",
     ANIVERSARIANTES: "Lista de crianças cadastradas que fazem aniversário no mês selecionado.",
     TURNOS: "Histórico de turnos de caixa abertos e fechados nesta unidade.",
-    PONTO: "Horas trabalhadas por colaborador e o registro bruto de cada marcação de ponto no período.",
     FROTA: "Quais carrinhos foram mais e menos usados no período — ajuda a decidir manutenção e reposição.",
   };
 
   return (
-    <div style={{ padding: "24px", maxWidth: "950px", margin: "0 auto" }}>
+    <div className="desk-wide" style={{ padding: "24px", maxWidth: "950px", margin: "0 auto" }}>
       <h1 style={{ fontFamily: "var(--font-display)", fontSize: "28px", margin: "0 0 4px" }}>Relatórios Gerais</h1>
       <HelpText>Consulte o histórico de vendas, visitas, planos e movimentações — selecione o período e a origem dos dados (Local/Safoplay).</HelpText>
 
@@ -165,12 +164,17 @@ export function RelatorioScreen() {
         {tab === "SESSOES" && <SessoesTab unitId={unit.id} from={from} to={to} />}
         {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
         {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
-        {tab === "PONTO" && <PontoTab from={from} to={to} />}
         {tab === "FROTA" && isQuiosque && <FrotaHeatmapTab unitId={unit.id} from={from} to={to} />}
       </div>
     </div>
   );
 }
+
+const SALES_DAY_COLUMNS: TableColumn<DailySales>[] = [
+  { key: "day", label: "Dia", sortValue: (d) => d.business_date, searchText: (d) => d.business_date },
+  { key: "orders", label: "Pedidos", sortValue: (d) => d.orders_count },
+  { key: "total", label: "Faturamento", sortValue: (d) => d.total_cents },
+];
 
 export function VendasTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
   const [byDay, setByDay] = useState<DailySales[]>([]);
@@ -192,6 +196,7 @@ export function VendasTab({ unitId, from, to }: { unitId: string | null; from: s
   }, [unitId]);
 
   const total = byMethod.reduce((sum, r) => sum + r.total_cents, 0);
+  const dayView = useTableView(byDay, SALES_DAY_COLUMNS);
 
   return (
     <div>
@@ -228,26 +233,27 @@ export function VendasTab({ unitId, from, to }: { unitId: string | null; from: s
         <RevenueByMethodChart data={byMethod} />
       </div>
       <Card style={{ padding: "8px", overflowX: "auto" }}>
+        <TableFilter view={dayView} label="Filtrar por dia (ex.: 2026-10)" />
         <table className="report-table">
           <thead>
             <tr>
-              <th>Dia</th>
-              <th>Pedidos</th>
-              <th>Faturamento</th>
+              <SortTh view={dayView} column="day" />
+              <SortTh view={dayView} column="orders" style={{ textAlign: "center" }} />
+              <SortTh view={dayView} column="total" style={{ textAlign: "right" }} />
             </tr>
           </thead>
           <tbody>
-            {byDay.map((d) => (
+            {dayView.rows.map((d) => (
               <tr key={d.business_date}>
                 <td>{d.business_date}</td>
                 <td style={{ textAlign: "center" }}>{d.orders_count}</td>
                 <td style={{ textAlign: "right" }}>{money(d.total_cents)}</td>
               </tr>
             ))}
-            {byDay.length === 0 && (
+            {dayView.rows.length === 0 && (
               <tr>
                 <td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
-                  Nenhuma venda encontrada para os filtros selecionados.
+                  {byDay.length === 0 ? "Nenhuma venda encontrada para os filtros selecionados." : "Nenhum dia corresponde ao filtro."}
                 </td>
               </tr>
             )}
@@ -272,8 +278,15 @@ export function PlanosVendidosTab({ unitId, from, to }: { unitId: string | null;
   );
 }
 
+const PLANS_SOLD_COLUMNS: TableColumn<PlanSold>[] = [
+  { key: "plan", label: "Plano", sortValue: (p) => p.plan_name, searchText: (p) => p.plan_name },
+  { key: "qty", label: "Qtd.", sortValue: (p) => p.sessions_count },
+  { key: "pct", label: "%", sortValue: (p) => p.sessions_count },
+];
+
 function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
   const total = data.reduce((sum, p) => sum + p.sessions_count, 0);
+  const planView = useTableView(data, PLANS_SOLD_COLUMNS);
 
   return (
     <div>
@@ -290,16 +303,17 @@ function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
           <PlansSoldChart title={`Participação — ${title}`} data={data} />
 
           <Card style={{ padding: "8px", overflowX: "auto" }}>
+            <TableFilter view={planView} label="Filtrar plano" />
             <table className="report-table">
               <thead>
                 <tr>
-                  <th>Plano</th>
-                  <th style={{ textAlign: "right" }}>Qtd.</th>
-                  <th style={{ textAlign: "right" }}>%</th>
+                  <SortTh view={planView} column="plan" />
+                  <SortTh view={planView} column="qty" style={{ textAlign: "right" }} />
+                  <SortTh view={planView} column="pct" style={{ textAlign: "right" }} />
                 </tr>
               </thead>
               <tbody>
-                {data.map((p) => {
+                {planView.rows.map((p) => {
                   const pct = (p.sessions_count / total) * 100;
                   return (
                     <tr key={p.plan_id}>
@@ -338,8 +352,14 @@ function PlansSoldBlock({ title, data }: { title: string; data: PlanSold[] }) {
   );
 }
 
+const VISITS_COLUMNS: TableColumn<DailyVisits>[] = [
+  { key: "day", label: "Dia", sortValue: (v) => v.business_date, searchText: (v) => v.business_date },
+  { key: "visits", label: "Visitas", sortValue: (v) => v.sessions_count },
+];
+
 export function VisitasTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
   const [visits, setVisits] = useState<DailyVisits[]>([]);
+  const visitView = useTableView(visits, VISITS_COLUMNS);
 
   useEffect(() => {
     Api.reportVisits(unitId, from, to).then(setVisits);
@@ -351,24 +371,25 @@ export function VisitasTab({ unitId, from, to }: { unitId: string | null; from: 
         <VisitsByDayChart data={visits} />
       </div>
       <Card style={{ padding: "8px", overflowX: "auto" }}>
+        <TableFilter view={visitView} label="Filtrar por dia (ex.: 2026-10)" />
         <table className="report-table">
           <thead>
             <tr>
-              <th>Dia</th>
-              <th>Visitas</th>
+              <SortTh view={visitView} column="day" />
+              <SortTh view={visitView} column="visits" style={{ textAlign: "center" }} />
             </tr>
           </thead>
           <tbody>
-            {visits.map((v) => (
+            {visitView.rows.map((v) => (
               <tr key={v.business_date}>
                 <td>{v.business_date}</td>
                 <td style={{ textAlign: "center" }}>{v.sessions_count}</td>
               </tr>
             ))}
-            {visits.length === 0 && (
+            {visitView.rows.length === 0 && (
               <tr>
                 <td colSpan={2} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
-                  Nenhuma visita encontrada no período e origem selecionados.
+                  {visits.length === 0 ? "Nenhuma visita encontrada no período e origem selecionados." : "Nenhum dia corresponde ao filtro."}
                 </td>
               </tr>
             )}
@@ -440,6 +461,21 @@ export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: 
     });
   }, [sessions, search]);
 
+  // A busca própria de cima (ID, CPF, telefone) continua sendo o filtro desta
+  // tabela; aqui entra só a ordenação, sobre o resultado já filtrado.
+  const sessionColumns: TableColumn<SessionAudit>[] = [
+    { key: "id", label: "ID da sessão", sortValue: (s) => s.id },
+    { key: "unit", label: "Unidade", sortValue: (s) => units.find((u) => u.id === s.unit_id)?.name },
+    { key: "child", label: "Criança", sortValue: (s) => s.child_name },
+    { key: "guardian", label: "Responsável", sortValue: (s) => s.guardian_name },
+    { key: "contact", label: "Contato" },
+    { key: "in", label: "Entrada", sortValue: (s) => s.checkin_at_ms },
+    { key: "out", label: "Saída", sortValue: (s) => s.checkout_at_ms },
+    { key: "status", label: "Status", sortValue: (s) => SESSION_STATUS_LABEL[s.status] ?? s.status },
+    { key: "by", label: "Atendido por", sortValue: (s) => s.employee_name },
+  ];
+  const sessionView = useTableView(filtered, sessionColumns);
+
   return (
     <div style={{ marginTop: "16px" }}>
       <div style={{ maxWidth: "420px", marginBottom: "16px" }}>
@@ -455,20 +491,20 @@ export function SessoesTab({ unitId, from, to }: { unitId: string | null; from: 
         <table className="report-table">
           <thead>
             <tr>
-              <th>ID da sessão</th>
-              {unitId === null && <th>Unidade</th>}
-              <th>Criança</th>
-              <th>Responsável</th>
-              <th>Contato</th>
-              <th>Entrada</th>
-              <th>Saída</th>
-              <th>Status</th>
-              <th>Atendido por</th>
+              <SortTh view={sessionView} column="id" />
+              {unitId === null && <SortTh view={sessionView} column="unit" />}
+              <SortTh view={sessionView} column="child" />
+              <SortTh view={sessionView} column="guardian" />
+              <SortTh view={sessionView} column="contact" />
+              <SortTh view={sessionView} column="in" />
+              <SortTh view={sessionView} column="out" />
+              <SortTh view={sessionView} column="status" />
+              <SortTh view={sessionView} column="by" />
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((s) => (
+            {sessionView.rows.map((s) => (
               <tr key={s.id}>
                 <td style={{ fontFamily: "monospace", fontSize: "11px", color: "var(--text-muted)", userSelect: "all" }} title="Identificador estável da sessão — use para rastreio posterior">
                   {s.id}
@@ -710,8 +746,20 @@ function AniversariantesTab() {
   );
 }
 
+const SHIFT_COLUMNS: TableColumn<ShiftSummary>[] = [
+  { key: "open", label: "Abertura", sortValue: (s) => s.opened_at_ms, searchText: (s) => new Date(s.opened_at_ms).toLocaleString("pt-BR") },
+  {
+    key: "close",
+    label: "Fechamento",
+    sortValue: (s) => s.closed_at_ms,
+    searchText: (s) => (s.closed_at_ms ? new Date(s.closed_at_ms).toLocaleString("pt-BR") : ""),
+  },
+  { key: "status", label: "Status", sortValue: (s) => s.status, searchText: (s) => s.status },
+];
+
 function TurnosTab({ unitId }: { unitId: string }) {
   const [shifts, setShifts] = useState<ShiftSummary[]>([]);
+  const shiftView = useTableView(shifts, SHIFT_COLUMNS);
 
   useEffect(() => {
     Api.reportShifts(unitId).then(setShifts);
@@ -719,246 +767,33 @@ function TurnosTab({ unitId }: { unitId: string }) {
 
   return (
     <Card style={{ padding: "8px", marginTop: "16px", overflowX: "auto" }}>
+      <TableFilter view={shiftView} label="Filtrar turnos (data ou status)" />
       <table className="report-table">
         <thead>
           <tr>
-            <th>Abertura</th>
-            <th>Fechamento</th>
-            <th>Status</th>
+            <SortTh view={shiftView} column="open" />
+            <SortTh view={shiftView} column="close" />
+            <SortTh view={shiftView} column="status" />
           </tr>
         </thead>
         <tbody>
-          {shifts.map((s) => (
+          {shiftView.rows.map((s) => (
             <tr key={s.id}>
               <td>{new Date(s.opened_at_ms).toLocaleString("pt-BR")}</td>
               <td>{s.closed_at_ms ? new Date(s.closed_at_ms).toLocaleString("pt-BR") : "—"}</td>
               <td>{s.status}</td>
             </tr>
           ))}
-          {shifts.length === 0 && (
+          {shiftView.rows.length === 0 && (
             <tr>
               <td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
-                Nenhum turno registrado.
+                {shifts.length === 0 ? "Nenhum turno registrado." : "Nenhum turno corresponde ao filtro."}
               </td>
             </tr>
           )}
         </tbody>
       </table>
     </Card>
-  );
-}
-
-interface DailyHoursSummary {
-  employeeId: string;
-  fullName: string;
-  dateLabel: string;
-  workedMs: number;
-  targetMs: number | null;
-  incomplete: boolean;
-}
-
-/**
- * Agrupa por dia no fuso da unidade (não no fuso do navegador de quem olha o
- * relatório — perto da meia-noite isso já jogou marcações para o dia/mês
- * errado) e reusa `computeWorkedMinutes` (mesmo cálculo do Controle de
- * Frequência e da Folha de Pagamento) em vez de reimplementar o pareamento
- * ENTRADA/INTERVALO/SAÍDA aqui, para não divergir silenciosamente dessas
- * outras telas nem perder o sinal de jornada incompleta.
- */
-function summarizeDailyHours(rows: FolhaPontoRow[], timeZone: string | null | undefined): DailyHoursSummary[] {
-  const byGroup = new Map<string, FolhaPontoRow[]>();
-  for (const r of rows) {
-    const { dateLabel } = dateTimeLabelsInTz(r.at_ms, timeZone);
-    const key = `${r.employee_id}|${dateLabel}`;
-    byGroup.set(key, [...(byGroup.get(key) ?? []), r]);
-  }
-
-  const summaries: DailyHoursSummary[] = [];
-  for (const [key, group] of byGroup) {
-    const [, dateLabel] = key.split("|") as [string, string];
-    const first = group[0]!;
-    const { minutes, incomplete } = computeWorkedMinutes(group);
-    summaries.push({
-      employeeId: first.employee_id,
-      fullName: first.full_name,
-      dateLabel,
-      workedMs: minutes * 60_000,
-      targetMs: first.weekly_hours_contracted ? (first.weekly_hours_contracted / 5) * 60 * 60 * 1000 : null,
-      incomplete,
-    });
-  }
-  return summaries.sort((a, b) => a.fullName.localeCompare(b.fullName) || a.dateLabel.localeCompare(b.dateLabel));
-}
-
-function formatDurationMs(ms: number): string {
-  const totalMinutes = Math.round(ms / 60_000);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${h}h${String(m).padStart(2, "0")}`;
-}
-
-function PontoTab({ from, to }: { from: string; to: string }) {
-  const { unit } = useAppState();
-  const [rows, setRows] = useState<FolhaPontoRow[]>([]);
-  const [ocorrencias, setOcorrencias] = useState<Awaited<ReturnType<typeof Api.ocorrencias>>>([]);
-
-  useEffect(() => {
-    const fParts = from.split("-").map((v) => Number(v) || 0);
-    const tParts = to.split("-").map((v) => Number(v) || 0);
-    const fY = fParts[0] || 2026;
-    const fM = fParts[1] || 1;
-    const fD = fParts[2] || 1;
-    const tY = tParts[0] || 2026;
-    const tM = tParts[1] || 1;
-    const tD = tParts[2] || 1;
-    const fromMs = new Date(fY, fM - 1, fD, 0, 0, 0, 0).getTime();
-    const toMs = new Date(tY, tM - 1, tD, 23, 59, 59, 999).getTime();
-    Api.reportPonto(fromMs, toMs, unit?.id).then(setRows).catch(() => setRows([]));
-    if (unit?.id) {
-      Api.ocorrencias(unit.id).then(setOcorrencias).catch(() => setOcorrencias([]));
-    } else {
-      setOcorrencias([]);
-    }
-  }, [from, to, unit?.id]);
-
-  const dailySummaries = summarizeDailyHours(rows, unit?.timezone);
-  const unitTimezones = unit?.id ? { [unit.id]: unit.timezone } : {};
-
-  // fromMs/toMs recalculados aqui só para filtrar ocorrências que se
-  // sobrepõem ao período — o afastamento cobre [created_at_ms, created_at_ms
-  // + days_away dias), não é um instante único como uma marcação de ponto.
-  const { fromMs: periodFromMs, toMs: periodToMs } = (() => {
-    const fParts = from.split("-").map((v) => Number(v) || 0);
-    const tParts = to.split("-").map((v) => Number(v) || 0);
-    return {
-      fromMs: new Date(fParts[0] || 2026, (fParts[1] || 1) - 1, fParts[2] || 1, 0, 0, 0, 0).getTime(),
-      toMs: new Date(tParts[0] || 2026, (tParts[1] || 1) - 1, tParts[2] || 1, 23, 59, 59, 999).getTime(),
-    };
-  })();
-  const ocorrenciasNoPeriodo = ocorrencias.filter((o) => {
-    const start = o.created_at_ms;
-    const end = start + o.days_away * 86_400_000;
-    return start < periodToMs && end > periodFromMs;
-  });
-
-  return (
-    <div>
-      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px", marginTop: "24px" }}>Resumo de horas por colaborador/dia</h3>
-      <Card style={{ padding: "8px", marginBottom: "24px", overflowX: "auto" }}>
-        <table className="report-table">
-          <thead>
-            <tr>
-              <th>Colaborador</th>
-              <th>Dia</th>
-              <th>Horas trabalhadas</th>
-              <th>Jornada contratada (dia)</th>
-              <th>Diferença</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dailySummaries.map((s) => {
-              const diffMs = s.targetMs !== null ? s.workedMs - s.targetMs : null;
-              return (
-                <tr key={`${s.employeeId}|${s.dateLabel}`}>
-                  <td>{s.fullName}</td>
-                  <td style={{ textAlign: "center" }}>{s.dateLabel}</td>
-                  <td style={{ textAlign: "center" }}>{formatDurationMs(s.workedMs)}</td>
-                  <td style={{ textAlign: "center" }}>{s.targetMs !== null ? formatDurationMs(s.targetMs) : "—"}</td>
-                  <td
-                    style={{
-                      textAlign: "center",
-                      fontWeight: "var(--weight-bold)" as unknown as number,
-                      color: diffMs === null ? undefined : diffMs < -15 * 60_000 ? "var(--color-error-text)" : diffMs > 15 * 60_000 ? "var(--color-amber-text)" : "var(--color-teal-text)",
-                    }}
-                  >
-                    {diffMs === null ? "—" : `${diffMs >= 0 ? "+" : "-"}${formatDurationMs(Math.abs(diffMs))}`}
-                  </td>
-                  <td style={{ textAlign: "center", color: s.incomplete ? "var(--color-amber-text)" : "var(--color-teal-text)" }}>
-                    {s.incomplete ? "⚠️ Incompleta" : "✓ Completa"}
-                  </td>
-                </tr>
-              );
-            })}
-            {dailySummaries.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
-                  Nenhuma marcação no período.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
-
-      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Ocorrências no período (faltas/atestados)</h3>
-      <HelpText style={{ marginTop: "-8px" }}>
-        Dias sem nenhuma marcação de ponto não aparecem no resumo acima — confira aqui se a ausência já tem falta ou atestado lançado em Gerencial &gt; Ocorrências.
-      </HelpText>
-      <Card style={{ padding: "8px", marginBottom: "24px", marginTop: "8px", overflowX: "auto" }}>
-        <table className="report-table">
-          <thead>
-            <tr>
-              <th>Colaborador</th>
-              <th>Tipo</th>
-              <th>Início</th>
-              <th>Dias</th>
-              <th>Observações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ocorrenciasNoPeriodo.map((o) => (
-              <tr key={o.id}>
-                <td>{o.fa_kiosk_employees?.full_name ?? "—"}</td>
-                <td>{o.tipo === "FALTA" ? "Falta" : "Atestado"}</td>
-                <td>{dateTimeLabelsInTz(o.created_at_ms, unit?.timezone).dateLabel}</td>
-                <td style={{ textAlign: "center" }}>{o.days_away}</td>
-                <td>{o.notes ?? "—"}</td>
-              </tr>
-            ))}
-            {ocorrenciasNoPeriodo.length === 0 && (
-              <tr>
-                <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
-                  Nenhuma ocorrência lançada para este período.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-        <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Marcações (registro de auditoria)</h3>
-        <Button variant="secondary" size="sm" disabled={rows.length === 0} onClick={() => exportFrequenciaCsv(rows, unitTimezones)}>
-          ⬇️ Exportar CSV
-        </Button>
-      </div>
-      <Card style={{ padding: "8px", marginTop: "16px", overflowX: "auto" }}>
-        <table className="report-table">
-          <thead>
-            <tr>
-              <th>Colaborador</th>
-              <th>Tipo</th>
-              <th>Horário</th>
-              <th>NSR</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => {
-              const { dateLabel, timeLabel } = dateTimeLabelsInTz(r.at_ms, unit?.timezone);
-              return (
-                <tr key={i}>
-                  <td>{r.full_name}</td>
-                  <td>{r.kind}</td>
-                  <td>{dateLabel} {timeLabel}</td>
-                  <td style={{ textAlign: "center" }}>{r.nsr}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
-    </div>
   );
 }
 
@@ -1017,8 +852,15 @@ export function FrotaHeatmapTab({ unitId, from, to }: { unitId: string; from: st
  * somar tudo, porque o valor do relatório aqui é ver o pico de movimento
  * de cada unidade, não um total agregado sem detalhe.
  */
+const CHECKIN_HOUR_COLUMNS: TableColumn<CheckinsByHour>[] = [
+  { key: "hour", label: "Hora", sortValue: (r) => r.hour, searchText: (r) => `${String(r.hour).padStart(2, "0")}h` },
+  { key: "unit", label: "Unidade", sortValue: (r) => r.unit_name, searchText: (r) => r.unit_name },
+  { key: "count", label: "Check-ins", sortValue: (r) => r.count },
+];
+
 export function CheckinsPorHoraTab({ unitId, from, to }: { unitId: string | null; from: string; to: string }) {
   const [rows, setRows] = useState<CheckinsByHour[]>([]);
+  const hourView = useTableView(rows, CHECKIN_HOUR_COLUMNS);
 
   useEffect(() => {
     Api.reportCheckinsByHour(unitId, from, to).then(setRows);
@@ -1050,26 +892,27 @@ export function CheckinsPorHoraTab({ unitId, from, to }: { unitId: string | null
         <CheckinsByHourChart data={chartData} unitNames={unitNames} />
       </div>
       <Card style={{ padding: "8px", overflowX: "auto" }}>
+        <TableFilter view={hourView} label="Filtrar por hora ou unidade" />
         <table className="report-table">
           <thead>
             <tr>
-              <th>Hora</th>
-              {unitId === null && <th>Unidade</th>}
-              <th>Check-ins</th>
+              <SortTh view={hourView} column="hour" />
+              {unitId === null && <SortTh view={hourView} column="unit" />}
+              <SortTh view={hourView} column="count" style={{ textAlign: "center" }} />
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {hourView.rows.map((r) => (
               <tr key={`${r.unit_id}-${r.hour}`}>
                 <td>{String(r.hour).padStart(2, "0")}h</td>
                 {unitId === null && <td>{r.unit_name}</td>}
                 <td style={{ textAlign: "center" }}>{r.count}</td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {hourView.rows.length === 0 && (
               <tr>
                 <td colSpan={unitId === null ? 3 : 2} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
-                  Nenhum check-in encontrado para os filtros selecionados.
+                  {rows.length === 0 ? "Nenhum check-in encontrado para os filtros selecionados." : "Nenhuma linha corresponde ao filtro."}
                 </td>
               </tr>
             )}

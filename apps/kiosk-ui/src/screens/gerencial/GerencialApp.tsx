@@ -12,7 +12,6 @@ import { MetasTab } from "./tabs/MetasTab.js";
 import { BonificacaoTab } from "./tabs/BonificacaoTab.js";
 import { ColaboradoresTab } from "./tabs/ColaboradoresTab.js";
 import { OcorrenciasTab } from "./tabs/OcorrenciasTab.js";
-import { FrequenciaTab } from "./tabs/FrequenciaTab.js";
 import { PermissoesTab } from "./tabs/PermissoesTab.js";
 import { GerencialRelatorioTab } from "./tabs/GerencialRelatorioTab.js";
 import { FolhaPagamentoTab } from "./tabs/FolhaPagamentoTab.js";
@@ -31,6 +30,14 @@ import { RelatoriosSessaoTab } from "./tabs/RelatoriosSessaoTab.js";
 import { OwnerAcompanhamentoTab } from "./tabs/OwnerAcompanhamentoTab.js";
 import { NpsDashboardTab } from "./tabs/NpsDashboardTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
+import { isElectronLocal } from "../../pwa.js";
+
+/**
+ * Cópia de nome fixo do instalador, mantida por scripts/release-kiosk.mjs no
+ * bucket público de updates: o link não quebra quando a versão muda.
+ */
+const INSTALADOR_URL =
+  "https://ivjvpdzsfjdpyabbzzuj.supabase.co/storage/v1/object/public/kiosk-updates/kiosk/FacaAmigos-Setup-atual.exe";
 
 export type GerencialTab =
   | "ACOMPANHAMENTO_OWNER"
@@ -42,7 +49,6 @@ export type GerencialTab =
   | "FIDELIDADE"
   | "METAS"
   | "COLABORADORES"
-  | "FREQUENCIA"
   | "OCORRENCIAS"
   | "PERMISSOES"
   | "CLIENTES"
@@ -124,7 +130,7 @@ const CATEGORIES: ModuleCategory[] = [
     label: "Equipe & Clientes",
     icon: "👥",
     badge: "RH & CRM",
-    description: "Gestão da equipe, controle legal de ponto, recrutamento e clientes",
+    description: "Gestão da equipe, recrutamento e clientes",
     items: [
       { value: "COLABORADORES", label: "Equipe & Operadores", icon: "👤", description: "Cadastro unificado da equipe e permissões por unidade." },
       { value: "CLIENTES", label: "Base de Clientes", icon: "🧑‍🤝‍🧑", description: "Consulta e histórico centralizado de responsáveis e crianças da rede." },
@@ -233,7 +239,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
             <span style={{ position: "absolute", left: "12px", color: "var(--text-secondary, #64748b)", fontSize: "14px" }}>🔎</span>
             <input
               type="text"
-              placeholder="Buscar menu gerencial... (ex: Ponto, Zoe, Planos, Bonificação)"
+              placeholder="Buscar menu gerencial... (ex: Zoe, Planos, Bonificação)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -324,6 +330,28 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
             <span style={{ fontSize: "13px", color: "var(--text-secondary, #475569)", fontWeight: 600 }}>
               {employee.full_name} · <span style={{ color: "#3b82f6" }}>{ROLE_LABEL[employee.role]}</span>
             </span>
+          )}
+          {/* No Electron o app já está instalado: o ícone só faz sentido no navegador. */}
+          {!isElectronLocal() && (
+            <a
+              href={INSTALADOR_URL}
+              download
+              title="Baixar o aplicativo para Windows"
+              aria-label="Baixar o aplicativo para Windows"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "32px",
+                height: "32px",
+                fontSize: "16px",
+                textDecoration: "none",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle, #cbd5e1)",
+              }}
+            >
+              <span aria-hidden="true">⬇️</span>
+            </a>
           )}
           <Button variant="ghost" size="sm" onClick={onExit} style={{ fontSize: "12px", border: "1px solid var(--border-subtle, #cbd5e1)" }}>
             Sair do Gerencial
@@ -453,7 +481,6 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
               {tab === "FIDELIDADE" && <FidelidadeTab />}
               {tab === "METAS" && <MetasTab />}
               {tab === "COLABORADORES" && <ColaboradoresTab />}
-              {tab === "FREQUENCIA" && <FrequenciaTab />}
               {tab === "OCORRENCIAS" && <OcorrenciasTab />}
               {tab === "PERMISSOES" && <PermissoesTab />}
               {tab === "CLIENTES" && <ClientesTab />}

@@ -1,4 +1,5 @@
 import { supabase } from "./client.js";
+import { markSessionStarted } from "./sessionExpiry.js";
 
 /**
  * Login por PIN — a única forma de autenticação de colaborador no
@@ -77,6 +78,9 @@ export async function pinLogin(
     type: "email",
   });
   if (verifyError || !verifyData.session) throw new Error("Não foi possível entrar");
+
+  // Reautenticação de ação sensível não é um novo turno: não renova o prazo.
+  if (context === "LOGIN") markSessionStarted();
 
   writeCache([
     ...readCache().filter((e) => e.employeeId !== data.employee.id),

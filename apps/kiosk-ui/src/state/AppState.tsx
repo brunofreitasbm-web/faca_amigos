@@ -9,6 +9,7 @@ import {
   forgetTerminalEmployee,
   type TerminalEmployee,
 } from "../lib/supabase/terminalAuth.js";
+import { clearSessionStarted, isStoredSessionExpired } from "../lib/supabase/sessionExpiry.js";
 import { clearStepUpCache } from "../auth/stepUpCache.js";
 
 interface AppStateValue {
@@ -26,8 +27,6 @@ interface AppStateValue {
   logout: () => Promise<void>;
   /** true até a sessão salva no navegador ter sido conferida. */
   restoring: boolean;
-  hasFaceEnrolled: boolean | null;
-  setHasFaceEnrolled: (val: boolean) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -39,26 +38,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [employee, setEmployee] = useState<TerminalEmployee | null>(null);
   const [terminalEmployees, setTerminalEmployees] = useState<TerminalEmployee[]>(listTerminalEmployees());
   const [restoring, setRestoring] = useState(true);
-  const [hasFaceEnrolled, setHasFaceEnrolled] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!employee) {
-      setHasFaceEnrolled(null);
-      return;
-    }
-    let isCancelled = false;
-    Api.myFaceDescriptor(employee.id)
-      .then((desc) => {
-        if (isCancelled) return;
-        setHasFaceEnrolled(Array.isArray(desc) && desc.length > 0);
-      })
-      .catch(() => {
-        if (!isCancelled) setHasFaceEnrolled(false);
-      });
-    return () => {
-      isCancelled = true;
-    };
-  }, [employee]);
 
   // As unidades só podem ser lidas com sessão (as policies de leitura são
   // `to authenticated` desde a migration 20260807000003), então a busca
@@ -179,6 +158,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRestoring(false);
         return;
       }
+      // Terminal ficou desligado/fechado durante o corte das 23h30: a sessão
+      // do operador anterior não pode ser reaproveitada, exige novo PIN.
+      if (isStoredSessionExpired()) {
+        await supabase().auth.signOut();
+        clearSessionStarted();
+        clearStepUpCache();
+        if (!cancelled) {
+          setEmployee(null);
+          setRestoring(false);
+        }
+        return;
+      }
       try {
         const me = await Api.currentEmployee();
         if (!cancelled) setEmployee(me);
@@ -202,34 +193,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Logout "de verdade" (sessão Supabase + estado local), reaproveitado pelo
-  // valor exposto em `logout` e pelo encerramento automático às 23h abaixo.
+  // valor exposto em `logout` e pelo encerramento automático às 23h30 abaixo.
   const doLogout = async () => {
     await supabase().auth.signOut();
+    clearSessionStarted();
     clearStepUpCache();
     setEmployee(null);
     setUnitId(null);
     setGerencial(false);
     autoSelectedForEmployeeId.current = null;
-    setHasFaceEnrolled(null);
   };
 
-  // Encerra a sessão automaticamente às 23h de cada dia, para que o
+  // Encerra a sessão automaticamente às 23h30 de cada dia, para que o
   // colaborador do turno seguinte seja obrigado a fazer login com a própria
-  // conta em vez de continuar usando a sessão de quem operou antes.
+  // conta em vez de continuar usando a sessão de quem operou antes. O critério
+  // é "login anterior ao último corte" (ver sessionExpiry.ts), não "são 23h30
+  // agora": assim também vale se o app estava fechado/suspenso no horário.
   const employeeRef = useRef(employee);
   employeeRef.current = employee;
-  const lastAutoLogoutDateRef = useRef<string | null>(null);
   useEffect(() => {
     const checkAutoLogout = () => {
-      const now = new Date();
-      const today = now.toDateString();
-      if (now.getHours() < 23) {
-        if (lastAutoLogoutDateRef.current !== today) lastAutoLogoutDateRef.current = null;
-        return;
-      }
-      if (lastAutoLogoutDateRef.current === today) return;
-      lastAutoLogoutDateRef.current = today;
-      if (employeeRef.current) void doLogout();
+      if (employeeRef.current && isStoredSessionExpired()) void doLogout();
     };
 
     checkAutoLogout();
@@ -273,8 +257,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       employee,
       terminalEmployees,
       restoring,
-      hasFaceEnrolled,
-      setHasFaceEnrolled,
       switchEmployee: async (employeeId, pin) => {
         const emp = await pinLogin(employeeId, pin);
         clearStepUpCache();
@@ -287,7 +269,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
       logout: doLogout,
     }),
-    [units, unitId, gerencial, employee, terminalEmployees, restoring, hasFaceEnrolled],
+    [units, unitId, gerencial, employee, terminalEmployees, restoring],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

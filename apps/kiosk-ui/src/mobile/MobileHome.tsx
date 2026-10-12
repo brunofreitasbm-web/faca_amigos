@@ -36,7 +36,7 @@ export function MobileHome({
   employeeName: string;
   activeCount: number | null;
   onNovaEntrada: () => void;
-  onAbrirTela: (screen: "SAIDA" | "CAIXA" | "PONTO" | "RELATORIO_SESSAO") => void;
+  onAbrirTela: (screen: "SAIDA" | "CAIXA" | "RELATORIO_SESSAO") => void;
   pendingRenewalsCount: number;
   onAbrirPedidos: () => void;
 }) {
