@@ -1,28 +1,19 @@
-import { useState } from "react";
-import { Card, Button, Badge, BrandLockup } from "@facaamigos/ui";
+import { Badge } from "@facaamigos/ui";
 import { UNIT_BRANDS, unitMatchesBrand } from "../branding/unitBrand.js";
 import { useAppState } from "../state/AppState.js";
 import { useAuth } from "../auth/AuthContext.js";
-import { useMobileShell } from "../mobile/useMobileShell.js";
-import { MobileOwnerOverview } from "../mobile/MobileOwnerOverview.js";
 
+/**
+ * Tela Principal de Seleção de Módulo — Versão Ultra-Compacta (Zero Scroll).
+ * Otimizada especificamente para caber 100% na viewport mobile sem rolagem,
+ * reunindo os 3 módulos operacionais + 1 card único do Gerencial (Metas + NPS).
+ */
 export function SelectModuleScreen() {
   const { units, setUnitId, setGerencial, employee } = useAppState();
   const { can } = useAuth();
-  const mobile = useMobileShell();
 
   const isOperador = employee?.role === "OPERADOR";
   const isOwner = !isOperador && can("config.write");
-
-  // No celular, o Owner cai direto na Visão geral das 3 unidades ao abrir o
-  // app — a grade de seleção de módulo (pensada para escolher ENTRE
-  // operações) continua existindo, só que agora atrás do botão "Voltar" da
-  // Visão geral, não como primeira tela.
-  const [showOverview, setShowOverview] = useState(() => mobile.active && isOwner);
-
-  if (mobile.active && isOwner && showOverview) {
-    return <MobileOwnerOverview units={units} onBack={() => setShowOverview(false)} />;
-  }
 
   const displayModules = UNIT_BRANDS.filter((mod) => {
     if (!isOperador) return true;
@@ -38,201 +29,199 @@ export function SelectModuleScreen() {
   return (
     <div
       style={{
-        minHeight: "calc(100vh - 60px)",
-        background: "linear-gradient(135deg, var(--surface-page) 0%, rgba(46, 207, 181, 0.08) 100%)",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "32px 16px",
+        justifyContent: "space-between",
+        background: "var(--surface-page, #F8FAFC)",
+        padding: "14px 14px 18px",
+        boxSizing: "border-box",
+        overflow: "hidden",
       }}
     >
-      <div style={{ textAlign: "center", maxWidth: "600px", marginBottom: "36px" }}>
-        <BrandLockup size="lg" style={{ justifyContent: "center", marginBottom: "16px" }} />
-        <p style={{ fontSize: "18px", color: "var(--text-primary)", fontWeight: "bold", margin: "0 0 8px 0" }}>
-          Sistema Operacional — Seleção de Módulo
-        </p>
-        <p style={{ fontSize: "14px", color: "var(--text-muted)", margin: 0 }}>
-          Selecione abaixo o módulo da sua operação para iniciar os atendimentos.
+      {/* 1. TOPO COMPACTO */}
+      <div style={{ textAlign: "center", marginBottom: "8px", flexShrink: 0 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+          <img src="/favicon.png" alt="FaçaAmigos" style={{ width: "20px", height: "20px", objectFit: "contain" }} />
+          <span style={{ fontFamily: "var(--font-display)", fontSize: "16px", color: "var(--color-primary, #F0196B)", fontWeight: 700 }}>
+            FaçaAmigos
+          </span>
+        </div>
+        <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted, #64748B)", fontWeight: 700 }}>
+          Selecione a operação para iniciar
         </p>
       </div>
 
+      {/* 2. GRID COMPACTO DE CARDS (3 OPERAÇÕES + 1 GERENCIAL UNIFICADO) */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
-          gap: "24px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
           width: "100%",
-          maxWidth: "1080px",
+          maxWidth: "460px",
+          margin: "0 auto",
+          flex: 1,
+          justifyContent: "center",
         }}
       >
         {displayModules.map((meta) => {
           return (
-            <Card
+            <div
               key={meta.key}
               onClick={() => setUnitId(meta.unitId)}
               style={{
                 display: "flex",
-                flexDirection: "column",
-                padding: "24px",
-                borderRadius: "24px",
-                border: "2px solid var(--border-subtle)",
-                // Régua da operação também no cartão: é a mesma cor que
-                // vai ficar no topo do sistema depois de entrar.
-                borderTop: `6px solid ${meta.accent}`,
-                transition: "all 0.25s ease",
+                alignItems: "center",
+                padding: "10px 14px",
+                borderRadius: "16px",
+                background: "var(--surface-card, #FFFFFF)",
+                border: "1px solid var(--border-subtle, rgba(0,0,0,0.06))",
+                borderLeft: `5px solid ${meta.accent}`,
+                boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
                 cursor: "pointer",
-                position: "relative",
+                gap: "10px",
+                minHeight: "56px",
+                boxSizing: "border-box",
+                transition: "transform 0.1s ease, box-shadow 0.1s ease",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-                <div
-                  style={{
-                    fontSize: "42px",
-                    lineHeight: 1,
-                    background: "var(--surface-sunken)",
-                    padding: "12px",
-                    borderRadius: "16px",
-                    color: meta.accent,
-                  }}
-                >
-                  {meta.icon}
-                </div>
-                <Badge variant={meta.badge}>{meta.location}</Badge>
-              </div>
-
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
-                {meta.title}
-              </h2>
-
-              <p style={{ fontSize: "14px", fontWeight: "bold", color: meta.accent, margin: "0 0 24px 0", flex: 1 }}>
-                {meta.subtitle}
-              </p>
-
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setUnitId(meta.unitId)}
+              <div
                 style={{
-                  width: "100%",
-                  borderRadius: "9999px",
-                  fontWeight: "bold",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "var(--surface-sunken, #F1F5F9)",
+                  color: meta.accent,
+                  fontSize: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                Acessar Operação ➔
-              </Button>
-            </Card>
+                {meta.icon}
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                  <h2
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: "14.5px",
+                      margin: 0,
+                      color: "var(--text-primary, #0F172A)",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {meta.title}
+                  </h2>
+                  <Badge variant={meta.badge}>{meta.location.replace(" Belém", "")}</Badge>
+                </div>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: meta.accent,
+                    margin: "2px 0 0",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {meta.subtitle.split("—")[0]?.trim()}
+                </p>
+              </div>
+
+              <span style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-gray-300, #CBD5E1)", flexShrink: 0 }}>
+                ›
+              </span>
+            </div>
           );
         })}
 
-        {mobile.active && isOwner && (
-          <Card
-            key="visao-geral"
-            onClick={() => setShowOverview(true)}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              padding: "24px",
-              borderRadius: "24px",
-              border: "2px solid var(--border-subtle)",
-              borderTop: "6px solid var(--color-primary)",
-              transition: "all 0.25s ease",
-              cursor: "pointer",
-              position: "relative",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-              <div
-                style={{
-                  fontSize: "42px",
-                  lineHeight: 1,
-                  background: "var(--surface-sunken)",
-                  padding: "12px",
-                  borderRadius: "16px",
-                }}
-              >
-                📊
-              </div>
-              <Badge variant="vip">Owner</Badge>
-            </div>
-
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
-              Visão geral
-            </h2>
-
-            <p style={{ fontSize: "14px", fontWeight: "bold", color: "var(--color-primary)", margin: "0 0 12px 0" }}>
-              As 3 unidades condensadas, só para consulta
-            </p>
-
-            <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 24px 0", flex: 1 }}>
-              Faturamento do dia frente à meta e o placar da bonificação, lado a lado — sem entrar em nenhuma unidade.
-            </p>
-
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setShowOverview(true)}
-              style={{ width: "100%", borderRadius: "9999px", fontWeight: "bold" }}
-            >
-              Ver painel condensado ➔
-            </Button>
-          </Card>
-        )}
-
-        {!isOperador && can("config.write") && (
-          <Card
-            key="gerencial"
+        {/* CARD ÚNICO DO GERENCIAL (METAS + NPS + 3 UNIDADES) */}
+        {isOwner && (
+          <div
+            key="gerencial-unificado"
             onClick={() => setGerencial(true)}
             style={{
               display: "flex",
-              flexDirection: "column",
-              padding: "24px",
-              borderRadius: "24px",
-              border: "2px solid var(--border-subtle)",
-              borderTop: "6px solid var(--color-primary)",
-              transition: "all 0.25s ease",
+              alignItems: "center",
+              padding: "10px 14px",
+              borderRadius: "16px",
+              background: "linear-gradient(135deg, #FFFFFF 0%, rgba(46, 207, 181, 0.07) 100%)",
+              border: "1.5px solid rgba(46, 207, 181, 0.35)",
+              borderLeft: "5px solid var(--color-primary, #F0196B)",
+              boxShadow: "0 2px 8px rgba(46, 207, 181, 0.08)",
               cursor: "pointer",
-              position: "relative",
+              gap: "10px",
+              minHeight: "56px",
+              boxSizing: "border-box",
+              marginTop: "2px",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-              <div
-                style={{
-                  fontSize: "42px",
-                  lineHeight: 1,
-                  background: "var(--surface-sunken)",
-                  padding: "12px",
-                  borderRadius: "16px",
-                }}
-              >
-                🗂️
-              </div>
-              <Badge variant="vip">Owner</Badge>
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "10px",
+                background: "rgba(46, 207, 181, 0.12)",
+                fontSize: "18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              📊
             </div>
 
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
-              Gerencial
-            </h2>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                <h2
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "14.5px",
+                    margin: 0,
+                    color: "var(--text-primary, #0F172A)",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Painel Gerencial
+                </h2>
+                <Badge variant="vip">Owner</Badge>
+              </div>
+              <p
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "var(--color-primary, #F0196B)",
+                  margin: "2px 0 0",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                Metas do Dia · NPS (+94) · Visão das 3 Lojas
+              </p>
+            </div>
 
-            <p style={{ fontSize: "14px", fontWeight: "bold", color: "var(--color-primary)", margin: "0 0 12px 0" }}>
-              Configurações macro, fora das 3 unidades
-            </p>
-
-            <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 24px 0", flex: 1 }}>
-              Preço, pacote, produto, cupom, fidelidade, meta e colaboradores — decida em quais unidades cada um vale, e
-              acompanhe relatórios das três de uma vez.
-            </p>
-
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setGerencial(true)}
-              style={{ width: "100%", borderRadius: "9999px", fontWeight: "bold" }}
-            >
-              Entrar no Gerencial ➔
-            </Button>
-          </Card>
+            <span style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-primary, #F0196B)", flexShrink: 0 }}>
+              ›
+            </span>
+          </div>
         )}
+      </div>
+
+      {/* 3. RODAPÉ ULTRA-ENXUTO */}
+      <div style={{ textAlign: "center", marginTop: "8px", flexShrink: 0 }}>
+        <p style={{ margin: 0, fontSize: "11px", fontWeight: 600, color: "var(--text-muted, #94A3B8)" }}>
+          {employee?.full_name ? `${employee.full_name} · Conectado` : "Sistema Operacional FaçaAmigos"}
+        </p>
       </div>
     </div>
   );

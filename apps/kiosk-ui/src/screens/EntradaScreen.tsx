@@ -901,7 +901,8 @@ export function EntradaScreen({
   return (
     <div style={{ maxWidth: "720px", margin: "0 auto", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
-        <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Entrada</h1>
+        {/* Título só para leitores de tela: a aba ativa "Entrada" já diz onde a pessoa está. */}
+        <h1 className="sr-only">Entrada</h1>
         <HelpText>
           Busque a criança pelo nome, CPF ou telefone; toque no plano; confirme. A pulseira e o recibo de guarda saem
           juntos, automaticamente.

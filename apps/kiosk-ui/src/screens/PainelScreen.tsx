@@ -523,8 +523,9 @@ export function PainelScreen() {
     <div className="painel-shell" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", padding: "clamp(12px, 2.5vw, 24px)", gap: "clamp(10px, 2vw, 20px)" }}>
       <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 3vw, 28px)" }}>Painel</h1>
-          <p style={{ margin: "4px 0 0 0", color: "var(--text-secondary)", fontSize: "14px" }}>
+          {/* Título só para leitores de tela: a aba ativa "Painel" já diz onde a pessoa está. */}
+          <h1 className="sr-only">Painel</h1>
+          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "14px" }}>
             {unit.kind === "QUIOSQUE"
               ? "Acompanhamento em tempo real dos carrinhos no circuito"
               : "Acompanhamento em tempo real das crianças no playground"}

@@ -117,7 +117,8 @@ export function ConfiguracoesScreen() {
 
   return (
     <div style={{ padding: "24px", maxWidth: "900px", margin: "0 auto" }}>
-      <h1 style={{ fontFamily: "var(--font-display)" }}>Configurações</h1>
+      {/* Título só para leitores de tela: a aba ativa "Configurações" já diz onde a pessoa está. */}
+      <h1 className="sr-only">Configurações</h1>
       <HelpText>Ajustes da operação — o que é cadastrado aqui aparece depois nas outras telas do sistema.</HelpText>
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       <HelpText style={{ margin: "12px 0" }}>{TAB_HELP[tab]}</HelpText>
@@ -1584,9 +1585,6 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      {/* ATUALIZAÇÕES DO SISTEMA (AUTO UPDATE) */}
-      <AutoUpdateCard />
-
       {bridgeStatus && !bridgeStatus.hasServiceRoleKey && (
         <HelpText icon="🛑" style={{ background: "#fff0f0", borderColor: "#f5c6cb", color: "#721c24", fontWeight: "bold" }}>
           Erro de Autenticação do Print Bridge: A chave de serviço (FACAAMIGOS_SUPABASE_SECRET_KEY) não está configurada no arquivo .env deste computador. Sem ela, o banco rejeita a reserva de cupons e a impressão não sai.

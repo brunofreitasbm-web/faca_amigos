@@ -12,9 +12,27 @@ const STORAGE_KEY = "fa.mobileShell";
  * bolso, andando pela pista — não para o tablet apoiado no balcão.
  */
 const PHONE_MAX_WIDTH = 640;
+const FORCE_MOBILE_KEY = "fa.forceMobile";
+
+function isMobileRequested(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mobile") === "1" || params.get("mobile") === "true" || params.get("emulador") === "1") {
+      return true;
+    }
+    if (window.localStorage.getItem(FORCE_MOBILE_KEY) === "1") {
+      return true;
+    }
+  } catch {
+    // Modo privado / ambiente sem storage
+  }
+  return false;
+}
 
 function phoneWidth(): boolean {
   if (typeof window === "undefined") return false;
+  if (isMobileRequested()) return true;
   return window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).matches;
 }
 
@@ -41,6 +59,7 @@ export function useMobileShell(): MobileShellState {
   const [isPhone, setIsPhone] = useState(phoneWidth);
   const [optedOut, setOptedOut] = useState(() => {
     try {
+      if (isMobileRequested()) return false;
       return window.localStorage.getItem(STORAGE_KEY) === "off";
     } catch {
       return false;
@@ -49,15 +68,20 @@ export function useMobileShell(): MobileShellState {
 
   useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`);
-    const onChange = () => setIsPhone(mql.matches);
+    const onChange = () => setIsPhone(phoneWidth());
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
   }, []);
 
   const persist = useCallback((value: "off" | null) => {
     try {
-      if (value === null) window.localStorage.removeItem(STORAGE_KEY);
-      else window.localStorage.setItem(STORAGE_KEY, value);
+      if (value === null) {
+        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.setItem(FORCE_MOBILE_KEY, "1");
+      } else {
+        window.localStorage.setItem(STORAGE_KEY, value);
+        window.localStorage.removeItem(FORCE_MOBILE_KEY);
+      }
     } catch {
       // Modo privado / storage cheio: a escolha vale só para esta aba.
     }
@@ -66,12 +90,14 @@ export function useMobileShell(): MobileShellState {
   const useFullVersion = useCallback(() => {
     persist("off");
     setOptedOut(true);
+    setIsPhone(phoneWidth());
   }, [persist]);
 
   const useMobileVersion = useCallback(() => {
     persist(null);
     setOptedOut(false);
+    setIsPhone(true);
   }, [persist]);
 
-  return { active: isPhone && !optedOut, isPhone, useFullVersion, useMobileVersion };
+  return { active: (isPhone || isMobileRequested()) && !optedOut, isPhone, useFullVersion, useMobileVersion };
 }

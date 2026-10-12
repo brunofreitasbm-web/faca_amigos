@@ -135,7 +135,8 @@ export function PdvScreen() {
   return (
     <div className="pdv-shell" style={{ display: "flex", gap: "24px", padding: "24px" }}>
       <div style={{ flex: 2 }}>
-        <h1 style={{ fontFamily: "var(--font-display)" }}>PDV</h1>
+        {/* Título só para leitores de tela: a aba ativa "PDV" já diz onde a pessoa está. */}
+        <h1 className="sr-only">PDV</h1>
         <HelpText>Toque num produto para adicioná-lo ao carrinho, ao lado. Produtos sem estoque aparecem apagados.</HelpText>
         <div className="pdv-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px", marginTop: "16px" }}>
           {products.map((p) => (
