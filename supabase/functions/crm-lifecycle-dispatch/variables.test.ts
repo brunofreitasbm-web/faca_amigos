@@ -14,12 +14,14 @@ const base = (kind: Kind, extra: Record<string, unknown> | null = null): Candida
 // dispatcher pula o envio quando não bate.
 const EXPECTED_COUNT: Partial<Record<Kind, number>> = {
   DEGRAU_2H: 2, DEGRAU_PORTO: 3, DEGRAU_DAYUSE: 2, CROSS_ATIVIDADE: 4, VIP: 2, WINBACK_1: 2, WINBACK_2: 2,
+  ANIVERSARIO: 3,
 };
 
 Deno.test("degraus e reescritos montam o número de variáveis do template", () => {
   const extras: Partial<Record<Kind, Record<string, unknown>>> = {
     DEGRAU_PORTO: { visits30d: 4 },
     CROSS_ATIVIDADE: { targetActivity: "CARRINHO" },
+    ANIVERSARIO: { validUntil: "2026-10-31" },
   };
   for (const [kind, count] of Object.entries(EXPECTED_COUNT)) {
     const vars = variablesFor(base(kind as Kind, extras[kind as Kind] ?? null), "https://g.page/r/x");
@@ -31,6 +33,14 @@ Deno.test("degraus e reescritos montam o número de variáveis do template", () 
 Deno.test("Porto Seguro leva o número de visitas e pula sem ele", () => {
   assertEquals(variablesFor(base("DEGRAU_PORTO", { visits30d: 5 }), "")?.["3"], "5");
   assertEquals(variablesFor(base("DEGRAU_PORTO", {}), ""), null);
+});
+
+Deno.test("cortesia de aniversário leva o último dia do mês e pula sem ele", () => {
+  const v = variablesFor(base("ANIVERSARIO", { validUntil: "2026-10-31", birthdayDate: "2026-10-16" }), "");
+  assertEquals(v?.["2"], "Miguel");
+  assertEquals(v?.["3"], "31/10");
+  assertEquals(variablesFor(base("ANIVERSARIO", {}), ""), null);
+  assertEquals(variablesFor(base("ANIVERSARIO", null), ""), null);
 });
 
 Deno.test("convite cruzado nomeia e descreve a atividade", () => {

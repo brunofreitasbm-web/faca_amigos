@@ -315,7 +315,11 @@ export function PlanosTab() {
               <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ width: "14px", height: "14px", borderRadius: "50%", background: p.color, display: "inline-block" }} />
                 {p.name} — {p.durationValue} {p.durationUnit.toLowerCase()}
-                {!p.active && <Badge variant="neutral">Inativo</Badge>}
+                {p.birthdayCourtesy ? (
+                  <Badge variant="neutral">Cortesia de aniversário</Badge>
+                ) : (
+                  !p.active && <Badge variant="neutral">Inativo</Badge>
+                )}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <span style={{ flex: "1 1 auto" }}>
@@ -324,7 +328,9 @@ export function PlanosTab() {
                 <Button variant="secondary" onClick={() => startEdit(p)} disabled={busy}>
                   Editar
                 </Button>
-                {p.active ? (
+                {/* O plano da cortesia fica sempre inativo: só aparece no check-in
+                    para quem tem a cortesia. Aqui só se ajusta o excedente. */}
+                {p.birthdayCourtesy ? null : p.active ? (
                   <Button variant="secondary" style={{ color: "var(--color-error-text)", borderColor: "var(--color-error-text)" }} onClick={() => handleToggleActive(p)} disabled={busy}>
                     Excluir
                   </Button>

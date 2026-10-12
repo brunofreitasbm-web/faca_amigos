@@ -45,7 +45,7 @@ const OFFER_BUTTONS = [{ title: "Quero saber mais", id: "OFERTA_INFO" }, { title
 // Templates substituídos por uma versão nova ou retirados de uso: nunca
 // reativados aqui, mesmo que a Meta os tenha aprovado (as migrations
 // 20261001130000 e 20261001140000 os desativaram).
-const RETIRED = new Set(["fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor", "fa_renovacao_fim_plano", "fa_nps_pos_visita_v2"]);
+const RETIRED = new Set(["fa_lc_aniversario", "fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor", "fa_renovacao_fim_plano", "fa_nps_pos_visita_v2"]);
 
 const TEMPLATES: TemplateDef[] = [
   // Estes dois já tinham content_sid real de antes desta rodada — entram
@@ -194,10 +194,15 @@ const TEMPLATES: TemplateDef[] = [
     body: "Oi {{1}}! {{2}} sempre se diverte muito aqui — que tal trazer o irmãozinho(a) também na próxima visita? 💛",
     sample: { "1": "Ana", "2": "Miguel" },
   },
+  // Cortesia de aniversário (migration 20261012120000): 30 min grátis no
+  // Playground, enviada 7 dias antes. {{3}} = último dia do mês de aniversário
+  // (dd/mm). Substitui fa_lc_aniversario ("algo especial"), que prometia um
+  // benefício que não existia como produto. O que passa de 30 min é cobrado
+  // por minuto — o aviso está no texto de propósito.
   {
-    purpose: "ANIVERSARIO", name: "fa_lc_aniversario", category: "MARKETING", variableCount: 2,
-    body: "Parabéns pra {{2}}, {{1}}! 🎉 Que tal comemorar o aniversário brincando com a gente? Preparamos algo especial pra essa data. 💛",
-    sample: { "1": "Ana", "2": "Miguel" },
+    purpose: "ANIVERSARIO", name: "fa_lc_aniversario_cortesia", category: "MARKETING", variableCount: 3,
+    body: "Oi, {{1}}! O aniversário de {{2}} está chegando, e a gente quer comemorar junto 💛\n\nDe presente, {{2}} ganha 30 minutos de brincadeira no Playground do FaçaAmigos, por nossa conta. Vale de segunda a sexta, até {{3}}, no Parque Shopping ou no Grão-Pará.\n\nÉ só chegar e dizer o nome de {{2}} na recepção. O que passar dos 30 minutos é cobrado por minuto.\n\nAqui todo mundo brinca junto, no ritmo de cada criança. Esperamos vocês! 🎈",
+    sample: { "1": "Ana", "2": "Miguel", "3": "31/10" },
   },
   // ── Régua de ofertas (migration 20261001130000): produtos maiores, sem
   //    desconto, com botões "Quero saber mais" / "Agora não" tratados pelo

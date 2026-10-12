@@ -189,3 +189,26 @@ Passos:
 - **Falha permanente** (63024, 63003, 21211, 21614): o número vira `opt_in = false` com `opt_out_reason = 'DELIVERY_FAILED'` em todos os canais — os dispatchers já pulam `opt_in = false`. Se o responsável escrever de volta, o webhook reativa. **63049 não bloqueia**: é a Meta recusando aquela mensagem, não o número.
 - **Custo:** `crm-whatsapp-cost-sync` (pg_cron, 30 min) copia o preço da Twilio para `fa_crm_messages.price` e confere na Meta a categoria real de cada template ativo (`fa_crm_templates.category`, `meta_status`). O card "Custo e entrega do WhatsApp" (Gerencial › CRM, `crm.admin`) lê `fa_crm_whatsapp_cost_stats`.
 - Deploy: aplicar a migration, `supabase functions deploy crm-whatsapp-webhook crm-whatsapp-cost-sync crm-templates-bootstrap`.
+
+## Cortesia de aniversário (30 min grátis no Playground)
+Migration `20261012120000_fa_birthday_courtesy.sql`. Substitui o antigo ANIVERSARIO ("algo especial"), que ficou desligado por prometer um benefício que não existia. Agora existe: o `crm-lifecycle-dispatch` manda a mensagem 7 dias antes do aniversário **e emite a cortesia** (`fa_kiosk_birthday_courtesies`) antes de enviar; se a Twilio recusar, a cortesia é estornada.
+
+**Regras**
+- Validade: do envio até o **último dia do mês de aniversário**, de segunda a sexta (fuso de Belém). Só Playground. Uma por criança por aniversário.
+- Elegível: responsável com aceite de **marketing** (`marketing_consent_at_ms`) e telefone; criança cadastrada há 60 dias ou mais. Sem o aceite de marketing não há candidato (estado seguro).
+- Grupo de controle: aniversário em dia terminado em 0 ou 5 não recebe mensagem nem cortesia; é registrado (`cohort = 'CONTROLE'`) a cada rodada com a mesma elegibilidade, para comparar visitas e gasto na mesma janela.
+- Prioridade máxima entre as mensagens de marketing e **ignora o intervalo de 7 dias** entre marketing (continua contando no teto de 3 por 30 dias). Sem isso, quem recebeu outra oferta na semana anterior perderia a cortesia e o grupo tratado ficaria enviesado.
+- Balcão: o card "Cortesia de aniversário (30min)" aparece sozinho na Entrada, para a criança identificada que tem cortesia válida hoje. É um plano de R$ 0,00 / 30 min (`fa_kiosk_plans.birthday_courtesy`, sempre inativo, fora de qualquer outra lista). A operadora só confirma. Passou dos 30 min: minuto adicional do plano de 30 min da unidade, com a tolerância de 1 min que vale para todos os planos (35 min de permanência = 4 min cobrados).
+- A validação é do servidor (trigger em `fa_kiosk_sessions`): recusa criança sem cortesia, fim de semana, fora da validade, Circuito, cupom junto e troca de plano para a cortesia. Entrou e saiu em até 3 min devolve a cortesia. A cortesia não consome o saldo de pacote da família.
+
+**Deploy (ordem)**
+1. Aplicar a migration. Conferir os planos criados: `select u.name, p.overage_cents_per_minute from fa_kiosk_plans p join fa_kiosk_units u on u.id = p.unit_id where p.birthday_courtesy;`. Unidade sem plano avulso de 30 min do Playground não recebe o plano (crie um e rode o `insert ... select` da seção 3 da migration). Ao reajustar o minuto adicional do plano de 30 min, ajuste o da cortesia em Gerencial › Planos.
+2. `supabase functions deploy crm-lifecycle-dispatch crm-templates-bootstrap`, e publicar o front.
+3. `crm-templates-bootstrap` com `{"names": ["fa_lc_aniversario_cortesia"]}` para submeter o template (Marketing, 3 variáveis: {{1}} responsável, {{2}} criança, {{3}} dd/mm do último dia do mês). Depois da aprovação da Meta, chamar de novo para ativar. O template antigo `fa_lc_aniversario` foi desativado e entra em `RETIRED`.
+4. Ligar por unidade: `insert into fa_kiosk_app_settings (unit_id, key, value) values ('<uuid>', 'crm_lc_aniversario', '1') on conflict (unit_id, key) do update set value = '1';`
+
+**Cuidado na primeira rodada:** quem faz aniversário nos próximos 7 dias recebe a mensagem logo que a flag ligar, com janela menor que a de quem entra depois. Ligue em um dia de semana e avise a recepção antes.
+
+**Relatório:** Gerencial › Equipe & Clientes › Cortesia de aniversário (`fa_birthday_courtesy_report`; nomes só com `crm.read`). Mostra enviadas, usos, minutos adicionais, compra em até 30 dias após o uso e a comparação com o controle. Janela mais curta para quem faz anos no fim do mês: compare dentro da mesma faixa de dia.
+
+**Não tratado:** feriados (a cortesia vale em feriado de semana).
