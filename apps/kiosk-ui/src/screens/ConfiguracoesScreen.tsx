@@ -23,7 +23,6 @@ import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import type { TerminalEmployee } from "../lib/supabase/terminalAuth.js";
 import { WristbandLabelPreview } from "../components/WristbandLabelPreview.js";
 import { WristbandPrintModal } from "../components/WristbandPrintModal.js";
-import { EspelhoPontoModal } from "../components/EspelhoPontoModal.js";
 import { isPushSupported, subscribeToPush, getExistingPushSubscription, pushSubscriptionToKeys, OWNER_PUSH_STORAGE_KEY } from "../lib/push.js";
 import { WristbandQRCode, generateWristbandQRCodeDataUrl } from "../components/WristbandQRCode.js";
 import { buildAcessoRapidoPosterHtml, printContract } from "../contract/contractTemplate.js";
@@ -40,7 +39,6 @@ type Tab =
   | "CUPONS"
   | "FIDELIDADE"
   | "FROTA"
-  | "PONTO"
   | "UNIDADE"
   | "FISCAL"
   | "TERMOS"
@@ -53,10 +51,8 @@ type Tab =
  * declarar o que exige — o modo de falha natural seria ela nascer aberta.
  *
  * Todas exigem no mínimo `config.write` (Owner); as de baixo têm capacidade
- * própria porque o dano de errar nelas é de outra natureza: dado fiscal, o
- * texto que o responsável aceita — e o Espelho de Ponto, que é a única aba
- * deste grupo aberta ao Líder (GERENTE), não só ao Owner: gerar o ponto de
- * terceiros é atribuição de liderança de turno, não de dono do negócio.
+ * própria porque o dano de errar nelas é de outra natureza: dado fiscal e o
+ * texto que o responsável aceita.
  *
  * Cadastro de colaborador (antes "COLABORADORES" aqui) mudou de lugar: vive
  * só no módulo Gerencial agora, porque um colaborador não pertence a uma
@@ -70,7 +66,6 @@ const TAB_CAPABILITY: Record<Tab, Capability> = {
   FIDELIDADE: "config.write",
   FROTA: "config.write",
   IMPRESSORAS: "config.write",
-  PONTO: "relatorio.ponto",
   UNIDADE: "config.unit.write",
   FISCAL: "config.fiscal.write",
   TERMOS: "config.terms.write",
@@ -90,7 +85,6 @@ const TAB_GROUP: Record<Tab, string> = {
   FROTA: "Catálogo e vendas",
   UNIDADE: "Operação",
   IMPRESSORAS: "Operação",
-  PONTO: "Operação",
   NOTIFICACOES: "Operação",
   FISCAL: "Fiscal e legal",
   TERMOS: "Fiscal e legal",
@@ -113,7 +107,6 @@ export function ConfiguracoesScreen() {
     { value: "CUPONS", label: "Cupons" },
     { value: "FIDELIDADE", label: "Fidelidade" },
     ...(isQuiosque ? ([{ value: "FROTA" as const, label: "Frota" }]) : []),
-    { value: "PONTO", label: "Espelho de Ponto" },
     { value: "UNIDADE", label: "Unidade" },
     { value: "FISCAL", label: "Dados Fiscais" },
     { value: "TERMOS", label: "Termos de Uso" },
@@ -130,7 +123,6 @@ export function ConfiguracoesScreen() {
     CUPONS: "Crie códigos de desconto ou parceria que o operador pode aplicar na tela de Entrada.",
     FIDELIDADE: "Defina recompensas automáticas para clientes recorrentes — ex.: a cada 10 visitas registradas pelo CPF do responsável, a 10ª entrada de 30 minutos é 100% gratuita (Playground e Circuito).",
     FROTA: "Cadastre os carrinhos do Circuito (nome, cor, emoji e foto) e marque quando um estiver em manutenção.",
-    PONTO: "Gere e imprima o espelho de ponto mensal de qualquer colaborador, com as marcações do mês e linha para assinatura.",
     UNIDADE: "Dados da unidade: nome, fuso, virada do dia operacional e o que aparece no cabeçalho do cupom.",
     FISCAL: "Dados do emitente para NFC-e (produtos) e o cadastro de NFS-e (serviço). Confira com seu contador antes de ligar a emissão.",
     TERMOS: "Texto que o responsável aceita no check-in. Alterações ficam registradas na trilha de auditoria.",
@@ -158,7 +150,6 @@ export function ConfiguracoesScreen() {
           {tab === "CUPONS" && <CuponsTab unitId={unit.id} />}
           {tab === "FIDELIDADE" && <FidelidadeTab unitId={unit.id} isQuiosque={isQuiosque} />}
           {tab === "FROTA" && isQuiosque && <FrotaTab unitId={unit.id} />}
-          {tab === "PONTO" && <EspelhoPontoTab unitId={unit.id} />}
           {tab === "UNIDADE" && <UnidadeTab unitId={unit.id} />}
           {tab === "FISCAL" && <FiscalTab unitId={unit.id} />}
           {tab === "TERMOS" && <TermosTab unitId={unit.id} />}
@@ -1322,48 +1313,6 @@ const CONTRACT_TYPE_LABEL: Record<NonNullable<Employee["contract_type"]>, string
   AUTONOMO: "Autônomo",
   PJ: "PJ (Prestador de Serviço)",
 };
-
-/**
- * Aba própria para o Espelho de Ponto — separada de Colaboradores porque a
- * capacidade é outra (`relatorio.ponto`, concedida ao Líder) e a de
- * Colaboradores exige `config.employees.write` (só Owner). Um Líder de
- * turno gerando o espelho de ponto de terceiros é rotina; cadastrar ou
- * desligar colaborador não é — misturar as duas na mesma aba abriria a
- * segunda para quem só deveria ter a primeira.
- */
-function EspelhoPontoTab({ unitId }: { unitId: string }) {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [espelhoTarget, setEspelhoTarget] = useState<Employee | null>(null);
-
-  useEffect(() => {
-    // Escopo por unidade: esta tela é a versão de Configurações (por
-    // unidade) do espelho de ponto, usada pelo Líder — que só deve ver
-    // colaboradores da própria unidade. A visão cross-unit já existe
-    // separadamente em Gerencial > Colaboradores > 📄 Ponto (Owner).
-    Api.allEmployees().then((all) => setEmployees(all.filter((e) => e.unitIds?.includes(unitId))));
-  }, [unitId]);
-
-  return (
-    <div>
-      <HelpText style={{ marginBottom: "12px" }}>Toque num colaborador para gerar o espelho de ponto do mês desejado.</HelpText>
-      {employees.map((e) => (
-        <Card
-          key={e.id}
-          onClick={() => setEspelhoTarget(e)}
-          style={{ padding: "12px", marginBottom: "8px", cursor: "pointer", opacity: e.active === false ? 0.5 : 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}
-        >
-          <span>
-            <strong>{e.full_name}</strong> — {ROLE_LABEL[e.role]}
-          </span>
-          <span aria-hidden>📄</span>
-        </Card>
-      ))}
-      {employees.length === 0 && <p style={{ color: "var(--text-muted)" }}>Nenhum colaborador cadastrado.</p>}
-
-      {espelhoTarget && <EspelhoPontoModal employee={espelhoTarget} onClose={() => setEspelhoTarget(null)} />}
-    </div>
-  );
-}
 
 /**
  * Nome exato da impressora tal como aparece no Windows (Painel de

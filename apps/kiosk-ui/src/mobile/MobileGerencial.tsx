@@ -5,10 +5,9 @@ import { GerencialApp } from "../screens/gerencial/GerencialApp.js";
 import { MobileGerencialHome } from "./MobileGerencialHome.js";
 import { MobileUnitDetail } from "./MobileUnitDetail.js";
 import { MobileRelatorios } from "./MobileRelatorios.js";
-import { MobileEquipe } from "./MobileEquipe.js";
 import "./mobile.css";
 
-type View = { kind: "HOME" } | { kind: "UNIT"; unit: Unit } | { kind: "RELATORIOS" } | { kind: "EQUIPE" } | { kind: "FULL" };
+type View = { kind: "HOME" } | { kind: "UNIT"; unit: Unit } | { kind: "RELATORIOS" } | { kind: "FULL" };
 
 /**
  * Entrada do Owner no modo celular.
@@ -43,10 +42,6 @@ export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; on
     return <MobileRelatorios units={units} onBack={() => setView({ kind: "HOME" })} />;
   }
 
-  if (view.kind === "EQUIPE") {
-    return <MobileEquipe units={units} onBack={() => setView({ kind: "HOME" })} />;
-  }
-
   return (
     <div className="m-shell">
       <div className="m-frame">
@@ -61,7 +56,6 @@ export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; on
           onAbrirPainelCompleto={() => setView({ kind: "FULL" })}
           onAbrirUnidade={(unit) => setView({ kind: "UNIT", unit })}
           onAbrirRelatorios={() => setView({ kind: "RELATORIOS" })}
-          onAbrirEquipe={() => setView({ kind: "EQUIPE" })}
         />
       </div>
     </div>

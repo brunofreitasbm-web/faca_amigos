@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, DateInput, Input, Select, Tabs, contrastRatio, HelpText, Button, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
-import type { AssetUsage, BirthdayChild, CheckinsByHour, DailySales, DailyVisits, FolhaPontoRow, PlanSold, RevenueByMethod, SessionAudit, ShiftSummary } from "../api/client.js";
+import type { AssetUsage, BirthdayChild, CheckinsByHour, DailySales, DailyVisits, PlanSold, RevenueByMethod, SessionAudit, ShiftSummary } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { IfCan } from "../auth/RequireCapability.js";
@@ -9,12 +9,10 @@ import { EmployeeAuthGate } from "../components/EmployeeAuthGate.js";
 import { money } from "../format.js";
 import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { AssetUsageChart, CheckinsByHourChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
-import { exportFrequenciaCsv } from "../lib/csvExport.js";
-import { computeWorkedMinutes, dateTimeLabelsInTz } from "../lib/ponto.js";
 import { SortTh, TableFilter, useTableView } from "../components/ReportTable.js";
 import type { TableColumn } from "../lib/tableView.js";
 
-type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "PONTO" | "FROTA";
+type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "FROTA";
 export type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
 
 export function isoDate(d: Date): string {
@@ -105,7 +103,6 @@ export function RelatorioScreen() {
     SESSOES: "Registro de cada entrada individual — horário, criança, responsável que acompanhou e quem atendeu no balcão. Para consulta e rastreio posterior, inclusive para fins jurídicos.",
     ANIVERSARIANTES: "Lista de crianças cadastradas que fazem aniversário no mês selecionado.",
     TURNOS: "Histórico de turnos de caixa abertos e fechados nesta unidade.",
-    PONTO: "Horas trabalhadas por colaborador e o registro bruto de cada marcação de ponto no período.",
     FROTA: "Quais carrinhos foram mais e menos usados no período — ajuda a decidir manutenção e reposição.",
   };
 
@@ -167,7 +164,6 @@ export function RelatorioScreen() {
         {tab === "SESSOES" && <SessoesTab unitId={unit.id} from={from} to={to} />}
         {tab === "ANIVERSARIANTES" && <AniversariantesTab />}
         {tab === "TURNOS" && <TurnosTab unitId={unit.id} />}
-        {tab === "PONTO" && <PontoTab from={from} to={to} />}
         {tab === "FROTA" && isQuiosque && <FrotaHeatmapTab unitId={unit.id} from={from} to={to} />}
       </div>
     </div>
@@ -798,275 +794,6 @@ function TurnosTab({ unitId }: { unitId: string }) {
         </tbody>
       </table>
     </Card>
-  );
-}
-
-interface DailyHoursSummary {
-  employeeId: string;
-  fullName: string;
-  dateLabel: string;
-  workedMs: number;
-  targetMs: number | null;
-  incomplete: boolean;
-}
-
-/**
- * Agrupa por dia no fuso da unidade (não no fuso do navegador de quem olha o
- * relatório — perto da meia-noite isso já jogou marcações para o dia/mês
- * errado) e reusa `computeWorkedMinutes` (mesmo cálculo do Controle de
- * Frequência e da Folha de Pagamento) em vez de reimplementar o pareamento
- * ENTRADA/INTERVALO/SAÍDA aqui, para não divergir silenciosamente dessas
- * outras telas nem perder o sinal de jornada incompleta.
- */
-// "dd/mm/aaaa" -> "aaaa-mm-dd" para ordenar cronologicamente, não por texto.
-const dayLabelToIso = (label: string) => label.split("/").reverse().join("-");
-
-const DAILY_HOURS_COLUMNS: TableColumn<DailyHoursSummary>[] = [
-  { key: "who", label: "Colaborador", sortValue: (s) => s.fullName, searchText: (s) => s.fullName },
-  { key: "day", label: "Dia", sortValue: (s) => dayLabelToIso(s.dateLabel), searchText: (s) => s.dateLabel },
-  { key: "worked", label: "Horas trabalhadas", sortValue: (s) => s.workedMs },
-  { key: "target", label: "Jornada contratada (dia)", sortValue: (s) => s.targetMs },
-  { key: "diff", label: "Diferença", sortValue: (s) => (s.targetMs === null ? null : s.workedMs - s.targetMs) },
-  {
-    key: "status",
-    label: "Status",
-    sortValue: (s) => (s.incomplete ? 0 : 1),
-    searchText: (s) => (s.incomplete ? "Incompleta" : "Completa"),
-  },
-];
-
-function summarizeDailyHours(rows: FolhaPontoRow[], timeZone: string | null | undefined): DailyHoursSummary[] {
-  const byGroup = new Map<string, FolhaPontoRow[]>();
-  for (const r of rows) {
-    const { dateLabel } = dateTimeLabelsInTz(r.at_ms, timeZone);
-    const key = `${r.employee_id}|${dateLabel}`;
-    byGroup.set(key, [...(byGroup.get(key) ?? []), r]);
-  }
-
-  const summaries: DailyHoursSummary[] = [];
-  for (const [key, group] of byGroup) {
-    const [, dateLabel] = key.split("|") as [string, string];
-    const first = group[0]!;
-    const { minutes, incomplete } = computeWorkedMinutes(group);
-    summaries.push({
-      employeeId: first.employee_id,
-      fullName: first.full_name,
-      dateLabel,
-      workedMs: minutes * 60_000,
-      targetMs: first.weekly_hours_contracted ? (first.weekly_hours_contracted / 5) * 60 * 60 * 1000 : null,
-      incomplete,
-    });
-  }
-  return summaries.sort((a, b) => a.fullName.localeCompare(b.fullName) || a.dateLabel.localeCompare(b.dateLabel));
-}
-
-function formatDurationMs(ms: number): string {
-  const totalMinutes = Math.round(ms / 60_000);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${h}h${String(m).padStart(2, "0")}`;
-}
-
-function PontoTab({ from, to }: { from: string; to: string }) {
-  const { unit } = useAppState();
-  const [rows, setRows] = useState<FolhaPontoRow[]>([]);
-  const [ocorrencias, setOcorrencias] = useState<Awaited<ReturnType<typeof Api.ocorrencias>>>([]);
-
-  useEffect(() => {
-    const fParts = from.split("-").map((v) => Number(v) || 0);
-    const tParts = to.split("-").map((v) => Number(v) || 0);
-    const fY = fParts[0] || 2026;
-    const fM = fParts[1] || 1;
-    const fD = fParts[2] || 1;
-    const tY = tParts[0] || 2026;
-    const tM = tParts[1] || 1;
-    const tD = tParts[2] || 1;
-    const fromMs = new Date(fY, fM - 1, fD, 0, 0, 0, 0).getTime();
-    const toMs = new Date(tY, tM - 1, tD, 23, 59, 59, 999).getTime();
-    Api.reportPonto(fromMs, toMs, unit?.id).then(setRows).catch(() => setRows([]));
-    if (unit?.id) {
-      Api.ocorrencias(unit.id).then(setOcorrencias).catch(() => setOcorrencias([]));
-    } else {
-      setOcorrencias([]);
-    }
-  }, [from, to, unit?.id]);
-
-  const timezone = unit?.timezone;
-  const dailySummaries = useMemo(() => summarizeDailyHours(rows, timezone), [rows, timezone]);
-  const dailyView = useTableView(dailySummaries, DAILY_HOURS_COLUMNS);
-  const unitTimezones = unit?.id ? { [unit.id]: unit.timezone } : {};
-
-  // fromMs/toMs recalculados aqui só para filtrar ocorrências que se
-  // sobrepõem ao período — o afastamento cobre [created_at_ms, created_at_ms
-  // + days_away dias), não é um instante único como uma marcação de ponto.
-  const { fromMs: periodFromMs, toMs: periodToMs } = (() => {
-    const fParts = from.split("-").map((v) => Number(v) || 0);
-    const tParts = to.split("-").map((v) => Number(v) || 0);
-    return {
-      fromMs: new Date(fParts[0] || 2026, (fParts[1] || 1) - 1, fParts[2] || 1, 0, 0, 0, 0).getTime(),
-      toMs: new Date(tParts[0] || 2026, (tParts[1] || 1) - 1, tParts[2] || 1, 23, 59, 59, 999).getTime(),
-    };
-  })();
-  const ocorrenciasNoPeriodo = ocorrencias.filter((o) => {
-    const start = o.created_at_ms;
-    const end = start + o.days_away * 86_400_000;
-    return start < periodToMs && end > periodFromMs;
-  });
-  const ocorrenciaColumns: TableColumn<(typeof ocorrenciasNoPeriodo)[number]>[] = [
-    { key: "who", label: "Colaborador", sortValue: (o) => o.fa_kiosk_employees?.full_name, searchText: (o) => o.fa_kiosk_employees?.full_name },
-    {
-      key: "tipo",
-      label: "Tipo",
-      sortValue: (o) => (o.tipo === "FALTA" ? "Falta" : "Atestado"),
-      searchText: (o) => (o.tipo === "FALTA" ? "Falta" : "Atestado"),
-    },
-    {
-      key: "start",
-      label: "Início",
-      sortValue: (o) => o.created_at_ms,
-      searchText: (o) => dateTimeLabelsInTz(o.created_at_ms, timezone).dateLabel,
-    },
-    { key: "days", label: "Dias", sortValue: (o) => o.days_away },
-    { key: "notes", label: "Observações", sortValue: (o) => o.notes, searchText: (o) => o.notes },
-  ];
-  const ocorrenciaView = useTableView(ocorrenciasNoPeriodo, ocorrenciaColumns);
-  const marcacaoColumns: TableColumn<FolhaPontoRow>[] = [
-    { key: "who", label: "Colaborador", sortValue: (r) => r.full_name, searchText: (r) => r.full_name },
-    { key: "kind", label: "Tipo", sortValue: (r) => r.kind, searchText: (r) => r.kind },
-    {
-      key: "at",
-      label: "Horário",
-      sortValue: (r) => r.at_ms,
-      searchText: (r) => {
-        const { dateLabel, timeLabel } = dateTimeLabelsInTz(r.at_ms, timezone);
-        return `${dateLabel} ${timeLabel}`;
-      },
-    },
-    { key: "nsr", label: "NSR", sortValue: (r) => r.nsr, searchText: (r) => String(r.nsr) },
-  ];
-  const marcacaoView = useTableView(rows, marcacaoColumns);
-
-  return (
-    <div>
-      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px", marginTop: "24px" }}>Resumo de horas por colaborador/dia</h3>
-      <Card style={{ padding: "8px", marginBottom: "24px", overflowX: "auto" }}>
-        <TableFilter view={dailyView} label="Filtrar colaborador ou dia" />
-        <table className="report-table">
-          <thead>
-            <tr>
-              <SortTh view={dailyView} column="who" />
-              <SortTh view={dailyView} column="day" style={{ textAlign: "center" }} />
-              <SortTh view={dailyView} column="worked" style={{ textAlign: "center" }} />
-              <SortTh view={dailyView} column="target" style={{ textAlign: "center" }} />
-              <SortTh view={dailyView} column="diff" style={{ textAlign: "center" }} />
-              <SortTh view={dailyView} column="status" style={{ textAlign: "center" }} />
-            </tr>
-          </thead>
-          <tbody>
-            {dailyView.rows.map((s) => {
-              const diffMs = s.targetMs !== null ? s.workedMs - s.targetMs : null;
-              return (
-                <tr key={`${s.employeeId}|${s.dateLabel}`}>
-                  <td>{s.fullName}</td>
-                  <td style={{ textAlign: "center" }}>{s.dateLabel}</td>
-                  <td style={{ textAlign: "center" }}>{formatDurationMs(s.workedMs)}</td>
-                  <td style={{ textAlign: "center" }}>{s.targetMs !== null ? formatDurationMs(s.targetMs) : "—"}</td>
-                  <td
-                    style={{
-                      textAlign: "center",
-                      fontWeight: "var(--weight-bold)" as unknown as number,
-                      color: diffMs === null ? undefined : diffMs < -15 * 60_000 ? "var(--color-error-text)" : diffMs > 15 * 60_000 ? "var(--color-amber-text)" : "var(--color-teal-text)",
-                    }}
-                  >
-                    {diffMs === null ? "—" : `${diffMs >= 0 ? "+" : "-"}${formatDurationMs(Math.abs(diffMs))}`}
-                  </td>
-                  <td style={{ textAlign: "center", color: s.incomplete ? "var(--color-amber-text)" : "var(--color-teal-text)" }}>
-                    {s.incomplete ? "⚠️ Incompleta" : "✓ Completa"}
-                  </td>
-                </tr>
-              );
-            })}
-            {dailyView.rows.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
-                  {dailySummaries.length === 0 ? "Nenhuma marcação no período." : "Nenhum registro corresponde ao filtro."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
-
-      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Ocorrências no período (faltas/atestados)</h3>
-      <HelpText style={{ marginTop: "-8px" }}>
-        Dias sem nenhuma marcação de ponto não aparecem no resumo acima — confira aqui se a ausência já tem falta ou atestado lançado em Gerencial &gt; Ocorrências.
-      </HelpText>
-      <Card style={{ padding: "8px", marginBottom: "24px", marginTop: "8px", overflowX: "auto" }}>
-        <TableFilter view={ocorrenciaView} label="Filtrar ocorrências" />
-        <table className="report-table">
-          <thead>
-            <tr>
-              <SortTh view={ocorrenciaView} column="who" />
-              <SortTh view={ocorrenciaView} column="tipo" />
-              <SortTh view={ocorrenciaView} column="start" />
-              <SortTh view={ocorrenciaView} column="days" style={{ textAlign: "center" }} />
-              <SortTh view={ocorrenciaView} column="notes" />
-            </tr>
-          </thead>
-          <tbody>
-            {ocorrenciaView.rows.map((o) => (
-              <tr key={o.id}>
-                <td>{o.fa_kiosk_employees?.full_name ?? "—"}</td>
-                <td>{o.tipo === "FALTA" ? "Falta" : "Atestado"}</td>
-                <td>{dateTimeLabelsInTz(o.created_at_ms, unit?.timezone).dateLabel}</td>
-                <td style={{ textAlign: "center" }}>{o.days_away}</td>
-                <td>{o.notes ?? "—"}</td>
-              </tr>
-            ))}
-            {ocorrenciaView.rows.length === 0 && (
-              <tr>
-                <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px" }}>
-                  {ocorrenciasNoPeriodo.length === 0 ? "Nenhuma ocorrência lançada para este período." : "Nenhuma ocorrência corresponde ao filtro."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-        <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px" }}>Marcações (registro de auditoria)</h3>
-        <Button variant="secondary" size="sm" disabled={rows.length === 0} onClick={() => exportFrequenciaCsv(rows, unitTimezones)}>
-          ⬇️ Exportar CSV
-        </Button>
-      </div>
-      <Card style={{ padding: "8px", marginTop: "16px", overflowX: "auto" }}>
-        <TableFilter view={marcacaoView} label="Filtrar marcações" />
-        <table className="report-table">
-          <thead>
-            <tr>
-              <SortTh view={marcacaoView} column="who" />
-              <SortTh view={marcacaoView} column="kind" />
-              <SortTh view={marcacaoView} column="at" />
-              <SortTh view={marcacaoView} column="nsr" style={{ textAlign: "center" }} />
-            </tr>
-          </thead>
-          <tbody>
-            {marcacaoView.rows.map((r) => {
-              const { dateLabel, timeLabel } = dateTimeLabelsInTz(r.at_ms, unit?.timezone);
-              return (
-                <tr key={`${r.employee_id}-${r.at_ms}-${r.nsr}-${r.kind}`}>
-                  <td>{r.full_name}</td>
-                  <td>{r.kind}</td>
-                  <td>{dateLabel} {timeLabel}</td>
-                  <td style={{ textAlign: "center" }}>{r.nsr}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
-    </div>
   );
 }
 
