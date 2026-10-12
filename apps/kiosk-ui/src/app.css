@@ -560,3 +560,63 @@ body {
     max-width: 1500px !important;
   }
 }
+
+/* ---------- Relatório: ordenação e filtro das tabelas ----------
+
+   O botão dentro do <th> herda a tipografia do cabeçalho (maiúsculas,
+   cinza) para a tabela não mudar de cara; só ganha seta e foco visível. */
+.report-sort-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.report-sort-btn:hover,
+.report-sort-btn:focus-visible {
+  color: var(--text-primary);
+}
+
+.report-sort-icon {
+  font-size: 10px;
+  opacity: 0.45;
+}
+
+.report-sort-icon.is-active {
+  opacity: 1;
+  color: var(--color-teal-text);
+}
+
+.report-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 6px 10px;
+}
+
+.report-filter input[type="search"] {
+  flex: 0 1 320px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+}
+
+.report-filter-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
