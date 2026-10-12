@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Ref } from "react";
 import { Button, Input, Tag, HelpText, AsyncState, AutismRibbonIcon } from "@facaamigos/ui";
 import { formatAccessCode } from "@facaamigos/domain";
 import { Api } from "../api/client.js";
@@ -84,6 +85,12 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
   );
 
   const busyRef = useRef(false);
+  // Desktop (mouse/teclado, leitor de código de barras USB que "digita" o
+  // código): a tela solta cuida de foco e teclado. Embutida no modal do
+  // Painel (entriesOverride) o próprio modal já gerencia o foco.
+  const standalone = !entriesOverride;
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  const resolvedAtRef = useRef(0);
 
   const handleCode = useCallback(
     async (rawValue: string) => {
@@ -95,6 +102,7 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
       try {
         const result = await Api.resolveAccessCode(unit.id, rawValue, employee?.id);
         if (result.reason === "OK") {
+          resolvedAtRef.current = Date.now();
           setResolved(result);
           // Início da conversa de retenção no balcão — a cobrança em si
           // vem depois, no CheckoutModal (que também tenta iniciar, é
@@ -184,6 +192,47 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
     toast.success(`Oferta "${offer.title}" recomendada ao responsável!`);
   }
 
+  // O campo de código fica sempre pronto: o operador bipa/digita sem clicar.
+  // Volta o foco ao terminar cada atendimento; ao resolver uma criança, tira
+  // o foco para o Enter seguinte abrir a cobrança em vez de reenviar o código.
+  useEffect(() => {
+    if (!standalone || checkoutOpen) return;
+    if (resolved) {
+      codeInputRef.current?.blur();
+    } else {
+      // select(): depois de um código recusado o texto continua no campo, e a
+      // próxima leitura do bipador seria anexada a ele (ex.: "ERRADO" + novo).
+      codeInputRef.current?.focus();
+      codeInputRef.current?.select();
+    }
+  }, [standalone, resolved, checkoutOpen, problem]);
+
+  const openCheckout = useCallback(() => {
+    if (!entry) return;
+    setClosingSnapshot(entry);
+    setCheckoutOpen(true);
+  }, [entry]);
+
+  useEffect(() => {
+    if (!standalone || !resolved || !entry || checkoutOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.target as HTMLElement | null)?.closest("button, input, textarea, select")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        clear();
+      } else if (e.key === "Enter") {
+        // Leitores costumam mandar Enter (às vezes dois) logo depois do código:
+        // sem esta janela, o sufixo da própria leitura abriria a cobrança
+        // antes de o operador ver o valor na tela.
+        if (Date.now() - resolvedAtRef.current < 600) return;
+        e.preventDefault();
+        openCheckout();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [standalone, resolved, entry, checkoutOpen, openCheckout]);
+
   function clear() {
     // Cancelou sem cobrar: ainda vale para treinamento (recusa/objeção),
     // mas não deve ficar em aberto até a próxima leitura de pulseira.
@@ -202,6 +251,7 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
 
   return (
     <div
+      className={standalone ? "saida-shell saida-desktop" : "saida-shell"}
       style={{
         height: "100%",
         minHeight: 0,
@@ -216,18 +266,24 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
         boxSizing: "border-box",
       }}
     >
-      <div>
+      <div className="saida-head">
         <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 5vw, 26px)" }}>Saída</h1>
         <HelpText>
           Digite o código de saída ou o PIN de 4 dígitos impressos no recibo de guarda para consultar o atendimento. A criança aparece na tela com o valor a pagar — confirme e ela está liberada.
         </HelpText>
       </div>
 
-      {busy && <Tag color="var(--color-teal)">Consultando código…</Tag>}
+      <div className="saida-col saida-col-left">
+      {busy && (
+        <div className="saida-status">
+          <Tag color="var(--color-teal)">Consultando código…</Tag>
+        </div>
+      )}
 
       {lastReleased && !resolved && (
         <div
           role="status"
+          className="saida-status"
           style={{
             background: "rgba(29, 155, 132, 0.10)",
             border: "1px solid var(--color-teal)",
@@ -244,6 +300,7 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
       {problem && !resolved && (
         <div
           role="alert"
+          className="saida-status"
           style={{
             background: "rgba(232, 48, 48, 0.08)",
             border: "1px solid var(--color-error)",
@@ -262,8 +319,55 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
         </div>
       )}
 
+      {/* Segunda via, sempre visível — não escondida atrás de "problemas?" */}
+      <div
+        className="saida-manual"
+        style={{
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "14px",
+          padding: "14px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
+        <strong style={{ fontSize: "14px" }}>Câmera não leu? Digite o código da pulseira</strong>
+        <HelpText>
+          Digite o código impresso na pulseira ou recibo (ex.:{" "}
+          {formatAccessCode("K7M2P9QX3B7")}) para consultar a criança.
+        </HelpText>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <Input
+            ref={standalone ? (codeInputRef as Ref<HTMLInputElement>) : undefined}
+            placeholder="0000"
+            inputMode="numeric"
+            value={manualCode}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void submitManual();
+            }}
+            style={{ flex: 1, letterSpacing: "2px", fontFamily: "var(--font-display)" }}
+          />
+          <Button variant="secondary" onClick={submitManual} loading={busy} disabled={!manualCode.trim() || busy}>
+            Buscar
+          </Button>
+        </div>
+      </div>
+
+      <div className="saida-help">
+        <HelpText>
+          Recibo perdido <strong>e</strong> etiqueta danificada? A liberação é feita no <strong>Painel</strong>, no botão
+          "Saída manual" do card da criança, conferindo o documento do responsável.
+        </HelpText>
+      </div>
+      </div>
+      <div className="saida-col saida-col-right">
       {resolved && entry && (
         <div
+          className="saida-result"
           style={{
             position: "relative",
             overflow: "hidden",
@@ -360,68 +464,32 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
 
           <div style={{ display: "flex", gap: "8px" }}>
             <Button variant="ghost" size="lg" onClick={clear} style={{ borderRadius: "9999px" }}>
-              Cancelar
+              Cancelar<span className="saida-kbd"> (Esc)</span>
             </Button>
             <Button
               variant="primary"
               size="lg"
-              onClick={() => {
-                setClosingSnapshot(entry);
-                setCheckoutOpen(true);
-              }}
+              onClick={openCheckout}
               style={{ borderRadius: "9999px", flex: 1 }}
               title="Cobrar e liberar a criança"
             >
-              Cobrar e liberar
+              Cobrar e liberar<span className="saida-kbd"> (Enter)</span>
             </Button>
           </div>
         </div>
       )}
 
       {resolved && !entry && sessionsStatus === "loading" && (
-        <AsyncState kind="loading" title="Carregando dados da criança…" />
-      )}
-
-      {/* Segunda via, sempre visível — não escondida atrás de "problemas?" */}
-      <div
-        style={{
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "14px",
-          padding: "14px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
-        }}
-      >
-        <strong style={{ fontSize: "14px" }}>Câmera não leu? Digite o código da pulseira</strong>
-        <HelpText>
-          Digite o código impresso na pulseira ou recibo (ex.:{" "}
-          {formatAccessCode("K7M2P9QX3B7")}) para consultar a criança.
-        </HelpText>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <Input
-            placeholder="0000"
-            inputMode="numeric"
-            value={manualCode}
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void submitManual();
-            }}
-            style={{ flex: 1, letterSpacing: "2px", fontFamily: "var(--font-display)" }}
-          />
-          <Button variant="secondary" onClick={submitManual} loading={busy} disabled={!manualCode.trim() || busy}>
-            Buscar
-          </Button>
+        <div className="saida-result">
+          <AsyncState kind="loading" title="Carregando dados da criança…" />
         </div>
+      )}
+        {!resolved && (
+          <div className="saida-placeholder" aria-hidden="true">
+            Aguardando leitura. Bipe a pulseira ou digite o código ao lado: a criança e o valor aparecem aqui.
+          </div>
+        )}
       </div>
-
-      <HelpText>
-        Recibo perdido <strong>e</strong> etiqueta danificada? A liberação é feita no <strong>Painel</strong>, no botão
-        "Saída manual" do card da criança, conferindo o documento do responsável.
-      </HelpText>
 
       {checkoutOpen && entry && (
         <CheckoutModal

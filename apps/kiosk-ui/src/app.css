@@ -755,3 +755,96 @@ body {
     display: inline;
   }
 }
+
+/* ---------- Saída: desktop com leitor/teclado ----------
+
+   A tela foi desenhada para uma coluna de 560px. No PC do balcão isso deixa
+   o valor a pagar espremido e o campo de código "pulando" de posição quando a
+   criança aparece. Só na tela solta (`.saida-desktop`; embutida no modal do
+   Painel ela segue em coluna) e com mouse em tela larga: campo de código fixo
+   à esquerda, criança e valor à direita.
+
+   Abaixo disso (ou embutida) os wrappers `.saida-col` somem (`display:
+   contents`) e `order` reproduz a ordem original: avisos, criança, campo de
+   código, ajuda. */
+.saida-col {
+  display: contents;
+}
+
+.saida-status {
+  order: 1;
+}
+
+.saida-result {
+  order: 2;
+}
+
+.saida-manual {
+  order: 3;
+}
+
+.saida-help {
+  order: 4;
+}
+
+.saida-placeholder,
+.saida-kbd {
+  display: none;
+}
+
+@media (min-width: 1100px) and (pointer: fine) {
+  .saida-desktop {
+    display: grid !important;
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+    gap: 16px 32px !important;
+    align-content: start;
+    max-width: 1100px !important;
+    padding: 24px !important;
+  }
+
+  .saida-desktop .saida-head {
+    grid-column: 1 / -1;
+  }
+
+  .saida-desktop .saida-col {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  /* No desktop a ordem da coluna esquerda é: código, avisos, ajuda. */
+  .saida-desktop .saida-manual {
+    order: 0;
+  }
+
+  .saida-desktop .saida-status {
+    order: 1;
+  }
+
+  .saida-desktop .saida-help {
+    order: 2;
+  }
+
+  .saida-desktop .saida-result {
+    order: 0;
+  }
+
+  .saida-desktop .saida-placeholder {
+    display: block;
+    padding: 48px 24px;
+    border: 2px dashed var(--border-subtle);
+    border-radius: 18px;
+    color: var(--text-muted);
+    text-align: center;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .saida-desktop .saida-kbd {
+    display: inline;
+    opacity: 0.75;
+    font-weight: normal;
+    font-size: 0.85em;
+  }
+}
