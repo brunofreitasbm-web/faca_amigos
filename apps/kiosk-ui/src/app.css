@@ -316,6 +316,28 @@ body {
   animation: pin-shake 0.4s ease-in-out;
 }
 
+/* ---------- Barra de Capacidade Compacta do Cabeçalho ---------- */
+.capacity-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  background: var(--surface-card);
+  padding: 6px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.capacity-bar-track {
+  height: 6px;
+  width: 100%;
+  background: var(--color-gray-200);
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
 /* ---------- Barra de Progresso Gamificada & Motivacional (Espaço Reservado do Cabeçalho) ---------- */
 .metric-progress-chip {
   display: inline-flex;

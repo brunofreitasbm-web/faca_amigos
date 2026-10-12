@@ -108,36 +108,39 @@ function PermissoesTabInner() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))",
+            gridTemplateColumns: "minmax(0, 1fr)",
             gap: "12px",
-            alignItems: "start",
+            maxWidth: "960px",
           }}
         >
         {Array.from(groups.entries()).map(([group, caps]) => (
           <Card key={group}>
             <h3 style={{ fontSize: "14px", marginTop: 0, marginBottom: "10px", paddingBottom: "6px", borderBottom: "1px solid var(--border, rgba(0,0,0,0.1))" }}>{group}</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
               {caps.map((capability) => {
                 const role = matrix[capability];
                 return (
                   <div
                     key={capability}
                     style={{
-                      display: "flex",
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1fr) 160px",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: "10px",
+                      gap: "16px",
+                      width: "100%",
+                      padding: "8px 0",
+                      borderBottom: "1px solid var(--border, rgba(0,0,0,0.06))",
                       opacity: savingCapability === capability ? 0.6 : 1,
                     }}
                   >
-                    <span style={{ fontSize: "13px", flex: "1 1 0", minWidth: 0, lineHeight: 1.35, overflowWrap: "anywhere" }}>
+                    <span style={{ fontSize: "13px", lineHeight: 1.35 }}>
                       {CAPABILITY_LABEL[capability as keyof typeof CAPABILITY_LABEL] ?? capability}
                     </span>
                     <Select
                       value={role ?? "OPERADOR"}
                       disabled={!role || savingCapability === capability}
                       onChange={(e) => changeRole(capability, e.target.value as EditableRole)}
-                      style={{ width: "140px", flexShrink: 0 }}
+                      style={{ width: "100%" }}
                     >
                       {EDITABLE_ROLES.map((r) => (
                         <option key={r} value={r}>
