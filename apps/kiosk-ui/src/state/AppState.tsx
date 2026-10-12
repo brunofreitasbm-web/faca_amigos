@@ -9,6 +9,7 @@ import {
   forgetTerminalEmployee,
   type TerminalEmployee,
 } from "../lib/supabase/terminalAuth.js";
+import { clearSessionStarted, isStoredSessionExpired } from "../lib/supabase/sessionExpiry.js";
 import { clearStepUpCache } from "../auth/stepUpCache.js";
 
 interface AppStateValue {
@@ -179,6 +180,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRestoring(false);
         return;
       }
+      // Terminal ficou desligado/fechado durante o corte das 23h30: a sessão
+      // do operador anterior não pode ser reaproveitada, exige novo PIN.
+      if (isStoredSessionExpired()) {
+        await supabase().auth.signOut();
+        clearSessionStarted();
+        clearStepUpCache();
+        if (!cancelled) {
+          setEmployee(null);
+          setRestoring(false);
+        }
+        return;
+      }
       try {
         const me = await Api.currentEmployee();
         if (!cancelled) setEmployee(me);
@@ -202,9 +215,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Logout "de verdade" (sessão Supabase + estado local), reaproveitado pelo
-  // valor exposto em `logout` e pelo encerramento automático às 23h abaixo.
+  // valor exposto em `logout` e pelo encerramento automático às 23h30 abaixo.
   const doLogout = async () => {
     await supabase().auth.signOut();
+    clearSessionStarted();
     clearStepUpCache();
     setEmployee(null);
     setUnitId(null);
@@ -213,23 +227,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setHasFaceEnrolled(null);
   };
 
-  // Encerra a sessão automaticamente às 23h de cada dia, para que o
+  // Encerra a sessão automaticamente às 23h30 de cada dia, para que o
   // colaborador do turno seguinte seja obrigado a fazer login com a própria
-  // conta em vez de continuar usando a sessão de quem operou antes.
+  // conta em vez de continuar usando a sessão de quem operou antes. O critério
+  // é "login anterior ao último corte" (ver sessionExpiry.ts), não "são 23h30
+  // agora": assim também vale se o app estava fechado/suspenso no horário.
   const employeeRef = useRef(employee);
   employeeRef.current = employee;
-  const lastAutoLogoutDateRef = useRef<string | null>(null);
   useEffect(() => {
     const checkAutoLogout = () => {
-      const now = new Date();
-      const today = now.toDateString();
-      if (now.getHours() < 23) {
-        if (lastAutoLogoutDateRef.current !== today) lastAutoLogoutDateRef.current = null;
-        return;
-      }
-      if (lastAutoLogoutDateRef.current === today) return;
-      lastAutoLogoutDateRef.current = today;
-      if (employeeRef.current) void doLogout();
+      if (employeeRef.current && isStoredSessionExpired()) void doLogout();
     };
 
     checkAutoLogout();
