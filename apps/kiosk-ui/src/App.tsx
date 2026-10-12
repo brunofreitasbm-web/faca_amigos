@@ -547,6 +547,7 @@ export function App() {
       {!mobile.active && mobile.isPhone && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
 
       <header
+        className="kiosk-header"
         style={{
           flexShrink: 0,
           display: "flex",
@@ -606,7 +607,8 @@ export function App() {
               key={s.value}
               variant={screen === s.value ? "teal" : "ghost"}
               size="sm"
-              title={s.help}
+              className="kiosk-nav-btn"
+              title={mobile.isPhone ? s.help : `${s.help} (Alt+${index + 1})`}
               aria-current={screen === s.value ? "page" : undefined}
               onClick={() => {
                 navigateToScreen(s.value);
@@ -617,7 +619,7 @@ export function App() {
               {s.icon} {s.label}
               {s.value === "RELATORIO_SESSAO" && <PendingSessionReportsBadge unitId={unit.id} />}
               {!mobile.isPhone && (
-                <kbd style={{ marginLeft: "6px", fontSize: "10px", padding: "2px 4px", borderRadius: "4px", background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}>
+                <kbd className="kiosk-nav-kbd" style={{ marginLeft: "6px", fontSize: "10px", padding: "2px 4px", borderRadius: "4px", background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}>
                   Alt+{index + 1}
                 </kbd>
               )}
@@ -625,7 +627,7 @@ export function App() {
           ))}
         </nav>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div className="kiosk-header-right" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           <ConnectionStatusChip />
 
           {/* Pareamento por QR: só faz sentido no computador do balcão —
@@ -638,11 +640,15 @@ export function App() {
               title="Conectar celular/tablet lendo um QR Code — instala o aplicativo no aparelho"
               style={{ fontSize: "12px", border: "1px solid var(--color-teal)", color: "var(--color-teal-text)", background: "rgba(29, 155, 132, 0.08)" }}
             >
-              📱 Conectar celular/tablet
+              📱 <span className="kiosk-connect-label">Conectar celular/tablet</span>
             </Button>
           )}
 
-          <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: "var(--weight-semibold)" as unknown as number }}>
+          <span
+            className="kiosk-user"
+            title={`${employee.full_name} · ${ROLE_LABEL[employee.role]}`}
+            style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: "var(--weight-semibold)" as unknown as number }}
+          >
             {employee.full_name} · {ROLE_LABEL[employee.role]}
           </span>
 
