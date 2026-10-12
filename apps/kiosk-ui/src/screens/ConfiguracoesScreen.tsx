@@ -1581,9 +1581,6 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      {/* ATUALIZAÇÕES DO SISTEMA (AUTO UPDATE) */}
-      <AutoUpdateCard />
-
       {bridgeStatus && !bridgeStatus.hasServiceRoleKey && (
         <HelpText icon="🛑" style={{ background: "#fff0f0", borderColor: "#f5c6cb", color: "#721c24", fontWeight: "bold" }}>
           Erro de Autenticação do Print Bridge: A chave de serviço (FACAAMIGOS_SUPABASE_SECRET_KEY) não está configurada no arquivo .env deste computador. Sem ela, o banco rejeita a reserva de cupons e a impressão não sai.

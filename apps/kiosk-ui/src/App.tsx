@@ -58,6 +58,7 @@ import { OwnerFloatingDashboard } from "./components/OwnerFloatingDashboard.js";
 import { isElectronLocal } from "./pwa.js";
 import { ensureOwnerPushSubscription } from "./lib/push.js";
 import { Api } from "./api/client.js";
+import type { Unit } from "./api/client.js";
 import { MobileShell } from "./mobile/MobileShell.js";
 import { MobileScreenFrame } from "./mobile/MobileScreenFrame.js";
 import { MobileGerencial } from "./mobile/MobileGerencial.js";
@@ -65,40 +66,6 @@ import { MobileLogin } from "./mobile/MobileLogin.js";
 import { useBackHandler } from "./hooks/useBackHandler.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
 
-/**
- * Reverte "Sempre abrir a versão completa" (MobileShell > Mais > Este
- * aparelho). Sem este botão, quem toca ali fica preso na versão de balcão
- * neste aparelho para sempre — useMobileShell().useMobileVersion existia
- * mas não estava ligado a nenhum controle da UI antes deste componente.
- */
-function UseMobileVersionButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        position: "fixed",
-        left: "50%",
-        transform: "translateX(-50%)",
-        bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
-        zIndex: 60,
-        border: "none",
-        borderRadius: "9999px",
-        padding: "12px 20px",
-        minHeight: "44px",
-        background: "var(--color-dark)",
-        color: "#fff",
-        font: "inherit",
-        fontSize: "13px",
-        fontWeight: 800,
-        boxShadow: "0 8px 24px rgba(0,0,0,.28)",
-        cursor: "pointer",
-      }}
-    >
-      📱 Usar versão celular
-    </button>
-  );
-}
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
   { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir a pulseira e o recibo de guarda", icon: <SignInIcon /> },
@@ -126,6 +93,7 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
   RELATORIO: RelatorioScreen,
   CONFIGURACOES: ConfiguracoesScreen,
 };
+
 
 export function App() {
   const { units, unit, setUnitId, gerencial, setGerencial, employee, logout, restoring } = useAppState();
@@ -331,17 +299,9 @@ export function App() {
     },
   );
 
-  async function handleChangeModule() {
-    const ok = await confirm({
-      title: "Trocar módulo?",
-      message: "Você vai sair da tela atual e voltar para a seleção de módulo.",
-      confirmLabel: "Trocar módulo",
-      cancelLabel: "Cancelar",
-    });
-    if (ok) {
-      setUnitId("");
-      setGerencial(false);
-    }
+  function handleChangeModule() {
+    setUnitId("");
+    setGerencial(false);
   }
 
   async function handleLogout() {
@@ -399,6 +359,7 @@ export function App() {
     return <AcessoRapidoScreen unitId={acessoRapidoParam} />;
   }
 
+
   // Enquanto a sessão salva não foi conferida, não decide nada: mostrar a
   // tela de login por um instante para quem já está logado faz o operador
   // digitar o PIN à toa a cada refresh.
@@ -409,7 +370,9 @@ export function App() {
   // Login por PIN não tem valor de negócio pra divergir entre versões —
   // MobileLogin usa exatamente os mesmos useAppState()/Api.employeesForLogin
   // de LoginScreen, só com a casca do modo celular.
-  if (!employee) return mobile.active ? <MobileLogin /> : <LoginScreen />;
+  if (!employee) {
+    return mobile.active ? <MobileLogin /> : <LoginScreen />;
+  }
 
   // Modo Gerencial: fora do contexto das 3 unidades, é onde o Owner configura
   // o que vale para várias unidades de uma vez e vê relatórios cross-unit.
@@ -426,12 +389,7 @@ export function App() {
       if (mobile.active) {
         return <MobileGerencial units={units} onExit={() => setGerencial(false)} onLogout={handleLogout} />;
       }
-      return (
-        <>
-          {mobile.isPhone && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
-          <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />
-        </>
-      );
+      return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
     }
   }
 
@@ -528,7 +486,6 @@ export function App() {
         </button>
       )}
 
-      {!mobile.active && mobile.isPhone && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
 
       <header
         className="kiosk-header"

@@ -122,25 +122,36 @@ function OptinCampaignCard() {
     }
   }
 
-  if (!stats) return null;
-  const running = stats.status === "RUNNING";
+  const running = stats?.status === "RUNNING";
   return (
     <Card style={{ padding: "12px", marginBottom: "12px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-        <div>
-          <strong>🤝 Campanha de autorização (base atual)</strong>{" "}
-          <Tag color={running ? "var(--color-success)" : "var(--border-subtle)"}>{running ? "Em andamento" : "Pausada"}</Tag>
-          <HelpText style={{ margin: 0 }}>
-            Hoje: {stats.sentToday}/{stats.dailyTarget ?? "—"}
-            {stats.deadlineDay != null && ` · dia ${stats.deadlineDay} de ${stats.deadlineDays}`} · enviados {stats.sent} · aceitaram{" "}
-            {stats.accepted} · pediram PARAR {stats.declined} · na fila {stats.pending} · com autorização {stats.withConsent}
-          </HelpText>
-          {stats.pausedReason && !running && <HelpText style={{ margin: 0, color: "var(--color-error)" }}>⚠️ {stats.pausedReason}</HelpText>}
-        </div>
-        <Button size="sm" variant={running ? "secondary" : "primary"} loading={busy} onClick={() => void setStatus(running ? "PAUSED" : "RUNNING")}>
-          {running ? "Pausar" : "Iniciar"}
-        </Button>
-      </div>
+      <details>
+        <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+          <span>
+            <strong>🤝 Campanha de autorização (base atual)</strong>{" "}
+            <Tag color={stats ? (running ? "var(--color-success)" : "var(--border-subtle)") : "var(--border-subtle)"}>
+              {stats ? (running ? "Em andamento" : "Pausada") : "carregando…"}
+            </Tag>
+          </span>
+        </summary>
+        {stats ? (
+          <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <div>
+              <HelpText style={{ margin: 0 }}>
+                Hoje: {stats.sentToday}/{stats.dailyTarget ?? "—"}
+                {stats.deadlineDay != null && ` · dia ${stats.deadlineDay} de ${stats.deadlineDays}`} · enviados {stats.sent} · aceitaram{" "}
+                {stats.accepted} · pediram PARAR {stats.declined} · na fila {stats.pending} · com autorização {stats.withConsent}
+              </HelpText>
+              {stats.pausedReason && !running && <HelpText style={{ margin: 0, color: "var(--color-error)" }}>⚠️ {stats.pausedReason}</HelpText>}
+            </div>
+            <Button size="sm" variant={running ? "secondary" : "primary"} loading={busy} onClick={() => void setStatus(running ? "PAUSED" : "RUNNING")}>
+              {running ? "Pausar" : "Iniciar"}
+            </Button>
+          </div>
+        ) : (
+          <HelpText style={{ margin: "8px 0 0" }}>Carregando dados da campanha…</HelpText>
+        )}
+      </details>
     </Card>
   );
 }
@@ -190,24 +201,35 @@ function MarketingOptinCampaignCard() {
     }
   }
 
-  if (!stats) return null;
-  const running = stats.status === "RUNNING";
+  const running = stats?.status === "RUNNING";
   return (
     <Card style={{ padding: "12px", marginBottom: "12px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-        <div>
-          <strong>🛍️ Campanha de opt-in de marketing</strong>{" "}
-          <Tag color={running ? "var(--color-success)" : "var(--border-subtle)"}>{running ? "Em andamento" : "Pausada"}</Tag>
-          <HelpText style={{ margin: 0 }}>
-            Hoje: {stats.sentToday}/{stats.dailyCap} · enviados {stats.sent} · aceitaram {stats.accepted} · pediram PARAR {stats.declined} · na fila{" "}
-            {stats.pending} · com consentimento de marketing {stats.withConsent}
-          </HelpText>
-          {stats.pausedReason && !running && <HelpText style={{ margin: 0, color: "var(--color-error)" }}>⚠️ {stats.pausedReason}</HelpText>}
-        </div>
-        <Button size="sm" variant={running ? "secondary" : "primary"} loading={busy} onClick={() => void setStatus(running ? "PAUSED" : "RUNNING")}>
-          {running ? "Pausar" : "Iniciar"}
-        </Button>
-      </div>
+      <details>
+        <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+          <span>
+            <strong>🛍️ Campanha de opt-in de marketing</strong>{" "}
+            <Tag color={stats ? (running ? "var(--color-success)" : "var(--border-subtle)") : "var(--border-subtle)"}>
+              {stats ? (running ? "Em andamento" : "Pausada") : "carregando…"}
+            </Tag>
+          </span>
+        </summary>
+        {stats ? (
+          <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <div>
+              <HelpText style={{ margin: 0 }}>
+                Hoje: {stats.sentToday}/{stats.dailyCap} · enviados {stats.sent} · aceitaram {stats.accepted} · pediram PARAR {stats.declined} · na fila{" "}
+                {stats.pending} · com consentimento de marketing {stats.withConsent}
+              </HelpText>
+              {stats.pausedReason && !running && <HelpText style={{ margin: 0, color: "var(--color-error)" }}>⚠️ {stats.pausedReason}</HelpText>}
+            </div>
+            <Button size="sm" variant={running ? "secondary" : "primary"} loading={busy} onClick={() => void setStatus(running ? "PAUSED" : "RUNNING")}>
+              {running ? "Pausar" : "Iniciar"}
+            </Button>
+          </div>
+        ) : (
+          <HelpText style={{ margin: "8px 0 0" }}>Carregando dados da campanha…</HelpText>
+        )}
+      </details>
     </Card>
   );
 }
@@ -274,13 +296,20 @@ function LifecycleCampaignsCard() {
       setStats(statsByKind);
 
       if (unitList.length) {
-        const flagEntries = await Promise.all(
-          LIFECYCLE_KINDS.map(async (def) => {
-            const row = await Api.unitSetting(unitList[0]!.id, def.settingKey);
-            return [def.kind, row.value === "1"] as const;
-          }),
-        );
-        setFlags(Object.fromEntries(flagEntries));
+        const { data: rows } = await supabase()
+          .from("fa_kiosk_app_settings")
+          .select("key, value")
+          .eq("unit_id", unitList[0]!.id)
+          .in(
+            "key",
+            LIFECYCLE_KINDS.map((k) => k.settingKey),
+          );
+        const map = new Map((rows ?? []).map((r) => [r.key, r.value]));
+        const flagsMap: Record<string, boolean> = {};
+        for (const def of LIFECYCLE_KINDS) {
+          flagsMap[def.kind] = map.get(def.settingKey) === "1";
+        }
+        setFlags(flagsMap);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao carregar automações");
@@ -306,44 +335,49 @@ function LifecycleCampaignsCard() {
     }
   }
 
-  if (loading) return null;
   return (
     <Card style={{ padding: "12px", marginBottom: "12px" }}>
       <details>
       <summary style={{ cursor: "pointer" }}><strong>🚀 Automações de ciclo de vida (upsell, cross-sell, LTV, retenção)</strong></summary>
-      <HelpText style={{ margin: "4px 0 12px" }}>
-        Últimos 30 dias. Cada uma só envia quando o template correspondente estiver aprovado no Twilio; as de categoria Marketing também exigem o
-        aceite de ofertas do responsável (campanha de opt-in de marketing acima).
-      </HelpText>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        {LIFECYCLE_KINDS.map((def) => {
-          const s = stats[def.kind];
-          return (
-            <div
-              key={def.kind}
-              style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap",
-                padding: "6px 0", borderBottom: "1px solid var(--border-subtle)",
-              }}
-            >
-              <div style={{ minWidth: "260px" }}>
-                <Checkbox
-                  checked={Boolean(flags[def.kind])}
-                  onChange={(v) => void toggle(def, v)}
-                  label={def.label}
-                  disabled={busyKind === def.kind}
-                />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <Tag color="var(--border-subtle)">{def.category}</Tag>
-                <HelpText style={{ margin: 0 }}>
-                  {s ? `enviados ${s.sent} · responderam ${s.replied} · converteram ${s.converted} (R$ ${(s.converted_cents / 100).toFixed(2)})` : "sem envios ainda"}
-                </HelpText>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {loading ? (
+        <HelpText style={{ margin: "8px 0 0" }}>Carregando automações…</HelpText>
+      ) : (
+        <>
+          <HelpText style={{ margin: "4px 0 12px" }}>
+            Últimos 30 dias. Cada uma só envia quando o template correspondente estiver aprovado no Twilio; as de categoria Marketing também exigem o
+            aceite de ofertas do responsável (campanha de opt-in de marketing acima).
+          </HelpText>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {LIFECYCLE_KINDS.map((def) => {
+              const s = stats[def.kind];
+              return (
+                <div
+                  key={def.kind}
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap",
+                    padding: "6px 0", borderBottom: "1px solid var(--border-subtle)",
+                  }}
+                >
+                  <div style={{ minWidth: "260px" }}>
+                    <Checkbox
+                      checked={Boolean(flags[def.kind])}
+                      onChange={(v) => void toggle(def, v)}
+                      label={def.label}
+                      disabled={busyKind === def.kind}
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Tag color="var(--border-subtle)">{def.category}</Tag>
+                    <HelpText style={{ margin: 0 }}>
+                      {s ? `enviados ${s.sent} · responderam ${s.replied} · converteram ${s.converted} (R$ ${(s.converted_cents / 100).toFixed(2)})` : "sem envios ainda"}
+                    </HelpText>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
       </details>
     </Card>
   );
@@ -388,33 +422,38 @@ function WhatsappCostCard() {
       });
   }, []);
 
-  if (!rows) return null;
-  const categories = [...new Set(rows.map((r) => r.category))].sort();
-  const pick = (cat: string, period: "current" | "previous") => rows.find((r) => r.category === cat && r.period === period);
-  const unit = rows.find((r) => r.price_unit)?.price_unit ?? "USD";
+  const categories = rows ? [...new Set(rows.map((r) => r.category))].sort() : [];
+  const pick = (cat: string, period: "current" | "previous") => rows?.find((r) => r.category === cat && r.period === period);
+  const unit = rows?.find((r) => r.price_unit)?.price_unit ?? "USD";
   const money = (v: number) => `${unit} ${v.toFixed(2)}`;
   const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
   const delta = (cur: number, prev: number) => (prev > 0 ? `${cur >= prev ? "+" : ""}${Math.round(((cur - prev) / prev) * 100)}% vs ${COST_DAYS}d anteriores` : "sem período anterior");
 
   return (
     <Card style={{ padding: "12px", marginBottom: "12px" }}>
-      <strong>💸 Custo e entrega do WhatsApp (últimos {COST_DAYS} dias)</strong>
-      {categories.length === 0 ? (
-        <HelpText style={{ margin: 0 }}>Nenhum envio no período.</HelpText>
-      ) : (
-        categories.map((cat) => {
-          const cur = pick(cat, "current");
-          const prev = pick(cat, "previous");
-          return (
-            <HelpText key={cat} style={{ margin: "4px 0 0" }}>
-              <strong>{COST_CATEGORY_LABEL[cat] ?? cat}</strong>: {cur?.sent ?? 0} enviadas ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · entregues{" "}
-              {pct(cur?.delivered ?? 0, cur?.sent ?? 0)} · lidas {pct(cur?.read_count ?? 0, cur?.sent ?? 0)} · falhas {cur?.failed ?? 0} · custo{" "}
-              {money(cur?.price_total ?? 0)} ({delta(cur?.price_total ?? 0, prev?.price_total ?? 0)})
-              {cur && cur.priced < cur.sent - cur.failed && ` · ${cur.sent - cur.failed - cur.priced} aguardando preço`}
-            </HelpText>
-          );
-        })
-      )}
+      <details>
+        <summary style={{ cursor: "pointer" }}>
+          <strong>💸 Custo e entrega do WhatsApp (últimos {COST_DAYS} dias)</strong>
+        </summary>
+        {rows == null ? (
+          <HelpText style={{ margin: "8px 0 0" }}>Carregando custos…</HelpText>
+        ) : categories.length === 0 ? (
+          <HelpText style={{ margin: "8px 0 0" }}>Nenhum envio no período.</HelpText>
+        ) : (
+          categories.map((cat) => {
+            const cur = pick(cat, "current");
+            const prev = pick(cat, "previous");
+            return (
+              <HelpText key={cat} style={{ margin: "4px 0 0" }}>
+                <strong>{COST_CATEGORY_LABEL[cat] ?? cat}</strong>: {cur?.sent ?? 0} enviadas ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · entregues{" "}
+                {pct(cur?.delivered ?? 0, cur?.sent ?? 0)} · lidas {pct(cur?.read_count ?? 0, cur?.sent ?? 0)} · falhas {cur?.failed ?? 0} · custo{" "}
+                {money(cur?.price_total ?? 0)} ({delta(cur?.price_total ?? 0, prev?.price_total ?? 0)})
+                {cur && cur.priced < cur.sent - cur.failed && ` · ${cur.sent - cur.failed - cur.priced} aguardando preço`}
+              </HelpText>
+            );
+          })
+        )}
+      </details>
     </Card>
   );
 }

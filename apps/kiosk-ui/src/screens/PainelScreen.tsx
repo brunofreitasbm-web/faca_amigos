@@ -520,42 +520,167 @@ export function PainelScreen() {
     // sessões (abaixo) rola internamente quando não cabe tudo. Cabeçalho,
     // meta do dia e os botões flutuantes ficam sempre visíveis, sem rolar
     // a página inteira, no computador, tablet ou celular.
-    <div className="painel-shell" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", padding: "clamp(12px, 2.5vw, 24px)", gap: "clamp(10px, 2vw, 20px)" }}>
-      <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-        <div>
-          <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "clamp(20px, 3vw, 28px)" }}>Painel</h1>
-          <p style={{ margin: "4px 0 0 0", color: "var(--text-secondary)", fontSize: "14px" }}>
+    <div className="painel-shell" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", padding: "clamp(10px, 1.5vw, 16px)", gap: "10px" }}>
+      <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px 16px" }}>
+        {/* Esquerda: Identificação + Indicadores em linha aproveitando o espaço horizontal */}
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px 12px", minWidth: 0 }}>
+          <h1 className="sr-only">Painel</h1>
+          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "13px", fontWeight: 500, whiteSpace: "nowrap" }}>
             {unit.kind === "QUIOSQUE"
               ? "Acompanhamento em tempo real dos carrinhos no circuito"
               : "Acompanhamento em tempo real das crianças no playground"}
           </p>
-          {!tipDismissed && entries.length > 0 && (
-            <div style={{ position: "relative" }} role="status">
-              <HelpText style={{ marginTop: "4px", paddingRight: "30px" }}>
-                Toque num cartão para selecioná-lo (fica com borda rosa) e depois em "Fechar sessões" para cobrar. O
-                rótulo colorido (verde/amarelo/vermelho) mostra o tempo restante do plano — vermelho já ultrapassou.
-              </HelpText>
-              <button
-                type="button"
-                onClick={() => {
-                  localStorage.setItem("facaamigos_panel_tip_dismissed", "true");
-                  setTipDismissed(true);
-                }}
-                title="Não mostrar mais esta dica"
-                style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "16px" }}
-              >
-                ✕
-              </button>
+
+          {/* Faixa compacta de indicadores (Ticket Médio, Bonificação, Regras):
+              posicionada em linha no cabeçalho para aproveitar o espaço horizontal vazio
+              e liberar área vertical para os cards das crianças/carrinhos logo abaixo. */}
+          {(ticketTargetCents > 0 || bonusRules.length > 0 || (unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)))) && (
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" }}>
+              {ticketTargetCents > 0 && (() => {
+                const percent = Math.min(120, Math.round((ticketMedioCents / ticketTargetCents) * 100));
+                const progressTrackWidth = Math.min(100, percent);
+
+                let zoneColor = "#3b82f6";
+                let zoneGradient = "linear-gradient(90deg, #3b82f6, #60a5fa)";
+                let badgeClass = "";
+
+                if (percent < 50) {
+                  zoneColor = "#ef4444";
+                  zoneGradient = "linear-gradient(90deg, #ef4444, #f59e0b)";
+                } else if (percent < 75) {
+                  zoneColor = "#d97706";
+                  zoneGradient = "linear-gradient(90deg, #f59e0b, #eab308)";
+                } else if (percent < 100) {
+                  zoneColor = "#16a34a";
+                  zoneGradient = "linear-gradient(90deg, #eab308, #10b981)";
+                } else if (percent < 120) {
+                  zoneColor = "#059669";
+                  zoneGradient = "linear-gradient(90deg, #10b981, #047857)";
+                  badgeClass = "meta-batida";
+                } else {
+                  zoneColor = "#b45309";
+                  zoneGradient = "linear-gradient(90deg, #f59e0b, #eab308, #3b82f6)";
+                  badgeClass = "super-meta";
+                }
+
+                const deltaCents = ticketTargetCents - ticketMedioCents;
+                let incentiveText = "";
+                if (deltaCents > 0) {
+                  incentiveText = `Falta R$ ${(deltaCents / 100).toFixed(2).replace(".", ",")} p/ meta`;
+                } else {
+                  incentiveText = `🔥 Meta Batida! (+${percent - 100}%)`;
+                }
+
+                return (
+                  <span
+                    title={`Ticket médio de hoje: ${money(ticketMedioCents)} (mín ${money(ticketMinCents)} / alvo ${money(ticketTargetCents)}) — ${incentiveText}`}
+                    className="metric-progress-chip"
+                  >
+                    <div
+                      className="metric-progress-track"
+                      style={{
+                        width: `${progressTrackWidth}%`,
+                        background: zoneGradient,
+                      }}
+                    />
+
+                    <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
+                      🌡️ Ticket médio <strong>{money(ticketMedioCents)}</strong>
+                    </span>
+
+                    <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: zoneColor }}>
+                      {percent}%
+                    </span>
+
+                    <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
+                      {incentiveText}
+                    </span>
+                  </span>
+                );
+              })()}
+
+              {unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)) && (() => {
+                const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
+                const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
+                const atual = tipo === "CIRCUITO" ? todayOrdersCount : Math.max(0, todayRevenueCents - todayRentalCents);
+                const dow = diaSemanaISO(businessDate);
+                const goal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
+                const b = bonificacaoHoje(tipo, businessDate, atual, goal, bonusProgram?.locacaoExtraBonusCents ?? 0);
+                if (!b) return null;
+
+                const percentBonus = b.meta > 0 ? Math.min(120, Math.round((b.atual / b.meta) * 100)) : 0;
+                const progressTrackWidth = Math.min(100, percentBonus);
+
+                const corNivel = b.nivel === "supermeta" ? "#d97706" : b.nivel === "meta" ? "#059669" : "#2563eb";
+                const bonusGradient = b.nivel === "supermeta"
+                  ? "linear-gradient(90deg, #f59e0b, #eab308, #3b82f6)"
+                  : b.nivel === "meta"
+                    ? "linear-gradient(90deg, #10b981, #059669)"
+                    : "linear-gradient(90deg, #3b82f6, #10b981)";
+                const badgeClass = b.nivel === "supermeta" ? "super-meta" : b.nivel === "meta" ? "meta-batida" : "";
+
+                const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta" : b.nivel === "meta" ? "🥈 Meta batida" : `${percentBonus}%`;
+                const atualLabel = tipo === "CIRCUITO" ? `${b.atual} locações` : money(b.atual);
+                const metaLabel = tipo === "CIRCUITO" ? `${b.meta}` : money(b.meta);
+                const superLabel = tipo === "CIRCUITO" ? `${b.super}` : money(b.super);
+
+                let bonusIncentiveText = "";
+                if (b.nivel === "abaixo") {
+                  const delta = b.meta - b.atual;
+                  bonusIncentiveText = tipo === "CIRCUITO" ? `Falta ${delta} loc. p/ bônus!` : `Falta ${money(delta)} p/ bônus!`;
+                } else if (b.nivel === "meta") {
+                  const deltaSuper = b.super - b.atual;
+                  bonusIncentiveText = tipo === "CIRCUITO" ? `Falta ${deltaSuper} loc. p/ SUPERMETA!` : `Falta ${money(deltaSuper)} p/ SUPERMETA!`;
+                } else {
+                  bonusIncentiveText = `🏆 SUPERMETA ALCANÇADA!`;
+                }
+
+                return (
+                  <span
+                    title={`Programa de Bonificação (piloto de 08/09, 2º ciclo até 05/11): ${atualLabel} (meta ${metaLabel} / super ${superLabel}) — bônus estimado ${money(b.bonusCents)}`}
+                    className="metric-progress-chip"
+                  >
+                    <div
+                      className="metric-progress-track"
+                      style={{
+                        width: `${progressTrackWidth}%`,
+                        background: bonusGradient,
+                      }}
+                    />
+
+                    <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
+                      🎮 Bonificação <strong>{atualLabel}</strong>
+                    </span>
+
+                    <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: corNivel }}>
+                      {badgeLabel}
+                    </span>
+
+                    <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
+                      {bonusIncentiveText}
+                    </span>
+                  </span>
+                );
+              })()}
+
+              {bonusRules.length > 0 && (
+                <span
+                  title={bonusRules.map((rule) => `🎁 ${rule.description} (${money(rule.rewardValueCents)})`).join(" · ")}
+                  className="metric-progress-chip"
+                >
+                  🏆 <strong>{bonusRules.length}</strong> regra{bonusRules.length > 1 ? "s" : ""} de bônus ativa{bonusRules.length > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
           )}
         </div>
 
-        {/* Gauge de Ocupação do Parque & Botão de Check-in */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-          <div style={{ minWidth: "280px", flex: "0 1 340px" }} className="capacity-container">
-            <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px 10px", fontSize: "13px", fontWeight: "bold" }}>
+        {/* Lado Direito: Gauge de Ocupação do Parque & Botão de Check-in compactos */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <div style={{ minWidth: "220px", flex: "0 1 280px" }} className="capacity-container">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "2px 8px", fontSize: "12px", fontWeight: "bold" }}>
               <span>Ocupação: {currentOccupancy} / {maxCapacity} {unit.kind === "QUIOSQUE" ? "carrinhos" : "crianças"}</span>
-              <span style={{ color: capacityTextColor }}>{occupancyPercent}% ({capacityLabel})</span>
+              <span style={{ color: capacityTextColor, fontSize: "11px" }}>{occupancyPercent}% ({capacityLabel})</span>
             </div>
             <div className="capacity-bar-track" role="progressbar" aria-valuenow={occupancyPercent} aria-valuemin={0} aria-valuemax={100}>
               <div className="capacity-bar-fill" style={{ width: `${occupancyPercent}%`, backgroundColor: capacityColor }} />
@@ -570,7 +695,7 @@ export function PainelScreen() {
                 setEntradaOpen(true);
               }}
               title="Fazer nova entrada/check-in sem sair do Painel (Teclas E ou F2)"
-              style={{ gap: "6px", fontWeight: "bold", whiteSpace: "nowrap", height: "42px", borderRadius: "12px" }}
+              style={{ gap: "6px", fontWeight: "bold", whiteSpace: "nowrap", height: "36px", borderRadius: "10px", fontSize: "13px", padding: "0 14px" }}
             >
               ⚡ Novo Check-in (E)
             </Button>
@@ -578,148 +703,23 @@ export function PainelScreen() {
         </div>
       </div>
 
-      {/* Faixa compacta de indicadores (Ticket Médio, Bonificação, Regras):
-          antes eram cards com barra de progresso empilhados abaixo da lista
-          de crianças, empurrando a área de rolagem para baixo do fold. Viram
-          um único chip por indicador (resumo + %, sem barra), lado a lado —
-          o foco da tela continua sendo os cards das crianças logo abaixo. */}
-      {(ticketTargetCents > 0 || bonusRules.length > 0 || (unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)))) && (
-        <div style={{ flexShrink: 0, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
-          {ticketTargetCents > 0 && (() => {
-            const percent = Math.min(120, Math.round((ticketMedioCents / ticketTargetCents) * 100));
-            const progressTrackWidth = Math.min(100, percent);
-
-            let zoneColor = "#3b82f6";
-            let zoneGradient = "linear-gradient(90deg, #3b82f6, #60a5fa)";
-            let badgeClass = "";
-
-            if (percent < 50) {
-              zoneColor = "#ef4444";
-              zoneGradient = "linear-gradient(90deg, #ef4444, #f59e0b)";
-            } else if (percent < 75) {
-              zoneColor = "#d97706";
-              zoneGradient = "linear-gradient(90deg, #f59e0b, #eab308)";
-            } else if (percent < 100) {
-              zoneColor = "#16a34a";
-              zoneGradient = "linear-gradient(90deg, #eab308, #10b981)";
-            } else if (percent < 120) {
-              zoneColor = "#059669";
-              zoneGradient = "linear-gradient(90deg, #10b981, #047857)";
-              badgeClass = "meta-batida";
-            } else {
-              zoneColor = "#b45309";
-              zoneGradient = "linear-gradient(90deg, #f59e0b, #eab308, #3b82f6)";
-              badgeClass = "super-meta";
-            }
-
-            const deltaCents = ticketTargetCents - ticketMedioCents;
-            let incentiveText = "";
-            if (deltaCents > 0) {
-              incentiveText = `Falta R$ ${(deltaCents / 100).toFixed(2).replace(".", ",")} p/ meta`;
-            } else {
-              incentiveText = `🔥 Meta Batida! (+${percent - 100}%)`;
-            }
-
-            return (
-              <span
-                title={`Ticket médio de hoje: ${money(ticketMedioCents)} (mín ${money(ticketMinCents)} / alvo ${money(ticketTargetCents)}) — ${incentiveText}`}
-                className="metric-progress-chip"
-              >
-                <div
-                  className="metric-progress-track"
-                  style={{
-                    width: `${progressTrackWidth}%`,
-                    background: zoneGradient,
-                  }}
-                />
-
-                <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
-                  🌡️ Ticket médio <strong>{money(ticketMedioCents)}</strong>
-                </span>
-
-                <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: zoneColor }}>
-                  {percent}%
-                </span>
-
-                <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
-                  {incentiveText}
-                </span>
-              </span>
-            );
-          })()}
-
-          {unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)) && (() => {
-            const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
-            const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
-            const atual = tipo === "CIRCUITO" ? todayOrdersCount : Math.max(0, todayRevenueCents - todayRentalCents);
-            const dow = diaSemanaISO(businessDate);
-            const goal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
-            const b = bonificacaoHoje(tipo, businessDate, atual, goal, bonusProgram?.locacaoExtraBonusCents ?? 0);
-            if (!b) return null;
-
-            const percentBonus = b.meta > 0 ? Math.min(120, Math.round((b.atual / b.meta) * 100)) : 0;
-            const progressTrackWidth = Math.min(100, percentBonus);
-
-            const corNivel = b.nivel === "supermeta" ? "#d97706" : b.nivel === "meta" ? "#059669" : "#2563eb";
-            const bonusGradient = b.nivel === "supermeta"
-              ? "linear-gradient(90deg, #f59e0b, #eab308, #3b82f6)"
-              : b.nivel === "meta"
-                ? "linear-gradient(90deg, #10b981, #059669)"
-                : "linear-gradient(90deg, #3b82f6, #10b981)";
-            const badgeClass = b.nivel === "supermeta" ? "super-meta" : b.nivel === "meta" ? "meta-batida" : "";
-
-            const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta" : b.nivel === "meta" ? "🥈 Meta batida" : `${percentBonus}%`;
-            const atualLabel = tipo === "CIRCUITO" ? `${b.atual} locações` : money(b.atual);
-            const metaLabel = tipo === "CIRCUITO" ? `${b.meta}` : money(b.meta);
-            const superLabel = tipo === "CIRCUITO" ? `${b.super}` : money(b.super);
-
-            let bonusIncentiveText = "";
-            if (b.nivel === "abaixo") {
-              const delta = b.meta - b.atual;
-              bonusIncentiveText = tipo === "CIRCUITO" ? `Falta ${delta} loc. p/ bônus!` : `Falta ${money(delta)} p/ bônus!`;
-            } else if (b.nivel === "meta") {
-              const deltaSuper = b.super - b.atual;
-              bonusIncentiveText = tipo === "CIRCUITO" ? `Falta ${deltaSuper} loc. p/ SUPERMETA!` : `Falta ${money(deltaSuper)} p/ SUPERMETA!`;
-            } else {
-              bonusIncentiveText = `🏆 SUPERMETA ALCANÇADA!`;
-            }
-
-            return (
-              <span
-                title={`Programa de Bonificação (piloto de 08/09, 2º ciclo até 05/11): ${atualLabel} (meta ${metaLabel} / super ${superLabel}) — bônus estimado ${money(b.bonusCents)}`}
-                className="metric-progress-chip"
-              >
-                <div
-                  className="metric-progress-track"
-                  style={{
-                    width: `${progressTrackWidth}%`,
-                    background: bonusGradient,
-                  }}
-                />
-
-                <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
-                  🎮 Bonificação <strong>{atualLabel}</strong>
-                </span>
-
-                <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: corNivel }}>
-                  {badgeLabel}
-                </span>
-
-                <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
-                  {bonusIncentiveText}
-                </span>
-              </span>
-            );
-          })()}
-
-          {bonusRules.length > 0 && (
-            <span
-              title={bonusRules.map((rule) => `🎁 ${rule.description} (${money(rule.rewardValueCents)})`).join(" · ")}
-              className="metric-progress-chip"
-            >
-              🏆 <strong>{bonusRules.length}</strong> regra{bonusRules.length > 1 ? "s" : ""} de bônus ativa{bonusRules.length > 1 ? "s" : ""}
-            </span>
-          )}
+      {!tipDismissed && entries.length > 0 && (
+        <div style={{ position: "relative", flexShrink: 0 }} role="status">
+          <HelpText style={{ marginTop: 0, paddingRight: "30px" }}>
+            Toque num cartão para selecioná-lo (fica com borda rosa) e depois em "Fechar sessões" para cobrar. O
+            rótulo colorido (verde/amarelo/vermelho) mostra o tempo restante do plano — vermelho já ultrapassou.
+          </HelpText>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem("facaamigos_panel_tip_dismissed", "true");
+              setTipDismissed(true);
+            }}
+            title="Não mostrar mais esta dica"
+            style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "16px" }}
+          >
+            ✕
+          </button>
         </div>
       )}
 

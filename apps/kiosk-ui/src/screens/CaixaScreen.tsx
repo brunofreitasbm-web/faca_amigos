@@ -1017,7 +1017,8 @@ export function CaixaScreen() {
       {renderEnvelopeModal()}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
         <div>
-          <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Caixa</h1>
+          {/* Título só para leitores de tela: a aba ativa "Caixa" já diz onde a pessoa está. */}
+          <h1 className="sr-only">Caixa</h1>
           <HelpText>
             Acompanhe o faturamento e as vendas deste turno, registre retiradas/reforços de dinheiro e feche o turno no
             final do dia.
