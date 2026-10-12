@@ -22,7 +22,7 @@ Isabella) recebem num grupo do Telegram e respondem ali mesmo, sem abrir o app. 
    lidas; a tela de PIN mostra "Há mensagens novas do Owner no chat" (sem nomes).
 5. Mensagem que falhar no Telegram é reenviada por varredura a cada 2 min (até 24 h).
 
-Status que o colaborador vê: *Enviando… → Enviada → Entregue ao Owner* (a mensagem chegou ao
+Status que o colaborador vê: *Enviando… → Enviada → Entregue aos donos* (a mensagem chegou ao
 Telegram dele). "Lido pelo Owner" não existe: o Telegram não informa isso.
 
 ## Ativação (uma vez)

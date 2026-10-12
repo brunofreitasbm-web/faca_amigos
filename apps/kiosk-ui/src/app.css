@@ -871,43 +871,57 @@ body {
   }
 }
 
-/* ---------- Chat interno com o Owner (components/ChatFab.tsx) ---------- */
+/* ---------- Chat interno com os donos (components/ChatFab.tsx) ---------- */
+/* Canto direito, ACIMA dos botões redondos de PDV/Entrada do Painel (2 x 64px + espaços ≈ 166px) e do
+   resumo do Owner. Grande, opaco e com o texto escrito: o operador não confunde com nenhum outro botão. */
 .chat-fab {
   position: fixed;
   z-index: 998; /* abaixo do resumo do Owner (999) e dos modais */
-  bottom: calc(96px + var(--install-banner-height, 0px));
-  width: 44px;
-  height: 52px;
+  right: 16px;
+  bottom: calc(196px + var(--install-banner-height, 0px));
+  width: 84px;
+  min-height: 84px;
+  padding: 10px 6px 8px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-card);
-  color: var(--color-primary-hover);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  gap: 4px;
+  border: 3px solid #fff;
+  border-radius: 24px;
+  background: var(--color-primary-hover);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  font: inherit;
   cursor: pointer;
-  opacity: 0.72;
-  transition: opacity 0.15s ease;
+  transition: transform 0.12s ease;
 }
 .chat-fab:hover,
-.chat-fab:focus-visible,
-.chat-fab--unread {
-  opacity: 1;
+.chat-fab:focus-visible {
+  transform: scale(1.04);
 }
-.chat-fab--left {
-  left: 0;
-  border-left: none;
-  border-radius: 0 16px 16px 0;
+.chat-fab:active {
+  transform: scale(0.97);
 }
-.chat-fab--right {
-  right: 0;
-  border-right: none;
-  border-radius: 16px 0 0 16px;
+.chat-fab__label {
+  display: block;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .chat-fab {
+    width: 76px;
+    min-height: 76px;
+    bottom: calc(176px + var(--install-banner-height, 0px));
+  }
 }
 .chat-fab__badge {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -12px;
+  right: -12px;
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
@@ -951,15 +965,15 @@ body {
 .chat-panel {
   position: fixed;
   z-index: 1000;
-  left: 0;
+  right: 0;
   top: 0;
   bottom: 0;
   width: min(380px, 100vw);
   display: flex;
   flex-direction: column;
   background: var(--surface-card);
-  border-right: 1px solid var(--border-subtle);
-  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.22);
+  border-left: 1px solid var(--border-subtle);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.22);
 }
 .chat-panel__head {
   display: flex;

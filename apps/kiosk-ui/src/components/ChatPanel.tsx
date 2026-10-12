@@ -82,9 +82,9 @@ export function ChatPanel({ messages, loading, error, onSend, onRetry, onClose }
 
   let lastDay = "";
   return (
-    <aside className="chat-panel" role="dialog" aria-label="Chat com o Owner">
+    <aside className="chat-panel" role="dialog" aria-label="Chat com os donos">
       <header className="chat-panel__head">
-        <strong>Chat com o Owner</strong>
+        <strong>Chat com os donos 👑</strong>
         <button type="button" className="chat-panel__close" onClick={onClose} aria-label="Fechar chat">
           <XIcon />
         </button>
@@ -95,7 +95,7 @@ export function ChatPanel({ messages, loading, error, onSend, onRetry, onClose }
         {loading && messages.length === 0 && <p className="chat-panel__empty">Carregando…</p>}
         {error && <p className="chat-panel__error">Chat indisponível: {error}</p>}
         {!loading && !error && messages.length === 0 && (
-          <p className="chat-panel__empty">Escreva abaixo para falar com o Owner sobre sistema, problemas ou avisos.</p>
+          <p className="chat-panel__empty">Escreva abaixo para falar com os donos sobre sistema, problemas ou avisos.</p>
         )}
         {messages.map((m) => {
           const day = dayLabel(m.created_at_ms);

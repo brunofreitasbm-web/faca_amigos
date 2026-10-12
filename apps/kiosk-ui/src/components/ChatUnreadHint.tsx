@@ -7,7 +7,7 @@ export function ChatUnreadHint() {
   return (
     <div className="chat-hint" role="status">
       <span className="chat-hint__dot" aria-hidden="true" />
-      Há mensagens novas do Owner no chat. Entre com seu PIN para ler.
+      Há mensagens novas dos donos no chat. Entre com seu PIN para ler.
     </div>
   );
 }
