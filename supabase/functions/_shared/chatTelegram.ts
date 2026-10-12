@@ -76,9 +76,10 @@ export async function chatWebhookSecret(token: string): Promise<string> {
 export const HELP_TEXT =
   "Para responder, use <b>Responder</b> (deslize) na mensagem do colaborador, ou toque num dos botões abaixo dela.";
 
-/** Resposta ao comando /id: só revela o id de quem perguntou. */
-export function idReply(userId: number | string): string {
-  return `Seu id no Telegram: <code>${userId}</code>`;
+/** Resposta ao comando /id: o id de quem perguntou e o do chat onde foi digitado (serve para achar o id do grupo). */
+export function idReply(userId: number | string, chatId?: number | string): string {
+  const chat = chatId === undefined ? "" : `\nId deste chat: <code>${chatId}</code>`;
+  return `Seu id no Telegram: <code>${userId}</code>${chat}`;
 }
 
 /** Nome curto para assinar a resposta (primeiro nome). */

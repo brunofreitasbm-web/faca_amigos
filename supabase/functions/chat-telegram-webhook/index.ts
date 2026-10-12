@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
 
   // /id (ou /id@bot): qualquer pessoa descobre o PRÓPRIO id. Não concede nenhum acesso.
   if (/^\/id(@\w+)?(\s|$)/.test(msg.text)) {
-    await say(idReply(msg.from?.id ?? ""));
+    await say(idReply(msg.from?.id ?? "", msg.chat?.id));
     return OK();
   }
 

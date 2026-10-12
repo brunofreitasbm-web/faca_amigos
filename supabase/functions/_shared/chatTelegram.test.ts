@@ -65,8 +65,10 @@ test("answeredKeyboard troca os botões por um rótulo inerte", () => {
   assert.match(kb.inline_keyboard[0]![0]!.text, /Bruno: Resolvido/);
 });
 
-test("idReply mostra só o id de quem perguntou", () => {
+test("idReply mostra o id de quem perguntou e, se informado, o do chat", () => {
   assert.match(idReply(123), /<code>123<\/code>/);
+  assert.doesNotMatch(idReply(123), /chat/);
+  assert.match(idReply(123, -1001234), /Id deste chat: <code>-1001234<\/code>/);
 });
 
 test("firstName pega o primeiro nome e tem fallback", () => {
