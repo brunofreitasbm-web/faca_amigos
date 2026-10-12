@@ -1,4 +1,5 @@
 import { supabase } from "./client.js";
+import { markSessionStarted } from "./sessionExpiry.js";
 
 /**
  * Porta de entrada do Hub de Gestão (gestao.institutofacaamigos.com.br).
@@ -21,4 +22,5 @@ export async function consumeHubSsoTicket(): Promise<void> {
 
   const { error } = await supabase().auth.verifyOtp({ token_hash: tokenHash, type: "email" });
   if (error) console.error("[sso] ticket do Hub de Gestão recusado:", error.message);
+  else markSessionStarted();
 }
