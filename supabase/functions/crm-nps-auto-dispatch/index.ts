@@ -1,9 +1,11 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { isWithinNpsSendWindow } from "../_shared/nps.ts";
 import { loadUnitOptions, npsVariables, renderNpsPreview, templateAsksUnit } from "../_shared/npsSurvey.ts";
 
 // Disparada a cada 15 min pelo pg_cron (migration 20260928140000). Envia o
-// NPS por WhatsApp a quem terminou a visita entre 2h e 6h atrás, SOMENTE nas
-// unidades com fa_kiosk_app_settings.crm_nps_auto = '1' (padrão desligado).
+// NPS por WhatsApp a quem terminou a visita entre 2h e 14h atrás, SOMENTE nas
+// unidades com fa_kiosk_app_settings.crm_nps_auto = '1' (padrão desligado),
+// estritamente na janela de envio entre 8h e 23h (horário local Belém/Brasília).
 //
 // verify_jwt = false (config.toml): só o pg_cron chama, sem JWT — mesmo
 // padrão de sales-compendium-dispatch. Rodar a mais não causa envio a
@@ -11,7 +13,7 @@ import { loadUnitOptions, npsVariables, renderNpsPreview, templateAsksUnit } fro
 // Inline (sem _shared) pelo mesmo motivo das demais functions de cron.
 
 const MIN_DELAY_MS = 2 * 60 * 60 * 1000;
-const MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const MAX_AGE_MS = 14 * 60 * 60 * 1000; // 14h cobre checkouts noturnos aguardando abertura às 8h
 const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_PER_RUN = 50;
 const WEBHOOK_URL =
@@ -21,6 +23,11 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async () => {
+  const now = Date.now();
+  if (!isWithinNpsSendWindow(now)) {
+    return json({ ok: true, skipped: "fora da janela de envio de NPS (8h-23h)" });
+  }
+
   const accountSid = Deno.env.get("TWILIO_CRM_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_CRM_AUTH_TOKEN");
   if (!accountSid || !authToken) return json({ error: "Twilio do CRM não configurado" }, 503);

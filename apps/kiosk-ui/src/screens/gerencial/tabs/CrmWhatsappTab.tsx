@@ -461,7 +461,6 @@ function WhatsappCostCard() {
 function CrmContent() {
   const { can } = useAuth();
   const toast = useToast();
-  const confirm = useConfirm();
   const canWrite = can("crm.write");
 
   const [contacts, setContacts] = useState<CrmContact[]>([]);
@@ -551,31 +550,6 @@ function CrmContent() {
     }
   }
 
-  async function sendNps(ids: string[], scope: string) {
-    if (ids.length === 0) return;
-    const ok = await confirm({
-      title: "Enviar pesquisa de NPS?",
-      message: `${scope} receberá(ão) a pergunta de 0 a 10 pelo WhatsApp (${ids.length} contato${ids.length > 1 ? "s" : ""}). Quem já recebeu nos últimos 30 dias ou pediu para não receber é pulado automaticamente.`,
-      confirmLabel: "Enviar NPS",
-    });
-    if (!ok) return;
-    setSending(true);
-    try {
-      const r = await Api.crmSendNps(ids.slice(0, 100));
-      toast.success(
-        `NPS enviado a ${r.sent}` +
-          (r.skippedRecent ? ` · ${r.skippedRecent} já pesquisado(s) há menos de 30 dias` : "") +
-          (r.skippedOptOut ? ` · ${r.skippedOptOut} sem opt-in` : "") +
-          (r.failed ? ` · ${r.failed} falha(s)` : ""),
-      );
-      void loadContacts();
-      if (selectedId) setMessages(await Api.crmMessages(selectedId));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao enviar NPS");
-    } finally {
-      setSending(false);
-    }
-  }
 
   async function send() {
     if (!selected || sending) return;
@@ -627,11 +601,7 @@ function CrmContent() {
             {s.label} ({contacts.filter((c) => c.stage === s.value).length})
           </Button>
         ))}
-        {canWrite && filtered.length > 0 && (
-          <Button size="sm" variant="secondary" disabled={sending} style={{ marginLeft: "auto" }} onClick={() => void sendNps(filtered.slice(0, 100).map((c) => c.id), "Os contatos filtrados")}>
-            ⭐ Enviar NPS aos {Math.min(filtered.length, 100)} contato(s) listado(s)
-          </Button>
-        )}
+
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 340px) 1fr", gap: "12px", alignItems: "start" }}>
@@ -695,11 +665,7 @@ function CrmContent() {
                     {selected.guardian_id && " · cadastro no kiosk"}
                   </div>
                 </div>
-                {canWrite && (
-                  <Button size="sm" variant="secondary" disabled={sending || !selected.opt_in} onClick={() => void sendNps([selected.id], contactTitle(selected))}>
-                    ⭐ Enviar NPS
-                  </Button>
-                )}
+
                 <select
                   aria-label="Etapa do funil"
                   value={selected.stage}

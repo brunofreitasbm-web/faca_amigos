@@ -1,0 +1,240 @@
+<title>Kiosk FaçaAmigos Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* Layout: comparação lado a lado (atual × proposta) do Painel, seguida das sugestões priorizadas */
+:root{
+  --bg:#FBF7F4; --fg:#1A3F35; --muted:#5E6F6A; --line:#E6DDD6; --card:#FFFFFF;
+  --pink:#F0196B; --pink-text:#C8155A; --teal:#2ECFB5; --teal-text:#1D8273; --yellow:#FFE234; --orange:#FF7A00;
+  --chip:#F1EAE4;
+  --f-display:'Fredoka','Fredoka One',system-ui,sans-serif; --f-body:'Nunito',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141414;--fg:#F3EEE9;--muted:#A9B3AF;--line:#2E2E2E;--card:#1E1E1E;--pink-text:#FF6BA3;--teal-text:#5FE0CB;--chip:#2A2A2A;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141414;--fg:#F3EEE9;--muted:#A9B3AF;--line:#2E2E2E;--card:#1E1E1E;--pink-text:#FF6BA3;--teal-text:#5FE0CB;--chip:#2A2A2A;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.55 var(--f-body);padding-inline:clamp(16px,4vw,48px);padding-block:32px 64px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;margin:0;text-wrap:balance;line-height:1.15}
+h1{font-size:clamp(30px,5vw,46px)} h2{font-size:26px} h3{font-size:18px}
+p{margin:0;max-width:65ch}
+.eyebrow{font:800 11px var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--pink-text)}
+.lead{color:var(--muted);font-size:16px;margin-top:10px}
+.head{display:flex;flex-direction:column;gap:6px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.seg{display:inline-flex;background:var(--chip);border-radius:999px;padding:4px;gap:2px}
+.seg button{font:800 13px var(--f-body);border:0;background:none;color:var(--muted);padding:8px 16px;border-radius:999px;cursor:pointer;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--pink);color:#fff;box-shadow:0 4px 14px rgba(240,25,107,.35)}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.cmp[data-show="now"] .col-new,.cmp[data-show="new"] .col-now{display:none}
+.cmp[data-show="now"],.cmp[data-show="new"]{grid-template-columns:1fr}
+@media(max-width:900px){.cmp{grid-template-columns:1fr}}
+.col{min-width:0;display:flex;flex-direction:column;gap:10px}
+.tag{font:800 12px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center}
+.tag b{background:var(--chip);border-radius:999px;padding:3px 10px;color:var(--fg)}
+.col-new .tag b{background:var(--pink);color:#fff}
+
+/* ===== telas simuladas (superfície do kiosk = clara, fixa) ===== */
+.screen{border-radius:20px;overflow:hidden;border:1px solid var(--line);font-family:var(--f-body);color:#1A3F35;min-width:0}
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:8px;font-weight:900;font-size:15px}
+.brand i{width:26px;height:26px;border-radius:50%;display:block}
+.nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.nav span{font-weight:800;font-size:12px;padding:6px 12px}
+.body{padding:14px;display:flex;flex-direction:column;gap:12px}
+.title{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.k{min-width:0;position:relative}
+.k .nm{font-weight:900;font-size:14px;line-height:1.2}
+.k .sub{font-size:11px;color:#6C7682;font-weight:600}
+.k .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pill{font-weight:800;font-size:10.5px;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.btn{font-weight:800;font-size:11.5px;border:0;border-radius:999px;padding:7px 12px;font-family:inherit}
+.tm{font-variant-numeric:tabular-nums}
+
+/* --- ATUAL --- */
+.s-now{background:#F5F6F7}
+.s-now .topbar{background:#fff;border-bottom:3px solid #F0196B}
+.s-now .brand i{background:#2ECFB5}
+.s-now .nav span{color:#5A636E;border-radius:8px}
+.s-now .nav .on{background:#E8EAEC;color:#1A3F35}
+.s-now .title b{font-size:17px;font-weight:900}
+.s-now .k{background:#fff;border:1px solid #CDD1D6;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.s-now .ph{border-radius:999px;padding:6px 10px;font-weight:800;font-size:12px}
+.s-now .btn{background:#E8EAEC;color:#1A3F35}
+.s-now .btn.p{background:#F0196B;color:#fff}
+
+/* --- PROPOSTA --- */
+.s-new{background:#FBF7F4}
+.s-new .topbar{background:#fff;border-bottom:1px solid #EFE6DF;position:relative}
+.s-new .topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:4px;background:linear-gradient(90deg,#F0196B,#FF7A00,#FFE234,#2ECFB5)}
+.s-new .brand{font-family:var(--f-display);font-weight:600;font-size:17px}
+.s-new .brand i{background:conic-gradient(from 200deg,#A020EE,#F0196B 20%,#FF7A00 50%,#FFD700 75%,#F0196B 95%,#A020EE);padding:3px;position:relative}
+.s-new .brand i::after{content:"";position:absolute;inset:3px;border-radius:50%;background:#fff}
+.s-new .nav span{color:#5A636E;border-radius:999px}
+.s-new .nav .on{background:#F0196B;color:#fff;box-shadow:0 4px 14px rgba(240,25,107,.35)}
+.s-new .title b{font-family:var(--f-display);font-weight:600;font-size:24px;line-height:1.1}
+.s-new .k{background:#fff;border-radius:24px;padding:14px 12px 12px;display:flex;flex-direction:column;gap:9px;box-shadow:0 6px 22px rgba(26,63,53,.10);overflow:hidden}
+.s-new .k .av{width:44px;height:44px;border-radius:50%;padding:3px;flex:none;display:grid;place-items:center;font-family:var(--f-display);font-size:16px;color:#fff;background-clip:content-box}
+.s-new .k .top{display:flex;gap:10px;align-items:center}
+.s-new .clock{border-radius:18px;padding:8px 12px;display:flex;justify-content:space-between;align-items:baseline;font-weight:800;font-size:11px}
+.s-new .clock .tm{font-family:var(--f-display);font-weight:600;font-size:26px;line-height:1}
+.s-new .btn{background:#F1EAE4;color:#1A3F35;padding:9px 14px}
+.s-new .btn.p{background:#F0196B;color:#fff;box-shadow:0 4px 14px rgba(240,25,107,.35)}
+.s-new .corner{position:absolute;top:0;right:0;width:34px;height:34px;background:#FFE234;clip-path:polygon(0 0,100% 0,100% 100%)}
+.s-new .over{box-shadow:0 6px 22px rgba(240,25,107,.28),0 0 0 2px #F0196B}
+
+/* ===== sugestões ===== */
+.sug{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card .meta{display:flex;gap:6px;flex-wrap:wrap}
+.m{font:800 11px var(--f-body);padding:4px 10px;border-radius:999px;background:var(--chip);color:var(--muted)}
+.m.hi{background:#FFE234;color:#3a3200}
+.m.lo{background:rgba(46,207,181,.2);color:var(--teal-text)}
+.card p{color:var(--muted);font-size:14px}
+.card code{font:700 12px ui-monospace,Consolas,monospace;background:var(--chip);padding:1px 6px;border-radius:6px;color:var(--fg)}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.sw{display:flex;align-items:center;gap:8px;font:700 12px var(--f-body);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 5px}
+.sw i{width:22px;height:22px;border-radius:50%;display:block}
+.foot{color:var(--muted);font-size:13px}
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <span class="eyebrow">Kiosk · proposta visual</span>
+    <h1>Painel com o visual FaçaAmigos mais novo</h1>
+    <p class="lead">O kiosk já usa as cores da marca, mas ainda parece uma ferramenta genérica. Aqui o mesmo Painel com os elementos do design system: títulos em Fredoka, cards de 24px, anel de gradiente nos avatares, sombras coloridas e botões em pílula. Segue claro, como decidido para a operação.</p>
+  </header>
+
+  <section class="head" style="gap:14px">
+    <div class="bar">
+      <h2 style="margin-right:auto">Painel: antes e depois</h2>
+      <div class="seg" role="group" aria-label="Versão">
+        <button id="b-both" aria-pressed="true">Lado a lado</button>
+        <button id="b-now" aria-pressed="false">Atual</button>
+        <button id="b-new" aria-pressed="false">Proposta</button>
+      </div>
+    </div>
+
+    <div class="cmp" id="cmp" data-show="both">
+      <!-- ATUAL -->
+      <div class="col col-now">
+        <div class="tag"><b>Hoje</b> como está no kiosk</div>
+        <div class="screen s-now">
+          <div class="topbar"><div class="brand"><i></i>Parque Shopping</div>
+            <div class="nav"><span>Entrada</span><span class="on">Painel</span><span>PDV</span><span>Saída</span></div></div>
+          <div class="body">
+            <div class="title"><b>Painel</b><span class="sub" style="font-size:12px;color:#6C7682">6 crianças no playground</span></div>
+            <div class="grid">
+              <div class="k"><span class="nm">Helena, 4a</span><span class="sub">Resp.: Camila · Plano 1h</span>
+                <div class="ph" style="background:#DDF5E8;color:#14633F">● no prazo <b class="tm">22:14</b></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k"><span class="nm">Davi, 6a</span><span class="sub">Resp.: Rafael · Plano 2h</span>
+                <div class="ph" style="background:#DDF5E8;color:#14633F">● no prazo <b class="tm">48:02</b></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k"><span class="nm">Maria Clara, 5a</span><span class="sub">Resp.: Joana · Plano 1h</span>
+                <div class="ph" style="background:#FFF1C2;color:#6B4A00">◆ acabando <b class="tm">08:40</b></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k"><span class="nm">Pedro, 3a</span><span class="sub">Resp.: Lia · Plano 30min</span>
+                <div class="ph" style="background:#FFE0E0;color:#8A1212">▲ últimos minutos <b class="tm">02:31</b></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k" style="border-color:#E83030"><span class="nm">Alice, 7a</span><span class="sub">Resp.: Bruna · Plano 1h</span>
+                <div class="ph" style="background:#E83030;color:#fff">✕ estourou <b class="tm">+07:31</b></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k"><span class="nm">Théo, 4a</span><span class="sub">Resp.: Marcos · Pausado</span>
+                <div class="ph" style="background:#E8EAEC;color:#3A4149">❚❚ pausado <b class="tm">05:12</b></div>
+                <div class="row"><button class="btn">Retomar</button><button class="btn p">Saída</button></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROPOSTA -->
+      <div class="col col-new">
+        <div class="tag"><b>Proposta</b> padrão FaçaAmigos novo</div>
+        <div class="screen s-new">
+          <div class="topbar"><div class="brand"><i></i>Parque Shopping</div>
+            <div class="nav"><span>Entrada</span><span class="on">Painel</span><span>PDV</span><span>Saída</span></div></div>
+          <div class="body" style="padding-top:18px">
+            <div class="title"><b>Quem está brincando agora</b><span class="pill" style="background:#D9F7F1;color:#17695C;font-size:12px;padding:5px 12px">6 crianças</span></div>
+            <div class="grid">
+              <div class="k"><div class="top"><span class="av" style="background:#2ECFB5;box-shadow:0 0 0 3px #fff inset;background-image:none;outline:3px solid transparent;border:3px solid transparent;background:linear-gradient(#2ECFB5,#2ECFB5) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box">H</span><div><div class="nm">Helena, 4a</div><div class="sub">Camila · Plano 1h</div></div></div>
+                <div class="clock" style="background:#DDF5E8;color:#14633F"><span>no prazo</span><span class="tm">22:14</span></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k"><span class="corner" title="Cuidado especial"></span><div class="top"><span class="av" style="background:linear-gradient(#FF7A00,#FF7A00) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box;border:3px solid transparent">D</span><div><div class="nm">Davi, 6a</div><div class="sub">Rafael · Plano 2h</div></div></div>
+                <div class="clock" style="background:#DDF5E8;color:#14633F"><span>no prazo</span><span class="tm">48:02</span></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k"><div class="top"><span class="av" style="background:linear-gradient(#A020EE,#A020EE) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box;border:3px solid transparent">M</span><div><div class="nm">Maria Clara, 5a</div><div class="sub">Joana · Plano 1h</div></div></div>
+                <div class="clock" style="background:#FFF1C2;color:#6B4A00"><span>acabando</span><span class="tm">08:40</span></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k"><div class="top"><span class="av" style="background:linear-gradient(#F0196B,#F0196B) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box;border:3px solid transparent">P</span><div><div class="nm">Pedro, 3a</div><div class="sub">Lia · Plano 30min</div></div></div>
+                <div class="clock" style="background:#FFE0E0;color:#8A1212"><span>últimos minutos</span><span class="tm">02:31</span></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+              <div class="k over"><div class="top"><span class="av" style="background:linear-gradient(#2ECFB5,#2ECFB5) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box;border:3px solid transparent">A</span><div><div class="nm">Alice, 7a</div><div class="sub">Bruna · Plano 1h</div></div></div>
+                <div class="clock" style="background:#F0196B;color:#fff"><span>estourou o tempo</span><span class="tm">+07:31</span></div>
+                <div class="row"><button class="btn">Pausar</button><button class="btn p">Cobrar e sair</button></div></div>
+              <div class="k"><div class="top"><span class="av" style="background:linear-gradient(#A0A8B2,#A0A8B2) padding-box,#CDD1D6 border-box;border:3px solid transparent">T</span><div><div class="nm">Théo, 4a</div><div class="sub">Marcos · Pausado</div></div></div>
+                <div class="clock" style="background:#ECEEF0;color:#3A4149"><span>pausado</span><span class="tm">05:12</span></div>
+                <div class="row"><button class="btn">Retomar</button><button class="btn p">Saída</button></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="foot">Dados de exemplo para ilustrar. Os estados continuam com ícone, texto e cor juntos, como o StatusBadge atual exige.</p>
+  </section>
+
+  <section class="head" style="gap:14px">
+    <h2>O que mudar, em ordem de retorno</h2>
+    <div class="sug">
+      <div class="card"><div class="meta"><span class="m hi">Alto impacto</span><span class="m lo">Esforço baixo</span></div>
+        <h3>Fredoka nos títulos e no cronômetro</h3>
+        <p>Hoje tudo é Nunito. Usar Fredoka só em títulos de tela e no número do tempo dá a cara da marca e deixa o cronômetro legível de longe. Corpo e rótulos continuam em Nunito. Mexe só em <code>--font-display</code>.</p></div>
+      <div class="card"><div class="meta"><span class="m hi">Alto impacto</span><span class="m lo">Esforço baixo</span></div>
+        <h3>Cards de 24px com sombra suave</h3>
+        <p>Os cards do Painel usam borda cinza e raio menor. O sistema pede preenchido, sem borda, <code>--radius-card</code> (24px) e sombra neutra leve. Estouro de tempo ganha sombra rosa e contorno.</p></div>
+      <div class="card"><div class="meta"><span class="m hi">Alto impacto</span><span class="m">Esforço médio</span></div>
+        <h3>Avatar com anel de gradiente</h3>
+        <p>A criança ganha um círculo com a inicial e o anel <code>--gradient-ring</code>, o mesmo do app mobile. Ajuda a achar a criança de relance e cria identidade. Pausadas ficam com anel cinza.</p></div>
+      <div class="card"><div class="meta"><span class="m">Impacto médio</span><span class="m lo">Esforço baixo</span></div>
+        <h3>Navegação em pílula e faixa colorida</h3>
+        <p>O módulo ativo vira pílula rosa com sombra rosa. A régua de 3px da unidade vira a faixa gradiente da marca no rodapé do cabeçalho. Mantém <code>brand.accent</code> por unidade como cor de apoio.</p></div>
+      <div class="card"><div class="meta"><span class="m">Impacto médio</span><span class="m lo">Esforço baixo</span></div>
+        <h3>Cronômetro como protagonista</h3>
+        <p>O tempo passa a ocupar uma faixa própria dentro do card, grande, com o estado ao lado. O operador lê o tempo antes do nome. Segue o foco operacional já descrito no StatusBadge.</p></div>
+      <div class="card"><div class="meta"><span class="m">Impacto médio</span><span class="m">Esforço médio</span></div>
+        <h3>Canto amarelo para cuidado especial</h3>
+        <p>O selo de TEA hoje é um ícone pequeno. O corte amarelo no canto, usado nos posts da marca, chama atenção sem cor de alarme. Deve vir com texto alternativo e legenda na ficha.</p></div>
+      <div class="card"><div class="meta"><span class="m">Impacto médio</span><span class="m lo">Esforço baixo</span></div>
+        <h3>Textos mais diretos</h3>
+        <p>Trocar rótulos técnicos pelo tom da marca: "Quem está brincando agora", "Cobrar e sair", "Hora de avisar o responsável". Frases curtas, sem tom corporativo.</p></div>
+      <div class="card"><div class="meta"><span class="m">Cuidado</span><span class="m">Decisão sua</span></div>
+        <h3>Manter o kiosk claro</h3>
+        <p>A marca é escura no app, mas o kiosk é claro de propósito. Sugiro não mudar. O rosa <code>#F0196B</code> mede 4,15:1 sobre branco: serve para botão e ícone, e texto pequeno deve usar <code>--color-primary-hover</code>.</p></div>
+    </div>
+  </section>
+
+  <section class="head" style="gap:12px">
+    <h2>Tokens que entram</h2>
+    <div class="swatches">
+      <span class="sw"><i style="background:#F0196B"></i>Rosa · ação</span>
+      <span class="sw"><i style="background:#2ECFB5"></i>Turquesa · apoio</span>
+      <span class="sw"><i style="background:#FFE234"></i>Amarelo · destaque</span>
+      <span class="sw"><i style="background:#FF7A00"></i>Laranja · oferta</span>
+      <span class="sw"><i style="background:conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE)"></i>Anel · avatar</span>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var c=document.getElementById('cmp');
+  var map={'b-both':'both','b-now':'now','b-new':'new'};
+  Object.keys(map).forEach(function(id){
+    document.getElementById(id).addEventListener('click',function(){
+      c.setAttribute('data-show',map[id]);
+      Object.keys(map).forEach(function(o){document.getElementById(o).setAttribute('aria-pressed',o===id?'true':'false')});
+    });
+  });
+})();
+</script>

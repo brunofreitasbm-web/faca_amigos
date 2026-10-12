@@ -123,3 +123,12 @@ export const NPS_TEXT = {
  * grudada numa pergunta no meio da conversa.
  */
 export const isNpsFinalReply = (reply: string): boolean => reply === NPS_TEXT.thanks || reply === NPS_TEXT.thanksNoComment;
+
+/**
+ * Janela permitida de envio de NPS: entre 8h e 23h no fuso de Brasília/Belém (UTC-3).
+ * Válido das 08:00:00 até 22:59:59 (hora local >= 8 e < 23).
+ */
+export function isWithinNpsSendWindow(nowMs: number = Date.now()): boolean {
+  const localHour = (Math.floor(nowMs / 3600000) - 3 + 24) % 24;
+  return localHour >= 8 && localHour < 23;
+}

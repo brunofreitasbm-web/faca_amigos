@@ -1,0 +1,206 @@
+<title>Kiosk 3 Propostas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* Layout: abas, uma proposta por vez: mockup do Painel + leitura rápida (para quem, ganho, custo) */
+:root{
+  --bg:#FBF7F4;--fg:#1A3F35;--muted:#5E6F6A;--line:#E6DDD6;--card:#fff;--chip:#F1EAE4;
+  --pink:#F0196B;--pink-text:#C8155A;--teal-text:#1D8273;
+  --f-display:'Fredoka',system-ui,sans-serif;--f-body:'Nunito',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141414;--fg:#F3EEE9;--muted:#A9B3AF;--line:#2E2E2E;--card:#1E1E1E;--chip:#2A2A2A;--pink-text:#FF6BA3;--teal-text:#5FE0CB;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141414;--fg:#F3EEE9;--muted:#A9B3AF;--line:#2E2E2E;--card:#1E1E1E;--chip:#2A2A2A;--pink-text:#FF6BA3;--teal-text:#5FE0CB;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.55 var(--f-body);padding-inline:clamp(16px,4vw,48px);padding-block:32px 64px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;margin:0;text-wrap:balance;line-height:1.15}
+h1{font-size:clamp(30px,5vw,44px)}h2{font-size:26px}h3{font-size:17px}
+p{margin:0;max-width:65ch}
+.eyebrow{font:800 11px var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--pink-text)}
+.lead{color:var(--muted);font-size:16px;margin-top:8px}
+:focus-visible{outline:3px solid #2ECFB5;outline-offset:2px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:760px){.tabs{grid-template-columns:1fr}}
+.tab{font:inherit;text-align:left;cursor:pointer;background:var(--card);color:var(--fg);border:2px solid var(--line);border-radius:24px;padding:14px 18px;display:flex;flex-direction:column;gap:2px;min-height:44px;min-width:0}
+.tab b{font:600 19px var(--f-display)}
+.tab span{font-size:13px;color:var(--muted)}
+.tab[aria-selected="true"]{border-color:var(--pink);box-shadow:0 6px 20px rgba(240,25,107,.22)}
+.panel[hidden]{display:none}
+.panel{display:flex;flex-direction:column;gap:20px}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+.rc{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.rc h3{font-size:15px;font-family:var(--f-body);font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.rc ul{margin:0;padding-left:18px;color:var(--fg);font-size:14px;display:flex;flex-direction:column;gap:4px}
+.rc p{font-size:14px}
+.m{display:inline-block;font:800 11px var(--f-body);padding:4px 10px;border-radius:999px;background:var(--chip);color:var(--muted);margin-right:6px}
+
+/* ===== telas simuladas ===== */
+.screen{border-radius:22px;overflow:hidden;border:1px solid var(--line);font-family:var(--f-body);min-width:0}
+.tm{font-variant-numeric:tabular-nums}
+.btn{font:800 11.5px var(--f-body);border:0;border-radius:999px;padding:8px 13px;white-space:nowrap}
+.nav span{font-weight:800;font-size:12px;padding:6px 13px;border-radius:999px}
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap}
+.nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:8px;font:600 17px var(--f-display)}
+.dot{width:26px;height:26px;border-radius:50%;background:conic-gradient(from 200deg,#A020EE,#F0196B 20%,#FF7A00 50%,#FFD700 75%,#F0196B 95%,#A020EE);display:block}
+.pad{padding:16px;display:flex;flex-direction:column;gap:14px}
+
+/* ---- A: Brincante ---- */
+.A{background:#FBF7F4;color:#1A3F35}
+.A .topbar{background:#fff;position:relative}
+.A .topbar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:linear-gradient(90deg,#F0196B,#FF7A00,#FFE234,#2ECFB5)}
+.A .nav span{color:#5A636E}.A .nav .on{background:#F0196B;color:#fff;box-shadow:0 4px 14px rgba(240,25,107,.35)}
+.A h4{margin:0;font:600 24px/1.1 var(--f-display)}
+.A .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.A .k{background:#fff;border-radius:24px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 22px rgba(26,63,53,.10);position:relative;overflow:hidden;min-width:0}
+.A .top{display:flex;gap:10px;align-items:center}
+.A .av{width:44px;height:44px;border-radius:50%;border:3px solid transparent;display:grid;place-items:center;font:600 16px var(--f-display);color:#fff;flex:none}
+.A .nm{font-weight:900;font-size:14px;line-height:1.2}.A .sub{font-size:11px;color:#6C7682;font-weight:600}
+.A .clock{border-radius:18px;padding:8px 12px;display:flex;justify-content:space-between;align-items:baseline;font-weight:800;font-size:11px}
+.A .clock .tm{font:600 26px/1 var(--f-display)}
+.A .row{display:flex;gap:6px;flex-wrap:wrap}
+.A .btn{background:#F1EAE4;color:#1A3F35}.A .btn.p{background:#F0196B;color:#fff;box-shadow:0 4px 14px rgba(240,25,107,.35)}
+.A .corner{position:absolute;top:0;right:0;width:34px;height:34px;background:#FFE234;clip-path:polygon(0 0,100% 0,100% 100%)}
+.A .over{box-shadow:0 6px 22px rgba(240,25,107,.28),0 0 0 2px #F0196B}
+
+/* ---- B: Torre de controle (denso, lista) ---- */
+.B{background:#F5F6F7;color:#1A3F35}
+.B .topbar{background:#fff;border-bottom:1px solid #CDD1D6;padding-block:8px}
+.B .nav span{color:#5A636E;border-radius:10px}.B .nav .on{background:#1A3F35;color:#fff}
+.B .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.B .kpi{background:#fff;border-radius:16px;padding:8px 12px;display:flex;flex-direction:column;border:1px solid #E8EAEC}
+.B .kpi small{font-weight:800;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#5A636E}
+.B .kpi b{font:600 24px/1.1 var(--f-display)}
+.B .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.B .chip{font-weight:800;font-size:11.5px;padding:6px 12px;border-radius:999px;background:#fff;border:1px solid #CDD1D6;color:#3A4149}
+.B .chip.on{background:#F0196B;border-color:#F0196B;color:#fff}
+.B .list{display:flex;flex-direction:column;gap:5px;overflow-x:auto}
+.B .r{display:grid;grid-template-columns:6px 1.4fr 1.2fr 1.4fr 84px 150px;gap:12px;align-items:center;background:#fff;border-radius:14px;padding:7px 12px 7px 0;min-width:640px}
+.B .r>i{align-self:stretch;border-radius:14px 0 0 14px}
+.B .nm{font-weight:900;font-size:13px}.B .sub{font-size:11px;color:#6C7682;font-weight:600}
+.B .bar{height:8px;border-radius:99px;background:#E8EAEC;overflow:hidden}.B .bar u{display:block;height:100%;border-radius:99px;text-decoration:none}
+.B .ph{font-weight:800;font-size:10.5px;margin-top:3px;display:block}
+.B .t{font:600 19px var(--f-display);text-align:right}
+.B .btn{background:#E8EAEC;color:#1A3F35;padding:6px 10px}.B .btn.p{background:#F0196B;color:#fff}
+.B .acts{display:flex;gap:5px;justify-content:flex-end}
+
+/* ---- C: Telão (escuro, colunas por urgência) ---- */
+.C{background:#141414;color:#F3EEE9}
+.C .topbar{background:#1E1E1E}
+.C .nav span{color:#A9B3AF}.C .nav .on{background:#F0196B;color:#fff}
+.C .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.C .col{background:#1E1E1E;border-radius:24px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.C .ch{display:flex;justify-content:space-between;align-items:center;font:600 15px var(--f-display);padding:2px 4px}
+.C .ch span{font:800 12px var(--f-body);border-radius:99px;padding:2px 10px}
+.C .c{background:#262626;border-radius:18px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.C .c b{font-weight:900;font-size:14px}.C .c small{font-size:11px;color:#A9B3AF;font-weight:600}
+.C .c .t{font:600 32px/1.05 var(--f-display);margin-top:4px}
+.C .c.hot{background:#F0196B;box-shadow:0 4px 20px rgba(240,25,107,.35)}.C .c.hot small{color:#FFE3EE}
+.C .empty{font-size:12px;color:#7A8490;padding:10px 4px}
+.C .legend{font-size:11.5px;color:#A9B3AF;font-weight:700}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Kiosk · direções visuais</span>
+    <h1>Três propostas para o Painel</h1>
+    <p class="lead">Todas usam Fredoka e Nunito, as cores e a regra de forma da marca. O que muda é a ideia de uso: um painel mais afetivo, um mais denso para o horário de pico e um modo telão escuro. Escolha uma aba para ver o mockup.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Propostas">
+    <button class="tab" role="tab" id="t-A" aria-selected="true" aria-controls="p-A"><b>A · Brincante</b><span>A marca em primeiro plano, cards grandes</span></button>
+    <button class="tab" role="tab" id="t-B" aria-selected="false" aria-controls="p-B"><b>B · Torre de controle</b><span>Lista densa, ordenada por urgência</span></button>
+    <button class="tab" role="tab" id="t-C" aria-selected="false" aria-controls="p-C"><b>C · Telão</b><span>Escuro, colunas por fase do tempo</span></button>
+  </div>
+
+  <!-- A -->
+  <section class="panel" id="p-A" role="tabpanel" aria-labelledby="t-A">
+    <div class="screen A">
+      <div class="topbar"><div class="brand"><i class="dot"></i>Parque Shopping</div><div class="nav"><span>Entrada</span><span class="on">Painel</span><span>PDV</span><span>Saída</span></div></div>
+      <div class="pad">
+        <h4>Quem está brincando agora</h4>
+        <div class="grid">
+          <div class="k"><div class="top"><span class="av" style="background:linear-gradient(#2ECFB5,#2ECFB5) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box">H</span><div><div class="nm">Helena, 4a</div><div class="sub">Camila · Plano 1h</div></div></div><div class="clock" style="background:#DDF5E8;color:#14633F"><span>no prazo</span><span class="tm">22:14</span></div><div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+          <div class="k"><span class="corner"></span><div class="top"><span class="av" style="background:linear-gradient(#FF7A00,#FF7A00) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box">D</span><div><div class="nm">Davi, 6a</div><div class="sub">Rafael · Plano 2h</div></div></div><div class="clock" style="background:#DDF5E8;color:#14633F"><span>no prazo</span><span class="tm">48:02</span></div><div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+          <div class="k"><div class="top"><span class="av" style="background:linear-gradient(#A020EE,#A020EE) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box">M</span><div><div class="nm">Maria Clara, 5a</div><div class="sub">Joana · Plano 1h</div></div></div><div class="clock" style="background:#FFF1C2;color:#6B4A00"><span>acabando</span><span class="tm">08:40</span></div><div class="row"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+          <div class="k over"><div class="top"><span class="av" style="background:linear-gradient(#2ECFB5,#2ECFB5) padding-box,conic-gradient(from 200deg,#A020EE,#F0196B,#FF7A00,#FFD700,#F0196B,#A020EE) border-box">A</span><div><div class="nm">Alice, 7a</div><div class="sub">Bruna · Plano 1h</div></div></div><div class="clock" style="background:#F0196B;color:#fff"><span>estourou</span><span class="tm">+07:31</span></div><div class="row"><button class="btn">Pausar</button><button class="btn p">Cobrar e sair</button></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="read">
+      <div class="rc"><h3>Ideia</h3><p>Evolução direta do que existe. Mesmo layout de cards, agora com a cara do app: avatar com anel, cronômetro em Fredoka, cards de 24px e sombra rosa no que estourou.</p></div>
+      <div class="rc"><h3>Bom para</h3><ul><li>Equipe que usa o kiosk em tablet</li><li>Pico de até uns 12 a 15 crianças</li><li>Reforçar a identidade da marca</li></ul></div>
+      <div class="rc"><h3>Custo</h3><p><span class="m">Esforço baixo</span><span class="m">Risco baixo</span></p><p>Mexe em tokens e nos componentes Card, Badge e StatusBadge. Nenhuma tela muda de lugar.</p></div>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section class="panel" id="p-B" role="tabpanel" aria-labelledby="t-B" hidden>
+    <div class="screen B">
+      <div class="topbar"><div class="brand"><i class="dot"></i>Parque Shopping</div><div class="nav"><span>Entrada</span><span class="on">Painel</span><span>PDV</span><span>Saída</span></div></div>
+      <div class="pad">
+        <div class="kpis">
+          <div class="kpi"><small>No playground</small><b>14</b></div>
+          <div class="kpi"><small>Acabando</small><b style="color:#8A5E00">3</b></div>
+          <div class="kpi"><small>Estourou</small><b style="color:#C8155A">1</b></div>
+          <div class="kpi"><small>Pausadas</small><b>2</b></div>
+        </div>
+        <div class="filters"><span class="chip on">Mais urgentes primeiro</span><span class="chip">Todas</span><span class="chip">Só estouradas</span><span class="chip">Cuidado especial</span></div>
+        <div class="list">
+          <div class="r"><i style="background:#F0196B"></i><div><div class="nm">Alice, 7a</div><div class="sub">Bruna</div></div><div class="sub">Plano 1h</div><div><div class="bar"><u style="width:100%;background:#F0196B"></u></div><span class="ph" style="color:#C8155A">▲ estourou o tempo</span></div><div class="t tm" style="color:#C8155A">+07:31</div><div class="acts"><button class="btn">Pausar</button><button class="btn p">Cobrar</button></div></div>
+          <div class="r"><i style="background:#E83030"></i><div><div class="nm">Pedro, 3a</div><div class="sub">Lia</div></div><div class="sub">Plano 30min</div><div><div class="bar"><u style="width:92%;background:#E83030"></u></div><span class="ph" style="color:#B01818">▲ últimos minutos</span></div><div class="t tm">02:31</div><div class="acts"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+          <div class="r"><i style="background:#E8A800"></i><div><div class="nm">Maria Clara, 5a</div><div class="sub">Joana</div></div><div class="sub">Plano 1h</div><div><div class="bar"><u style="width:86%;background:#E8A800"></u></div><span class="ph" style="color:#8A5E00">◆ acabando</span></div><div class="t tm">08:40</div><div class="acts"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+          <div class="r"><i style="background:#28C880"></i><div><div class="nm">Helena, 4a</div><div class="sub">Camila</div></div><div class="sub">Plano 1h</div><div><div class="bar"><u style="width:63%;background:#28C880"></u></div><span class="ph" style="color:#1A8454">● no prazo</span></div><div class="t tm">22:14</div><div class="acts"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+          <div class="r"><i style="background:#28C880"></i><div><div class="nm">Davi, 6a</div><div class="sub">Rafael · cuidado especial</div></div><div class="sub">Plano 2h</div><div><div class="bar"><u style="width:60%;background:#28C880"></u></div><span class="ph" style="color:#1A8454">● no prazo</span></div><div class="t tm">48:02</div><div class="acts"><button class="btn">Pausar</button><button class="btn p">Saída</button></div></div>
+          <div class="r"><i style="background:#A0A8B2"></i><div><div class="nm">Théo, 4a</div><div class="sub">Marcos</div></div><div class="sub">Plano 1h</div><div><div class="bar"><u style="width:40%;background:#A0A8B2"></u></div><span class="ph" style="color:#3A4149">❚❚ pausado</span></div><div class="t tm">05:12</div><div class="acts"><button class="btn">Retomar</button><button class="btn p">Saída</button></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="read">
+      <div class="rc"><h3>Ideia</h3><p>Pensado para o horário de pico. Placar no topo, lista ordenada por urgência e barra de progresso do plano em cada linha. Cabem de 10 a 14 crianças na tela sem rolar.</p></div>
+      <div class="rc"><h3>Bom para</h3><ul><li>Balcão com muita criança ao mesmo tempo</li><li>Quem precisa achar o próximo a sair em 1 segundo</li><li>Filtros rápidos por estado</li></ul></div>
+      <div class="rc"><h3>Custo</h3><p><span class="m">Esforço médio</span><span class="m">Risco médio</span></p><p>Vira uma segunda visualização do Painel. Sugiro um botão para alternar entre cards e lista, assim ninguém perde o hábito atual.</p></div>
+    </div>
+  </section>
+
+  <!-- C -->
+  <section class="panel" id="p-C" role="tabpanel" aria-labelledby="t-C" hidden>
+    <div class="screen C">
+      <div class="topbar"><div class="brand"><i class="dot"></i>Parque Shopping</div><div class="nav"><span>Entrada</span><span class="on">Painel</span><span>PDV</span><span>Saída</span></div></div>
+      <div class="pad">
+        <div class="cols">
+          <div class="col"><div class="ch">No prazo <span style="background:#14633F;color:#DDF5E8">3</span></div>
+            <div class="c"><b>Davi, 6a</b><small>Rafael · 2h</small><span class="t tm">48:02</span></div>
+            <div class="c"><b>Helena, 4a</b><small>Camila · 1h</small><span class="t tm">22:14</span></div></div>
+          <div class="col"><div class="ch">Acabando <span style="background:#6B4A00;color:#FFF1C2">1</span></div>
+            <div class="c"><b>Maria Clara, 5a</b><small>Joana · 1h</small><span class="t tm" style="color:#FFE234">08:40</span></div></div>
+          <div class="col"><div class="ch">Últimos minutos <span style="background:#8A1212;color:#FFE0E0">1</span></div>
+            <div class="c"><b>Pedro, 3a</b><small>Lia · 30min</small><span class="t tm" style="color:#FF8A8A">02:31</span></div></div>
+          <div class="col"><div class="ch">Estourou <span style="background:#F0196B;color:#fff">1</span></div>
+            <div class="c hot"><b>Alice, 7a</b><small>Bruna · 1h</small><span class="t tm">+07:31</span></div>
+            <div class="empty">Toque no card para cobrar</div></div>
+        </div>
+        <div class="legend">● no prazo · ◆ acabando · ▲ últimos minutos · ✕ estourou. Estado sempre com forma e texto, nunca só cor.</div>
+      </div>
+    </div>
+    <div class="read">
+      <div class="rc"><h3>Ideia</h3><p>Colunas por fase, com o tempo gigante. Dá para ler de longe, numa TV ou tablet fixado na parede. A criança muda de coluna sozinha conforme o tempo passa.</p></div>
+      <div class="rc"><h3>Bom para</h3><ul><li>Tela de apoio no salão, só para consulta</li><li>Recreadores que passam e olham</li><li>Ambiente com pouca luz ou festas</li></ul></div>
+      <div class="rc"><h3>Custo</h3><p><span class="m">Esforço médio</span><span class="m">Decisão sua</span></p><p>O kiosk é claro de propósito. Aqui o escuro entraria como modo opcional de telão, sem ação de cobrança, para não mudar o padrão de quem opera o balcão.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var ids=['A','B','C'];
+  ids.forEach(function(k){
+    document.getElementById('t-'+k).addEventListener('click',function(){
+      ids.forEach(function(o){
+        document.getElementById('t-'+o).setAttribute('aria-selected',o===k?'true':'false');
+        document.getElementById('p-'+o).hidden=(o!==k);
+      });
+    });
+  });
+})();
+</script>

@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/http.ts";
 import { requireCapability } from "../_shared/requireCapability.ts";
+import { isWithinNpsSendWindow } from "../_shared/nps.ts";
 import { loadUnitOptions, npsVariables, renderNpsPreview, templateAsksUnit } from "../_shared/npsSurvey.ts";
 
 // Dispara a pesquisa de NPS por WhatsApp para uma lista de contatos do CRM.
@@ -10,6 +11,7 @@ import { loadUnitOptions, npsVariables, renderNpsPreview, templateAsksUnit } fro
 // aprovado com purpose 'NPS' (fa_crm_templates). Variável {{1}} = primeiro nome.
 //
 // Proteções contra spam, aplicadas aqui e não na SPA:
+//   - janela de envio: apenas entre 8h e 23h (horário local);
 //   - contato com opt_in = false é pulado;
 //   - contato com pesquisa enviada nos últimos 30 dias (ou ainda em aberto) é pulado;
 //   - no máximo MAX_PER_CALL contatos por chamada.
@@ -25,6 +27,11 @@ Deno.serve(async (req) => {
 
   const auth = await requireCapability(req, "crm.write");
   if (!auth.ok) return auth.response;
+
+  const now = Date.now();
+  if (!isWithinNpsSendWindow(now)) {
+    return jsonResponse(req, { error: "Envio de pesquisa de NPS permitido apenas entre 8h e 23h" }, 400);
+  }
 
   const accountSid = Deno.env.get("TWILIO_CRM_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_CRM_AUTH_TOKEN");

@@ -1,5 +1,5 @@
 // deno test supabase/functions/_shared/nps.test.ts
-import { isDecline, isNpsFinalReply, npsStep, NPS_TEXT, parseNumberInRange, unitListText, unitOptions } from "./nps.ts";
+import { isDecline, isNpsFinalReply, isWithinNpsSendWindow, npsStep, NPS_TEXT, parseNumberInRange, unitListText, unitOptions } from "./nps.ts";
 
 function assertEquals(actual: unknown, expected: unknown, msg = "") {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -74,4 +74,21 @@ Deno.test("só o agradecimento encerra a pesquisa; perguntas não", () => {
   assertEquals(isNpsFinalReply(NPS_TEXT.commentQuestion(9)), false);
   assertEquals(isNpsFinalReply(NPS_TEXT.retryFive), false);
   assertEquals(isNpsFinalReply("Combinado! Avisamos a recepção."), false);
+});
+
+Deno.test("janela de envio de NPS: apenas entre 8h e 23h (UTC-3)", () => {
+  // Cria timestamp para hora específica em Belém/Brasília (UTC-3)
+  const atHour = (h: number, m = 0) => {
+    // h horas em UTC-3 equivalem a h+3 em UTC
+    const d = new Date(Date.UTC(2026, 9, 12, h + 3, m, 0));
+    return d.getTime();
+  };
+
+  assertEquals(isWithinNpsSendWindow(atHour(7, 59)), false, "7h59 deve estar bloqueado");
+  assertEquals(isWithinNpsSendWindow(atHour(8, 0)), true, "8h00 deve estar permitido");
+  assertEquals(isWithinNpsSendWindow(atHour(12, 0)), true, "12h00 deve estar permitido");
+  assertEquals(isWithinNpsSendWindow(atHour(22, 59)), true, "22h59 deve estar permitido");
+  assertEquals(isWithinNpsSendWindow(atHour(23, 0)), false, "23h00 deve estar bloqueado");
+  assertEquals(isWithinNpsSendWindow(atHour(23, 30)), false, "23h30 deve estar bloqueado");
+  assertEquals(isWithinNpsSendWindow(atHour(2, 0)), false, "02h00 da madrugada deve estar bloqueado");
 });
