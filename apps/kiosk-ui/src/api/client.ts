@@ -508,8 +508,37 @@ export interface Plan {
    * plano PLAYGROUND marca o aluguel avulso de pelúcia (fa_kiosk_sessions.rental_kind).
    */
   assetKind?: "CARRO" | "PELUCIA" | null;
+  /**
+   * Plano da cortesia de aniversário (30 min grátis). Fica inativo e só entra no
+   * check-in por `Api.birthdayCourtesyOffer()`; o servidor recusa o plano para
+   * quem não tem a cortesia (trigger em fa_kiosk_sessions).
+   */
+  birthdayCourtesy?: boolean;
   /** Só preenchido por `Api.plansAllUnits()` (Gerencial). */
   unitId?: string;
+}
+
+/** Uma linha do relatório da cortesia de aniversário (fa_birthday_courtesy_report). */
+export interface BirthdayCourtesyRow {
+  courtesy_id: string;
+  child_id: string;
+  /** Nome só vem com a permissão crm.read. */
+  child_name: string | null;
+  guardian_name: string | null;
+  birthday_date: string;
+  cohort: "TRATAMENTO" | "CONTROLE";
+  sent_at_ms: number | null;
+  valid_until_date: string;
+  used: boolean;
+  used_at_ms: number | null;
+  used_unit_id: string | null;
+  used_unit_name: string | null;
+  overage_minutes: number;
+  overage_cents: number;
+  /** null no grupo de controle e em quem não usou. */
+  bought_after: boolean | null;
+  visits_in_window: number;
+  paid_cents_in_window: number;
 }
 
 export interface Asset {
@@ -1298,6 +1327,7 @@ function planFromRow(row: Record<string, unknown>): Plan {
     color: row.color as string,
     active: Boolean(row.active),
     assetKind: (row.asset_kind as Plan["assetKind"]) ?? null,
+    birthdayCourtesy: Boolean(row.birthday_courtesy),
     unitId: row.unit_id as string | undefined,
   };
 }
@@ -2010,10 +2040,34 @@ export const Api = {
   },
   plans: async (unitId: string, activity: string, onlyActive = true) => {
     let query = supabase().from("fa_kiosk_plans").select("*").eq("unit_id", unitId).eq("activity", activity);
-    if (onlyActive) query = query.eq("active", true);
+    // Telas operacionais (onlyActive) nunca listam o plano da cortesia de
+    // aniversário, mesmo que alguém o reative: ele só entra pelo
+    // birthdayCourtesyOffer. As telas de cadastro (onlyActive = false) o veem.
+    if (onlyActive) query = query.eq("active", true).eq("birthday_courtesy", false);
     const rows = await unwrap<Record<string, unknown>[]>(query);
     return rows.map(planFromRow);
   },
+  /**
+   * Cortesia de aniversário (30 min grátis no Playground) utilizável AGORA por
+   * esta criança, ou null (sem cortesia, fora da validade, fim de semana,
+   * unidade sem o plano). A regra mora no servidor (fa_birthday_courtesy_usable);
+   * a tela só mostra o card.
+   */
+  birthdayCourtesyOffer: async (childId: string, unitId: string) => {
+    const rows = await unwrap<{ courtesy_id: string; plan_id: string; valid_until: string }[]>(
+      supabase().rpc("fa_kiosk_birthday_courtesy_offer", { p_child_id: childId, p_unit_id: unitId }),
+    );
+    const row = rows[0];
+    if (!row) return null;
+    const planRows = await unwrap<Record<string, unknown>[]>(
+      supabase().from("fa_kiosk_plans").select("*").eq("id", row.plan_id),
+    );
+    if (!planRows[0]) return null;
+    return { courtesyId: row.courtesy_id, validUntil: row.valid_until, plan: planFromRow(planRows[0]) };
+  },
+  /** Cortesias de aniversário (tratamento e controle) com aniversário entre `from` e `to` (AAAA-MM-DD). */
+  birthdayCourtesyReport: (from: string, to: string) =>
+    unwrap<BirthdayCourtesyRow[]>(supabase().rpc("fa_birthday_courtesy_report", { p_from: from, p_to: to })),
   /** Todos os planos de todas as unidades — Gerencial. */
   plansAllUnits: async () => {
     const rows = await unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_plans").select("*"));

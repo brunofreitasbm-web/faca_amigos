@@ -247,6 +247,14 @@ export function EntradaScreen({
   const peluciaPlan = activity === "PLAYGROUND" ? plans.find((p) => p.assetKind) : undefined;
   const regularPlans = activity === "PLAYGROUND" ? plans.filter((p) => !p.assetKind) : plans;
   const isPelucia = Boolean(peluciaPlan && planId === peluciaPlan.id);
+
+  // Cortesia de aniversário: o plano é inativo (fora de `plans`) e vem de
+  // Api.birthdayCourtesyOffer só para a criança identificada que tem cortesia
+  // válida hoje. Não recebe cupom (o desconto de 40% atingiria o minuto
+  // adicional), nem venda pré-paga, nem upsell de 1 h.
+  const [birthdayOffer, setBirthdayOffer] = useState<{ courtesyId: string; validUntil: string; plan: Plan } | null>(null);
+  const birthdayPlanIdRef = useRef<string | null>(null);
+  const isBirthdayCourtesy = Boolean(birthdayOffer && planId === birthdayOffer.plan.id);
   const peluciaAssets = assets.filter((a) => a.kind === "PELUCIA");
 
   const [lastGuardianId, setLastGuardianId] = useState<string | null>(null);
@@ -295,6 +303,36 @@ export function EntradaScreen({
     Api.currentShift(unit.id).then((shift) => setHasOpenShift(!!shift)).catch(() => setHasOpenShift(null));
   }, [unit, activity]);
 
+  // Card "Cortesia de aniversário (30min)": aparece sozinho para a criança
+  // identificada que tem a cortesia. A operadora só confirma a entrada.
+  const unitId = unit?.id;
+  useEffect(() => {
+    let active = true;
+    const clear = () => {
+      const stale = birthdayPlanIdRef.current;
+      birthdayPlanIdRef.current = null;
+      setBirthdayOffer(null);
+      if (stale) setPlanId((cur) => (cur === stale ? null : cur));
+    };
+    if (!unitId || activity !== "PLAYGROUND" || !matchedChild?.id) {
+      clear();
+      return;
+    }
+    Api.birthdayCourtesyOffer(matchedChild.id, unitId)
+      .then((offer) => {
+        if (!active) return;
+        if (!offer) return clear();
+        birthdayPlanIdRef.current = offer.plan.id;
+        setBirthdayOffer(offer);
+      })
+      .catch(() => {
+        if (active) clear();
+      });
+    return () => {
+      active = false;
+    };
+  }, [matchedChild?.id, unitId, activity]);
+
   // Pré-cadastro do QR de Acesso Rápido: preenche o formulário exatamente
   // como se o operador tivesse digitado tudo — ele só confere identidade
   // e toca em "Confirmar entrada". `submit()` manda o `preCheckinId`
@@ -332,6 +370,8 @@ export function EntradaScreen({
     if (activity !== "PLAYGROUND") return;
     // Aluguel de pelúcia: preço cheio, o servidor recusa qualquer cupom.
     if (isPelucia) return;
+    // Cortesia de aniversário: o servidor também recusa cupom.
+    if (isBirthdayCourtesy) return;
     if (couponCode && couponCode !== lastAutoCouponRef.current) return;
 
     let next: string;
@@ -358,7 +398,7 @@ export function EntradaScreen({
     lastAutoCouponRef.current = next;
     setCouponCode(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, isNeurodivergent, coupons, isPelucia]);
+  }, [activity, isNeurodivergent, coupons, isPelucia, isBirthdayCourtesy]);
 
   // Busca única com debounce. Só dígitos quando o operador digitou um número:
   // a coluna de telefone é E.164 ("+5591982501215") e o texto mascarado
@@ -600,7 +640,10 @@ export function EntradaScreen({
   }));
   const usingPackage = planId?.startsWith(PACKAGE_PREFIX) ?? false;
   const selectedPackageId = usingPackage ? planId!.slice(PACKAGE_PREFIX.length) : null;
-  const selectedPlan = plans.find((p) => p.id === planId) ?? packagePlans.find((p) => p.id === planId);
+  const selectedPlan =
+    plans.find((p) => p.id === planId) ??
+    packagePlans.find((p) => p.id === planId) ??
+    (isBirthdayCourtesy ? birthdayOffer?.plan : undefined);
   const threshold = 120;
 
   // Cupons restritos a um plano (ex.: "N ESTRELAS", só no plano de 30min)
@@ -617,7 +660,7 @@ export function EntradaScreen({
   // toda no plano atual com o minuto adicional.
   const olharOffer = useMemo(() => {
     if (olharOfferDismissed || activity !== "PLAYGROUND") return null;
-    if (!selectedPlan || isPelucia || usingPackage || usingHourBank || usingChildCredit) return null;
+    if (!selectedPlan || isPelucia || isBirthdayCourtesy || usingPackage || usingHourBank || usingChildCredit) return null;
     const currentMinutes = planDurationMinutes(selectedPlan);
     if (currentMinutes >= SESSION_REPORT_MIN_MINUTES) return null;
     const target = regularPlans.find((p) => planDurationMinutes(p) === SESSION_REPORT_MIN_MINUTES);
@@ -630,7 +673,7 @@ export function EntradaScreen({
     const targetCents = getPlanDiscountedCents(target.valueCents, couponCode, coupons, target.id).finalCents;
     if (targetCents >= stayCents) return null;
     return { target, extraMinutes, stayCents, targetCents };
-  }, [olharOfferDismissed, activity, selectedPlan, isPelucia, usingPackage, usingHourBank, usingChildCredit, regularPlans, couponCode, coupons]);
+  }, [olharOfferDismissed, activity, selectedPlan, isPelucia, isBirthdayCourtesy, usingPackage, usingHourBank, usingChildCredit, regularPlans, couponCode, coupons]);
 
   useEffect(() => {
     if (!unit) return;
@@ -760,7 +803,7 @@ export function EntradaScreen({
           cpf: normalizeCpf(cpf),
           phoneE164: normalizePhoneE164(phone),
         },
-        couponCode: usingHourBank || usingChildCredit || isPelucia ? undefined : couponCode || undefined,
+        couponCode: usingHourBank || usingChildCredit || isPelucia || isBirthdayCourtesy ? undefined : couponCode || undefined,
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
         preCheckinId: preCheckinId ?? undefined,
@@ -852,7 +895,10 @@ export function EntradaScreen({
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao registrar a entrada";
-      if (msg.includes("CRIANCA_JA_EM_SESSAO")) {
+      if (msg.includes("CORTESIA_ANIVERSARIO_")) {
+        // "CODIGO: texto para a operadora" — mostra só o texto.
+        setError(msg.includes(": ") ? msg.slice(msg.indexOf(": ") + 2) : msg);
+      } else if (msg.includes("CRIANCA_JA_EM_SESSAO")) {
         setError(isPelucia
           ? "Esta criança já está numa sessão ativa. Finalize a brincadeira antes de alugar a pelúcia."
           : "Esta criança já tem uma sessão ativa (brincadeira ou pelúcia alugada). Finalize-a antes de uma nova entrada.");
@@ -1404,6 +1450,33 @@ export function EntradaScreen({
               <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>sem vencimento · sem custo de entrada</div>
             </Card>
           )}
+          {/* Cortesia de aniversário: só aparece para a criança que a tem,
+              válida hoje. Plano de R$ 0,00; o minuto adicional (depois dos
+              30 min) é cobrado normalmente no fechamento. */}
+          {birthdayOffer && activity === "PLAYGROUND" && (
+            <Card
+              onClick={() => {
+                setPlanId(birthdayOffer.plan.id);
+                setStartNow(true);
+              }}
+              title="Cortesia de aniversário: 30 minutos grátis para a criança aniversariante"
+              style={{
+                cursor: "pointer",
+                padding: "14px 18px",
+                minWidth: "200px",
+                borderRadius: "16px",
+                border: isBirthdayCourtesy ? "2px solid var(--color-warning, #F5A623)" : "2px dashed var(--color-warning, #F5A623)",
+                background: isBirthdayCourtesy ? "rgba(245, 166, 35, 0.12)" : "var(--surface-card)",
+              }}
+            >
+              <strong style={{ fontSize: "16px", display: "block" }}>🎂 {birthdayOffer.plan.name}</strong>
+              <div style={{ fontSize: "18px", fontWeight: "bold", marginTop: "2px", color: "var(--color-primary-hover)" }}>Grátis</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                vale até {new Date(`${birthdayOffer.validUntil}T12:00:00`).toLocaleDateString("pt-BR")} · depois dos 30 min,{" "}
+                {money(birthdayOffer.plan.overageCentsPerMinute)}/min
+              </div>
+            </Card>
+          )}
           {/* Pacotes entram no mesmo grid dos planos, sem seção ou marca
               visual separada — cada um já chegou aqui como um Plan
               sintético (packagePlans). */}
@@ -1572,7 +1645,7 @@ export function EntradaScreen({
             aparece quando já há um plano escolhido, não é o banco de
             horas (não dá pra pré-pagar um saldo que a criança já tem) e
             é Playground (CARRINHO não pode ser reservado para o futuro). */}
-        {selectedPlan && !usingHourBank && !usingChildCredit && !isPelucia && activity === "PLAYGROUND" && (
+        {selectedPlan && !usingHourBank && !usingChildCredit && !isPelucia && !isBirthdayCourtesy && activity === "PLAYGROUND" && (
           <IfCan capability="venda.prepago">
             <div
               style={{
@@ -1735,7 +1808,7 @@ export function EntradaScreen({
       </section>
 
       {/* Cupom fica atrás de um toque ou visualizado automaticamente */}
-      {!isPelucia && (
+      {!isPelucia && !isBirthdayCourtesy && (
       <section style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {couponCode && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

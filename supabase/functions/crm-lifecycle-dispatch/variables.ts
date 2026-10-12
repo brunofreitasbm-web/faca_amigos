@@ -49,7 +49,7 @@ export const PREVIEW_LABEL: Record<Kind, string> = {
   UPSELL_PACOTE: "oferta de pacote enviada",
   CROSS_ATIVIDADE: "convite de outra atividade enviado",
   CROSS_IRMAO: "convite para o irmão enviado",
-  ANIVERSARIO: "mensagem de aniversário enviada",
+  ANIVERSARIO: "cortesia de aniversário enviada",
   VIP: "reconhecimento VIP enviado",
   WINBACK_1: "mensagem de saudade enviada",
   WINBACK_2: "mensagem de saudade enviada",
@@ -94,8 +94,12 @@ export function variablesFor(c: Candidate, googleReviewUrl: string): Record<stri
     }
     case "CROSS_IRMAO":
       return { "1": guardian, "2": child };
-    case "ANIVERSARIO":
-      return { "1": guardian, "2": child };
+    case "ANIVERSARIO": {
+      // {{3}} = último dia do mês de aniversário (fim da validade da cortesia).
+      const until = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(extra.validUntil ?? ""));
+      if (!until) return null;
+      return { "1": guardian, "2": child, "3": `${until[3]}/${until[2]}` };
+    }
     case "VIP":
       return { "1": guardian, "2": child };
     case "WINBACK_1":
