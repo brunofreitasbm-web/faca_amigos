@@ -25,6 +25,15 @@ const GROUP_LABEL: Record<string, string> = {
   config: "Configurações",
   talentos: "Banco de Talentos",
   ocorrencias: "Ocorrências",
+  nfse: "Fiscal (Notas)",
+  nfce: "Fiscal (Notas)",
+  notificacoes: "Notificações",
+  metas: "Metas",
+  clientes: "Clientes",
+  bonificacao: "Bonificação",
+  treinamento: "Treinamento de Vendas",
+  crm: "CRM WhatsApp",
+  relatorio_sessao: "Olhar FaçaAmigos",
 };
 
 function groupOf(capability: string): string {
@@ -96,11 +105,18 @@ function PermissoesTabInner() {
           <p style={{ color: "var(--text-muted)" }}>Carregando…</p>
         </Card>
       ) : (
-        <div style={{ columns: "440px", columnGap: "8px" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))",
+            gap: "12px",
+            alignItems: "start",
+          }}
+        >
         {Array.from(groups.entries()).map(([group, caps]) => (
-          <Card key={group} style={{ breakInside: "avoid", marginBottom: "8px" }}>
-            <h3 style={{ fontSize: "14px", marginTop: 0, marginBottom: "8px" }}>{group}</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <Card key={group}>
+            <h3 style={{ fontSize: "14px", marginTop: 0, marginBottom: "10px", paddingBottom: "6px", borderBottom: "1px solid var(--border, rgba(0,0,0,0.1))" }}>{group}</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {caps.map((capability) => {
                 const role = matrix[capability];
                 return (
@@ -111,11 +127,10 @@ function PermissoesTabInner() {
                       alignItems: "center",
                       justifyContent: "space-between",
                       gap: "10px",
-                      flexWrap: "nowrap",
                       opacity: savingCapability === capability ? 0.6 : 1,
                     }}
                   >
-                    <span style={{ fontSize: "13px", flex: "1 1 0", minWidth: 0 }}>
+                    <span style={{ fontSize: "13px", flex: "1 1 0", minWidth: 0, lineHeight: 1.35, overflowWrap: "anywhere" }}>
                       {CAPABILITY_LABEL[capability as keyof typeof CAPABILITY_LABEL] ?? capability}
                     </span>
                     <Select

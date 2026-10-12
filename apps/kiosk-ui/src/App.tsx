@@ -63,49 +63,9 @@ import { MobileShell } from "./mobile/MobileShell.js";
 import { MobileScreenFrame } from "./mobile/MobileScreenFrame.js";
 import { MobileGerencial } from "./mobile/MobileGerencial.js";
 import { MobileLogin } from "./mobile/MobileLogin.js";
-import { MobileHome } from "./mobile/MobileHome.js";
-import { MobileGerencialHome } from "./mobile/MobileGerencialHome.js";
-import { MobileOwnerOverview } from "./mobile/MobileOwnerOverview.js";
-import { MobileDevToolbar, type SimScreen } from "./mobile/MobileDevToolbar.js";
 import { useBackHandler } from "./hooks/useBackHandler.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
 
-/**
- * Reverte "Sempre abrir a versão completa" (MobileShell > Mais > Este
- * aparelho). Sem este botão, quem toca ali fica preso na versão de balcão
- * neste aparelho para sempre — useMobileShell().useMobileVersion existia
- * mas não estava ligado a nenhum controle da UI antes deste componente.
- */
-function UseMobileVersionButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        position: "fixed",
-        right: "20px",
-        bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
-        zIndex: 9999,
-        border: "none",
-        borderRadius: "9999px",
-        padding: "10px 18px",
-        minHeight: "40px",
-        background: "#F0196B",
-        color: "#fff",
-        font: "inherit",
-        fontSize: "13px",
-        fontWeight: 800,
-        boxShadow: "0 8px 24px rgba(240, 25, 107, 0.4)",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: "6px",
-      }}
-    >
-      📱 Modo celular (Emulador)
-    </button>
-  );
-}
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
   { value: "ENTRADA", label: "Entrada", help: "Cadastrar a chegada de uma criança: escolher o plano, identificar responsável e imprimir a pulseira e o recibo de guarda", icon: <SignInIcon /> },
@@ -134,26 +94,6 @@ const SCREEN_COMPONENTS: Record<Screen, () => ReactElement | null> = {
   CONFIGURACOES: ConfiguracoesScreen,
 };
 
-const DEV_PREVIEW_UNITS: Unit[] = [
-  {
-    id: "unit-bosque",
-    name: "Playground (Bosque Grão-Pará)",
-    kind: "LOJA",
-    business_day_cutoff_hour: 4,
-  },
-  {
-    id: "unit-parque",
-    name: "FaçaAmigos Playground (Parque Shopping)",
-    kind: "LOJA",
-    business_day_cutoff_hour: 4,
-  },
-  {
-    id: "unit-circuito",
-    name: "Circuito (Parque Shopping)",
-    kind: "QUIOSQUE",
-    business_day_cutoff_hour: 4,
-  },
-];
 
 export function App() {
   const { units, unit, setUnitId, gerencial, setGerencial, employee, logout, restoring } = useAppState();
@@ -163,18 +103,6 @@ export function App() {
   const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  const [simScreen, setSimScreen] = useState<SimScreen>(() => {
-    try {
-      const p = new URLSearchParams(window.location.search);
-      const isSim = p.get("emulador") === "1" || p.get("sim") === "1";
-      if (!isSim) return "AUTO";
-      const tela = p.get("tela");
-      if (tela === "principal" || tela === "modulos") return "PRINCIPAL";
-      if (tela === "turno" || tela === "1") return "TURNO";
-      return "GERENCIAL";
-    } catch {}
-    return "AUTO";
-  });
   // Casca mobile: no celular o operador entra por ela, e `mobileEscape`
   // guarda a tela completa que ele pediu de dentro dela (Saída, Caixa…).
   // Enquanto for null, quem manda no celular é a casca.
@@ -371,17 +299,9 @@ export function App() {
     },
   );
 
-  async function handleChangeModule() {
-    const ok = await confirm({
-      title: "Trocar módulo?",
-      message: "Você vai sair da tela atual e voltar para a seleção de módulo.",
-      confirmLabel: "Trocar módulo",
-      cancelLabel: "Cancelar",
-    });
-    if (ok) {
-      setUnitId("");
-      setGerencial(false);
-    }
+  function handleChangeModule() {
+    setUnitId("");
+    setGerencial(false);
   }
 
   async function handleLogout() {
@@ -439,58 +359,6 @@ export function App() {
     return <AcessoRapidoScreen unitId={acessoRapidoParam} />;
   }
 
-  if (simScreen !== "AUTO") {
-    const simUnits = units.length > 0 ? units : DEV_PREVIEW_UNITS;
-    const simUnit = simUnits.find((u) => u.name.includes("Parque") && u.kind === "LOJA") || simUnits[0]!;
-    return (
-      <>
-        <MobileDevToolbar activeScreen={simScreen} onChange={setSimScreen} />
-        {simScreen === "PRINCIPAL" ? (
-          <div className="m-shell">
-            <div className="m-frame" style={{ overflowY: "auto" }}>
-              <SelectModuleScreen />
-            </div>
-          </div>
-        ) : simScreen === "TURNO" ? (
-          <div className="m-shell">
-            <div className="m-frame">
-              <MobileHome
-                unit={simUnit}
-                employeeName={employee?.full_name || "Bruno Pereira"}
-                activeCount={0}
-                onNovaEntrada={() => {}}
-                onAbrirTela={() => {}}
-                pendingRenewalsCount={0}
-                onAbrirPedidos={() => {}}
-              />
-              <nav className="m-tabbar" aria-label="Seções">
-                <button type="button" aria-current="page">Turno</button>
-                <button type="button" onClick={() => setSimScreen("GERENCIAL")}>Gerencial</button>
-                <button type="button" onClick={() => setSimScreen("PRINCIPAL")}>Módulos</button>
-              </nav>
-            </div>
-          </div>
-        ) : (
-          <div className="m-shell">
-            <div className="m-frame">
-              <div className="m-navbar">
-                <button type="button" className="m-round" aria-label="Voltar" onClick={() => setSimScreen("PRINCIPAL")}>
-                  ‹
-                </button>
-                <span className="m-title-sm m-grow">Gerencial Unificado</span>
-              </div>
-              <MobileGerencialHome
-                units={simUnits}
-                onAbrirPainelCompleto={() => {}}
-                onAbrirUnidade={() => setSimScreen("TURNO")}
-                onAbrirRelatorios={() => {}}
-              />
-            </div>
-          </div>
-        )}
-      </>
-    );
-  }
 
   // Enquanto a sessão salva não foi conferida, não decide nada: mostrar a
   // tela de login por um instante para quem já está logado faz o operador
@@ -503,12 +371,7 @@ export function App() {
   // MobileLogin usa exatamente os mesmos useAppState()/Api.employeesForLogin
   // de LoginScreen, só com a casca do modo celular.
   if (!employee) {
-    return (
-      <>
-        {mobile.active ? <MobileLogin /> : <LoginScreen />}
-        {!mobile.active && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
-      </>
-    );
+    return mobile.active ? <MobileLogin /> : <LoginScreen />;
   }
 
   // Modo Gerencial: fora do contexto das 3 unidades, é onde o Owner configura
@@ -526,23 +389,13 @@ export function App() {
       if (mobile.active) {
         return <MobileGerencial units={units} onExit={() => setGerencial(false)} onLogout={handleLogout} />;
       }
-      return (
-        <>
-          {!mobile.active && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
-          <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />
-        </>
-      );
+      return <GerencialApp onExit={() => setGerencial(false)} onLogout={handleLogout} />;
     }
   }
 
   // Se nenhuma operação/módulo foi selecionado ainda, exibe a Tela Inicial de Seleção de Módulo
   if (!unit) {
-    return (
-      <>
-        <SelectModuleScreen />
-        {!mobile.active && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
-      </>
-    );
+    return <SelectModuleScreen />;
   }
 
   // Retorno do app InfinitePay depois de uma cobrança por aproximação
@@ -633,7 +486,6 @@ export function App() {
         </button>
       )}
 
-      {!mobile.active && <UseMobileVersionButton onClick={mobile.useMobileVersion} />}
 
       <header
         className="kiosk-header"
