@@ -31,6 +31,7 @@ export function MobileHome({
   onAbrirTela,
   pendingRenewalsCount,
   onAbrirPedidos,
+  onAbrirPainel,
 }: {
   unit: Unit;
   employeeName: string;
@@ -39,6 +40,7 @@ export function MobileHome({
   onAbrirTela: (screen: "SAIDA" | "CAIXA" | "RELATORIO_SESSAO") => void;
   pendingRenewalsCount: number;
   onAbrirPedidos: () => void;
+  onAbrirPainel: () => void;
 }) {
   const { can } = useAuth();
   const [pendentes, setPendentes] = useState<number | null>(null);
@@ -185,15 +187,21 @@ export function MobileHome({
         )}
 
         <div className="m-row" style={{ gap: 12, marginTop: 14 }}>
-          <div className="m-card m-grow" style={{ borderRadius: 20, padding: 14 }}>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>Dentro agora</p>
+          <button
+            type="button"
+            className="m-card m-tap m-grow"
+            onClick={can("sessao.checkout") ? onAbrirPainel : undefined}
+            disabled={!can("sessao.checkout")}
+            style={{ borderRadius: 20, padding: 14, font: "inherit", textAlign: "left", cursor: can("sessao.checkout") ? "pointer" : "default" }}
+          >
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>Dentro agora{can("sessao.checkout") ? " ›" : ""}</p>
             <p
               className="m-num"
               style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 28, lineHeight: 1.15, color: "#1D8273" }}
             >
               {activeCount ?? "—"}
             </p>
-          </div>
+          </button>
           <div className="m-card m-grow" style={{ borderRadius: 20, padding: 14 }}>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>Receita do dia</p>
             <p

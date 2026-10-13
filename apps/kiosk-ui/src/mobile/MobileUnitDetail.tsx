@@ -4,6 +4,7 @@ import type { Unit, UnitCashStatus, UnitEnvelopeBalance } from "../api/client.js
 import { useActiveSessions } from "../api/useTick.js";
 import { unitBrandFor } from "../branding/unitBrand.js";
 import { money } from "../format.js";
+import { MobileNavBar } from "./MobileNav.js";
 
 function fmtTime(ms: number): string {
   return new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -46,14 +47,8 @@ export function MobileUnitDetail({ unit, onBack }: { unit: Unit; onBack: () => v
   }).length : 0;
 
   return (
-    <div className="m-shell">
-      <div className="m-frame">
-        <div className="m-navbar">
-          <button type="button" className="m-round" aria-label="Voltar" onClick={onBack}>
-            ‹
-          </button>
-          <span className="m-title-sm m-grow">{brand.icon} {brand.title}</span>
-        </div>
+    <>
+      <MobileNavBar title={`${brand.icon} ${brand.title}`} backLabel="Resumo" onBack={onBack} />
 
         <div className="m-scroll">
           <div className="m-row" style={{ gap: 10 }}>
@@ -98,7 +93,6 @@ export function MobileUnitDetail({ unit, onBack }: { unit: Unit; onBack: () => v
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </>
   );
 }
