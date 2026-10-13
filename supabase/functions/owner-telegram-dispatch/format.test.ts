@@ -141,6 +141,20 @@ test("DIVERGENCIA_FECHAMENTO", () => {
   assert.match(out, /bruta \(sistema\): <b>R\$ 33,80<\/b> · líquida: <b>−R\$ 19,40<\/b> \(falta\)/);
 });
 
+test("DIVERGENCIA_FECHAMENTO: esperado e declarado de todas as formas de pagamento", () => {
+  const body = `${DIVERGENCIA_FECHAMENTO}
+Conferência CREDITO: declarado R$ 223.20 | esperado R$ 223.20
+Conferência DEBITO: declarado R$ 216.00 | esperado R$ 216.00
+Conferência DINHEIRO: declarado R$ 332.40 | esperado R$ 346.80
+Conferência PIX: declarado R$ 121.80 | esperado R$ 126.80`;
+  const out = formatMessage("DIVERGENCIA_FECHAMENTO", `🏠 ⚠️ Divergência no fechamento — ${UNIT}`, body);
+  assertValidTelegramHtml(out);
+  assert.match(out, /Por forma de pagamento/);
+  assert.match(out, /✅ <b>💳 Crédito<\/b>\n\s+esperado R\$ 223,20 · declarado R\$ 223,20/);
+  assert.match(out, /🔻 <b>💵 Dinheiro<\/b>\n\s+esperado R\$ 346,80 · declarado R\$ 332,40/);
+  assert.ok(!/Conferência/.test(out), "linhas cruas não devem vazar");
+});
+
 test("ABERTURA e DIVERGENCIA_ABERTURA (falta e sobra)", () => {
   for (const type of ["ABERTURA", "DIVERGENCIA_ABERTURA"]) {
     const out = formatMessage(type, `🏠 Abertura ${UNIT}`, ABERTURA);
