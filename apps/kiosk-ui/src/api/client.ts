@@ -1193,8 +1193,35 @@ export interface Coupon {
   description: string | null;
   /** Plano ao qual o cupom fica restrito; null = vale para qualquer plano da unidade. */
   allowedPlanId: string | null;
+  /** Dias ISO (1=seg…7=dom) em que vale; null = todos os dias. */
+  scheduleDays: number[] | null;
+  /** Horário "HH:MM"; ambos null = qualquer horário. */
+  scheduleStart: string | null;
+  scheduleEnd: string | null;
   /** Só preenchido por `Api.couponsAllUnits()` (Gerencial). */
   unitId?: string;
+}
+
+export interface CouponScheduleInput {
+  scheduleDays?: number[] | null;
+  scheduleStart?: string | null;
+  scheduleEnd?: string | null;
+}
+
+/** True se o cupom vale agora (dia da semana + horário, hora local do quiosque). */
+export function isCouponInSchedule(c: Coupon, now: Date = new Date()): boolean {
+  if (c.scheduleDays && c.scheduleDays.length > 0) {
+    const isoDow = now.getDay() === 0 ? 7 : now.getDay();
+    if (!c.scheduleDays.includes(isoDow)) return false;
+  }
+  if (c.scheduleStart && c.scheduleEnd) {
+    const cur = now.getHours() * 60 + now.getMinutes();
+    const toMin = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+    const a = toMin(c.scheduleStart);
+    const b = toMin(c.scheduleEnd);
+    return a <= b ? cur >= a && cur < b : cur >= a || cur < b;
+  }
+  return true;
 }
 
 export interface LoyaltyRule {
@@ -1369,6 +1396,9 @@ function couponFromRow(row: Record<string, unknown>): Coupon {
     active: row.active ? 1 : 0,
     description: (row.description as string | null) ?? null,
     allowedPlanId: (row.allowed_plan_id as string | null) ?? null,
+    scheduleDays: (row.schedule_days as number[] | null) ?? null,
+    scheduleStart: row.schedule_start ? String(row.schedule_start).slice(0, 5) : null,
+    scheduleEnd: row.schedule_end ? String(row.schedule_end).slice(0, 5) : null,
     unitId: row.unit_id as string | undefined,
   };
 }
@@ -3654,7 +3684,7 @@ export const Api = {
   /** Todos os cupons de todas as unidades — Gerencial. */
   couponsAllUnits: () =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_coupons").select("*")).then((rows) => rows.map(couponFromRow)),
-  createCoupon: (body: { unitId: string; code: string; kind: Coupon["kind"]; value: number; description?: string; allowedPlanId?: string | null }) =>
+  createCoupon: (body: { unitId: string; code: string; kind: Coupon["kind"]; value: number; description?: string; allowedPlanId?: string | null } & CouponScheduleInput) =>
     unwrap<{ id: string }>(
       supabase()
         .from("fa_kiosk_coupons")
@@ -3665,12 +3695,15 @@ export const Api = {
           value: body.value,
           description: body.description ?? null,
           allowed_plan_id: body.allowedPlanId ?? null,
+          schedule_days: body.scheduleDays?.length ? body.scheduleDays : null,
+          schedule_start: body.scheduleStart || null,
+          schedule_end: body.scheduleEnd || null,
         })
         .select("id")
         .single(),
     ),
   setCouponActive: (id: string, active: boolean) => unwrap(supabase().from("fa_kiosk_coupons").update({ active }).eq("id", id)),
-  updateCoupon: (id: string, body: { code: string; kind: Coupon["kind"]; value: number; description?: string; allowedPlanId?: string | null }) =>
+  updateCoupon: (id: string, body: { code: string; kind: Coupon["kind"]; value: number; description?: string; allowedPlanId?: string | null } & CouponScheduleInput) =>
     unwrap(
       supabase()
         .from("fa_kiosk_coupons")
@@ -3680,6 +3713,9 @@ export const Api = {
           value: body.value,
           description: body.description ?? null,
           allowed_plan_id: body.allowedPlanId ?? null,
+          schedule_days: body.scheduleDays?.length ? body.scheduleDays : null,
+          schedule_start: body.scheduleStart || null,
+          schedule_end: body.scheduleEnd || null,
         })
         .eq("id", id),
     ),

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge, AutismRibbonIcon } from "@facaamigos/ui";
-import { Api } from "../api/client.js";
+import { Api, isCouponInSchedule } from "../api/client.js";
 import type { Asset, ChildMatch, Coupon, ForeignPackageBalance, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { OlharUpsellCard } from "../components/OlharUpsellCard.js";
@@ -650,7 +650,7 @@ export function EntradaScreen({
   // só aparecem quando esse plano está selecionado — evita o operador
   // escolher um cupom que o servidor vai recusar no check-in.
   const eligibleCoupons = useMemo(
-    () => coupons.filter((c) => !c.allowedPlanId || c.allowedPlanId === planId),
+    () => coupons.filter((c) => (!c.allowedPlanId || c.allowedPlanId === planId) && isCouponInSchedule(c)),
     [coupons, planId],
   );
 

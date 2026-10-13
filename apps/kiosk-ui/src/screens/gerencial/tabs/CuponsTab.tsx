@@ -12,6 +12,25 @@ function planLabel(p: Plan): string {
   return `${p.name} (${duration})`;
 }
 
+const WEEKDAYS: { iso: number; label: string }[] = [
+  { iso: 1, label: "Seg" },
+  { iso: 2, label: "Ter" },
+  { iso: 3, label: "Qua" },
+  { iso: 4, label: "Qui" },
+  { iso: 5, label: "Sex" },
+  { iso: 6, label: "Sáb" },
+  { iso: 7, label: "Dom" },
+];
+
+function scheduleLabel(c: Coupon): string | null {
+  const days = c.scheduleDays ?? [];
+  const hasTime = c.scheduleStart && c.scheduleEnd;
+  if (days.length === 0 && !hasTime) return null;
+  const isWeek = days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d));
+  const dayText = days.length === 0 ? "todos os dias" : isWeek ? "seg a sex" : WEEKDAYS.filter((w) => days.includes(w.iso)).map((w) => w.label).join(", ");
+  return hasTime ? `${dayText}, ${c.scheduleStart}–${c.scheduleEnd}` : dayText;
+}
+
 export function CuponsTab() {
   const toast = useToast();
   const { units } = useAppState();
@@ -27,6 +46,10 @@ export function CuponsTab() {
   const [unitIds, setUnitIds] = useState<string[]>(units.map((u) => u.id));
   const [allowedPlanId, setAllowedPlanId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [limitSchedule, setLimitSchedule] = useState(false);
+  const [scheduleDays, setScheduleDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [scheduleStart, setScheduleStart] = useState("14:00");
+  const [scheduleEnd, setScheduleEnd] = useState("17:00");
 
   function load() {
     Api.couponsAllUnits().then(setCoupons);
@@ -52,6 +75,11 @@ export function CuponsTab() {
     setValue(String(c.value));
     setDescription(c.description ?? "");
     setAllowedPlanId(c.allowedPlanId ?? "");
+    const has = Boolean((c.scheduleDays && c.scheduleDays.length) || (c.scheduleStart && c.scheduleEnd));
+    setLimitSchedule(has);
+    setScheduleDays(c.scheduleDays?.length ? c.scheduleDays : [1, 2, 3, 4, 5]);
+    setScheduleStart(c.scheduleStart ?? "14:00");
+    setScheduleEnd(c.scheduleEnd ?? "17:00");
   }
 
   function cancelEdit() {
@@ -62,6 +90,10 @@ export function CuponsTab() {
     setDescription("");
     setUnitIds(units.map((u) => u.id));
     setAllowedPlanId("");
+    setLimitSchedule(false);
+    setScheduleDays([1, 2, 3, 4, 5]);
+    setScheduleStart("14:00");
+    setScheduleEnd("17:00");
   }
 
   async function save() {
@@ -73,6 +105,9 @@ export function CuponsTab() {
         value: Number(value),
         description: description || undefined,
         allowedPlanId: planRestrictionUnitId ? allowedPlanId || null : null,
+        scheduleDays: limitSchedule ? scheduleDays : null,
+        scheduleStart: limitSchedule ? scheduleStart : null,
+        scheduleEnd: limitSchedule ? scheduleEnd : null,
       };
 
       if (editingId) {
@@ -104,7 +139,6 @@ export function CuponsTab() {
 
   const reviewCoupons = coupons.filter((c) => c.description === "10% desconto - 5 Avaliação Google");
   const totalReviewIssued = reviewCoupons.length;
-  const totalReviewUsed = reviewCoupons.reduce((acc, c) => acc + c.used_count, 0);
 
   return (
     <div className="g-split">
@@ -112,8 +146,7 @@ export function CuponsTab() {
       <Card style={{ marginBottom: "10px", background: "var(--surface-sunken)", borderLeft: "4px solid var(--color-primary)", borderRadius: "12px" }}>
         <h3 style={{ fontSize: "16px", margin: "0 0 8px 0", color: "var(--text-primary)" }}>⭐ Desempenho: Avaliações do Google</h3>
         <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>
-          <strong>{totalReviewIssued}</strong> descontos (cupons) emitidos <br/>
-          <strong>{totalReviewUsed}</strong> resgatados pelos clientes ({totalReviewIssued > 0 ? Math.round((totalReviewUsed / totalReviewIssued) * 100) : 0}% de conversão)
+          <strong>{totalReviewIssued}</strong> descontos (cupons) emitidos
         </p>
       </Card>
 
@@ -153,7 +186,36 @@ export function CuponsTab() {
             </p>
           )
         )}
-        <Button variant="primary" style={{ ...FULL_ROW, justifySelf: "start" }} disabled={busy || !code || (!editingId && unitIds.length === 0)} onClick={save}>
+        <label style={{ ...FULL_ROW, display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
+          <input type="checkbox" checked={limitSchedule} onChange={(e) => setLimitSchedule(e.target.checked)} />
+          Limitar a dias e horários específicos
+        </label>
+        {limitSchedule && (
+          <div style={{ ...FULL_ROW, display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {WEEKDAYS.map((w) => {
+                const on = scheduleDays.includes(w.iso);
+                return (
+                  <Button
+                    key={w.iso}
+                    variant={on ? "primary" : "secondary"}
+                    onClick={() => setScheduleDays(on ? scheduleDays.filter((d) => d !== w.iso) : [...scheduleDays, w.iso].sort())}
+                  >
+                    {w.label}
+                  </Button>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <Input label="Início" type="time" value={scheduleStart} onChange={(e) => setScheduleStart(e.target.value)} />
+              <Input label="Fim" type="time" value={scheduleEnd} onChange={(e) => setScheduleEnd(e.target.value)} />
+            </div>
+            <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
+              Valem as unidades marcadas acima. Fora desse dia/horário o cupom não aparece nem é aceito.
+            </p>
+          </div>
+        )}
+        <Button variant="primary" style={{ ...FULL_ROW, justifySelf: "start" }} disabled={busy || !code || (limitSchedule && (!scheduleStart || !scheduleEnd || scheduleDays.length === 0)) || (!editingId && unitIds.length === 0)} onClick={save}>
           {editingId ? "Salvar cupom" : `Criar cupom em ${unitIds.length} unidade(s)`}
         </Button>
       </Card>
@@ -169,6 +231,9 @@ export function CuponsTab() {
                 {" "}
                 · só no plano {planLabel(plans.find((p) => p.id === c.allowedPlanId) ?? ({ name: "?", durationValue: 0, durationUnit: "MINUTO" } as Plan))}
               </span>
+            )}
+            {scheduleLabel(c) && (
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · ⏰ {scheduleLabel(c)}</span>
             )}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
