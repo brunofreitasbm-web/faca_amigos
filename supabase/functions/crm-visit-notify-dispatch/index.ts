@@ -187,6 +187,26 @@ Deno.serve(async () => {
       continue;
     }
 
+    // Boas-vindas e fidelidade são Marketing e entram no teto de 1 a cada 30 dias por pessoa
+    // (fa_crm_can_send; migration 20261013140000). Excedente e renovação aplicada são avisos
+    // operacionais da sessão e não entram na conta.
+    if (cand.kind === "WELCOME" || cand.kind === "LOYALTY") {
+      const { data: canSend } = await admin.rpc("fa_crm_can_send", {
+        p_contact_id: contact!.id, p_category: "MARKETING", p_now_ms: Date.now(), p_kind: cand.kind,
+      });
+      if (canSend !== true) {
+        skipped++;
+        continue;
+      }
+    }
+    // Mesmo texto para o mesmo contato nos últimos 30 min (várias sessões da mesma criança): pula.
+    const body = template.preview.replace(/\{\{(\d+)\}\}/g, (_m: string, n: string) => variables[n] ?? "");
+    const { data: sameBody } = await admin.rpc("fa_crm_recent_same_body", { p_contact_id: contact!.id, p_body: body, p_now_ms: Date.now() });
+    if (sameBody === true) {
+      skipped++;
+      continue;
+    }
+
     // Trava: quem inserir primeiro envia; o resto (cron sobreposto) pula.
     const { data: claim, error: claimErr } = await admin
       .from("fa_crm_visit_notifications")
@@ -238,7 +258,7 @@ Deno.serve(async () => {
     await admin.from("fa_crm_messages").insert({
       contact_id: contact!.id,
       direction: "OUT",
-      body: template.preview.replace(/\{\{(\d+)\}\}/g, (_m: string, n: string) => variables[n] ?? ""),
+      body,
       twilio_sid: out.sid,
       status: "queued",
       template_id: template.id,
