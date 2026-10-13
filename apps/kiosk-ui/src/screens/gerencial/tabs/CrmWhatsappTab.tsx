@@ -242,73 +242,136 @@ interface LifecycleStatRow {
   converted_cents: number;
 }
 
-interface LifecycleKindDef {
-  kind: string;
+interface PurposeStatRow {
+  purpose: string | null;
+  category: string;
+  sent: number;
+  delivered: number;
+  read_count: number;
+  failed: number;
+  replied: number;
+  price_total: number;
+  price_unit: string | null;
+  twilio_fee: number;
+}
+
+interface AutomationDef {
+  id: string;
   settingKey: UnitSettingKey;
+  /** kind em fa_crm_automation_sends (só ciclo de vida: mede conversão em pedido). */
+  lcKind?: string;
+  /** purpose do template em fa_crm_templates (mede envio/entrega/resposta/custo). */
+  purpose: string;
   label: string;
   category: "Utility" | "Marketing";
 }
 
+interface AutomationGroup {
+  title: string;
+  items: AutomationDef[];
+}
+
 /**
- * As 10 ações do catálogo de upsell/cross-sell/LTV/retenção (12 kinds, winback
- * tem 2 toques). Cada uma só dispara de verdade quando: (1) o template
- * aprovado existir no Twilio para o purpose, e (2) para as de categoria
- * Marketing, o responsável tiver marketing_consent_at_ms (campanha de opt-in
- * de marketing acima). O toggle aqui liga/desliga em todas as unidades juntas
- * — mais simples que gerenciar unidade por unidade e como a Meta cobra por
- * categoria, não por unidade.
+ * TODAS as mensagens automáticas que saem pelo WhatsApp (Twilio), agrupadas.
+ * O toggle liga/desliga em todas as unidades juntas (a Meta cobra por
+ * categoria, não por unidade). Cada uma só envia de verdade quando o template
+ * aprovado existir; as de categoria Marketing também exigem o aceite de
+ * ofertas do responsável. As campanhas de opt-in têm card próprio acima, e o
+ * "Olhar FaçaAmigos" (relatório de sessão) é disparado pela equipe no
+ * fechamento da sessão — não tem chave aqui.
+ * Retirada (não listar): NPS_PROMOTOR (convite de avaliação no Google).
  */
-const LIFECYCLE_KINDS: LifecycleKindDef[] = [
-  { kind: "EXPIRACAO", settingKey: "crm_lc_expiracao", label: "Recarga antes de acabar (pacote/saldo/banco de horas)", category: "Utility" },
-  { kind: "RELATORIO_CUPOM", settingKey: "crm_lc_relatorio_cupom", label: "Cupom de retorno no relatório de sessão", category: "Utility" },
-  { kind: "PREMIO_FIDELIDADE", settingKey: "crm_lc_premio_fidelidade", label: "Lembrete de prêmio de fidelidade não resgatado", category: "Utility" },
-  { kind: "NPS_PROMOTOR", settingKey: "crm_lc_nps_promotor", label: "NPS nota alta → convite de avaliação no Google", category: "Utility" },
-  { kind: "NPS_DETRATOR", settingKey: "crm_lc_nps_detrator", label: "NPS nota baixa → aviso de contato humano", category: "Utility" },
-  { kind: "UPSELL_PACOTE", settingKey: "crm_lc_upsell_pacote", label: "Oferta de pacote pós-visita avulsa", category: "Marketing" },
-  { kind: "DEGRAU_2H", settingKey: "crm_lc_degrau_2h", label: "Oferta do plano de 2 horas (após plano curto com excedente/renovação)", category: "Marketing" },
-  { kind: "DEGRAU_PORTO", settingKey: "crm_lc_degrau_porto", label: "Oferta Porto Seguro (3+ visitas em 30 dias)", category: "Marketing" },
-  { kind: "DEGRAU_DAYUSE", settingKey: "crm_lc_degrau_dayuse", label: "Oferta Day Use (quintas, 2+ visitas em 60 dias)", category: "Marketing" },
-  { kind: "CROSS_ATIVIDADE", settingKey: "crm_lc_cross_atividade", label: "Convite Playground ↔ Circuito", category: "Marketing" },
-  { kind: "CROSS_IRMAO", settingKey: "crm_lc_cross_irmao", label: "Convite para o irmão que não frequenta", category: "Marketing" },
-  { kind: "ANIVERSARIO", settingKey: "crm_lc_aniversario", label: "Mensagem de aniversário automática", category: "Marketing" },
-  { kind: "VIP", settingKey: "crm_lc_vip", label: "Reconhecimento de status VIP", category: "Marketing" },
-  { kind: "WINBACK_1", settingKey: "crm_lc_winback_1", label: "Winback — 1º toque (30-90 dias sem visitar)", category: "Marketing" },
-  { kind: "WINBACK_2", settingKey: "crm_lc_winback_2", label: "Winback — 2º toque (com cupom)", category: "Marketing" },
+const AUTOMATION_GROUPS: AutomationGroup[] = [
+  {
+    title: "Pós-visita e operação",
+    items: [
+      { id: "nps", settingKey: "crm_nps_auto", purpose: "NPS", label: "Pesquisa NPS após a visita", category: "Utility" },
+      { id: "welcome", settingKey: "crm_notify_welcome", purpose: "VISITA_BOAS_VINDAS", label: "Boas-vindas no check-in", category: "Marketing" },
+      { id: "overage", settingKey: "crm_notify_overage", purpose: "VISITA_EXCEDENTE", label: "Aviso de excedente / fim do plano", category: "Marketing" },
+      { id: "renewal_ok", settingKey: "crm_notify_renewal_ok", purpose: "VISITA_RENOVACAO_OK", label: "Confirmação de renovação de plano", category: "Utility" },
+      { id: "loyalty", settingKey: "crm_notify_loyalty", purpose: "VISITA_FIDELIDADE", label: "Aviso do cartão fidelidade (visitas 8–10)", category: "Marketing" },
+      { id: "renewal", settingKey: "crm_renewal_alert", purpose: "RENOVACAO", label: "Alerta de fim de plano com botões +30/+60 min", category: "Marketing" },
+      { id: "mapeamento", settingKey: "crm_mapeamento_followup", purpose: "MAPEAMENTO", label: "Follow-up do mapeamento de desenvolvimento", category: "Marketing" },
+    ],
+  },
+  {
+    title: "Ciclo de vida (upsell, cross-sell, LTV, retenção)",
+    items: [
+      { id: "expiracao", settingKey: "crm_lc_expiracao", lcKind: "EXPIRACAO", purpose: "EXPIRACAO", label: "Recarga antes de acabar (pacote/saldo/banco de horas)", category: "Marketing" },
+      { id: "relatorio_cupom", settingKey: "crm_lc_relatorio_cupom", lcKind: "RELATORIO_CUPOM", purpose: "RELATORIO_CUPOM", label: "Cupom de retorno no relatório de sessão", category: "Marketing" },
+      { id: "premio", settingKey: "crm_lc_premio_fidelidade", lcKind: "PREMIO_FIDELIDADE", purpose: "PREMIO_FIDELIDADE", label: "Lembrete de prêmio de fidelidade não resgatado", category: "Marketing" },
+      { id: "nps_detrator", settingKey: "crm_lc_nps_detrator", lcKind: "NPS_DETRATOR", purpose: "NPS_DETRATOR", label: "NPS nota baixa → aviso de contato humano", category: "Utility" },
+      { id: "upsell", settingKey: "crm_lc_upsell_pacote", lcKind: "UPSELL_PACOTE", purpose: "UPSELL_PACOTE", label: "Oferta de pacote pós-visita avulsa", category: "Marketing" },
+      { id: "degrau_2h", settingKey: "crm_lc_degrau_2h", lcKind: "DEGRAU_2H", purpose: "DEGRAU_2H", label: "Oferta do plano de 2 horas", category: "Marketing" },
+      { id: "degrau_porto", settingKey: "crm_lc_degrau_porto", lcKind: "DEGRAU_PORTO", purpose: "DEGRAU_PORTO", label: "Oferta Porto Seguro (3+ visitas em 30 dias)", category: "Marketing" },
+      { id: "degrau_dayuse", settingKey: "crm_lc_degrau_dayuse", lcKind: "DEGRAU_DAYUSE", purpose: "DEGRAU_DAYUSE", label: "Oferta Day Use (quintas, 2+ visitas em 60 dias)", category: "Marketing" },
+      { id: "cross_atividade", settingKey: "crm_lc_cross_atividade", lcKind: "CROSS_ATIVIDADE", purpose: "CROSS_ATIVIDADE", label: "Convite Playground ↔ Circuito", category: "Marketing" },
+      { id: "cross_irmao", settingKey: "crm_lc_cross_irmao", lcKind: "CROSS_IRMAO", purpose: "CROSS_IRMAO", label: "Convite para o irmão que não frequenta", category: "Marketing" },
+      { id: "aniversario", settingKey: "crm_lc_aniversario", lcKind: "ANIVERSARIO", purpose: "ANIVERSARIO", label: "Mensagem de aniversário com cortesia", category: "Marketing" },
+      { id: "vip", settingKey: "crm_lc_vip", lcKind: "VIP", purpose: "VIP", label: "Reconhecimento de status VIP", category: "Marketing" },
+      { id: "winback_1", settingKey: "crm_lc_winback_1", lcKind: "WINBACK_1", purpose: "WINBACK", label: "Winback — 1º toque (30-90 dias sem visitar)", category: "Marketing" },
+      { id: "winback_2", settingKey: "crm_lc_winback_2", lcKind: "WINBACK_2", purpose: "WINBACK", label: "Winback — 2º toque (com cupom)", category: "Marketing" },
+    ],
+  },
 ];
 
-function LifecycleCampaignsCard() {
+const ALL_AUTOMATIONS = AUTOMATION_GROUPS.flatMap((g) => g.items);
+const STATS_DAYS = 30;
+
+function AutomationsCard() {
   const toast = useToast();
   const [units, setUnits] = useState<{ id: string }[]>([]);
   const [flags, setFlags] = useState<Record<string, boolean>>({});
-  const [stats, setStats] = useState<Record<string, LifecycleStatRow>>({});
-  const [busyKind, setBusyKind] = useState<string | null>(null);
+  const [lcStats, setLcStats] = useState<Record<string, LifecycleStatRow>>({});
+  const [purposeStats, setPurposeStats] = useState<Record<string, PurposeStatRow>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [unitList, statRows] = await Promise.all([
+      const [unitList, lcRows, purposeRows] = await Promise.all([
         Api.units(),
-        supabase().rpc("fa_crm_automation_stats", { p_days: 30 }),
+        supabase().rpc("fa_crm_automation_stats", { p_days: STATS_DAYS }),
+        supabase().rpc("fa_crm_message_stats_by_purpose_v2", { p_days: STATS_DAYS }),
       ]);
       setUnits(unitList);
-      const statsByKind: Record<string, LifecycleStatRow> = {};
-      for (const row of (statRows.data ?? []) as LifecycleStatRow[]) statsByKind[row.kind] = row;
-      setStats(statsByKind);
+      const lcByKind: Record<string, LifecycleStatRow> = {};
+      for (const row of (lcRows.data ?? []) as LifecycleStatRow[]) lcByKind[row.kind] = row;
+      setLcStats(lcByKind);
+
+      // Uma linha por purpose (o mesmo purpose pode vir em 2 categorias após troca de template): soma.
+      const byPurpose: Record<string, PurposeStatRow> = {};
+      for (const r of (purposeRows.data ?? []) as PurposeStatRow[]) {
+        if (!r.purpose) continue;
+        const cur = byPurpose[r.purpose];
+        const price = Number(r.price_total);
+        const fee = Number(r.twilio_fee);
+        byPurpose[r.purpose] = cur
+          ? {
+              ...cur,
+              sent: cur.sent + r.sent,
+              delivered: cur.delivered + r.delivered,
+              read_count: cur.read_count + r.read_count,
+              failed: cur.failed + r.failed,
+              replied: cur.replied + r.replied,
+              price_total: cur.price_total + price,
+              twilio_fee: cur.twilio_fee + fee,
+              price_unit: cur.price_unit ?? r.price_unit,
+            }
+          : { ...r, price_total: price, twilio_fee: fee };
+      }
+      setPurposeStats(byPurpose);
 
       if (unitList.length) {
         const { data: rows } = await supabase()
           .from("fa_kiosk_app_settings")
           .select("key, value")
-          .eq("unit_id", unitList[0]!.id)
-          .in(
-            "key",
-            LIFECYCLE_KINDS.map((k) => k.settingKey),
-          );
-        const map = new Map((rows ?? []).map((r) => [r.key, r.value]));
+          .in("unit_id", unitList.map((u) => u.id))
+          .in("key", ALL_AUTOMATIONS.map((a) => a.settingKey));
+        // Ligada se estiver ligada em QUALQUER unidade (é o que os dispatchers checam).
+        const on = new Set((rows ?? []).filter((r) => r.value === "1").map((r) => r.key));
         const flagsMap: Record<string, boolean> = {};
-        for (const def of LIFECYCLE_KINDS) {
-          flagsMap[def.kind] = map.get(def.settingKey) === "1";
-        }
+        for (const def of ALL_AUTOMATIONS) flagsMap[def.id] = on.has(def.settingKey);
         setFlags(flagsMap);
       }
     } catch (e) {
@@ -322,62 +385,86 @@ function LifecycleCampaignsCard() {
     void load();
   }, [load]);
 
-  async function toggle(def: LifecycleKindDef, next: boolean) {
-    setBusyKind(def.kind);
+  async function toggle(def: AutomationDef, next: boolean) {
+    setBusyId(def.id);
     try {
       // Liga/desliga em todas as unidades juntas.
       await Promise.all(units.map((u) => Api.setUnitSetting(u.id, def.settingKey, next ? "1" : "0")));
-      setFlags((prev) => ({ ...prev, [def.kind]: next }));
+      setFlags((prev) => ({ ...prev, [def.id]: next }));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao alterar a automação");
     } finally {
-      setBusyKind(null);
+      setBusyId(null);
     }
+  }
+
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
+
+  function statsLine(def: AutomationDef): string {
+    const s = purposeStats[def.purpose];
+    if (!s || s.sent === 0) return "sem envios no período";
+    const unit = s.price_unit ?? "USD";
+    // winback_1/2 dividem o purpose: entrega/custo aparecem juntos; resposta/conversão usam o kind.
+    const lc = def.lcKind ? lcStats[def.lcKind] : undefined;
+    const shared = def.purpose === "WINBACK" ? " (1º+2º toque)" : "";
+    const parts = [
+      `enviadas ${s.sent}${shared}`,
+      `entregues ${pct(s.delivered, s.sent)}`,
+      `lidas ${pct(s.read_count, s.sent)}`,
+      `responderam ${s.replied} (${pct(s.replied, s.sent)})`,
+    ];
+    if (s.failed) parts.push(`falhas ${s.failed}`);
+    if (lc) parts.push(`converteram ${lc.converted} (R$ ${(lc.converted_cents / 100).toFixed(2)})`);
+    parts.push(`custo ${unit} ${(s.price_total + s.twilio_fee).toFixed(2)}`);
+    return parts.join(" · ");
   }
 
   return (
     <Card style={{ padding: "12px", marginBottom: "12px" }}>
-      <details>
-      <summary style={{ cursor: "pointer" }}><strong>🚀 Automações de ciclo de vida (upsell, cross-sell, LTV, retenção)</strong></summary>
-      {loading ? (
-        <HelpText style={{ margin: "8px 0 0" }}>Carregando automações…</HelpText>
-      ) : (
-        <>
-          <HelpText style={{ margin: "4px 0 12px" }}>
-            Últimos 30 dias. Cada uma só envia quando o template correspondente estiver aprovado no Twilio; as de categoria Marketing também exigem o
-            aceite de ofertas do responsável (campanha de opt-in de marketing acima).
-          </HelpText>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {LIFECYCLE_KINDS.map((def) => {
-              const s = stats[def.kind];
-              return (
-                <div
-                  key={def.kind}
-                  style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap",
-                    padding: "6px 0", borderBottom: "1px solid var(--border-subtle)",
-                  }}
-                >
-                  <div style={{ minWidth: "260px" }}>
-                    <Checkbox
-                      checked={Boolean(flags[def.kind])}
-                      onChange={(v) => void toggle(def, v)}
-                      label={def.label}
-                      disabled={busyKind === def.kind}
-                    />
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Tag color="var(--border-subtle)">{def.category}</Tag>
-                    <HelpText style={{ margin: 0 }}>
-                      {s ? `enviados ${s.sent} · responderam ${s.replied} · converteram ${s.converted} (R$ ${(s.converted_cents / 100).toFixed(2)})` : "sem envios ainda"}
-                    </HelpText>
-                  </div>
+      <details open>
+        <summary style={{ cursor: "pointer" }}>
+          <strong>🚀 Mensagens automáticas (ligar / desligar)</strong>
+        </summary>
+        {loading ? (
+          <HelpText style={{ margin: "8px 0 0" }}>Carregando automações…</HelpText>
+        ) : (
+          <>
+            <HelpText style={{ margin: "4px 0 12px" }}>
+              Últimos {STATS_DAYS} dias. “Responderam” = o responsável escreveu ou tocou num botão em até 48h. “Converteram” (só ciclo de vida) = pedido pago em até
+              14 dias. Custo = preço da Meta + taxa da Twilio por mensagem (as mais recentes podem estar sem o preço da Meta por algumas horas). Cada uma só envia com o template aprovado; as de Marketing exigem o aceite
+              de ofertas do responsável.
+            </HelpText>
+            {AUTOMATION_GROUPS.map((group) => (
+              <div key={group.title} style={{ marginBottom: "12px" }}>
+                <strong style={{ fontSize: "13px" }}>{group.title}</strong>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
+                  {group.items.map((def) => (
+                    <div
+                      key={def.id}
+                      style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap",
+                        padding: "6px 0", borderBottom: "1px solid var(--border-subtle)",
+                      }}
+                    >
+                      <div style={{ minWidth: "260px" }}>
+                        <Checkbox
+                          checked={Boolean(flags[def.id])}
+                          onChange={(v) => void toggle(def, v)}
+                          label={def.label}
+                          disabled={busyId === def.id}
+                        />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <Tag color="var(--border-subtle)">{def.category}</Tag>
+                        <HelpText style={{ margin: 0 }}>{statsLine(def)}</HelpText>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+              </div>
+            ))}
+          </>
+        )}
       </details>
     </Card>
   );
@@ -393,6 +480,7 @@ interface CostStatRow {
   priced: number;
   price_total: number;
   price_unit: string | null;
+  twilio_fee: number;
 }
 
 const COST_CATEGORY_LABEL: Record<string, string> = {
@@ -401,6 +489,7 @@ const COST_CATEGORY_LABEL: Record<string, string> = {
   AUTHENTICATION: "Autenticação",
   SERVICE: "Conversa (janela 24h)",
   DESCONHECIDA: "Sem categoria",
+  RECEBIDAS: "Mensagens recebidas (taxa Twilio)",
 };
 
 const COST_DAYS = 30;
@@ -416,9 +505,9 @@ function WhatsappCostCard() {
 
   useEffect(() => {
     void supabase()
-      .rpc("fa_crm_whatsapp_cost_stats", { p_days: COST_DAYS })
+      .rpc("fa_crm_whatsapp_cost_stats_v2", { p_days: COST_DAYS })
       .then(({ data, error }) => {
-        if (!error) setRows(((data ?? []) as CostStatRow[]).map((r) => ({ ...r, price_total: Number(r.price_total) })));
+        if (!error) setRows(((data ?? []) as CostStatRow[]).map((r) => ({ ...r, price_total: Number(r.price_total), twilio_fee: Number(r.twilio_fee) })));
       });
   }, []);
 
@@ -440,18 +529,37 @@ function WhatsappCostCard() {
         ) : categories.length === 0 ? (
           <HelpText style={{ margin: "8px 0 0" }}>Nenhum envio no período.</HelpText>
         ) : (
-          categories.map((cat) => {
-            const cur = pick(cat, "current");
-            const prev = pick(cat, "previous");
-            return (
-              <HelpText key={cat} style={{ margin: "4px 0 0" }}>
-                <strong>{COST_CATEGORY_LABEL[cat] ?? cat}</strong>: {cur?.sent ?? 0} enviadas ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · entregues{" "}
-                {pct(cur?.delivered ?? 0, cur?.sent ?? 0)} · lidas {pct(cur?.read_count ?? 0, cur?.sent ?? 0)} · falhas {cur?.failed ?? 0} · custo{" "}
-                {money(cur?.price_total ?? 0)} ({delta(cur?.price_total ?? 0, prev?.price_total ?? 0)})
-                {cur && cur.priced < cur.sent - cur.failed && ` · ${cur.sent - cur.failed - cur.priced} aguardando preço`}
-              </HelpText>
-            );
-          })
+          <>
+            {categories.map((cat) => {
+              const cur = pick(cat, "current");
+              const prev = pick(cat, "previous");
+              const cost = (r?: CostStatRow) => (r?.price_total ?? 0) + (r?.twilio_fee ?? 0);
+              if (cat === "RECEBIDAS") {
+                return (
+                  <HelpText key={cat} style={{ margin: "4px 0 0" }}>
+                    <strong>{COST_CATEGORY_LABEL[cat]}</strong>: {cur?.sent ?? 0} ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · custo {money(cost(cur))}
+                  </HelpText>
+                );
+              }
+              return (
+                <HelpText key={cat} style={{ margin: "4px 0 0" }}>
+                  <strong>{COST_CATEGORY_LABEL[cat] ?? cat}</strong>: {cur?.sent ?? 0} enviadas ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · entregues{" "}
+                  {pct(cur?.delivered ?? 0, cur?.sent ?? 0)} · lidas {pct(cur?.read_count ?? 0, cur?.sent ?? 0)} · falhas {cur?.failed ?? 0} · custo{" "}
+                  {money(cost(cur))} ({delta(cost(cur), cost(prev))}) — Meta {money(cur?.price_total ?? 0)} + Twilio {money(cur?.twilio_fee ?? 0)}
+                  {cur && cur.priced < cur.sent - cur.failed && ` · ${cur.sent - cur.failed - cur.priced} aguardando preço da Meta`}
+                </HelpText>
+              );
+            })}
+            <HelpText style={{ margin: "8px 0 0" }}>
+              <strong>Total</strong>:{" "}
+              {money((rows ?? []).filter((r) => r.period === "current").reduce((n, r) => n + r.price_total + r.twilio_fee, 0))} (
+              {delta(
+                (rows ?? []).filter((r) => r.period === "current").reduce((n, r) => n + r.price_total + r.twilio_fee, 0),
+                (rows ?? []).filter((r) => r.period === "previous").reduce((n, r) => n + r.price_total + r.twilio_fee, 0),
+              )}
+              )
+            </HelpText>
+          </>
         )}
       </details>
     </Card>
@@ -586,7 +694,7 @@ function CrmContent() {
         <div className="g-cards g-cards-wide" style={{ alignItems: "start", marginBottom: "12px" }}>
           <OptinCampaignCard />
           <MarketingOptinCampaignCard />
-          <LifecycleCampaignsCard />
+          <AutomationsCard />
           <WhatsappCostCard />
         </div>
       )}
