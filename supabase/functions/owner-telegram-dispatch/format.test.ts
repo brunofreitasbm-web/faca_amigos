@@ -141,6 +141,17 @@ test("DIVERGENCIA_FECHAMENTO", () => {
   assert.match(out, /bruta \(sistema\): <b>R\$ 33,80<\/b> · líquida: <b>−R\$ 19,40<\/b> \(falta\)/);
 });
 
+test("FECHAMENTO com divergência: esperado e declarado de todas as formas", () => {
+  const body = `${FECHAMENTO_0910}
+Conferência CREDITO: declarado R$ 223.20 | esperado R$ 223.20
+Conferência DINHEIRO: declarado R$ 332.40 | esperado R$ 346.80`;
+  const out = formatMessage("FECHAMENTO", `🏠 Fechamento ${UNIT}`, body);
+  assertValidTelegramHtml(out);
+  assert.match(out, /✅ <b>💳 Crédito<\/b>\n\s+esperado R\$ 223,20 · declarado R\$ 223,20/);
+  assert.match(out, /🔻 <b>💵 Dinheiro<\/b>\n\s+esperado R\$ 346,80 · declarado R\$ 332,40/);
+  assert.ok(!/Conferência/.test(out));
+});
+
 test("DIVERGENCIA_FECHAMENTO: esperado e declarado de todas as formas de pagamento", () => {
   const body = `${DIVERGENCIA_FECHAMENTO}
 Conferência CREDITO: declarado R$ 223.20 | esperado R$ 223.20

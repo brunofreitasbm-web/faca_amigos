@@ -371,7 +371,7 @@ function formatFechamento(title: string, body: string): string | null {
     out.push(
       "",
       `<b>${NUM[4]} ${sobraOnly ? "💡 SOBRAS" : "⚠️ DIVERGÊNCIAS"}</b> (${div.entries.length} ${div.entries.length === 1 ? "item" : "itens"})`,
-      renderDivergences(div.entries, div.total, div.rest.filter((r) => !/^(⚠️|💡)/.test(r))),
+      renderDivergences(div.entries, div.total, div.rest.filter((r) => !/^(⚠️|💡)/.test(r)), div.conf),
     );
   }
   return out.join("\n");
