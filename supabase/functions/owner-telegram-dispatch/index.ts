@@ -195,7 +195,10 @@ Deno.serve(async (req) => {
         photo: row.photo_url,
         caption: "Foto do envelope",
       });
-      if (!photo.ok) console.error(`Falha ao enviar foto de ${row.notification_id}:`, photo.detail);
+      if (!photo.ok) {
+        console.error(`Falha ao enviar foto de ${row.notification_id}:`, photo.detail);
+        errors.push(`foto: ${photo.detail}`.slice(0, 200));
+      }
     }
   }
 
