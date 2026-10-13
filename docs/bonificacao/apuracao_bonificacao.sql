@@ -230,7 +230,14 @@ calc as (
 ),
 bonus as (
   select c.*,
-         coalesce(c.abertura::time <= case when extract(isodow from c.business_date)::int = 7 then time '12:15' else time '10:15' end, false) as trava_abertura_ok,
+         -- limite = horário de abertura + 15 min: exceção da data > horário do dia da semana > padrão (10:00 seg-sáb, 12:00 dom)
+         coalesce(c.abertura::time <= time '00:00' + (
+           coalesce(
+             (select o.abertura_min from fa_kiosk_unit_opening_overrides o where o.unit_id = c.unit_id and o.business_date = c.business_date),
+             (select h.abertura_min from fa_kiosk_unit_opening_hours h where h.unit_id = c.unit_id and h.weekday = extract(isodow from c.business_date)::int),
+             case when extract(isodow from c.business_date)::int = 7 then 12 * 60 else 10 * 60 end
+           ) + 15
+         ) * interval '1 minute', false) as trava_abertura_ok,
          (coalesce(c.fechado, false) and not coalesce(c.diverg_sem_justificativa, false)) as trava_caixa_ok,
          case
            -- sem meta configurada pra esse dia/unidade: zero, nunca um valor adivinhado

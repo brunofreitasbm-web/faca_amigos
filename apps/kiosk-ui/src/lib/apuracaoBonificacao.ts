@@ -70,6 +70,14 @@ export interface BonusProgramConfig {
   /** Teto mensal do Bônus de Planos Longos, separado de `tetoMesCents`; 0 = sem teto. */
   planosTetoMesCents: number;
   planRules: BonusPlanRule[];
+  /**
+   * Horário de abertura da unidade por dia da semana (isodow 1-7), em minutos
+   * desde 00:00. A trava de abertura vale até esse horário + `TOLERANCIA_ABERTURA_MIN`.
+   * Dia ausente = padrão antigo (10:00 seg-sáb, 12:00 domingo).
+   */
+  aberturaMinPorDia?: Record<number, number>;
+  /** Exceções por data ("AAAA-MM-DD" -> horário de abertura em minutos); vencem `aberturaMinPorDia`. */
+  aberturaMinPorData?: Record<string, number>;
 }
 
 /** unitId -> configuração; uma unidade ausente do mapa está "não configurada" (zero bônus). */
@@ -106,9 +114,34 @@ export function diaSemanaISO(businessDate: string): number {
   return jsDow === 0 ? 7 : jsDow;
 }
 
-/** Retorna o limite em minutos desde 00:00 para abertura do caixa (10:15 seg-sáb, 12:15 domingo). */
-export function getAberturaLimiteMin(dow: number): number {
-  return dow === 7 ? 12 * 60 + 15 : 10 * 60 + 15;
+/** Folga sobre o horário de abertura da unidade até a trava de abertura zerar o bônus do dia. */
+export const TOLERANCIA_ABERTURA_MIN = 15;
+
+/** Horário de abertura padrão (minutos desde 00:00) quando nada foi configurado: 10:00 seg-sáb, 12:00 domingo. */
+export function getAberturaPadraoMin(dow: number): number {
+  return dow === 7 ? 12 * 60 : 10 * 60;
+}
+
+/**
+ * Limite em minutos desde 00:00 para abertura do caixa: horário de abertura
+ * (exceção da data > horário do dia da semana > padrão) + tolerância.
+ * Sem configuração dá 10:15 seg-sáb e 12:15 domingo, como antes.
+ */
+export function getAberturaLimiteMin(
+  dow: number,
+  program?: Pick<BonusProgramConfig, "aberturaMinPorDia" | "aberturaMinPorData"> | null,
+  businessDate?: string,
+): number {
+  const abertura =
+    (businessDate ? program?.aberturaMinPorData?.[businessDate] : undefined) ??
+    program?.aberturaMinPorDia?.[dow] ??
+    getAberturaPadraoMin(dow);
+  return abertura + TOLERANCIA_ABERTURA_MIN;
+}
+
+/** Minutos desde 00:00 -> "HH:MM" (ex.: 675 -> "11:15"). */
+export function formatHorarioMin(min: number): string {
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 }
 const DIVERGENCIA_SEM_JUSTIFICATIVA_LIMIT_CENTS = 2000; // R$20
 
@@ -205,6 +238,8 @@ export interface ApuracaoDia {
   produtosCents: number;
   bonusProdutosCents: number;
   travaAberturaOk: boolean;
+  /** Limite da trava de abertura aplicado neste dia (minutos desde 00:00); ausente em dados antigos. */
+  limiteAberturaMin?: number;
   travaCaixaOk: boolean;
   bonusMetaCents: number;
   bonusDiaCents: number;
@@ -460,7 +495,7 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     const sd = shiftsDia.get(shiftUnitDateKey(unitId, businessDate));
     const planos = planosByKey.get(key) ?? { qtd: {}, bonusCents: 0 };
 
-    const limiteAberturaMin = getAberturaLimiteMin(dow);
+    const limiteAberturaMin = getAberturaLimiteMin(dow, program, businessDate);
     const travaAberturaOk = sd?.aberturaMin !== null && sd?.aberturaMin !== undefined && sd.aberturaMin <= limiteAberturaMin;
     const travaCaixaOk = Boolean(sd?.fechado) && !sd?.divergSemJustificativa;
 
@@ -493,6 +528,7 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
       produtosCents: prod.prodCents,
       bonusProdutosCents: prod.bonusProdCents,
       travaAberturaOk,
+      limiteAberturaMin,
       travaCaixaOk,
       bonusMetaCents,
       bonusDiaCents,

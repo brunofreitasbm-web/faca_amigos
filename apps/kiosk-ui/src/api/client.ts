@@ -1637,7 +1637,7 @@ async function fetchActiveSessions(unitId: string, nowMs: number = Date.now()): 
  */
 async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgramsByUnit> {
   if (unitIds.length === 0) return {};
-  const [goalRows, configRows, ruleRows] = await Promise.all([
+  const [goalRows, configRows, ruleRows, openingRows, overrideRows] = await Promise.all([
     unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_bonus_program_goals")
@@ -1651,7 +1651,28 @@ async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgram
         .select("unit_id, kind, ref_id, label, bonus_cents, escada_meta, escada_bonus_cents, active, sort_order")
         .in("unit_id", unitIds),
     ),
+    unwrap<Record<string, unknown>[]>(
+      supabase().from("fa_kiosk_unit_opening_hours").select("unit_id, weekday, abertura_min").in("unit_id", unitIds),
+    ),
+    unwrap<Record<string, unknown>[]>(
+      supabase().from("fa_kiosk_unit_opening_overrides").select("unit_id, business_date, abertura_min").in("unit_id", unitIds),
+    ),
   ]);
+
+  const aberturaPorDiaByUnit = new Map<string, Record<number, number>>();
+  for (const row of openingRows) {
+    const unitId = row.unit_id as string;
+    const map = aberturaPorDiaByUnit.get(unitId) ?? {};
+    map[row.weekday as number] = row.abertura_min as number;
+    aberturaPorDiaByUnit.set(unitId, map);
+  }
+  const aberturaPorDataByUnit = new Map<string, Record<string, number>>();
+  for (const row of overrideRows) {
+    const unitId = row.unit_id as string;
+    const map = aberturaPorDataByUnit.get(unitId) ?? {};
+    map[row.business_date as string] = row.abertura_min as number;
+    aberturaPorDataByUnit.set(unitId, map);
+  }
 
   const rulesByUnit = new Map<string, BonusPlanRule[]>();
   for (const row of ruleRows) {
@@ -1700,6 +1721,8 @@ async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgram
       locacaoExtraBonusCents: row.locacao_extra_bonus_cents as number,
       planosTetoMesCents: (row.planos_teto_mes_cents as number | null) ?? 0,
       planRules: rulesByUnit.get(unitId) ?? [],
+      aberturaMinPorDia: aberturaPorDiaByUnit.get(unitId) ?? {},
+      aberturaMinPorData: aberturaPorDataByUnit.get(unitId) ?? {},
     };
   }
   return result;
@@ -4426,7 +4449,7 @@ export const Api = {
   setBonusProgram: async (
     unitId: string,
     goals: BonusProgramGoal[],
-    config: Omit<BonusProgramConfig, "goals" | "planRules" | "planosTetoMesCents">,
+    config: Omit<BonusProgramConfig, "goals" | "planRules" | "planosTetoMesCents" | "aberturaMinPorDia" | "aberturaMinPorData">,
   ): Promise<void> => {
     const now = Date.now();
     await Promise.all([
@@ -4467,6 +4490,36 @@ export const Api = {
           ),
       ),
     ]);
+  },
+  // Horário de abertura da unidade por dia da semana (isodow 1-7 -> minutos
+  // desde 00:00). A trava de abertura da bonificação vale até esse horário + 15 min.
+  setBonusOpeningHours: async (unitId: string, aberturaMinPorDia: Record<number, number>): Promise<void> => {
+    const now = Date.now();
+    const rows = Object.entries(aberturaMinPorDia).map(([weekday, aberturaMin]) => ({
+      unit_id: unitId,
+      weekday: Number(weekday),
+      abertura_min: aberturaMin,
+      updated_at_ms: now,
+    }));
+    if (rows.length === 0) return;
+    await unwrap(supabase().from("fa_kiosk_unit_opening_hours").upsert(rows, { onConflict: "unit_id,weekday" }));
+  },
+  // Exceção de horário de abertura para uma data (feriado, evento, horário
+  // especial do shopping). Vence o horário do dia da semana.
+  setBonusOpeningOverride: async (unitId: string, businessDate: string, aberturaMin: number, motivo?: string): Promise<void> => {
+    await unwrap(
+      supabase()
+        .from("fa_kiosk_unit_opening_overrides")
+        .upsert(
+          { unit_id: unitId, business_date: businessDate, abertura_min: aberturaMin, motivo: motivo ?? null, updated_at_ms: Date.now() },
+          { onConflict: "unit_id,business_date" },
+        ),
+    );
+  },
+  deleteBonusOpeningOverride: async (unitId: string, businessDate: string): Promise<void> => {
+    await unwrap(
+      supabase().from("fa_kiosk_unit_opening_overrides").delete().eq("unit_id", unitId).eq("business_date", businessDate),
+    );
   },
   /**
    * Bônus de Planos Longos de UMA unidade: regras por plano/pacote + teto mensal
