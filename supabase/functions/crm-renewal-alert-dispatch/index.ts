@@ -124,6 +124,16 @@ Deno.serve(async () => {
     const optionsText = options.map((o) => `+${o.minutes} min por ${brl(o.cents)}`).join(" ou ");
     const variables = { "1": guardianFirst, "2": child, "3": optionsText };
 
+    // Mesmo texto (mesma criança, mesmas opções) para o mesmo contato nos últimos 30 min — várias
+    // sessões da mesma criança geravam 3 a 5 avisos em 2 minutos. Registra na trava e pula.
+    const body = template.preview.replace(/\{\{(\d+)\}\}/g, (_m: string, n: string) => (variables as Record<string, string>)[n] ?? "");
+    const { data: sameBody } = await admin.rpc("fa_crm_recent_same_body", { p_contact_id: contact!.id, p_body: body, p_now_ms: Date.now() });
+    if (sameBody === true) {
+      await admin.from("fa_crm_renewal_alerts").update({ error: "duplicado: mesmo texto enviado há menos de 30 min" }).eq("id", claim.id);
+      skipped++;
+      continue;
+    }
+
     let res: Response | null = null;
     let out: { sid?: string; code?: number; message?: string } = {};
     try {
@@ -164,7 +174,7 @@ Deno.serve(async () => {
     await admin.from("fa_crm_messages").insert({
       contact_id: contact!.id,
       direction: "OUT",
-      body: template.preview.replace(/\{\{(\d+)\}\}/g, (_m: string, n: string) => (variables as Record<string, string>)[n] ?? ""),
+      body,
       twilio_sid: out.sid,
       status: "queued",
       template_id: template.id,
