@@ -828,7 +828,16 @@ export type UnitSettingKey =
   | "crm_lc_winback_2"
   | "crm_lc_degrau_2h"
   | "crm_lc_degrau_porto"
-  | "crm_lc_degrau_dayuse";
+  | "crm_lc_degrau_dayuse"
+  // Automações fora do catálogo de ciclo de vida (cada uma com seu dispatcher
+  // crm-*-dispatch). '1' liga, ausente/'0' desliga.
+  | "crm_nps_auto"
+  | "crm_renewal_alert"
+  | "crm_mapeamento_followup"
+  | "crm_notify_welcome"
+  | "crm_notify_overage"
+  | "crm_notify_renewal_ok"
+  | "crm_notify_loyalty";
 
 export interface VipFlag {
   child_id: string;
