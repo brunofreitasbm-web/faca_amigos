@@ -3,7 +3,7 @@ import { Card, HelpText, Badge } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
 import type { TicketGoal } from "../api/client.js";
 import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO } from "../bonificacao.js";
-import { mesAtualValue, rangeDoMes, type ApuracaoDia, type ApuracaoOperador, type BonusProgramsByUnit } from "../lib/apuracaoBonificacao.js";
+import { formatHorarioMin, getAberturaLimiteMin, mesAtualValue, rangeDoMes, type ApuracaoDia, type ApuracaoOperador, type BonusProgramsByUnit } from "../lib/apuracaoBonificacao.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
 
@@ -187,7 +187,7 @@ export function MinhaBonificacaoScreen() {
             {travaZerou && (
               <div style={{ marginTop: "8px", fontSize: "13px", color: "var(--color-error-text)" }}>
                 ⚠️ {!diaHoje?.travaAberturaOk
-                  ? "Caixa aberto depois de 10h15: o bônus do dia zera mesmo batendo a meta."
+                  ? `Caixa aberto depois das ${formatHorarioMin(diaHoje?.limiteAberturaMin ?? getAberturaLimiteMin(1))}: o bônus do dia zera mesmo batendo a meta.`
                   : "Fechamento com diferença acima de R$20 sem justificativa: o bônus do dia zera mesmo batendo a meta."}
               </div>
             )}
@@ -305,7 +305,7 @@ export function MinhaBonificacaoScreen() {
               : naoBateuMeta
                 ? "não bateu a meta do dia"
                 : !d.travaAberturaOk
-                  ? "trava: caixa aberto depois de 10h15"
+                  ? `trava: caixa aberto depois das ${formatHorarioMin(d.limiteAberturaMin ?? getAberturaLimiteMin(1))}`
                   : "trava: diferença no fechamento sem justificativa";
             return (
               <div

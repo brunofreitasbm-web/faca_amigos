@@ -24,14 +24,6 @@ extraResources:
   # Migrations .sql lidas em runtime (ver packages/db-local/src/migrate.ts)
   - from: ../../packages/db-local/dist/migrations
     to: migrations
-  # whisper-cli.exe + DLLs para transcrição local de voz (ver
-  # src/main/voiceWorker.ts e scripts/fetch-whisper.mjs, rodado antes do
-  # empacotamento pelo script "dist"). NUNCA o modelo .bin aqui — ele é
-  # baixado em runtime pro userData/whisper/, senão o instalador estoura o
-  # limite de 100MB/arquivo do bucket público de updates (ver comentário
-  # abaixo sobre o .env, mesmo bucket).
-  - from: vendor/whisper
-    to: whisper
 
 # NÃO volte a embutir `.env` aqui.
 #

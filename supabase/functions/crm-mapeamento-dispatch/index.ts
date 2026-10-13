@@ -129,6 +129,16 @@ Deno.serve(async () => {
       continue;
     }
 
+    // Teto de marketing: 1 mensagem promocional a cada 30 dias por pessoa, somando todas as
+    // automações (fa_crm_can_send; migration 20261013140000).
+    const { data: canSend } = await admin.rpc("fa_crm_can_send", {
+      p_contact_id: contact!.id, p_category: "MARKETING", p_now_ms: Date.now(), p_kind: "MAPEAMENTO",
+    });
+    if (canSend !== true) {
+      skipped++;
+      continue;
+    }
+
     // Trava do "uma única vez": quem inserir primeiro envia; o resto pula.
     const { data: claim, error: claimErr } = await admin
       .from("fa_crm_mapeamento_invites")

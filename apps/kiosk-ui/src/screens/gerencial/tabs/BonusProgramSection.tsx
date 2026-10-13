@@ -3,7 +3,14 @@ import { Button, HelpText } from "@facaamigos/ui";
 import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { Unit } from "../../../api/client.js";
-import type { BonusProgramConfig, BonusProgramGoal, BonusProgramsByUnit } from "../../../lib/apuracaoBonificacao.js";
+import {
+  formatHorarioMin,
+  getAberturaPadraoMin,
+  TOLERANCIA_ABERTURA_MIN,
+  type BonusProgramConfig,
+  type BonusProgramGoal,
+  type BonusProgramsByUnit,
+} from "../../../lib/apuracaoBonificacao.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { supabase } from "../../../lib/supabase/client.js";
 import { money } from "../../../format.js";
@@ -27,6 +34,10 @@ interface GroupForm {
 
 interface UnitForm {
   groups: Record<GroupKey, GroupForm>;
+  /** Horário de abertura por período da semana, em minutos desde 00:00. */
+  aberturaMin: Record<GroupKey, number>;
+  /** Exceções por data ("AAAA-MM-DD" -> horário de abertura em minutos). */
+  aberturaExcecoes: Record<string, number>;
   tetoMesReais: number;
   produtoPrecoCorteReais: number;
   produtoBonusBaixoReais: number;
@@ -41,6 +52,8 @@ interface UnitForm {
 const EMPTY_GROUP: GroupForm = { metaValor: 0, superValor: 0, metaBonusReais: 0, superBonusReais: 0 };
 const EMPTY_FORM: UnitForm = {
   groups: { SEG_QUI: { ...EMPTY_GROUP }, SEX: { ...EMPTY_GROUP }, SAB: { ...EMPTY_GROUP }, DOM: { ...EMPTY_GROUP } },
+  aberturaMin: { SEG_QUI: getAberturaPadraoMin(1), SEX: getAberturaPadraoMin(5), SAB: getAberturaPadraoMin(6), DOM: getAberturaPadraoMin(7) },
+  aberturaExcecoes: {},
   tetoMesReais: 200,
   produtoPrecoCorteReais: 15,
   produtoBonusBaixoReais: 0.5,
@@ -73,9 +86,16 @@ function formFromProgram(program: BonusProgramConfig | undefined, isCircuito: bo
         }
       : { ...EMPTY_GROUP };
   }
-  if (!program) return { ...EMPTY_FORM, groups };
+  const aberturaMin = { ...EMPTY_FORM.aberturaMin };
+  for (const g of GROUPS) {
+    aberturaMin[g.key] = program?.aberturaMinPorDia?.[g.weekdays[0]!] ?? getAberturaPadraoMin(g.weekdays[0]!);
+  }
+  const aberturaExcecoes = { ...(program?.aberturaMinPorData ?? {}) };
+  if (!program) return { ...EMPTY_FORM, groups, aberturaMin, aberturaExcecoes };
   return {
     groups,
+    aberturaMin,
+    aberturaExcecoes,
     tetoMesReais: reais(program.tetoMesCents),
     produtoPrecoCorteReais: reais(program.produtoPrecoCorteCents),
     produtoBonusBaixoReais: reais(program.produtoBonusBaixoCents),
@@ -103,7 +123,24 @@ function goalsFromForm(form: UnitForm, isCircuito: boolean): BonusProgramGoal[] 
   });
 }
 
-function configFromForm(form: UnitForm): Omit<BonusProgramConfig, "goals" | "planRules" | "planosTetoMesCents"> {
+/** Horário de abertura de cada dia da semana (isodow) a partir dos 4 períodos do formulário. */
+function aberturaFromForm(form: UnitForm): Record<number, number> {
+  const result: Record<number, number> = {};
+  for (const g of GROUPS) for (const weekday of g.weekdays) result[weekday] = form.aberturaMin[g.key];
+  return result;
+}
+
+/** "HH:MM" (input type=time) -> minutos desde 00:00; null se inválido. */
+function minFromTime(value: string): number | null {
+  const m = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!m) return null;
+  const min = Number(m[1]) * 60 + Number(m[2]);
+  return min >= 0 && min < 1440 ? min : null;
+}
+
+function configFromForm(
+  form: UnitForm,
+): Omit<BonusProgramConfig, "goals" | "planRules" | "planosTetoMesCents" | "aberturaMinPorDia" | "aberturaMinPorData"> {
   return {
     tetoMesCents: centsFrom(form.tetoMesReais),
     produtoPrecoCorteCents: centsFrom(form.produtoPrecoCorteReais),
@@ -247,6 +284,34 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
     });
   }
 
+  const [novaExcecao, setNovaExcecao] = useState<Record<string, { date: string; time: string }>>({});
+
+  async function addExcecao(unit: Unit) {
+    const draft = novaExcecao[unit.id];
+    const min = draft ? minFromTime(draft.time) : null;
+    if (!draft?.date || min === null) {
+      toast.error("Informe a data e o horário de abertura da exceção.");
+      return;
+    }
+    try {
+      await Api.setBonusOpeningOverride(unit.id, draft.date, min);
+      setNovaExcecao((prev) => ({ ...prev, [unit.id]: { date: "", time: draft.time } }));
+      toast.success(`Exceção de ${draft.date} salva: abertura ${formatHorarioMin(min)}.`);
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar a exceção.");
+    }
+  }
+
+  async function removeExcecao(unit: Unit, date: string) {
+    try {
+      await Api.deleteBonusOpeningOverride(unit.id, date);
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível remover a exceção.");
+    }
+  }
+
   function applyPreset(unitId: string, percentMultiplier: number) {
     setForms((prev) => {
       const form = prev[unitId];
@@ -271,6 +336,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
       const form = forms[unit.id];
       if (!form) continue;
       await Api.setBonusProgram(unit.id, goalsFromForm(form, unit.kind === "QUIOSQUE"), configFromForm(form));
+      await Api.setBonusOpeningHours(unit.id, aberturaFromForm(form));
     }
   }
 
@@ -289,6 +355,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
     setBusyUnitId(unit.id);
     try {
       await Api.setBonusProgram(unit.id, goalsFromForm(form, isCircuito), configFromForm(form));
+      await Api.setBonusOpeningHours(unit.id, aberturaFromForm(form));
       toast.success(`Programa de bonificação de ${unit.name} salvo com sucesso!`);
       loadData();
     } catch (err) {
@@ -557,6 +624,24 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                         </span>
                       </div>
 
+                      {/* HORÁRIO DE ABERTURA (trava de abertura) */}
+                      <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                        <span>
+                          🕙 Abertura do shopping{" "}
+                          <span style={{ color: "var(--text-muted)" }}>
+                            (trava até {formatHorarioMin(form.aberturaMin[g.key] + TOLERANCIA_ABERTURA_MIN)})
+                          </span>
+                        </span>
+                        <input
+                          type="time"
+                          value={formatHorarioMin(form.aberturaMin[g.key])}
+                          onChange={(e) => {
+                            const min = minFromTime(e.target.value);
+                            if (min !== null) updateConfig(unit.id, { aberturaMin: { ...form.aberturaMin, [g.key]: min } });
+                          }}
+                        />
+                      </label>
+
                       {/* SLIDER META BASE */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
@@ -636,6 +721,45 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* EXCEÇÕES DE HORÁRIO DE ABERTURA POR DATA */}
+            <div>
+              <h4 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: "700" }}>🗓️ Exceções de horário de abertura</h4>
+              <HelpText>
+                Para um dia com horário diferente do padrão (feriado, evento, shopping abrindo mais tarde). Vale só para a data
+                informada e substitui o horário do dia da semana; a trava continua sendo a abertura + {TOLERANCIA_ABERTURA_MIN} min.
+              </HelpText>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                {Object.entries(form.aberturaExcecoes)
+                  .sort(([a], [b]) => b.localeCompare(a))
+                  .map(([date, min]) => (
+                    <div key={date} style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "13px" }}>
+                      <span>
+                        {date.split("-").reverse().join("/")}: abertura {formatHorarioMin(min)} (trava até{" "}
+                        {formatHorarioMin(min + TOLERANCIA_ABERTURA_MIN)})
+                      </span>
+                      <Button variant="secondary" onClick={() => removeExcecao(unit, date)}>
+                        Remover
+                      </Button>
+                    </div>
+                  ))}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <input
+                    type="date"
+                    value={novaExcecao[unit.id]?.date ?? ""}
+                    onChange={(e) => setNovaExcecao((prev) => ({ ...prev, [unit.id]: { date: e.target.value, time: prev[unit.id]?.time ?? "11:00" } }))}
+                  />
+                  <input
+                    type="time"
+                    value={novaExcecao[unit.id]?.time ?? "11:00"}
+                    onChange={(e) => setNovaExcecao((prev) => ({ ...prev, [unit.id]: { date: prev[unit.id]?.date ?? "", time: e.target.value } }))}
+                  />
+                  <Button variant="secondary" onClick={() => addExcecao(unit)}>
+                    Adicionar exceção
+                  </Button>
+                </div>
               </div>
             </div>
 

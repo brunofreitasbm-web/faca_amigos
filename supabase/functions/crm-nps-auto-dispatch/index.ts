@@ -8,7 +8,7 @@ import { loadUnitOptions, npsVariables, renderNpsPreview, templateAsksUnit } fro
 // estritamente na janela de envio entre 8h e 23h (horário local Belém/Brasília).
 //
 // verify_jwt = false (config.toml): só o pg_cron chama, sem JWT — mesmo
-// padrão de sales-compendium-dispatch. Rodar a mais não causa envio a
+// padrão de ponto-photo-retention-dispatch. Rodar a mais não causa envio a
 // mais: a janela de checkout é fixa e há cooldown de 30 dias por contato.
 // Inline (sem _shared) pelo mesmo motivo das demais functions de cron.
 

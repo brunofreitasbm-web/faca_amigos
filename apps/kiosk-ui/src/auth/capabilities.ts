@@ -41,15 +41,12 @@ export const CAPABILITIES = [
   "metas.ticket.write",
   "clientes.write",
   "bonificacao.self",
-  "treinamento.transcricoes.read",
-  "treinamento.transcricoes.write",
-  "treinamento.compendio.gerar",
-  "config.terminais.read",
   "crm.read",
   "crm.write",
   "crm.admin",
   "relatorio_sessao.write",
   "relatorio_sessao.read",
+  "chat.usar",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -89,15 +86,12 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "metas.ticket.write": "Configurar meta de Ticket Médio (mínimo e alvo) de cada unidade",
   "clientes.write": "Editar dados de clientes (responsável e crianças vinculadas)",
   "bonificacao.self": "Ver a própria bonificação (menu Minha Bonificação)",
-  "treinamento.transcricoes.read": "Ver transcrições dos atendimentos gravados (treinamento de venda)",
-  "treinamento.transcricoes.write": "Anotar/analisar transcrições dos atendimentos gravados",
-  "treinamento.compendio.gerar": "Gerar o Compêndio de Vendas com IA para a Reunião de Alinhamento Mensal",
-  "config.terminais.read": "Ver o painel central de saúde dos terminais (whisper.cpp, modelo, fila de transcrição) de toda a rede",
   "crm.read": "Ver o CRM de WhatsApp (conversas e contatos do Playground e do Circuito)",
   "crm.write": "Responder clientes e editar a ficha no CRM de WhatsApp",
   "crm.admin": "Gerenciar números (canais) e templates do CRM de WhatsApp",
   "relatorio_sessao.write": "Preencher o Olhar FaçaAmigos (crianças com plano de 1h ou mais)",
   "relatorio_sessao.read": "Ver o histórico do Olhar FaçaAmigos no Gerencial",
+  "chat.usar": "Usar o chat interno com os donos (botão flutuante)",
 };
 
 /** Papéis como estão no banco. Ver ROLE_LABEL para o que o usuário lê. */
@@ -152,10 +146,7 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
           c !== "sessao.cancel" &&
           c !== "config.rbac.write" &&
           c !== "notificacoes.owner_push" &&
-          c !== "talentos.write" &&
-          c !== "treinamento.transcricoes.write" &&
-          c !== "treinamento.compendio.gerar" &&
-          c !== "config.terminais.read"
+          c !== "talentos.write"
       )
     );
   }
@@ -183,11 +174,12 @@ export function getDefaultCapabilitiesForRole(role: Role): Set<Capability> {
       "nfse.emit",
       "nfce.retry",
       "relatorio_sessao.write",
+      "chat.usar",
     ]);
   }
 
   if (role === "ESTAGIARIO") {
-    return new Set(["ponto.self", "bonificacao.self", "relatorio_sessao.write"]);
+    return new Set(["ponto.self", "bonificacao.self", "relatorio_sessao.write", "chat.usar"]);
   }
 
   if (role === "PRESTADOR_PJ") {

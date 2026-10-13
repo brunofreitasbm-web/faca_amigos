@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   agregarPorOperador,
   apurarBonificacaoPorDia,
+  formatHorarioMin,
+  getAberturaLimiteMin,
   planRuleKey,
   type ApuracaoInput,
   type BonusPlanRule,
@@ -294,5 +296,32 @@ describe("bônus de planos longos", () => {
       expect(b?.planosMes.find((p) => p.key === KPS)?.qtd).toBe(1);
       expect(b?.acumuladoPlanosMesCents).toBe(2500 + 1500);
     });
+  });
+});
+
+describe("limite da trava de abertura", () => {
+  const MIN = (h: number, m = 0) => h * 60 + m;
+
+  it("sem configuração mantém o padrão antigo: 10:15 seg-sáb, 12:15 domingo", () => {
+    expect(getAberturaLimiteMin(2)).toBe(MIN(10, 15));
+    expect(getAberturaLimiteMin(6, null, "2026-10-10")).toBe(MIN(10, 15));
+    expect(getAberturaLimiteMin(7)).toBe(MIN(12, 15));
+  });
+
+  it("horário do dia da semana configurado vira abertura + 15 min", () => {
+    const program = { aberturaMinPorDia: { 2: MIN(11) } };
+    expect(getAberturaLimiteMin(2, program, "2026-10-13")).toBe(MIN(11, 15));
+    expect(getAberturaLimiteMin(3, program, "2026-10-14")).toBe(MIN(10, 15)); // outros dias seguem o padrão
+  });
+
+  it("exceção por data vence o dia da semana e vale só naquela data", () => {
+    const program = { aberturaMinPorDia: { 1: MIN(10) }, aberturaMinPorData: { "2026-10-12": MIN(11) } };
+    expect(getAberturaLimiteMin(1, program, "2026-10-12")).toBe(MIN(11, 15));
+    expect(getAberturaLimiteMin(1, program, "2026-10-19")).toBe(MIN(10, 15));
+  });
+
+  it("formata minutos como HH:MM", () => {
+    expect(formatHorarioMin(MIN(11, 15))).toBe("11:15");
+    expect(formatHorarioMin(MIN(9, 5))).toBe("09:05");
   });
 });

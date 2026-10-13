@@ -12,9 +12,15 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Twilio e grava nos dois campos acima. Inline pelo mesmo motivo das demais.
 
 const CONTENT_API = "https://content.twilio.com/v1/Content";
-const BATCH = 80;
-const MAX_AGE_MS = 5 * 24 * 60 * 60 * 1000; // depois disso a Twilio já não vai preencher
+const BATCH = 120;
+// A Twilio mantém o preço consultável por muito mais tempo que 5 dias; a janela curta deixava sem preço tudo
+// o que foi enviado antes da function entrar no ar (e qualquer atraso do cron). 40 dias cobre o mês corrente
+// e o anterior do comparativo do painel.
+const MAX_AGE_MS = 40 * 24 * 60 * 60 * 1000;
 const MIN_AGE_MS = 10 * 60 * 1000;
+// Sem preço depois de 3 dias = a Twilio não vai cobrar (ex.: conversa dentro da janela de 24h). Marca como
+// conferida para não ocupar vaga no lote para sempre.
+const GIVE_UP_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -30,7 +36,7 @@ Deno.serve(async () => {
   // ── 1. Preço ──
   const { data: pending } = await admin
     .from("fa_crm_messages")
-    .select("id, twilio_sid")
+    .select("id, twilio_sid, created_at_ms")
     .eq("direction", "OUT")
     .not("twilio_sid", "is", null)
     .is("price_synced_at_ms", null)
@@ -42,14 +48,32 @@ Deno.serve(async () => {
 
   let priced = 0;
   let waiting = 0;
+  let httpErrors = 0;
+  let gaveUp = 0;
+  let firstError: { status: number; body: string } | null = null;
   for (const m of pending ?? []) {
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages/${m.twilio_sid}.json`, {
       headers: { Authorization: auth },
     });
-    if (!res.ok) continue;
+    if (res.status === 404) {
+      // Mensagem que a Twilio não conhece (apagada/outra conta): não adianta insistir.
+      await admin.from("fa_crm_messages").update({ price_synced_at_ms: now }).eq("id", m.id);
+      gaveUp++;
+      continue;
+    }
+    if (!res.ok) {
+      if (!firstError) firstError = { status: res.status, body: (await res.text().catch(() => "")).slice(0, 300) };
+      httpErrors++; // antes era silencioso: credencial/limite da Twilio aparecia como "0 preços" sem explicação
+      continue;
+    }
     const out = await res.json().catch(() => null);
     if (out?.price == null || out.price === "") {
-      waiting++; // ainda não faturada; tenta de novo na próxima rodada
+      if (now - m.created_at_ms > GIVE_UP_AFTER_MS) {
+        await admin.from("fa_crm_messages").update({ price_synced_at_ms: now }).eq("id", m.id);
+        gaveUp++;
+      } else {
+        waiting++; // ainda não faturada; tenta de novo na próxima rodada
+      }
       continue;
     }
     await admin
@@ -82,5 +106,7 @@ Deno.serve(async () => {
   }
   if (reclassified.length) console.warn("templates reclassificados pela Meta:", JSON.stringify(reclassified));
 
-  return json({ priced, waiting, templatesChecked: templates?.length ?? 0, reclassified });
+  if (httpErrors) console.warn(`Twilio recusou ${httpErrors} consulta(s) de preço`, JSON.stringify(firstError));
+
+  return json({ priced, waiting, gaveUp, httpErrors, firstError, templatesChecked: templates?.length ?? 0, reclassified });
 });

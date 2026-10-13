@@ -141,6 +141,7 @@ Deno.serve(async (req) => {
     body: string;
     photo_url: string | null;
     due_at_ms: number;
+    divergence_id: string | null;
   }>).sort((a, b) => a.due_at_ms - b.due_at_ms);
 
   if (rows.length === 0) {
@@ -159,7 +160,10 @@ Deno.serve(async (req) => {
   for (const row of rows) {
     const html = buildMessage(row.report_type, row.title, row.body);
     // Divergências levam os botões Conferido / Pedir justificativa / Pendência.
-    const markup = BUTTON_TYPES.has(row.report_type) ? { reply_markup: divergenceKeyboard(row.notification_id) } : {};
+    // O FECHAMENTO com divergência acima do limiar absorve a mensagem da
+    // divergência (o banco não manda a segunda) e leva os botões dela.
+    const buttonId = BUTTON_TYPES.has(row.report_type) ? row.notification_id : row.divergence_id;
+    const markup = buttonId ? { reply_markup: divergenceKeyboard(buttonId) } : {};
     const payload = html
       ? { chat_id: chatId, text: html, parse_mode: "HTML", disable_web_page_preview: true, ...markup }
       : {
@@ -195,7 +199,10 @@ Deno.serve(async (req) => {
         photo: row.photo_url,
         caption: "Foto do envelope",
       });
-      if (!photo.ok) console.error(`Falha ao enviar foto de ${row.notification_id}:`, photo.detail);
+      if (!photo.ok) {
+        console.error(`Falha ao enviar foto de ${row.notification_id}:`, photo.detail);
+        errors.push(`foto: ${photo.detail}`.slice(0, 200));
+      }
     }
   }
 

@@ -11,6 +11,8 @@ interface UnitFullStatus {
   revenueCents: number;
   goalCents: number;
   inside: number;
+  /** Sessões abertas no dia operacional até agora (dentro + finalizadas). */
+  sessionsToday: number;
   ordersCount: number;
   cash: UnitCashStatus | null;
   envelope: UnitEnvelopeBalance | null;
@@ -22,8 +24,8 @@ interface NpsSummaryQuick {
   promotersPct: number;
   passivesPct: number;
   detractorsPct: number;
-  avgTeam: number;
-  avgSpace: number;
+  avgTeam: number | null;
+  avgSpace: number | null;
   totalAnswered: number;
 }
 
@@ -31,30 +33,21 @@ interface NpsSummaryQuick {
  * Home do Dono / Gerencial Mobile UNIFICADA:
  * Reúne em um único painel executivo:
  * 1. KPIs consolidados das 3 operações (Faturamento e Crianças Dentro Agora)
- * 2. NPS Geral Resumido (Satisfação, promotores, notas de equipe e espaço)
- * 3. Operações completas com Faturamento vs Meta, Bonificação do Turno e Envelopes
+ * 2. Operações completas com Faturamento vs Meta, Bonificação do Turno e Envelopes
+ * 3. NPS Geral Resumido (Satisfação, promotores, notas de equipe e espaço), abaixo das unidades
  */
 export function MobileGerencialHome({
   units,
   onAbrirPainelCompleto,
   onAbrirUnidade,
-  onAbrirRelatorios,
 }: {
   units: Unit[];
   onAbrirPainelCompleto: () => void;
   onAbrirUnidade: (unit: Unit) => void;
-  onAbrirRelatorios: () => void;
 }) {
   const [unitRows, setUnitRows] = useState<UnitFullStatus[]>([]);
-  const [npsSummary, setNpsSummary] = useState<NpsSummaryQuick>({
-    score: 94,
-    promotersPct: 95,
-    passivesPct: 4,
-    detractorsPct: 1,
-    avgTeam: 4.9,
-    avgSpace: 4.9,
-    totalAnswered: 142,
-  });
+  // null = ainda carregando (ou sem respostas): o card mostra "—", nunca um número de exemplo.
+  const [npsSummary, setNpsSummary] = useState<NpsSummaryQuick | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,13 +67,14 @@ export function MobileGerencialHome({
             const businessDate = businessDateFor(Date.now(), u.business_day_cutoff_hour);
             const tipo: UnidadeTipo = u.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
 
-            const [goalCents, revenue, ticketMedio, programs, rental, insideSessions] = await Promise.all([
+            const [goalCents, revenue, ticketMedio, programs, rental, insideSessions, sessionsToday] = await Promise.all([
               Api.todayGoal(u.id, u.business_day_cutoff_hour).catch(() => 0),
               Api.todayRevenue(u.id, u.business_day_cutoff_hour).catch(() => ({ totalCents: 0 })),
               Api.todayTicketMedio(u.id, u.business_day_cutoff_hour).catch(() => ({ ordersCount: 0 })),
               Api.bonusProgramsByUnit([u.id]).catch(() => ({}) as Record<string, never>),
               Api.todayRentalCents(u.id, u.business_day_cutoff_hour).catch(() => ({ totalCents: 0 })),
               Api.activeSessions(u.id).catch(() => []),
+              Api.todaySessionsCount(u.id, u.business_day_cutoff_hour).catch(() => 0),
             ]);
 
             const program = programs[u.id] ?? null;
@@ -95,6 +89,7 @@ export function MobileGerencialHome({
               revenueCents: revenue.totalCents,
               goalCents: goalCents || 0,
               inside: insideSessions.length,
+              sessionsToday,
               ordersCount: ticketMedio.ordersCount,
               cash: cashStatusList.find((c) => c.unit_id === u.id) ?? null,
               envelope: envelopeList.find((e) => e.unit_id === u.id) ?? null,
@@ -115,8 +110,8 @@ export function MobileGerencialHome({
                 promotersPct: Math.round(((s.promoters || 0) / total) * 100),
                 passivesPct: Math.round(((s.passives || 0) / total) * 100),
                 detractorsPct: Math.round(((s.detractors || 0) / total) * 100),
-                avgTeam: s.avgTeam ? Math.round(s.avgTeam * 10) / 10 : 4.9,
-                avgSpace: s.avgSpace ? Math.round(s.avgSpace * 10) / 10 : 4.9,
+                avgTeam: s.avgTeam ? Math.round(s.avgTeam * 10) / 10 : null,
+                avgSpace: s.avgSpace ? Math.round(s.avgSpace * 10) / 10 : null,
                 totalAnswered: total,
               });
             }
@@ -146,6 +141,7 @@ export function MobileGerencialHome({
 
   const totalRevenueCents = unitRows.reduce((sum, r) => sum + r.revenueCents, 0);
   const totalInside = unitRows.reduce((sum, r) => sum + r.inside, 0);
+  const totalSessions = unitRows.reduce((sum, r) => sum + r.sessionsToday, 0);
   const hasAnyData = unitRows.length > 0;
 
   return (
@@ -166,53 +162,24 @@ export function MobileGerencialHome({
         </div>
       </div>
 
-      {/* 2. NPS ATUAL RESUMIDO */}
-      <div
-        className="m-card"
-        style={{
-          borderRadius: 20,
-          padding: "14px 16px",
-          background: "linear-gradient(135deg, rgba(46, 207, 181, 0.08) 0%, rgba(240, 25, 107, 0.06) 100%)",
-          border: "1.5px solid rgba(46, 207, 181, 0.25)",
-          marginBottom: 14,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 18 }}>⭐</span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)" }}>NPS Atual Resumido</span>
+      {/* Sessões do dia até agora: total nas operações e quebra por unidade. */}
+      <div className="m-card" style={{ borderRadius: 20, padding: 14, marginBottom: 14 }}>
+        <div className="m-row" style={{ justifyContent: "space-between", gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>Sessões hoje · até agora</p>
+          <p className="m-num" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, color: "var(--color-primary-hover)" }}>
+            {hasAnyData ? totalSessions : "—"}
+          </p>
+        </div>
+        {hasAnyData && (
+          <div className="m-stack" style={{ gap: 6, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border-subtle)" }}>
+            {unitRows.map((r) => (
+              <div key={r.unit.id} className="m-row" style={{ justifyContent: "space-between", gap: 10, fontSize: 13, fontWeight: 700 }}>
+                <span className="m-trunc">{unitBrandFor(r.unit.name).title}</span>
+                <span className="m-num">{r.sessionsToday}</span>
+              </div>
+            ))}
           </div>
-          <Badge variant="green">🏆 Zona de Excelência</Badge>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
-          <span style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 1, color: "#1D8273" }}>
-            +{npsSummary.score}
-          </span>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-muted)" }}>
-            {npsSummary.totalAnswered} famílias avaliaram nos últimos 30 dias
-          </span>
-        </div>
-
-        {/* Barra de distribuição NPS */}
-        <div style={{ marginTop: 10 }}>
-          <div style={{ height: 7, borderRadius: 9999, background: "#E2E8F0", overflow: "hidden", display: "flex" }}>
-            <div style={{ width: `${npsSummary.promotersPct}%`, background: "#10b981" }} title="Promotores" />
-            <div style={{ width: `${npsSummary.passivesPct}%`, background: "#f59e0b" }} title="Neutros" />
-            <div style={{ width: `${npsSummary.detractorsPct}%`, background: "#ef4444" }} title="Detratores" />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>
-            <span style={{ color: "#10b981" }}>🟢 {npsSummary.promotersPct}% Promotores</span>
-            <span style={{ color: "#f59e0b" }}>🟡 {npsSummary.passivesPct}% Neutros</span>
-            <span style={{ color: "#ef4444" }}>🔴 {npsSummary.detractorsPct}% Detratores</span>
-          </div>
-        </div>
-
-        {/* Médias de Equipe e Espaço */}
-        <div style={{ display: "flex", gap: 16, marginTop: 10, paddingTop: 10, borderTop: "1px dashed rgba(0,0,0,0.08)", fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
-          <span>👥 Equipe: <strong style={{ color: "#1D8273" }}>⭐ {npsSummary.avgTeam}/5.0</strong></span>
-          <span>🏰 Espaço: <strong style={{ color: "#F0196B" }}>⭐ {npsSummary.avgSpace}/5.0</strong></span>
-        </div>
+        )}
       </div>
 
       {/* 3. OPERAÇÕES UNIFICADAS (DADOS DO TURNO + METAS + BONIFICAÇÃO) */}
@@ -287,6 +254,12 @@ export function MobileGerencialHome({
                   <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>Dentro</p>
                   <p className="m-num" style={{ margin: "2px 0 0", fontFamily: "var(--font-display)", fontSize: 18, color: "#1D8273" }}>
                     {inside}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>Sessões</p>
+                  <p className="m-num" style={{ margin: "2px 0 0", fontFamily: "var(--font-display)", fontSize: 18 }}>
+                    {row.sessionsToday}
                   </p>
                 </div>
                 <div>
@@ -377,17 +350,60 @@ export function MobileGerencialHome({
         <p style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Carregando dados unificados das operações…</p>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 22 }}>
-        <button type="button" className="m-pill" onClick={onAbrirRelatorios}>
-          Relatórios / fechamento
-        </button>
+      {/* NPS: fica depois das operações — o que o Owner abre primeiro são as unidades. */}
+      <div
+        className="m-card"
+        style={{
+          borderRadius: 20,
+          padding: "14px 16px",
+          background: "linear-gradient(135deg, rgba(46, 207, 181, 0.08) 0%, rgba(240, 25, 107, 0.06) 100%)",
+          border: "1.5px solid rgba(46, 207, 181, 0.25)",
+          marginTop: 14,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>⭐</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)" }}>NPS Atual Resumido</span>
+          </div>
+          {npsSummary && npsSummary.score >= 75 && <Badge variant="green">🏆 Zona de Excelência</Badge>}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 1, color: "#1D8273" }}>
+            {npsSummary ? `${npsSummary.score > 0 ? "+" : ""}${npsSummary.score}` : "—"}
+          </span>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-muted)" }}>
+            {npsSummary ? `${npsSummary.totalAnswered} famílias avaliaram nos últimos 30 dias` : "últimos 30 dias"}
+          </span>
+        </div>
+
+        {/* Barra de distribuição NPS */}
+        <div style={{ marginTop: 10 }}>
+          <div style={{ height: 7, borderRadius: 9999, background: "#E2E8F0", overflow: "hidden", display: "flex" }}>
+            <div style={{ width: `${npsSummary?.promotersPct ?? 0}%`, background: "#10b981" }} title="Promotores" />
+            <div style={{ width: `${npsSummary?.passivesPct ?? 0}%`, background: "#f59e0b" }} title="Neutros" />
+            <div style={{ width: `${npsSummary?.detractorsPct ?? 0}%`, background: "#ef4444" }} title="Detratores" />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>
+            <span style={{ color: "#10b981" }}>🟢 {npsSummary ? `${npsSummary.promotersPct}%` : "—"} Promotores</span>
+            <span style={{ color: "#f59e0b" }}>🟡 {npsSummary ? `${npsSummary.passivesPct}%` : "—"} Neutros</span>
+            <span style={{ color: "#ef4444" }}>🔴 {npsSummary ? `${npsSummary.detractorsPct}%` : "—"} Detratores</span>
+          </div>
+        </div>
+
+        {/* Médias de Equipe e Espaço */}
+        <div style={{ display: "flex", gap: 16, marginTop: 10, paddingTop: 10, borderTop: "1px dashed rgba(0,0,0,0.08)", fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
+          <span>👥 Equipe: <strong style={{ color: "#1D8273" }}>{npsSummary?.avgTeam != null ? `⭐ ${npsSummary.avgTeam}/5.0` : "—"}</strong></span>
+          <span>🏰 Espaço: <strong style={{ color: "#F0196B" }}>{npsSummary?.avgSpace != null ? `⭐ ${npsSummary.avgSpace}/5.0` : "—"}</strong></span>
+        </div>
       </div>
 
       <button
         type="button"
         className="m-cta"
         onClick={onAbrirPainelCompleto}
-        style={{ marginTop: 12, background: "var(--color-dark, #1A3F35)" }}
+        style={{ marginTop: 22, background: "var(--color-dark, #1A3F35)" }}
       >
         Abrir painel administrativo completo
       </button>
