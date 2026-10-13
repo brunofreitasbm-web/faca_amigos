@@ -4,7 +4,6 @@ import type { Unit } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { money } from "../format.js";
 import { usePendingSessionReports } from "../api/useSessionReports.js";
-import { ConnectionStatusChip } from "../components/ConnectionStatusChip.js";
 
 function initials(name: string): string {
   return name
@@ -92,9 +91,6 @@ export function MobileHome({
             {shiftOpen === false ? " · caixa fechado" : revenueCents != null ? ` · ${money(revenueCents)} hoje` : ""}
           </p>
         </div>
-        {/* Sem o chip, o operador só descobre que está sem internet quando a
-            venda "some" na fila — no balcão ele fica no cabeçalho. */}
-        <ConnectionStatusChip />
         <span className="m-avatar" aria-hidden="true">
           {initials(employeeName)}
         </span>

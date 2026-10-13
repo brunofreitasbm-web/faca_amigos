@@ -254,7 +254,7 @@ function MobileMais({
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", marginBottom: 22, font: "inherit", textAlign: "left" }}
           >
             <span className="m-grow">
-              <span style={{ display: "block", fontSize: 15.5, fontWeight: 800 }}>Chat com os donos</span>
+              <span style={{ display: "block", fontSize: 15.5, fontWeight: 800 }}>Chat</span>
               <span style={{ display: "block", marginTop: 3, fontSize: 12.5, lineHeight: 1.4, fontWeight: 600, color: "var(--text-muted)" }}>
                 {chat.unread > 0 ? `${chat.unread} mensagem(ns) nova(s)` : "sistema, problemas e avisos"}
               </span>
