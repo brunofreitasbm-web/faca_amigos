@@ -247,7 +247,6 @@ export function MetasTab() {
 
   // Global Bonus Settings
   const [monthlyCapReais, setMonthlyCapReais] = useState<string>("200.00");
-  const [cashOpeningDeadline, setCashOpeningDeadline] = useState<string>("10:15");
   const [cashDiffToleranceReais, setCashDiffToleranceReais] = useState<string>("20.00");
 
   // Historical Baselines per Unit
@@ -557,12 +556,6 @@ export function MetasTab() {
               </div>
             </div>
 
-            <Input
-              label="Horário Abertura"
-              type="text"
-              value={cashOpeningDeadline}
-              onChange={(e) => setCashOpeningDeadline(e.target.value)}
-            />
             <Input
               label="Tol. Caixa (R$)"
               type="number"
