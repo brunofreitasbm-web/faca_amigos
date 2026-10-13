@@ -114,8 +114,18 @@ const METHOD_LABEL: Record<string, string> = {
   PIX: "⚡ Pix",
 };
 
-function parseDivergences(lines: string[]): { entries: Div[]; total: number | null; rest: string[] } {
+/** Esperado × declarado de uma forma de pagamento, divergente ou não. */
+type Conf = { name: string; declared: number; expected: number };
+
+function parseDivergences(
+  lines: string[],
+): { entries: Div[]; total: number | null; rest: string[]; conf: Conf[] } {
   const entries: Div[] = [];
+  const conf: Conf[] = [];
+  const confRe = new RegExp(
+    `^Conferência\\s+([^:]+?):\\s*declarado\\s+(${MONEY_ONE})\\s*\\|\\s*esperado\\s+(${MONEY_ONE})`,
+    "i",
+  );
   const rest: string[] = [];
   let total: number | null = null;
   let last: Div | null = null;
@@ -134,6 +144,11 @@ function parseDivergences(lines: string[]): { entries: Div[]; total: number | nu
     const l = raw.trim();
     if (!l) continue;
 
+    const c = l.match(confRe);
+    if (c) {
+      conf.push({ name: c[1].trim(), declared: parseMoney(c[2]) ?? 0, expected: parseMoney(c[3]) ?? 0 });
+      continue;
+    }
     const g = l.match(gaveta);
     if (g) {
       const amount = parseMoney(g[4]) ?? 0;
@@ -178,10 +193,10 @@ function parseDivergences(lines: string[]): { entries: Div[]; total: number | nu
     }
     rest.push(l);
   }
-  return { entries, total, rest };
+  return { entries, total, rest, conf };
 }
 
-function renderDivergences(entries: Div[], total: number | null, rest: string[]): string {
+function renderDivergences(entries: Div[], total: number | null, rest: string[], conf: Conf[] = []): string {
   const out: string[] = [];
   const seen = new Map<string, string>();
 
@@ -216,6 +231,16 @@ function renderDivergences(entries: Div[], total: number | null, rest: string[])
     parts.push(`líquida: <b>${brlSigned(net)}</b>${word}`);
   }
   if (parts.length > 0) out.push(`\n🧾 ${parts.join(" · ")}`);
+
+  if (conf.length > 0) {
+    out.push("", "<b>📋 Por forma de pagamento</b>");
+    for (const c of conf) {
+      const label = METHOD_LABEL[c.name.toUpperCase()] ?? `🔸 ${c.name}`;
+      const ok = Math.abs(c.declared - c.expected) < 0.005;
+      out.push(`${ok ? "✅" : c.declared < c.expected ? "🔻" : "🔺"} <b>${esc(label)}</b>`);
+      out.push(`     esperado ${brl(c.expected)} · declarado ${brl(c.declared)}`);
+    }
+  }
 
   for (const r of rest) out.push(t(r));
   return out.join("\n");
@@ -346,16 +371,16 @@ function formatFechamento(title: string, body: string): string | null {
     out.push(
       "",
       `<b>${NUM[4]} ${sobraOnly ? "💡 SOBRAS" : "⚠️ DIVERGÊNCIAS"}</b> (${div.entries.length} ${div.entries.length === 1 ? "item" : "itens"})`,
-      renderDivergences(div.entries, div.total, div.rest.filter((r) => !/^(⚠️|💡)/.test(r))),
+      renderDivergences(div.entries, div.total, div.rest.filter((r) => !/^(⚠️|💡)/.test(r)), div.conf),
     );
   }
   return out.join("\n");
 }
 
 function formatDivergenciaFechamento(title: string, body: string): string | null {
-  const { entries, total, rest } = parseDivergences(body.split("\n"));
+  const { entries, total, rest, conf } = parseDivergences(body.split("\n"));
   if (entries.length === 0) return null;
-  return [`<b>${esc(title)}</b>`, "", renderDivergences(entries, total, rest)].join("\n");
+  return [`<b>${esc(title)}</b>`, "", renderDivergences(entries, total, rest, conf)].join("\n");
 }
 
 // ───────────────────────── abertura ─────────────────────────
