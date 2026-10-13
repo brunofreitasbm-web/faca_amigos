@@ -9,7 +9,6 @@ import { CashPaymentPad } from "./CashPaymentPad.js";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 import { openTapCharge, savePendingTap } from "../lib/infinitepayTap.js";
 import { IfCan } from "../auth/RequireCapability.js";
-import { voiceRecorder } from "../lib/voiceRecorder.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 type PaymentMethod = (typeof METHODS)[number];
@@ -89,16 +88,6 @@ export function CheckoutModal({
     return first ? first.session.checkin_at_ms + first.session.paused_ms_total + (first.session.loyalty_courtesy_minutes ?? 0) * 60_000 + first.quote.timing.elapsedMs : Date.now();
   });
 
-  // "Iniciar se ainda não estiver gravando esta mesma conversa" — cobre o
-  // fechamento pelo Painel (várias sessões de uma vez, ou saída manual),
-  // que nunca passa pela SaidaScreen. Quando o operador já veio pela leitura
-  // da pulseira, isto é no-op (voiceRecorder.start é idempotente).
-  useEffect(() => {
-    if (!unit || !employee) return;
-    void voiceRecorder.start({ unitId: unit.id, employeeId: employee.id, momento: "CHECKOUT" });
-    for (const e of entries) voiceRecorder.addSession(e.session.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só no mount: `entries` já está congelado acima, não precisa reagir a mudanças.
-  }, [unit?.id, employee?.id]);
   const [method, setMethod] = useState<PaymentMethod>("PIX");
   const [secondMethod, setSecondMethod] = useState<PaymentMethod | null>(null);
   const [splitTyped, setSplitTyped] = useState("");
@@ -246,10 +235,6 @@ export function CheckoutModal({
         closedAtMs,
       });
 
-      // Pagamento confirmado: a conversa de retenção acaba aqui. Sem
-      // `await` de propósito — não pode atrasar o cupom/recibo na tela.
-      void voiceRecorder.stop({ outcome: "SUCCESS", orderId: result.orderId });
-
       setPaidOrderId(result.orderId);
       setPaidOrderCode(result.orderCode ?? null);
       const nowStr = new Date().toLocaleString("pt-BR");
@@ -306,14 +291,6 @@ export function CheckoutModal({
     if (!employee || !unit || isSplit || (method !== "CREDITO" && method !== "DEBITO")) return;
     const orderId = crypto.randomUUID();
 
-    // Diferente do fechamento normal: aqui a página é TROCADA (InfiniteTap
-    // é outro app no mesmo aparelho) e um MediaRecorder em memória não
-    // sobrevive a isso — por isso `wait: true` (aguarda converter+enviar
-    // antes de navegar) em vez do fire-and-forget de `confirm()` acima.
-    // `busy` evita duplo clique enquanto isto roda (até ~1-2s).
-    setBusy(true);
-    await voiceRecorder.stop({ outcome: "SUCCESS", orderId, wait: true });
-    setBusy(false);
     const nowStr = new Date().toLocaleString("pt-BR");
     const receiptsBase = entries.map((e) => ({
       title: "Comprovante de Saída",

@@ -31,7 +31,6 @@ const GROUP_LABEL: Record<string, string> = {
   metas: "Metas",
   clientes: "Clientes",
   bonificacao: "Bonificação",
-  treinamento: "Treinamento de Vendas",
   crm: "CRM WhatsApp",
   relatorio_sessao: "Olhar FaçaAmigos",
 };

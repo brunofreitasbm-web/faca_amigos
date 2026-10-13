@@ -26,14 +26,7 @@ async function main() {
   // Em dev a SPA normalmente roda no Vite (5173) com proxy; servir o dist
   // daqui é opt-in via env (útil para testar o modo empacotado sem Electron).
   const uiDist = process.env.FACAAMIGOS_UI_DIST;
-  // O worker de transcrição (whisper.cpp) só roda no processo main do
-  // Electron (precisa de app.getPath("userData") e das APIs nativas) — em
-  // dev:server a rota /api/voz aceita o upload e enfileira, mas nada
-  // transcreve até rodar via start:electron ou scripts/voz-worker-dev.ts.
-  // Função de gravação/transcrição de voz desativada por padrão em toda a
-  // rede — só liga se alguém setar FACAAMIGOS_VOZ_ENABLED=true explicitamente.
-  const voiceDir = process.env.FACAAMIGOS_VOZ_ENABLED === "true" ? (process.env.FACAAMIGOS_VOZ_DIR ?? "./.voz") : undefined;
-  const app = await buildApp({ db, hmacKey, nowMs: () => Date.now(), voiceDir }, { tls, uiDist });
+  const app = await buildApp({ db, hmacKey, nowMs: () => Date.now() }, { tls, uiDist });
   await app.listen({ port: PORT, host: "0.0.0.0" });
   console.log(`FaçaAmigos kiosk server em ${tls ? "https" : "http"}://127.0.0.1:${PORT}`);
 }
