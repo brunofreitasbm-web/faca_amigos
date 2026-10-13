@@ -252,6 +252,7 @@ interface PurposeStatRow {
   replied: number;
   price_total: number;
   price_unit: string | null;
+  twilio_fee: number;
 }
 
 interface AutomationDef {
@@ -331,7 +332,7 @@ function AutomationsCard() {
       const [unitList, lcRows, purposeRows] = await Promise.all([
         Api.units(),
         supabase().rpc("fa_crm_automation_stats", { p_days: STATS_DAYS }),
-        supabase().rpc("fa_crm_message_stats_by_purpose", { p_days: STATS_DAYS }),
+        supabase().rpc("fa_crm_message_stats_by_purpose_v2", { p_days: STATS_DAYS }),
       ]);
       setUnits(unitList);
       const lcByKind: Record<string, LifecycleStatRow> = {};
@@ -344,6 +345,7 @@ function AutomationsCard() {
         if (!r.purpose) continue;
         const cur = byPurpose[r.purpose];
         const price = Number(r.price_total);
+        const fee = Number(r.twilio_fee);
         byPurpose[r.purpose] = cur
           ? {
               ...cur,
@@ -353,9 +355,10 @@ function AutomationsCard() {
               failed: cur.failed + r.failed,
               replied: cur.replied + r.replied,
               price_total: cur.price_total + price,
+              twilio_fee: cur.twilio_fee + fee,
               price_unit: cur.price_unit ?? r.price_unit,
             }
-          : { ...r, price_total: price };
+          : { ...r, price_total: price, twilio_fee: fee };
       }
       setPurposeStats(byPurpose);
 
@@ -412,7 +415,7 @@ function AutomationsCard() {
     ];
     if (s.failed) parts.push(`falhas ${s.failed}`);
     if (lc) parts.push(`converteram ${lc.converted} (R$ ${(lc.converted_cents / 100).toFixed(2)})`);
-    parts.push(`custo ${unit} ${s.price_total.toFixed(2)}`);
+    parts.push(`custo ${unit} ${(s.price_total + s.twilio_fee).toFixed(2)}`);
     return parts.join(" · ");
   }
 
@@ -428,7 +431,7 @@ function AutomationsCard() {
           <>
             <HelpText style={{ margin: "4px 0 12px" }}>
               Últimos {STATS_DAYS} dias. “Responderam” = o responsável escreveu ou tocou num botão em até 48h. “Converteram” (só ciclo de vida) = pedido pago em até
-              14 dias. Custo é o informado pela Twilio (pode faltar nas mais recentes). Cada uma só envia com o template aprovado; as de Marketing exigem o aceite
+              14 dias. Custo = preço da Meta + taxa da Twilio por mensagem (as mais recentes podem estar sem o preço da Meta por algumas horas). Cada uma só envia com o template aprovado; as de Marketing exigem o aceite
               de ofertas do responsável.
             </HelpText>
             {AUTOMATION_GROUPS.map((group) => (
@@ -477,6 +480,7 @@ interface CostStatRow {
   priced: number;
   price_total: number;
   price_unit: string | null;
+  twilio_fee: number;
 }
 
 const COST_CATEGORY_LABEL: Record<string, string> = {
@@ -485,6 +489,7 @@ const COST_CATEGORY_LABEL: Record<string, string> = {
   AUTHENTICATION: "Autenticação",
   SERVICE: "Conversa (janela 24h)",
   DESCONHECIDA: "Sem categoria",
+  RECEBIDAS: "Mensagens recebidas (taxa Twilio)",
 };
 
 const COST_DAYS = 30;
@@ -500,9 +505,9 @@ function WhatsappCostCard() {
 
   useEffect(() => {
     void supabase()
-      .rpc("fa_crm_whatsapp_cost_stats", { p_days: COST_DAYS })
+      .rpc("fa_crm_whatsapp_cost_stats_v2", { p_days: COST_DAYS })
       .then(({ data, error }) => {
-        if (!error) setRows(((data ?? []) as CostStatRow[]).map((r) => ({ ...r, price_total: Number(r.price_total) })));
+        if (!error) setRows(((data ?? []) as CostStatRow[]).map((r) => ({ ...r, price_total: Number(r.price_total), twilio_fee: Number(r.twilio_fee) })));
       });
   }, []);
 
@@ -524,18 +529,37 @@ function WhatsappCostCard() {
         ) : categories.length === 0 ? (
           <HelpText style={{ margin: "8px 0 0" }}>Nenhum envio no período.</HelpText>
         ) : (
-          categories.map((cat) => {
-            const cur = pick(cat, "current");
-            const prev = pick(cat, "previous");
-            return (
-              <HelpText key={cat} style={{ margin: "4px 0 0" }}>
-                <strong>{COST_CATEGORY_LABEL[cat] ?? cat}</strong>: {cur?.sent ?? 0} enviadas ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · entregues{" "}
-                {pct(cur?.delivered ?? 0, cur?.sent ?? 0)} · lidas {pct(cur?.read_count ?? 0, cur?.sent ?? 0)} · falhas {cur?.failed ?? 0} · custo{" "}
-                {money(cur?.price_total ?? 0)} ({delta(cur?.price_total ?? 0, prev?.price_total ?? 0)})
-                {cur && cur.priced < cur.sent - cur.failed && ` · ${cur.sent - cur.failed - cur.priced} aguardando preço`}
-              </HelpText>
-            );
-          })
+          <>
+            {categories.map((cat) => {
+              const cur = pick(cat, "current");
+              const prev = pick(cat, "previous");
+              const cost = (r?: CostStatRow) => (r?.price_total ?? 0) + (r?.twilio_fee ?? 0);
+              if (cat === "RECEBIDAS") {
+                return (
+                  <HelpText key={cat} style={{ margin: "4px 0 0" }}>
+                    <strong>{COST_CATEGORY_LABEL[cat]}</strong>: {cur?.sent ?? 0} ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · custo {money(cost(cur))}
+                  </HelpText>
+                );
+              }
+              return (
+                <HelpText key={cat} style={{ margin: "4px 0 0" }}>
+                  <strong>{COST_CATEGORY_LABEL[cat] ?? cat}</strong>: {cur?.sent ?? 0} enviadas ({delta(cur?.sent ?? 0, prev?.sent ?? 0)}) · entregues{" "}
+                  {pct(cur?.delivered ?? 0, cur?.sent ?? 0)} · lidas {pct(cur?.read_count ?? 0, cur?.sent ?? 0)} · falhas {cur?.failed ?? 0} · custo{" "}
+                  {money(cost(cur))} ({delta(cost(cur), cost(prev))}) — Meta {money(cur?.price_total ?? 0)} + Twilio {money(cur?.twilio_fee ?? 0)}
+                  {cur && cur.priced < cur.sent - cur.failed && ` · ${cur.sent - cur.failed - cur.priced} aguardando preço da Meta`}
+                </HelpText>
+              );
+            })}
+            <HelpText style={{ margin: "8px 0 0" }}>
+              <strong>Total</strong>:{" "}
+              {money((rows ?? []).filter((r) => r.period === "current").reduce((n, r) => n + r.price_total + r.twilio_fee, 0))} (
+              {delta(
+                (rows ?? []).filter((r) => r.period === "current").reduce((n, r) => n + r.price_total + r.twilio_fee, 0),
+                (rows ?? []).filter((r) => r.period === "previous").reduce((n, r) => n + r.price_total + r.twilio_fee, 0),
+              )}
+              )
+            </HelpText>
+          </>
         )}
       </details>
     </Card>
