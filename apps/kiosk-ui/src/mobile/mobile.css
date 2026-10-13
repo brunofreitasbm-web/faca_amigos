@@ -254,20 +254,87 @@
 
 .m-tabbar button {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   background: none;
   border: none;
-  padding: 8px 2px;
+  padding: 6px 2px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-muted);
-  min-height: 44px;
+  min-height: 52px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .m-tabbar button[aria-current="page"] {
   font-weight: 800;
   color: var(--color-primary-hover);
+}
+
+.m-tab-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 28px;
+  border-radius: 9999px;
+  transition: background 160ms ease;
+}
+
+.m-tabbar button[aria-current="page"] .m-tab-icon {
+  background: var(--surface-page);
+}
+
+.m-tab-badge {
+  position: absolute;
+  top: -3px;
+  right: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Botão "Voltar" com texto: ver MobileNav.tsx. 44px de alto é o piso de
+   toque da casca; a largura vem do rótulo, então "Resumo"/"Turno" dizem
+   para onde o toque leva. */
+.m-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  min-height: 44px;
+  padding: 0 14px 0 8px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.m-back:active {
+  transform: scale(0.97);
+}
+
+.m-navbar-title {
+  text-align: right;
+  font-size: 17px;
 }
 
 /* ---------- folha inferior ---------- */

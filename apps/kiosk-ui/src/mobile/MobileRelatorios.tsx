@@ -32,7 +32,7 @@ function sumJson(json: string | null): number {
  * não entram nessa soma, por isso o rótulo diz "desde a abertura do
  * turno atual" em vez de "hoje".
  */
-export function MobileRelatorios({ units, onBack }: { units: Unit[]; onBack: () => void }) {
+export function MobileRelatorios({ units }: { units: Unit[] }) {
   const [revenueByUnit, setRevenueByUnit] = useState<Record<string, number>>({});
   const [methodTotals, setMethodTotals] = useState<Record<string, number>>({});
   const [divergences, setDivergences] = useState<Divergence[]>([]);
@@ -83,14 +83,10 @@ export function MobileRelatorios({ units, onBack }: { units: Unit[]; onBack: () 
   const hasRevenue = Object.keys(revenueByUnit).length > 0;
 
   return (
-    <div className="m-shell">
-      <div className="m-frame">
-        <div className="m-navbar">
-          <button type="button" className="m-round" aria-label="Voltar" onClick={onBack}>
-            ‹
-          </button>
-          <span className="m-title-sm m-grow">Relatórios</span>
-        </div>
+    <>
+      <div className="m-appbar">
+        <p className="m-title m-grow">Relatórios</p>
+      </div>
 
         <div className="m-scroll">
           <p className="m-eyebrow">Receita das 3 unidades hoje</p>
@@ -151,7 +147,6 @@ export function MobileRelatorios({ units, onBack }: { units: Unit[]; onBack: () 
             <p style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Carregando…</p>
           )}
         </div>
-      </div>
-    </div>
+    </>
   );
 }

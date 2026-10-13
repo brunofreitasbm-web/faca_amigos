@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { MobileNavBar } from "./MobileNav.js";
 import "./mobile.css";
 
 /**
@@ -21,17 +22,12 @@ import "./mobile.css";
  * ativa quando a tela filha já rolou, mas cobre o caso de uma tela futura
  * que não tenha o próprio scroll.
  */
-export function MobileScreenFrame({ title, onBack, children }: { title: string; onBack: () => void; children: ReactNode }) {
+export function MobileScreenFrame({ title, onBack, backLabel = "Voltar", children }: { title: string; onBack: () => void; backLabel?: string; children: ReactNode }) {
   return (
     <div className="m-shell">
       <div className="m-frame">
-        <div className="m-navbar">
-          <button type="button" className="m-round" aria-label="Voltar ao modo celular" onClick={onBack}>
-            ‹
-          </button>
-          <span className="m-title-sm m-grow">{title}</span>
-        </div>
-        <div className="m-scroll" style={{ padding: 0 }}>
+        <MobileNavBar title={title} backLabel={backLabel} onBack={onBack} />
+        <div className="m-scroll" style={{ padding: 0, overflowX: "auto" }}>
           {children}
         </div>
       </div>
