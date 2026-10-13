@@ -131,13 +131,6 @@ export const TabIcons = {
       <path d="M22 20H2" />
     </Svg>
   ),
-  relatorios: (
-    <Svg>
-      <path d="M6 3h9l4 4v14H6z" />
-      <path d="M14 3v5h5" />
-      <path d="M9 13h7M9 17h5" />
-    </Svg>
-  ),
   console: (
     <Svg>
       <circle cx="12" cy="12" r="3" />
