@@ -26,7 +26,8 @@ type View = Tab | "CHECKIN" | "PEDIDOS";
 // tivesse saído do Painel — perde o lugar. Vive fora do componente de
 // propósito: só precisa sobreviver ao desmonte, não ao reload.
 let lastTab: Tab = "TURNO";
-const TAB_LABEL: Record<Tab, string> = { TURNO: "Turno", PAINEL: "Dentro", MAIS: "Mais" };
+let lastTabOwner: string | null = null;
+const TAB_LABEL: Record<Tab, string> = { TURNO: "Turno", PAINEL: "Painel", MAIS: "Mais" };
 
 /** Rótulo do botão "Voltar" das telas completas: a aba de onde o operador saiu. */
 export function mobileReturnLabel(): string {
@@ -62,6 +63,11 @@ export function MobileShell({
 }) {
   const { can } = useAuth();
   const toast = useToast();
+  // Outro colaborador no mesmo aparelho começa sempre no Turno.
+  if (lastTabOwner !== employeeId) {
+    lastTabOwner = employeeId;
+    lastTab = "TURNO";
+  }
   const [view, setViewState] = useState<View>(lastTab);
   const setView = (next: View) => {
     if (next === "TURNO" || next === "PAINEL" || next === "MAIS") lastTab = next;
@@ -91,7 +97,7 @@ export function MobileShell({
 
   const tabs = [
     { id: "TURNO" as const, label: "Turno", icon: TabIcons.turno, badge: pendingRenewals.size },
-    { id: "PAINEL" as const, label: "Dentro", icon: TabIcons.painel, show: can("sessao.checkout") },
+    { id: "PAINEL" as const, label: "Painel", icon: TabIcons.painel, show: can("sessao.checkout") },
     { id: "MAIS" as const, label: "Mais", icon: TabIcons.mais },
   ];
 

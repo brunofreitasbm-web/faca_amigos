@@ -34,7 +34,7 @@ export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; on
   // O console completo tem o próprio cabeçalho; o "Sair do Gerencial" dele
   // agora leva de volta ao Resumo (e não direto para a seleção de unidade,
   // o que fazia o Owner perder o lugar). Quem quer mesmo trocar de
-  // unidade usa a aba "Operar".
+  // unidade usa a aba "Atender".
   if (view.kind === "FULL") {
     return <GerencialApp onExit={() => setView({ kind: "HOME" })} onLogout={onLogout} />;
   }
@@ -45,8 +45,8 @@ export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; on
   const tabs = [
     { id: "HOME" as const, label: "Resumo", icon: TabIcons.resumo },
     { id: "RELATORIOS" as const, label: "Relatórios", icon: TabIcons.relatorios },
-    { id: "FULL" as const, label: "Console", icon: TabIcons.console },
-    { id: "OPERAR" as const, label: "Operar", icon: TabIcons.operar },
+    { id: "FULL" as const, label: "Completo", icon: TabIcons.console },
+    { id: "OPERAR" as const, label: "Atender", icon: TabIcons.operar },
   ];
   const onTab = (id: (typeof tabs)[number]["id"]) => {
     if (id === "OPERAR") return onExit();

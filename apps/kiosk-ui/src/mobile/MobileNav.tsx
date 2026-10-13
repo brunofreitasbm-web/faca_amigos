@@ -69,10 +69,22 @@ export function MobileTabBar<Id extends string>({
       {tabs
         .filter((t) => t.show !== false)
         .map((t) => (
-          <button key={t.id} type="button" aria-current={active === t.id ? "page" : undefined} onClick={() => onSelect(t.id)}>
-            <span className="m-tab-icon" aria-hidden="true">
-              {t.icon}
-              {t.badge != null && t.badge > 0 && <span className="m-tab-badge">{t.badge > 9 ? "9+" : t.badge}</span>}
+          <button
+            key={t.id}
+            type="button"
+            aria-current={active === t.id ? "page" : undefined}
+            aria-label={t.badge ? `${t.label}, ${t.badge} pendente${t.badge > 1 ? "s" : ""}` : t.label}
+            onClick={() => onSelect(t.id)}
+          >
+            <span className="m-tab-icon">
+              <span aria-hidden="true" style={{ display: "flex" }}>
+                {t.icon}
+              </span>
+              {t.badge != null && t.badge > 0 && (
+                <span className="m-tab-badge" aria-hidden="true">
+                  {t.badge > 9 ? "9+" : t.badge}
+                </span>
+              )}
             </span>
             <span>{t.label}</span>
           </button>

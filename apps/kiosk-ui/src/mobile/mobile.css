@@ -288,20 +288,36 @@
 }
 
 .m-tabbar button[aria-current="page"] .m-tab-icon {
-  background: var(--surface-page);
+  background: color-mix(in srgb, var(--color-primary) 14%, white);
+  color: var(--color-primary-hover);
+}
+
+.m-tabbar button > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* O foco global troca o raio; sem isto o anel perde o formato de pílula. */
+.m-back:focus-visible,
+.m-tabbar button:focus-visible {
+  border-radius: 9999px;
 }
 
 .m-tab-badge {
   position: absolute;
-  top: -3px;
-  right: 6px;
+  top: -4px;
+  right: 4px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
   border-radius: 9999px;
-  background: var(--color-primary);
+  /* primary-hover: texto pequeno branco sobre o rosa puro não chega a 4.5:1 */
+  background: var(--color-primary-hover);
+  box-shadow: 0 0 0 2px var(--surface-card);
   color: var(--text-on-primary);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 18px;
   text-align: center;
@@ -368,8 +384,12 @@
   .m-sheet {
     animation: none;
   }
-  .m-tap {
+  .m-tap,
+  .m-tab-icon {
     transition: none;
+  }
+  .m-back:active {
+    transform: none;
   }
 }
 
