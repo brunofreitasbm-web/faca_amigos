@@ -4,11 +4,10 @@ import type { Unit } from "../api/client.js";
 import { GerencialApp } from "../screens/gerencial/GerencialApp.js";
 import { MobileGerencialHome } from "./MobileGerencialHome.js";
 import { MobileUnitDetail } from "./MobileUnitDetail.js";
-import { MobileRelatorios } from "./MobileRelatorios.js";
 import { MobileTabBar, TabIcons } from "./MobileNav.js";
 import "./mobile.css";
 
-type View = { kind: "HOME" } | { kind: "UNIT"; unit: Unit } | { kind: "RELATORIOS" } | { kind: "FULL" };
+type View = { kind: "HOME" } | { kind: "UNIT"; unit: Unit } | { kind: "FULL" };
 
 /**
  * Entrada do Owner no modo celular.
@@ -22,8 +21,7 @@ type View = { kind: "HOME" } | { kind: "UNIT"; unit: Unit } | { kind: "RELATORIO
  *
  * O que faltava era a PRIMEIRA tela: hoje, entrar em Gerencial cai direto
  * na aba Planos, sem nenhum resumo. Esta home mostra as 3 operações
- * juntas primeiro, com três destinos nativos (detalhe de unidade,
- * relatórios, equipe) e um caminho pro console completo quando o Owner
+ * juntas primeiro, com o detalhe de cada unidade e um caminho pro console completo quando o Owner
  * precisa mexer em cadastro de verdade.
  */
 export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; onExit: () => void; onLogout: () => void | Promise<void> }) {
@@ -44,7 +42,6 @@ export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; on
   // como o "‹" ambíguo do topo.
   const tabs = [
     { id: "HOME" as const, label: "Resumo", icon: TabIcons.resumo },
-    { id: "RELATORIOS" as const, label: "Relatórios", icon: TabIcons.relatorios },
     { id: "FULL" as const, label: "Completo", icon: TabIcons.console },
     { id: "OPERAR" as const, label: "Atender", icon: TabIcons.operar },
   ];
@@ -59,8 +56,6 @@ export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; on
       <div className="m-frame">
         {view.kind === "UNIT" ? (
           <MobileUnitDetail unit={view.unit} onBack={() => setView({ kind: "HOME" })} />
-        ) : view.kind === "RELATORIOS" ? (
-          <MobileRelatorios units={units} />
         ) : (
           <>
             <div className="m-appbar">
@@ -70,7 +65,6 @@ export function MobileGerencial({ units, onExit, onLogout }: { units: Unit[]; on
               units={units}
               onAbrirPainelCompleto={() => setView({ kind: "FULL" })}
               onAbrirUnidade={(unit) => setView({ kind: "UNIT", unit })}
-              onAbrirRelatorios={() => setView({ kind: "RELATORIOS" })}
             />
           </>
         )}

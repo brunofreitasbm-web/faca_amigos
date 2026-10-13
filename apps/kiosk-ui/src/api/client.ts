@@ -3610,6 +3610,19 @@ export const Api = {
     return { totalCents };
   },
   /**
+   * Sessões abertas hoje (dia operacional) até agora — inclui as que ainda estão
+   * dentro e as já finalizadas. É a "quantidade de sessões do dia" do Gerencial.
+   */
+  todaySessionsCount: async (unitId: string, cutoffHour: number): Promise<number> => {
+    const { count, error } = await supabase()
+      .from("fa_kiosk_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("unit_id", unitId)
+      .eq("business_date", businessDateFor(Date.now(), cutoffHour));
+    if (error) throw error;
+    return count ?? 0;
+  },
+  /**
    * Parte do faturamento do dia que é aluguel de pelúcia. O placar de
    * bonificação desconta isto, igual à apuração oficial.
    */

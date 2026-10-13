@@ -11,6 +11,8 @@ interface UnitFullStatus {
   revenueCents: number;
   goalCents: number;
   inside: number;
+  /** Sessões abertas no dia operacional até agora (dentro + finalizadas). */
+  sessionsToday: number;
   ordersCount: number;
   cash: UnitCashStatus | null;
   envelope: UnitEnvelopeBalance | null;
@@ -38,12 +40,10 @@ export function MobileGerencialHome({
   units,
   onAbrirPainelCompleto,
   onAbrirUnidade,
-  onAbrirRelatorios,
 }: {
   units: Unit[];
   onAbrirPainelCompleto: () => void;
   onAbrirUnidade: (unit: Unit) => void;
-  onAbrirRelatorios: () => void;
 }) {
   const [unitRows, setUnitRows] = useState<UnitFullStatus[]>([]);
   const [npsSummary, setNpsSummary] = useState<NpsSummaryQuick>({
@@ -74,13 +74,14 @@ export function MobileGerencialHome({
             const businessDate = businessDateFor(Date.now(), u.business_day_cutoff_hour);
             const tipo: UnidadeTipo = u.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
 
-            const [goalCents, revenue, ticketMedio, programs, rental, insideSessions] = await Promise.all([
+            const [goalCents, revenue, ticketMedio, programs, rental, insideSessions, sessionsToday] = await Promise.all([
               Api.todayGoal(u.id, u.business_day_cutoff_hour).catch(() => 0),
               Api.todayRevenue(u.id, u.business_day_cutoff_hour).catch(() => ({ totalCents: 0 })),
               Api.todayTicketMedio(u.id, u.business_day_cutoff_hour).catch(() => ({ ordersCount: 0 })),
               Api.bonusProgramsByUnit([u.id]).catch(() => ({}) as Record<string, never>),
               Api.todayRentalCents(u.id, u.business_day_cutoff_hour).catch(() => ({ totalCents: 0 })),
               Api.activeSessions(u.id).catch(() => []),
+              Api.todaySessionsCount(u.id, u.business_day_cutoff_hour).catch(() => 0),
             ]);
 
             const program = programs[u.id] ?? null;
@@ -95,6 +96,7 @@ export function MobileGerencialHome({
               revenueCents: revenue.totalCents,
               goalCents: goalCents || 0,
               inside: insideSessions.length,
+              sessionsToday,
               ordersCount: ticketMedio.ordersCount,
               cash: cashStatusList.find((c) => c.unit_id === u.id) ?? null,
               envelope: envelopeList.find((e) => e.unit_id === u.id) ?? null,
@@ -146,6 +148,7 @@ export function MobileGerencialHome({
 
   const totalRevenueCents = unitRows.reduce((sum, r) => sum + r.revenueCents, 0);
   const totalInside = unitRows.reduce((sum, r) => sum + r.inside, 0);
+  const totalSessions = unitRows.reduce((sum, r) => sum + r.sessionsToday, 0);
   const hasAnyData = unitRows.length > 0;
 
   return (
@@ -164,6 +167,26 @@ export function MobileGerencialHome({
             {hasAnyData ? totalInside : "—"}
           </p>
         </div>
+      </div>
+
+      {/* Sessões do dia até agora: total nas operações e quebra por unidade. */}
+      <div className="m-card" style={{ borderRadius: 20, padding: 14, marginBottom: 14 }}>
+        <div className="m-row" style={{ justifyContent: "space-between", gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>Sessões hoje · até agora</p>
+          <p className="m-num" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, color: "var(--color-primary-hover)" }}>
+            {hasAnyData ? totalSessions : "—"}
+          </p>
+        </div>
+        {hasAnyData && (
+          <div className="m-stack" style={{ gap: 6, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border-subtle)" }}>
+            {unitRows.map((r) => (
+              <div key={r.unit.id} className="m-row" style={{ justifyContent: "space-between", gap: 10, fontSize: 13, fontWeight: 700 }}>
+                <span className="m-trunc">{unitBrandFor(r.unit.name).title}</span>
+                <span className="m-num">{r.sessionsToday}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 2. NPS ATUAL RESUMIDO */}
@@ -290,6 +313,12 @@ export function MobileGerencialHome({
                   </p>
                 </div>
                 <div>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>Sessões</p>
+                  <p className="m-num" style={{ margin: "2px 0 0", fontFamily: "var(--font-display)", fontSize: 18 }}>
+                    {row.sessionsToday}
+                  </p>
+                </div>
+                <div>
                   <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>Faturamento</p>
                   <p className="m-num" style={{ margin: "2px 0 0", fontFamily: "var(--font-display)", fontSize: 18 }}>
                     {money(revenueCents)}
@@ -377,17 +406,11 @@ export function MobileGerencialHome({
         <p style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Carregando dados unificados das operações…</p>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 22 }}>
-        <button type="button" className="m-pill" onClick={onAbrirRelatorios}>
-          Relatórios / fechamento
-        </button>
-      </div>
-
       <button
         type="button"
         className="m-cta"
         onClick={onAbrirPainelCompleto}
-        style={{ marginTop: 12, background: "var(--color-dark, #1A3F35)" }}
+        style={{ marginTop: 22, background: "var(--color-dark, #1A3F35)" }}
       >
         Abrir painel administrativo completo
       </button>
