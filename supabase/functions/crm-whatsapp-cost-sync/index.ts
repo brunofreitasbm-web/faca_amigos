@@ -50,6 +50,7 @@ Deno.serve(async () => {
   let waiting = 0;
   let httpErrors = 0;
   let gaveUp = 0;
+  let firstError: { status: number; body: string } | null = null;
   for (const m of pending ?? []) {
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages/${m.twilio_sid}.json`, {
       headers: { Authorization: auth },
@@ -61,6 +62,7 @@ Deno.serve(async () => {
       continue;
     }
     if (!res.ok) {
+      if (!firstError) firstError = { status: res.status, body: (await res.text().catch(() => "")).slice(0, 300) };
       httpErrors++; // antes era silencioso: credencial/limite da Twilio aparecia como "0 preços" sem explicação
       continue;
     }
@@ -104,7 +106,7 @@ Deno.serve(async () => {
   }
   if (reclassified.length) console.warn("templates reclassificados pela Meta:", JSON.stringify(reclassified));
 
-  if (httpErrors) console.warn(`Twilio recusou ${httpErrors} consulta(s) de preço`);
+  if (httpErrors) console.warn(`Twilio recusou ${httpErrors} consulta(s) de preço`, JSON.stringify(firstError));
 
-  return json({ priced, waiting, gaveUp, httpErrors, templatesChecked: templates?.length ?? 0, reclassified });
+  return json({ priced, waiting, gaveUp, httpErrors, firstError, templatesChecked: templates?.length ?? 0, reclassified });
 });
