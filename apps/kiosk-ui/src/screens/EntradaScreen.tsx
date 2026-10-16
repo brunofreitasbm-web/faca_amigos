@@ -1494,16 +1494,12 @@ export function EntradaScreen({
               visual separada — cada um já chegou aqui como um Plan
               sintético (packagePlans). */}
           {[...regularPlans, ...packagePlans].map((plan) => {
-            const minutes = planDurationMinutes(plan);
             const discountInfo = getPlanDiscountedCents(plan.valueCents, couponCode, coupons, plan.id);
             return (
               <Card
                 key={plan.id}
                 onClick={() => {
                   setPlanId(plan.id);
-                  if (minutes >= quickTriggerMinutes) {
-                    setCrossSellModalOpen(true);
-                  }
                 }}
                 style={{
                   cursor: "pointer",
