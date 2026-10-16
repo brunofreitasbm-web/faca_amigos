@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api, isCouponInSchedule } from "../api/client.js";
-import type { Asset, ChildMatch, Coupon, ForeignPackageBalance, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer } from "../api/client.js";
+import type { Asset, ChildMatch, Coupon, ForeignPackageBalance, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer, WifiCouponLookup } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { OlharUpsellCard } from "../components/OlharUpsellCard.js";
 import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
@@ -174,6 +174,10 @@ export function EntradaScreen({
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [couponCode, setCouponCode] = useState("");
   const [showExtras, setShowExtras] = useState(false);
+  // Conferência do cupom do portal Wi-Fi (ESPERA-XXXX): o servidor responde de quem é e se ainda vale.
+  const [wifiCode, setWifiCode] = useState("");
+  const [wifiLookup, setWifiLookup] = useState<WifiCouponLookup | null>(null);
+  const [wifiChecking, setWifiChecking] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -635,7 +639,13 @@ export function EntradaScreen({
   // só aparecem quando esse plano está selecionado — evita o operador
   // escolher um cupom que o servidor vai recusar no check-in.
   const eligibleCoupons = useMemo(
-    () => coupons.filter((c) => (!c.allowedPlanId || c.allowedPlanId === planId) && isCouponInSchedule(c)),
+    () =>
+      coupons.filter(
+        (c) =>
+          (!c.allowedPlanId || c.allowedPlanId === planId) &&
+          isCouponInSchedule(c) &&
+          !(c.expiresAtMs && c.expiresAtMs < Date.now()),
+      ),
     [coupons, planId],
   );
 
@@ -728,6 +738,31 @@ export function EntradaScreen({
       setShowExtras(true);
       toast.success(`Item "${offer.targetName || offer.title}" recomendado no balcão!`);
     }
+  }
+
+  async function checkWifiCoupon() {
+    const code = wifiCode.trim().toUpperCase();
+    if (!unit || !code) return;
+    setWifiChecking(true);
+    try {
+      setWifiLookup(await Api.wifiCouponLookup(unit.id, code));
+    } catch (err) {
+      setWifiLookup(null);
+      toast.error(err instanceof Error ? err.message : "Não foi possível conferir o cupom.");
+    } finally {
+      setWifiChecking(false);
+    }
+  }
+
+  function applyWifiCoupon() {
+    const found = wifiLookup?.status === "OK" ? wifiLookup.coupon : null;
+    if (!found) return;
+    // Entra na lista local só para o preço mostrar o desconto; o servidor continua sendo quem decide no check-in.
+    setCoupons((prev) => [...prev.filter((c) => c.code !== found.code), found]);
+    setCouponCode(found.code);
+    setWifiCode("");
+    setWifiLookup(null);
+    toast.success(`Cupom ${found.code} aplicado.`);
   }
 
   useEffect(() => {
@@ -1800,15 +1835,44 @@ export function EntradaScreen({
             {couponCode ? "Alterar cupom de desconto" : "＋ Aplicar cupom de desconto"}
           </Button>
         ) : (
-          <Select label="Cupom de desconto / parceria" value={couponCode} onChange={(e) => setCouponCode(e.target.value)}>
-            <option value="">Nenhum</option>
-            {eligibleCoupons.map((c) => (
-              <option key={c.id} value={c.code}>
-                {c.code}
-                {c.description ? ` — ${c.description}` : ""}
-              </option>
-            ))}
-          </Select>
+          <>
+            <Select label="Cupom de desconto / parceria" value={couponCode} onChange={(e) => setCouponCode(e.target.value)}>
+              <option value="">Nenhum</option>
+              {eligibleCoupons.map((c) => (
+                <option key={c.id} value={c.code}>
+                  {c.code}
+                  {c.description ? ` — ${c.description}` : ""}
+                </option>
+              ))}
+            </Select>
+
+            {/* Cupom do portal Wi-Fi da clínica: um por família, então não entra na lista acima. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontWeight: 700, fontSize: "13px" }}>Cupom do Wi-Fi da clínica (ESPERA-XXXX)</label>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                <Input
+                  placeholder="ESPERA-AB12"
+                  value={wifiCode}
+                  autoCapitalize="characters"
+                  onChange={(e) => {
+                    setWifiCode(e.target.value.toUpperCase());
+                    setWifiLookup(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void checkWifiCoupon();
+                    }
+                  }}
+                  style={{ maxWidth: "220px" }}
+                />
+                <Button variant="ghost" size="sm" onClick={() => void checkWifiCoupon()} disabled={!wifiCode.trim() || wifiChecking}>
+                  {wifiChecking ? "Conferindo…" : "Conferir"}
+                </Button>
+              </div>
+              {wifiLookup && <WifiCouponResult lookup={wifiLookup} onApply={applyWifiCoupon} />}
+            </div>
+          </>
         )}
       </section>
       )}
@@ -2057,6 +2121,41 @@ export function EntradaScreen({
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+const WIFI_STATUS_TEXT: Record<Exclude<WifiCouponLookup["status"], "OK">, string> = {
+  USADO: "Este cupom já foi usado.",
+  USADO_OUTRA_UNIDADE: "Este cupom já foi usado na outra unidade (um benefício por cupom).",
+  VENCIDO: "Este cupom está vencido.",
+  DESATIVADO: "Este cupom foi desativado.",
+  NAO_ENCONTRADO: "Cupom não encontrado nesta unidade. Confira o código.",
+};
+
+/** Resultado da conferência do cupom do Wi-Fi: de quem é, o que vale, até quando, e o botão de aplicar. */
+function WifiCouponResult({ lookup, onApply }: { lookup: WifiCouponLookup; onApply: () => void }) {
+  if (lookup.status !== "OK" || !lookup.coupon) {
+    const text = WIFI_STATUS_TEXT[lookup.status === "OK" ? "NAO_ENCONTRADO" : lookup.status];
+    return (
+      <p style={{ margin: 0, fontWeight: 700, color: "var(--color-error-text)" }}>
+        ✖ {text}
+        {lookup.guardianName ? ` (cupom de ${lookup.guardianName})` : ""}
+      </p>
+    );
+  }
+  const c = lookup.coupon;
+  const benefit = c.kind === "MINUTOS_EXTRA" ? `+${c.value} min grátis` : c.kind === "DESCONTO_PCT" ? `${c.value}% de desconto` : "desconto";
+  const until = c.expiresAtMs ? ` · vale até ${new Date(c.expiresAtMs).toLocaleDateString("pt-BR")}` : "";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+      <span style={{ fontWeight: 700 }}>
+        ✔ Cupom de {lookup.guardianName ?? "cliente"} · {benefit}
+        {until}
+      </span>
+      <Button size="sm" onClick={onApply}>
+        Aplicar
+      </Button>
     </div>
   );
 }

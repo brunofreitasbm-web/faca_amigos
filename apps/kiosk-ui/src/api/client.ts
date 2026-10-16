@@ -1208,6 +1208,8 @@ export interface Coupon {
   /** Horário "HH:MM"; ambos null = qualquer horário. */
   scheduleStart: string | null;
   scheduleEnd: string | null;
+  /** Fim da validade (ms epoch); null = sem prazo. Hoje só os ESPERA-XXXX do portal Wi-Fi têm. */
+  expiresAtMs?: number | null;
   /** Só preenchido por `Api.couponsAllUnits()` (Gerencial). */
   unitId?: string;
 }
@@ -1410,7 +1412,18 @@ function couponFromRow(row: Record<string, unknown>): Coupon {
     scheduleStart: row.schedule_start ? String(row.schedule_start).slice(0, 5) : null,
     scheduleEnd: row.schedule_end ? String(row.schedule_end).slice(0, 5) : null,
     unitId: row.unit_id as string | undefined,
+    expiresAtMs: (row.expires_at_ms as number | null | undefined) ?? null,
   };
+}
+
+/** Resposta de `fa_kiosk_wifi_coupon_lookup`: confere um cupom ESPERA-XXXX do portal Wi-Fi. */
+export type WifiCouponStatus = "OK" | "USADO" | "USADO_OUTRA_UNIDADE" | "VENCIDO" | "DESATIVADO" | "NAO_ENCONTRADO";
+export interface WifiCouponLookup {
+  found: boolean;
+  status: WifiCouponStatus;
+  /** Primeiro nome + inicial do sobrenome, para conferir com quem está no balcão. */
+  guardianName: string | null;
+  coupon: Coupon | null;
 }
 
 function loyaltyRuleFromRow(row: Record<string, unknown>): LoyaltyRule {
@@ -3561,6 +3574,35 @@ export const Api = {
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_coupons").select("*").eq("unit_id", unitId)).then((rows) =>
       rows.map(couponFromRow),
     ),
+  /**
+   * Confere um cupom do Wi-Fi (ESPERA-XXXX) na unidade. Eles não aparecem em `coupons()` (um por família
+   * encheria a lista e exporia nomes); a operadora digita o código e o servidor responde de quem é e se vale.
+   */
+  wifiCouponLookup: async (unitId: string, code: string): Promise<WifiCouponLookup> => {
+    const r = await unwrap<Record<string, unknown>>(
+      supabase().rpc("fa_kiosk_wifi_coupon_lookup", { p_unit_id: unitId, p_code: code }),
+    );
+    const found = r.found === true;
+    return {
+      found,
+      status: (r.status as WifiCouponStatus) ?? "NAO_ENCONTRADO",
+      guardianName: (r.guardianName as string | null | undefined) ?? null,
+      coupon: found
+        ? couponFromRow({
+            id: r.id,
+            code: r.code,
+            kind: r.kind,
+            value: r.value,
+            max_uses: r.maxUses,
+            used_count: r.usedCount,
+            active: r.active,
+            description: r.description,
+            expires_at_ms: r.expiresAtMs,
+            unit_id: unitId,
+          })
+        : null,
+    };
+  },
   /** Todos os cupons de todas as unidades — Gerencial. */
   couponsAllUnits: () =>
     unwrap<Record<string, unknown>[]>(supabase().from("fa_kiosk_coupons").select("*")).then((rows) => rows.map(couponFromRow)),
