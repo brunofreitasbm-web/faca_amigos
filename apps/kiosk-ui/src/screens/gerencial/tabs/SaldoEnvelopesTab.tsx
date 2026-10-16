@@ -13,6 +13,7 @@ export function SaldoEnvelopesTab() {
   const [pending, setPending] = useState<PendingEnvelope[]>([]);
   const [employeeNames, setEmployeeNames] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState(false);
   const [collecting, setCollecting] = useState(false);
   // Seleção de uma loja por vez: trocar de loja descarta a seleção anterior.
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
@@ -21,15 +22,24 @@ export function SaldoEnvelopesTab() {
   async function loadData() {
     setLoading(true);
     try {
-      const [envelopes, cash, list] = await Promise.all([Api.unitsEnvelopeBalance(), Api.unitsCashStatus(), Api.pendingEnvelopes()]);
-      setBalances(envelopes);
-      setCashStatus(cash);
-      setPending(list);
-      // Só mantém marcados os que ainda estão pendentes (outro gestor pode ter recolhido).
-      const stillPending = new Set(list.map((e) => e.movement_id));
-      setSelectedIds((prev) => new Set([...prev].filter((id) => stillPending.has(id))));
-    } catch {
-      // mantém os dados anteriores na tela em caso de falha
+      // Cada leitura é independente: se a lista de envelopes falhar (ex.: RPC
+      // ainda não publicada), saldos e caixa continuam aparecendo.
+      const [envelopes, cash, list] = await Promise.allSettled([
+        Api.unitsEnvelopeBalance(),
+        Api.unitsCashStatus(),
+        Api.pendingEnvelopes(),
+      ]);
+      if (envelopes.status === "fulfilled") setBalances(envelopes.value);
+      if (cash.status === "fulfilled") setCashStatus(cash.value);
+      if (list.status === "fulfilled") {
+        setPending(list.value);
+        setListError(false);
+        // Só mantém marcados os que ainda estão pendentes (outro gestor pode ter recolhido).
+        const stillPending = new Set(list.value.map((e) => e.movement_id));
+        setSelectedIds((prev) => new Set([...prev].filter((id) => stillPending.has(id))));
+      } else {
+        setListError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -124,6 +134,15 @@ export function SaldoEnvelopesTab() {
           </Button>
         </div>
       </Card>
+
+      {listError && (
+        <Card style={{ padding: "16px", marginBottom: "16px", borderLeft: "4px solid var(--color-danger, #c0392b)" }}>
+          <HelpText>
+            Não foi possível carregar a lista de envelopes individuais. Os saldos por loja continuam corretos; a seleção fica indisponível até
+            a atualização do banco (migration fa_collect_selected_envelopes) ou nova tentativa em "Atualizar".
+          </HelpText>
+        </Card>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px", marginBottom: "20px" }}>
         {balances.map((b) => {
