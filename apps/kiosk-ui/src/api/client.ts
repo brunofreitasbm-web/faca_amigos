@@ -1146,6 +1146,17 @@ export interface UnitEnvelopeBalance {
   last_collected_at_ms: number | null;
 }
 
+/** Um envelope ainda na loja (pendente de recolhimento) — ver RPC fa_pending_envelopes. */
+export interface PendingEnvelope {
+  movement_id: string;
+  unit_id: string;
+  envelope_number: string;
+  amount_cents: number;
+  at_ms: number;
+  reason: string | null;
+  employee_id: string;
+}
+
 export interface UnitCashStatus {
   unit_id: string;
   unit_name: string;
@@ -2832,6 +2843,9 @@ export const Api = {
   // Saldo em envelopes pendentes (ainda na loja) por unidade — aba gerencial
   // "Saldo em Envelopes" (ver RPC fa_units_envelope_balance).
   unitsEnvelopeBalance: () => unwrap<UnitEnvelopeBalance[]>(supabase().rpc("fa_units_envelope_balance")),
+  // Cada envelope pendente individualmente (sem limite de linhas), para o
+  // gestor escolher quais recolhe.
+  pendingEnvelopes: () => unwrap<PendingEnvelope[]>(supabase().rpc("fa_pending_envelopes")),
   // Rotinas de notificação do Owner (Web Push) — abertura/acompanhamento
   // 17h-20h/fechamento de caixa, ver 20260818000001_fa_kiosk_owner_reports.
   ownerPushSubscribe: (endpoint: string, p256dh: string, auth: string) =>
@@ -2879,6 +2893,12 @@ export const Api = {
       p_unit_id: unitId,
       p_employee_id: employeeId,
     }),
+  // Recolhe só os envelopes escolhidos (de uma unidade).
+  collectSelectedEnvelopes: (unitId: string, employeeId: string, movementIds: string[]) =>
+    callResilient<{ ok: boolean; requested_count: number; collected_count: number; collected_cents: number }>(
+      "fa_collect_selected_envelopes",
+      { p_unit_id: unitId, p_employee_id: employeeId, p_movement_ids: movementIds },
+    ),
   revenueByMethod: async (shiftId: string) => {
     const rows = await unwrap<{ method: string; amount_cents: number }[]>(
       supabase().from("fa_kiosk_payments").select("method, amount_cents, fa_kiosk_orders!inner(shift_id)").eq("fa_kiosk_orders.shift_id", shiftId),
