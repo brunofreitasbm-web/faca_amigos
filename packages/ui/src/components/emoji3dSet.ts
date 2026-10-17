@@ -1,8 +1,9 @@
-// Gerado a partir de public/emoji3d (Fluent Emoji 3D, Microsoft, MIT).
+// Gerado a partir de apps/kiosk-ui/public/emoji3d (Fluent Emoji 3D, Microsoft, MIT).
 // Chave = codepoints em hex separados por "-", sem U+FE0F.
 export const EMOJI_3D: ReadonlySet<string> = new Set([
   "1f31f",
   "1f321",
+  "1f331",
   "1f381",
   "1f382",
   "1f388",
@@ -13,10 +14,12 @@ export const EMOJI_3D: ReadonlySet<string> = new Set([
   "1f3ae",
   "1f3af",
   "1f3c1",
+  "1f3c3",
   "1f3c6",
   "1f3e2",
   "1f3ec",
   "1f3f0",
+  "1f441",
   "1f44b",
   "1f451",
   "1f464",
@@ -39,6 +42,7 @@ export const EMOJI_3D: ReadonlySet<string> = new Set([
   "1f4cd",
   "1f4ce",
   "1f4d0",
+  "1f4da",
   "1f4dd",
   "1f4de",
   "1f4e5",
@@ -98,6 +102,7 @@ export const EMOJI_3D: ReadonlySet<string> = new Set([
   "26a1",
   "26aa",
   "2709",
+  "270b",
   "270f",
   "2728",
   "2797",

@@ -14,5 +14,7 @@ export * from "./components/Modal.js";
 export * from "./components/RevealPin.js";
 export * from "./components/Tabs.js";
 export * from "./components/Tooltip.js";
+export * from "./components/Emoji3D.js";
 export * from "./tokens/contrast.js";
 export * from "./icons/index.js";
+export { EMOJI_3D } from "./components/emoji3dSet.js";

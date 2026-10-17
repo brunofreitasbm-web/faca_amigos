@@ -5,6 +5,7 @@ import type { ActiveSessionEntry, Asset } from "../api/client.js";
 import { useActiveSessions } from "../api/useTick.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { useToast } from "../state/ToastContext.js";
+import { renderEmoji } from "../components/Emoji3D.js";
 
 /** mm:ss até uma hora, depois 1h07 — o formato que o operador lê de relance. */
 function clock(ms: number): string {
@@ -231,7 +232,7 @@ export function MobilePainel({
                     className="m-row"
                     style={{ justifyContent: "space-between", background: "var(--surface-card)", border: "1px solid var(--color-gray-200)", borderRadius: 16, padding: "11px 14px" }}
                   >
-                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{v.emoji} {v.name}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{renderEmoji(v.emoji)} {v.name}</span>
                     <span style={{ fontSize: 12, fontWeight: 800, color: statusColor }}>{statusLabel}</span>
                   </div>
                 );
