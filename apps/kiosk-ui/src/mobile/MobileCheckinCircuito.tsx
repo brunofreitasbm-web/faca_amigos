@@ -5,6 +5,7 @@ import { Api } from "../api/client.js";
 import type { Asset, ChildMatch, Package, Plan } from "../api/client.js";
 import { useToast } from "../state/ToastContext.js";
 import { money, formatAge } from "../format.js";
+import { renderEmoji } from "../components/Emoji3D.js";
 
 type Step = "busca" | "veiculo" | "plano" | "pronto";
 type Catalogo = "planos" | "pacotes";
@@ -239,7 +240,7 @@ export function MobileCheckinCircuito({
                   }}
                 >
                   <div className="m-row" style={{ justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 15, fontWeight: 800 }}>{v.emoji} {v.name}</span>
+                    <span style={{ fontSize: 15, fontWeight: 800 }}>{renderEmoji(v.emoji)} {v.name}</span>
                     <span style={{ fontSize: 12, fontWeight: 800, color: statusColor }}>{statusLabel}</span>
                   </div>
                 </button>

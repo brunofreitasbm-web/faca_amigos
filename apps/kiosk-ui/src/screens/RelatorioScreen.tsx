@@ -833,7 +833,7 @@ export function FrotaHeatmapTab({ unitId, from, to }: { unitId: string; from: st
                 color: idle ? "var(--text-primary)" : textColor,
               }}
             >
-              <div style={{ fontSize: "28px" }}>{u.emoji}</div>
+              <div style={{ fontSize: "28px" }}>{renderEmoji(u.emoji)}</div>
               <strong>{u.name}</strong>
               <div style={{ fontSize: "13px" }}>{u.sessions_count} usos</div>
               <div style={{ fontSize: "12px" }}>{Math.round(u.total_minutes / 60)}h no período</div>

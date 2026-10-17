@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Emoji3D } from "./Emoji3D.js";
 
 const AUTO_HIDE_MS = 6_000;
 
@@ -53,7 +54,7 @@ export function RevealPin({ pin, label = "PIN" }: { pin: string; label?: string 
       }}
     >
       {label}: <strong>{revealed ? pin : "····"}</strong>
-      {!revealed && <span aria-hidden="true" style={{ fontSize: "0.85em" }}>👁</span>}
+      {!revealed && <span aria-hidden="true" style={{ fontSize: "0.85em" }}><Emoji3D e="👁" /></span>}
     </button>
   );
 }

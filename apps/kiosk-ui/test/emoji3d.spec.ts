@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Emoji3D, renderEmoji } from "../src/components/Emoji3D.js";
-import { EMOJI_3D } from "../src/components/emoji3dSet.js";
+import { EMOJI_3D } from "@facaamigos/ui";
 
 const html = (node: unknown) => renderToStaticMarkup(createElement("span", null, node as never));
 

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { renderEmoji } from "./Emoji3D.js";
 
 export interface AsyncStateProps {
   /** "Carregando…" — spinner + texto. */
@@ -22,7 +23,7 @@ export interface AsyncStateProps {
  * três casos ao menos *parecem* diferentes um do outro.
  */
 export function AsyncState({ kind, title, detail, style }: AsyncStateProps) {
-  const icon = kind === "loading" ? "⏳" : kind === "error" ? "⚠️" : "📭";
+  const icon = renderEmoji(kind === "loading" ? "⏳" : kind === "error" ? "⚠️" : "📭");
   const color = kind === "error" ? "var(--color-error-text)" : "var(--text-muted)";
 
   return (
