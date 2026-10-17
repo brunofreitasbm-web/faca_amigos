@@ -326,7 +326,7 @@ export function ColaboradoresTab() {
               <Emoji3D e="🔗" /> Gerar link de cadastro
             </Button>
             <Button variant="primary" onClick={() => setShowForm(true)} style={{ borderRadius: "9999px" }}>
-              ⚡ + Novo colaborador rápido
+              <Emoji3D e="⚡" /> + Novo colaborador rápido
             </Button>
           </div>
         </div>
@@ -367,7 +367,7 @@ export function ColaboradoresTab() {
         <Card style={{ padding: "20px", marginBottom: "20px", borderRadius: "18px", border: "2px solid var(--color-primary, #f0196b)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <div>
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>⚡ Cadastro Rápido de Colaborador</h2>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}><Emoji3D e="⚡" /> Cadastro Rápido de Colaborador</h2>
               <HelpText style={{ margin: 0 }}>Apenas Nome, Permissão e PIN são obrigatórios para cadastro imediato.</HelpText>
             </div>
             <Button variant="ghost" size="sm" onClick={() => { setShowForm(false); resetForm(); }}>
@@ -449,7 +449,7 @@ export function ColaboradoresTab() {
       )}
 
       {resetPinTarget && (
-        <Modal onClose={closeResetPin} title={`🔑 Redefinir PIN de ${resetPinTarget.full_name}`}>
+        <Modal onClose={closeResetPin} title={renderEmoji(`🔑 Redefinir PIN de ${resetPinTarget.full_name}`)}>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
               Informe o novo PIN numérico de 6 dígitos que o colaborador usará para login no sistema.
@@ -478,7 +478,7 @@ export function ColaboradoresTab() {
       )}
 
       {unitsTarget && (
-        <Modal onClose={() => setUnitsTarget(null)} title={`🗂️ Unidades de ${unitsTarget.full_name}`}>
+        <Modal onClose={() => setUnitsTarget(null)} title={renderEmoji(`🗂️ Unidades de ${unitsTarget.full_name}`)}>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
               Em quais unidades este colaborador atua? Aparece na Configurações só das unidades marcadas.
@@ -693,7 +693,7 @@ export function ColaboradoresTab() {
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <strong style={{ fontSize: "16px" }}>{e.full_name}</strong>
                       <span style={{ fontSize: "12px", fontWeight: "bold", padding: "2px 8px", borderRadius: "9999px", background: roleBadgeStyle.bg, color: roleBadgeStyle.color }}>
-                        {roleBadgeStyle.label}
+                        {renderEmoji(roleBadgeStyle.label)}
                       </span>
                       {e.active === false ? <Tag color="var(--text-muted)">Inativo</Tag> : <Tag color="var(--color-teal, #1d9b84)">Ativo</Tag>}
                       {cadastroStatus.get(e.id) ? (

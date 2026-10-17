@@ -104,7 +104,7 @@ export function FotosEnvelopeTab() {
                   </div>
                 )}
                 <div>
-                  <strong style={{ color: "var(--color-primary)" }}>✉️ #{m.envelope_number}</strong>
+                  <strong style={{ color: "var(--color-primary)" }}><Emoji3D e="✉️" /> #{m.envelope_number}</strong>
                   <div style={{ fontSize: "18px", fontWeight: "bold" }}>{money(m.amount_cents)}</div>
                   {m.fundo_caixa_cents !== null && (
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Fundo de caixa: {money(m.fundo_caixa_cents)}</div>

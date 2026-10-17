@@ -302,12 +302,12 @@ export function ClientesTab() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ margin: 0, fontSize: "20px", fontFamily: "var(--font-display)" }}>
-                👤 {selectedCliente.guardian_name}
+                <Emoji3D e="👤" /> {selectedCliente.guardian_name}
               </h3>
               <div style={{ display: "flex", gap: "8px" }}>
                 {!editing && can("clientes.write") && (
                   <Button variant="secondary" size="sm" onClick={() => startEditing(selectedCliente)}>
-                    ✏️ Editar
+                    <Emoji3D e="✏️" /> Editar
                   </Button>
                 )}
                 <Button

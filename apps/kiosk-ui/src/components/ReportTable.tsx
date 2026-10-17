@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { applyTableView, nextSort, type SortState, type TableColumn } from "../lib/tableView.js";
+import { renderEmoji } from "./Emoji3D.js";
 
 export interface TableView<T> {
   /** Linhas já filtradas e ordenadas — é o que a tabela renderiza. */
@@ -75,7 +76,7 @@ export function SortTh<T>({
       >
         {label}
         <span aria-hidden="true" className={`report-sort-icon${active ? " is-active" : ""}`}>
-          {active === "asc" ? "▲" : active === "desc" ? "▼" : "↕"}
+          {active === "asc" ? "▲" : active === "desc" ? "▼" : renderEmoji("↕")}
         </span>
       </button>
     </th>

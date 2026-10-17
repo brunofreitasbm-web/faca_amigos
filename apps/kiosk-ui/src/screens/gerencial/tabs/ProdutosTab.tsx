@@ -7,6 +7,7 @@ import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { money } from "../../../format.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
+import { renderEmoji } from "../../../components/Emoji3D.js";
 
 export function ProdutosTab() {
   const toast = useToast();
@@ -130,7 +131,7 @@ export function ProdutosTab() {
       {products.map((p) => (
         <Card key={p.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px", opacity: p.active ? 1 : 0.5 }}>
           <span>
-            {p.emoji} {p.name}
+            {renderEmoji(p.emoji)} {p.name}
             <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · {units.find((u) => u.id === p.unit_id)?.name ?? "—"}</span>
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>

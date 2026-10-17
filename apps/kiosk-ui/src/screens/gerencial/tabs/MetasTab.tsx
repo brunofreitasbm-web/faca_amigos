@@ -518,7 +518,7 @@ export function MetasTab() {
         </Card>
 
         <Card style={{ padding: "16px" }}>
-          <h3 style={{ margin: "0 0 12px", fontSize: "15px" }}>⚙️ Travas Operacionais & Limites Globais</h3>
+          <h3 style={{ margin: "0 0 12px", fontSize: "15px" }}><Emoji3D e="⚙️" /> Travas Operacionais & Limites Globais</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", gap: "12px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -705,7 +705,7 @@ export function MetasTab() {
               <Emoji3D e="📊" /> Metas Diárias Automáticas por Dia da Semana ({activeUnit?.name})
             </h3>
             <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-              ✨ Campos calculados automaticamente via série histórica. Para Circuito, o operador enxerga em locações e o gerencial em R$ (TM R$ {CIRCUITO_TM_REAIS}).
+              <Emoji3D e="✨" /> Campos calculados automaticamente via série histórica. Para Circuito, o operador enxerga em locações e o gerencial em R$ (TM R$ {CIRCUITO_TM_REAIS}).
             </span>
           </div>
           <button
@@ -737,7 +737,7 @@ export function MetasTab() {
               cursor: "pointer",
             }}
           >
-            ⚡ Recalcular Série Histórica
+            <Emoji3D e="⚡" /> Recalcular Série Histórica
           </button>
         </div>
 
@@ -833,7 +833,7 @@ export function MetasTab() {
                 gap: "6px",
               }}
             >
-              ✨ {loadingSuggestions ? "Calculando Histórico..." : "Auto-Calcular Todas via Histórico"}
+              <Emoji3D e="✨" /> {loadingSuggestions ? "Calculando Histórico..." : "Auto-Calcular Todas via Histórico"}
             </button>
           </IfCan>
         </div>
@@ -860,7 +860,7 @@ export function MetasTab() {
                 <strong style={{ fontSize: "15px", color: "var(--text-primary)" }}>{u.name}</strong>
                 {sugg && (
                   <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "12px", background: "rgba(59, 130, 246, 0.1)", color: "#2563eb", fontWeight: "600" }}>
-                    ✨ Sugestão Histórica: Mín R$ {sugg.minReais} | Alvo R$ {sugg.targetReais}
+                    <Emoji3D e="✨" /> Sugestão Histórica: Mín R$ {sugg.minReais} | Alvo R$ {sugg.targetReais}
                   </span>
                 )}
               </div>
@@ -905,7 +905,7 @@ export function MetasTab() {
                     }}
                     title="Preencher com a sugestão estatística baseada na série histórica desta unidade"
                   >
-                    ⚡ Aplicar Sugestão
+                    <Emoji3D e="⚡" /> Aplicar Sugestão
                   </button>
 
                   <Button variant="primary" disabled={ticketBusyUnitId === u.id} onClick={() => saveTicketGoal(u.id)}>

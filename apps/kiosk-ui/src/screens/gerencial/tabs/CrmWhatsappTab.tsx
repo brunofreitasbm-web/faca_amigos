@@ -808,7 +808,7 @@ function CrmContent() {
                       {m.body}
                       {m.media.length > 0 && <div style={{ fontSize: "12px", opacity: 0.7 }}><Emoji3D e="📎" /> {m.media.length} anexo(s) — abrir no WhatsApp</div>}
                       <div style={{ fontSize: "11px", opacity: 0.65, textAlign: "right" }}>
-                        {timeLabel(m.created_at_ms)} {m.direction === "OUT" && (m.status === "read" ? <span style={{ color: "#1a73e8" }}>{STATUS_ICON[m.status]}</span> : STATUS_ICON[m.status])}
+                        {timeLabel(m.created_at_ms)} {m.direction === "OUT" && (m.status === "read" ? <span style={{ color: "#1a73e8" }}>{renderEmoji(STATUS_ICON[m.status])}</span> : renderEmoji(STATUS_ICON[m.status]))}
                         {m.error && <span title={m.error}> {m.error}</span>}
                       </div>
                     </div>

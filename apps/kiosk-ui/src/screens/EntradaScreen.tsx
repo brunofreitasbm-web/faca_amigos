@@ -1325,7 +1325,7 @@ export function EntradaScreen({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
               <div>
                 <Tag color="var(--color-teal)" style={{ fontWeight: "bold", marginBottom: "4px" }}>
-                  👤 Responsável Ativo (Dados Mantidos)
+                  <Emoji3D e="👤" /> Responsável Ativo (Dados Mantidos)
                 </Tag>
                 <div style={{ fontSize: "16px", fontWeight: "bold", color: "var(--text-main)" }}>
                   {guardianName || "Responsável"}

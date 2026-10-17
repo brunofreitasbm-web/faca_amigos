@@ -698,7 +698,7 @@ export function PainelScreen() {
               title="Fazer nova entrada/check-in sem sair do Painel (Teclas E ou F2)"
               style={{ gap: "6px", fontWeight: "bold", whiteSpace: "nowrap", height: "36px", borderRadius: "10px", fontSize: "13px", padding: "0 14px" }}
             >
-              ⚡ Novo Check-in (E)
+              <Emoji3D e="⚡" /> Novo Check-in (E)
             </Button>
           </IfCan>
         </div>
@@ -1279,7 +1279,7 @@ export function PainelScreen() {
                         setEditRegistrationFor(entry);
                       }}
                     >
-                      <span style={{ fontSize: "16px" }}>✏️</span>
+                      <span style={{ fontSize: "16px" }}><Emoji3D e="✏️" /></span>
                       <span style={ICON_BUTTON_LABEL_STYLE}>Editar</span>
                     </Button>
                   </Tooltip>

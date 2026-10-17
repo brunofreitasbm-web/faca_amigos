@@ -564,7 +564,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                         gap: "6px",
                       }}
                     >
-                      <span>{statusMeta.icon}</span> METAS {statusMeta.title}
+                      <span>{renderEmoji(statusMeta.icon)}</span> METAS {statusMeta.title}
                     </span>
                   </div>
 
@@ -665,7 +665,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                       {/* SLIDER SUPERMETA */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                          <span>⚡ Supermeta ({isCircuito ? "Locações" : "R$"})</span>
+                          <span><Emoji3D e="⚡" /> Supermeta ({isCircuito ? "Locações" : "R$"})</span>
                           <strong style={{ color: "#6D28D9", fontSize: "14px" }}>
                             {isCircuito ? `${gf.superValor} locações` : money(centsFrom(gf.superValor))}
                           </strong>

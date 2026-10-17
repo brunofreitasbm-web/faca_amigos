@@ -205,7 +205,7 @@ export function AutoUpdateCard() {
             loading={applying}
             onClick={handleApplyUpdate}
           >
-            ⚡ Atualizar e Reiniciar Agora
+            <Emoji3D e="⚡" /> Atualizar e Reiniciar Agora
           </Button>
         )}
       </div>

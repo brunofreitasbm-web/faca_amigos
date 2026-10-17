@@ -145,7 +145,7 @@ function FaceCaptureModal({
 
         {ready ? (
           <Button variant="primary" size="lg" loading={capturing} disabled={capturing} onClick={handleCapture}>
-            ⚡ Capturar Rosto Agora
+            <Emoji3D e="⚡" /> Capturar Rosto Agora
           </Button>
         ) : (
           !starting && (

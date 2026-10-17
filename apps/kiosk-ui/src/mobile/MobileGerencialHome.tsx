@@ -364,7 +364,7 @@ export function MobileGerencialHome({
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 18 }}>⭐</span>
+            <span style={{ fontSize: 18 }}><Emoji3D e="⭐" /></span>
             <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)" }}>NPS Atual Resumido</span>
           </div>
           {npsSummary && npsSummary.score >= 75 && <Badge variant="green"><Emoji3D e="🏆" /> Zona de Excelência</Badge>}
@@ -395,8 +395,8 @@ export function MobileGerencialHome({
 
         {/* Médias de Equipe e Espaço */}
         <div style={{ display: "flex", gap: 16, marginTop: 10, paddingTop: 10, borderTop: "1px dashed rgba(0,0,0,0.08)", fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
-          <span>👥 Equipe: <strong style={{ color: "#1D8273" }}>{npsSummary?.avgTeam != null ? `⭐ ${npsSummary.avgTeam}/5.0` : "—"}</strong></span>
-          <span><Emoji3D e="🏰" /> Espaço: <strong style={{ color: "#F0196B" }}>{npsSummary?.avgSpace != null ? `⭐ ${npsSummary.avgSpace}/5.0` : "—"}</strong></span>
+          <span><Emoji3D e="👥" /> Equipe: <strong style={{ color: "#1D8273" }}>{npsSummary?.avgTeam != null ? renderEmoji(`⭐ ${npsSummary.avgTeam}/5.0`) : "—"}</strong></span>
+          <span><Emoji3D e="🏰" /> Espaço: <strong style={{ color: "#F0196B" }}>{npsSummary?.avgSpace != null ? renderEmoji(`⭐ ${npsSummary.avgSpace}/5.0`) : "—"}</strong></span>
         </div>
       </div>
 

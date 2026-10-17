@@ -274,7 +274,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
                     transition: "all 0.15s ease",
                   }}
                 >
-                  <span>{u.badge}</span>
+                  <span>{renderEmoji(u.badge)}</span>
                   {isSelected && <span style={{ marginLeft: "4px" }}>✓</span>}
                 </button>
               );
@@ -344,7 +344,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           {/* STATUS DA EQUIPE / COLABORADORES */}
           <div style={{ flex: 1, minWidth: "260px" }}>
             <strong style={{ fontSize: "13px", display: "block", marginBottom: "6px", color: "var(--text-primary)" }}>
-              👥 Filtro de Colaboradores:
+              <Emoji3D e="👥" /> Filtro de Colaboradores:
             </strong>
             <button
               type="button"
@@ -477,7 +477,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
               <Emoji3D e="📍" /> {selectedUnitBadge} • {activePeriodLabel}
             </div>
             <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#047857", display: "flex", alignItems: "center", gap: "8px" }}>
-              👥 Performance da Equipe Ativa
+              <Emoji3D e="👥" /> Performance da Equipe Ativa
             </h3>
             <div style={{ marginBottom: "12px", background: "rgba(16, 185, 129, 0.08)", padding: "10px 12px", borderRadius: "8px" }}>
               <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", color: "#047857" }}>

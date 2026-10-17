@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@facaamigos/ui";
 import { canvasToImageBlob } from "../lib/imageCompression.js";
-import { Emoji3D } from "./Emoji3D.js";
+import { Emoji3D, renderEmoji } from "./Emoji3D.js";
 
 /**
  * Foto pela câmera do tablet — usada tanto para a criança (identificação
@@ -134,7 +134,7 @@ export function PhotoCapture({
 
       {status === "idle" && (
         <Button variant="ghost" size="sm" onClick={openCamera} style={{ alignSelf: "flex-start" }}>
-          {buttonLabel}
+          {renderEmoji(buttonLabel)}
         </Button>
       )}
 

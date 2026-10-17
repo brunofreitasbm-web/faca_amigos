@@ -74,7 +74,7 @@ export function FidelidadeBannerCard({ childFirstName, visitCount = 8 }: Fidelid
         <p style={{ margin: 0, fontSize: "14px", color: "#C2410C", lineHeight: 1.5, fontWeight: isEighthVisit ? 600 : 400 }}>
           {isEighthVisit ? (
             <>
-              Depois da próxima sessão (9ª), a 10ª visita traz <strong>30 min de cortesia</strong> para {childFirstName}! <Emoji3D e="🎁" />✨
+              Depois da próxima sessão (9ª), a 10ª visita traz <strong>30 min de cortesia</strong> para {childFirstName}! <Emoji3D e="🎁" /><Emoji3D e="✨" />
             </>
           ) : isNinthVisit ? (
             <>

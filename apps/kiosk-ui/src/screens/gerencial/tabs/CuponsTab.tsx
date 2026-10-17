@@ -145,7 +145,7 @@ export function CuponsTab() {
     <div className="g-split">
       <aside>
       <Card style={{ marginBottom: "10px", background: "var(--surface-sunken)", borderLeft: "4px solid var(--color-primary)", borderRadius: "12px" }}>
-        <h3 style={{ fontSize: "16px", margin: "0 0 8px 0", color: "var(--text-primary)" }}>⭐ Desempenho: Avaliações do Google</h3>
+        <h3 style={{ fontSize: "16px", margin: "0 0 8px 0", color: "var(--text-primary)" }}><Emoji3D e="⭐" /> Desempenho: Avaliações do Google</h3>
         <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>
           <strong>{totalReviewIssued}</strong> descontos (cupons) emitidos
         </p>

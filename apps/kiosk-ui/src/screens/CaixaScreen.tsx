@@ -633,7 +633,7 @@ export function CaixaScreen() {
             background: "var(--surface-card)",
           }}
         >
-          <h2 style={{ marginTop: 0, fontSize: "20px" }}>✉️ Registrar Envelope (Sangria)</h2>
+          <h2 style={{ marginTop: 0, fontSize: "20px" }}><Emoji3D e="✉️" /> Registrar Envelope (Sangria)</h2>
           <HelpText style={{ marginBottom: "16px" }}>
             {envelopeFromClosing
               ? "Valor do envelope e fundo de caixa vêm da conferência do fechamento (contado − fundo do próximo dia). Confira o dinheiro separado, fotografe o envelope e confirme."
@@ -980,7 +980,7 @@ export function CaixaScreen() {
                     onClick={() => void openEnvelopeModal({ envelopeCents: cm.envelopeCents, fundoCents: cm.nextDayFloatCents })}
                     disabled={busy || !!pendingCloseKey}
                   >
-                    ✉️ Registrar Envelope de {money(cm.envelopeCents)}
+                    <Emoji3D e="✉️" /> Registrar Envelope de {money(cm.envelopeCents)}
                   </Button>
                 </IfCan>
               )}
@@ -1027,7 +1027,7 @@ export function CaixaScreen() {
         </div>
         <IfCan capability="caixa.open_close">
           <Button variant="secondary" onClick={() => void openEnvelopeModal()}>
-            ✉️ Registrar Envelope
+            <Emoji3D e="✉️" /> Registrar Envelope
           </Button>
         </IfCan>
       </div>
@@ -1333,7 +1333,7 @@ export function CaixaScreen() {
 
             {isNfse && fiscalErrorModal.sale.guardianId && (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-card)", border: "1px solid var(--border-subtle)", padding: "14px", borderRadius: "12px" }}>
-                <strong style={{ fontSize: "13px" }}>✏️ Cadastrar/Atualizar CPF do Responsável:</strong>
+                <strong style={{ fontSize: "13px" }}><Emoji3D e="✏️" /> Cadastrar/Atualizar CPF do Responsável:</strong>
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                   Digite o CPF correto abaixo para atualizar o cadastro e tentar a emissão novamente:
                 </span>

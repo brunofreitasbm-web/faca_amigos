@@ -3,7 +3,7 @@ import { Card, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, SessionEvent } from "../api/client.js";
 import { supabase } from "../lib/supabase/client.js";
-import { Emoji3D } from "./Emoji3D.js";
+import { Emoji3D, renderEmoji } from "./Emoji3D.js";
 
 const PAUSE_REASON_LABEL: Record<string, string> = {
   BANHEIRO: "Foi ao banheiro",
@@ -143,14 +143,14 @@ export function SessionTimelineModal({ entry, onClose }: { entry: ActiveSessionE
           {steps.map((s, i) => (
             <Card key={i} style={{ padding: "12px", borderLeft: `4px solid ${s.color}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
-                <strong style={{ fontSize: "14px" }}>{s.label}</strong>
+                <strong style={{ fontSize: "14px" }}>{renderEmoji(s.label)}</strong>
                 <span style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
                   {new Date(s.atMs).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}{" "}
                   ({new Date(s.atMs).toLocaleDateString("pt-BR")})
                 </span>
               </div>
               <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-                👤 Colaborador: {s.employeeName ?? "—"}
+                <Emoji3D e="👤" /> Colaborador: {s.employeeName ?? "—"}
               </div>
               {s.detail && <div style={{ fontSize: "12px", color: "var(--text-muted)" }}><Emoji3D e="💬" /> Comentário: {s.detail}</div>}
             </Card>

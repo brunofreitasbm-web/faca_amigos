@@ -414,7 +414,7 @@ export function OwnerAcompanhamentoTab() {
                           borderRadius: "6px",
                         }}
                       >
-                        {scoreLabel}
+                        {renderEmoji(scoreLabel)}
                       </span>
                       <span style={{ fontSize: "12px", color: "#64748b" }}>
                         Código: <strong>{log.code}</strong>

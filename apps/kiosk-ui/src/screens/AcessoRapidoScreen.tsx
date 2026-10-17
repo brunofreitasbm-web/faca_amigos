@@ -334,7 +334,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
                         fontSize: "13px",
                       }}
                     >
-                      <span>{(c.childName || `Criança ${i + 1}`) + (c.isNeurodivergent && !c.childName.includes("🧩") ? " 🧩" : "")}</span>
+                      <span>{renderEmoji((c.childName || `Criança ${i + 1}`) + (c.isNeurodivergent && !c.childName.includes("🧩") ? " 🧩" : ""))}</span>
                       <span style={{ fontWeight: 700, color: session ? "var(--color-teal-text)" : "var(--text-muted)" }}>
                         {session ? "✓ Confirmada" : "Aguardando balcão"}
                       </span>

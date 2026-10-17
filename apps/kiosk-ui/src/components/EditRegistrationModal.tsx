@@ -166,7 +166,7 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
   if (!open) return null;
 
   return (
-    <Modal title="✏️ Editar Cadastro & Oportunidades" onClose={onClose}>
+    <Modal title={renderEmoji("✏️ Editar Cadastro & Oportunidades")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: "14px", minWidth: "320px", maxWidth: "480px" }}>
         <HelpText style={{ margin: 0 }}>
           Edite abaixo os dados do responsável e da criança. Atualize a data de nascimento para ativar campanhas de aniversário e combos promocionais.
