@@ -1,6 +1,7 @@
 import { Modal, Button, Tag } from "@facaamigos/ui";
 import { WristbandQRCode } from "./WristbandQRCode.js";
 import { getPublicAppUrl } from "../lib/appUrl.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 interface ConnectDeviceModalProps {
   onClose: () => void;
@@ -22,7 +23,7 @@ export function ConnectDeviceModal({ onClose }: ConnectDeviceModalProps) {
     <Modal
       title={
         <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span>📱</span> Conectar celular ou tablet
+          <span><Emoji3D e="📱" /></span> Conectar celular ou tablet
         </span>
       }
       onClose={onClose}

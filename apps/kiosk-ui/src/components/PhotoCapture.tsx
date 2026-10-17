@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@facaamigos/ui";
 import { canvasToImageBlob } from "../lib/imageCompression.js";
+import { Emoji3D, renderEmoji } from "./Emoji3D.js";
 
 /**
  * Foto pela câmera do tablet — usada tanto para a criança (identificação
@@ -133,7 +134,7 @@ export function PhotoCapture({
 
       {status === "idle" && (
         <Button variant="ghost" size="sm" onClick={openCamera} style={{ alignSelf: "flex-start" }}>
-          {buttonLabel}
+          {renderEmoji(buttonLabel)}
         </Button>
       )}
 
@@ -174,7 +175,7 @@ export function PhotoCapture({
                   whiteSpace: "nowrap",
                 }}
               >
-                📐 Aproxime e centralize o envelope no retângulo
+                <Emoji3D e="📐" /> Aproxime e centralize o envelope no retângulo
               </div>
 
               {/* Guia retangular vertical (mesma proporção do envelope, que é bem mais alto que largo)
@@ -242,7 +243,7 @@ export function PhotoCapture({
           />
           <div style={{ display: "flex", gap: "8px" }}>
             <Button variant="ghost" size="sm" onClick={retake}>
-              🔄 Repetir
+              <Emoji3D e="🔄" /> Repetir
             </Button>
             <Button variant="ghost" size="sm" onClick={remove}>
               ✕ Remover

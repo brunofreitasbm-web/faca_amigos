@@ -13,6 +13,7 @@ import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { RequireCapability } from "../../../auth/RequireCapability.js";
 import { LevelSegmented } from "../../../components/session-report/LevelSegmented.js";
+import { renderEmoji } from "../../../components/Emoji3D.js";
 
 const STATUS_LABEL: Record<SessionReportWhatsappStatus, string> = {
   PENDING: "Aguardando envio",
@@ -250,7 +251,7 @@ function Content() {
       </div>
 
       {detail && (
-        <Modal title={`📝 ${detail.child_name_snapshot}`} onClose={() => setDetail(null)} maxWidth="720px">
+        <Modal title={renderEmoji(`📝 ${detail.child_name_snapshot}`)} onClose={() => setDetail(null)} maxWidth="720px">
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <div style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.6 }}>
               Sessão de {detail.eligible_minutes} min · saída {dt(detail.session_checkout_at_ms)} · preenchido {dt(detail.filled_at_ms)}

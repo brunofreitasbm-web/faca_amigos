@@ -31,6 +31,7 @@ import { AutoUpdateCard } from "../components/AutoUpdateCard.js";
 import { SideTabs, type SideTabGroup } from "../components/SideTabs.js";
 import { DESKTOP_POINTER_QUERY, useMediaQuery } from "../hooks/useMediaQuery.js";
 import { getPublicAppUrl } from "../lib/appUrl.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 type Tab =
   | "PLANOS"
@@ -935,7 +936,7 @@ function ProdutosTab({ unitId }: { unitId: string }) {
       {products.map((p) => (
         <Card key={p.id} style={{ padding: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: p.active ? 1 : 0.5 }}>
           <span>
-            {p.emoji} {p.name}
+            {renderEmoji(p.emoji)} {p.name}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <span>
@@ -1231,7 +1232,7 @@ function FrotaTab({ unitId }: { unitId: string }) {
                 aria-pressed={emoji === em}
                 aria-label={`Usar ${em} para este carrinho`}
               >
-                {em}
+                {renderEmoji(em)}
               </Button>
             ))}
           </div>
@@ -1273,7 +1274,7 @@ function FrotaTab({ unitId }: { unitId: string }) {
             {a.photo_url ? (
               <img src={a.photo_url} alt={a.name} style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "10px", border: "1px solid var(--border-subtle)" }} />
             ) : (
-              <span style={{ fontSize: "24px" }}>{a.emoji}</span>
+              <span style={{ fontSize: "24px" }}>{renderEmoji(a.emoji)}</span>
             )}
             <span>
               {a.name} — {a.status} — {Math.round(a.odometer_minutes / 60)}h de uso
@@ -1281,7 +1282,7 @@ function FrotaTab({ unitId }: { unitId: string }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
             <label style={{ fontSize: "12px", color: "var(--text-secondary)", cursor: "pointer" }} title="Trocar a foto deste carrinho">
-              {photoBusyFor === a.id ? "Enviando…" : "🖼️ Trocar foto"}
+              {photoBusyFor === a.id ? "Enviando…" : renderEmoji("🖼️ Trocar foto")}
               {/* .sr-only em vez de display:none: display:none tira o
                   input da ordem de tabulação — o upload de foto virava
                   mouse-only. .sr-only esconde visualmente mas mantém
@@ -1582,7 +1583,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {bridgeStatus && !bridgeStatus.hasServiceRoleKey && (
-        <HelpText icon="🛑" style={{ background: "#fff0f0", borderColor: "#f5c6cb", color: "#721c24", fontWeight: "bold" }}>
+        <HelpText icon={renderEmoji("🛑")} style={{ background: "#fff0f0", borderColor: "#f5c6cb", color: "#721c24", fontWeight: "bold" }}>
           Erro de Autenticação do Print Bridge: A chave de serviço (FACAAMIGOS_SUPABASE_SECRET_KEY) não está configurada no arquivo .env deste computador. Sem ela, o banco rejeita a reserva de cupons e a impressão não sai.
           {typeof window.facaamigos?.saveTerminalKey === "function" && (
             <form
@@ -1610,7 +1611,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
         </HelpText>
       )}
       {bridgeStatus && bridgeStatus.hasServiceRoleKey && bridgeStatus.started && (
-        <HelpText icon="🟢" style={{ background: "#f0fff4", borderColor: "#c3e6cb", color: "#155724", fontWeight: "600" }}>
+        <HelpText icon={renderEmoji("🟢")} style={{ background: "#f0fff4", borderColor: "#c3e6cb", color: "#155724", fontWeight: "600" }}>
           Ponte de Impressão Ativa e Autenticada (Print Bridge OK — escutando a fila de impressão neste terminal).
         </HelpText>
       )}
@@ -1638,7 +1639,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
       <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>
-            🖥️ Este terminal — Travar Impressão Local
+            <Emoji3D e="🖥️" /> Este terminal — Travar Impressão Local
           </h2>
           {terminalUnitId ? (
             <span
@@ -1654,7 +1655,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
                 gap: "4px",
               }}
             >
-              🔒 Impressão Travada Neste Terminal
+              <Emoji3D e="🔒" /> Impressão Travada Neste Terminal
             </span>
           ) : (
             <span
@@ -1681,7 +1682,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
         </p>
 
         {!terminalUnitAvailable && !printerApiAvailable && (
-          <HelpText icon="ℹ️" style={{ color: "var(--text-muted)" }}>
+          <HelpText icon={renderEmoji("ℹ️")} style={{ color: "var(--text-muted)" }}>
             Este terminal está em execução via navegador web/dispositivo móvel. A trava de impressora local é gerenciada diretamente no aplicativo desktop FaçaAmigos instalado no computador de caixa.
           </HelpText>
         )}
@@ -1718,7 +1719,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
                 disabled={!terminalUnitDraft || terminalUnitDraft === terminalUnitId}
                 onClick={() => saveTerminalUnit()}
               >
-                🔒 Vincular e Travar Impressão
+                <Emoji3D e="🔒" /> Vincular e Travar Impressão
               </Button>
 
               {unitId && unitId !== terminalUnitId && (
@@ -1731,7 +1732,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
                     saveTerminalUnit(unitId);
                   }}
                 >
-                  📍 Travar na Unidade Atual ({allUnits.find((u) => u.id === unitId)?.name ?? "Sessão"})
+                  <Emoji3D e="📍" /> Travar na Unidade Atual ({allUnits.find((u) => u.id === unitId)?.name ?? "Sessão"})
                 </Button>
               )}
             </div>
@@ -1746,9 +1747,9 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
 
         {!terminalUnitAvailable && printerApiAvailable && (
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
-            <HelpText icon="⏳">Conectando ao serviço de terminal local...</HelpText>
+            <HelpText icon={renderEmoji("⏳")}>Conectando ao serviço de terminal local...</HelpText>
             <Button variant="ghost" size="sm" loading={loadingTerminalInfo} onClick={refreshTerminalInfo}>
-              🔄 Tentar Novamente
+              <Emoji3D e="🔄" /> Tentar Novamente
             </Button>
           </div>
         )}
@@ -1769,7 +1770,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
             </Select>
           </div>
           <Button variant="ghost" size="sm" loading={loadingPrinters} onClick={refreshPrinters}>
-            🔄 Buscar novamente
+            <Emoji3D e="🔄" /> Buscar novamente
           </Button>
         </div>
 
@@ -1778,7 +1779,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
             Salvar Impressora
           </Button>
           <Button variant="secondary" size="sm" loading={testingReceipt} onClick={testReceiptPrint}>
-            🖨️ Enviar Cupom de Teste
+            <Emoji3D e="🖨️" /> Enviar Cupom de Teste
           </Button>
           <Button
             variant="ghost"
@@ -1787,7 +1788,7 @@ function ImpressorasTab({ unitId }: { unitId: string }) {
             onClick={testCheckinReceiptPrint}
             title="Cupom de teste com accessCode fake — o único jeito de ver o QR de acompanhamento sem fazer um check-in de verdade"
           >
-            📱 Cupom de Teste — Check-in
+            <Emoji3D e="📱" /> Cupom de Teste — Check-in
           </Button>
         </div>
       </Card>
@@ -1906,19 +1907,19 @@ function SystemVersionCard() {
         <Tag color="var(--color-teal, #2ECFB5)">{version ? `v${version}` : "—"}</Tag>
       </div>
       <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-        {updateState.status === "checking" && "🔎 Verificando se há novas atualizações..."}
-        {updateState.status === "available" && `⏳ Baixando versão ${updateState.version ?? ""} (${updateState.progress ?? 0}%)...`}
-        {updateState.status === "downloaded" && `🚀 Nova versão ${updateState.version ?? ""} pronta para ser instalada!`}
+        {updateState.status === "checking" && renderEmoji("🔎 Verificando se há novas atualizações...")}
+        {updateState.status === "available" && renderEmoji(`⏳ Baixando versão ${updateState.version ?? ""} (${updateState.progress ?? 0}%)...`)}
+        {updateState.status === "downloaded" && renderEmoji(`🚀 Nova versão ${updateState.version ?? ""} pronta para ser instalada!`)}
         {updateState.status === "error" && `⚠️ Status de atualização: ${updateState.error ?? "Erro ao verificar"}`}
         {updateState.status === "idle" && "✅ O aplicativo está na versão mais recente."}
       </div>
       <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
         <Button variant="secondary" size="sm" loading={checking} onClick={handleCheck}>
-          🔄 Verificar Atualizações
+          <Emoji3D e="🔄" /> Verificar Atualizações
         </Button>
         {updateState.status === "downloaded" && (
           <Button variant="primary" size="sm" onClick={handleApply}>
-            🚀 Atualizar e Reiniciar Agora
+            <Emoji3D e="🚀" /> Atualizar e Reiniciar Agora
           </Button>
         )}
       </div>
@@ -2084,7 +2085,7 @@ function UnidadeTab({ unitId }: { unitId: string }) {
           />
         </div>
         <Button variant="secondary" onClick={usarLocalizacaoAtual} style={{ alignSelf: "flex-start" }}>
-          📍 Usar localização atual deste dispositivo
+          <Emoji3D e="📍" /> Usar localização atual deste dispositivo
         </Button>
       </Card>
 
@@ -2115,7 +2116,7 @@ function UnidadeTab({ unitId }: { unitId: string }) {
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <HelpText style={{ margin: 0, wordBreak: "break-all" }}>{acessoRapidoUrl}</HelpText>
             <Button variant="secondary" loading={printingPoster} disabled={printingPoster} onClick={printPoster} style={{ alignSelf: "flex-start" }}>
-              🖨️ Imprimir cartaz (A4)
+              <Emoji3D e="🖨️" /> Imprimir cartaz (A4)
             </Button>
           </div>
         </div>
@@ -2310,7 +2311,7 @@ function FiscalTab({ unitId }: { unitId: string }) {
             {isTerminalActive ? "✅" : "⚠️"} <strong>Emissor no Balcão:</strong> {isTerminalActive ? "Terminal ativo e comunicando" : "Aguardando heartbeat do emissor local no PC do balcão"}.
           </li>
           <li>
-            {isFiscalEnabled ? "✅" : "ℹ️"} <strong>Chave NFC-e:</strong> {isFiscalEnabled ? "Ligada (emissão automática ativa nas vendas)" : "Desligada (chave geral)"}.
+            {isFiscalEnabled ? "✅" : renderEmoji("ℹ️")} <strong>Chave NFC-e:</strong> {isFiscalEnabled ? "Ligada (emissão automática ativa nas vendas)" : "Desligada (chave geral)"}.
           </li>
         </ul>
         <HelpText style={{ marginTop: "8px" }}>

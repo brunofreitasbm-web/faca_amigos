@@ -4,6 +4,7 @@ import { generateGainschaGS2208DTSPL } from "@facaamigos/domain";
 import { Api, systemStatus } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { WristbandLabelPreview } from "./WristbandLabelPreview.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 export interface WristbandData {
   wristbandCode: string;
@@ -206,7 +207,7 @@ export function WristbandPrintModal({ data, onClose }: WristbandPrintModalProps)
               title="Enviar a pulseira para a impressora configurada nesta unidade"
               onClick={handleQueuePrint}
             >
-              🖨️ Imprimir Pulseira (Gainscha)
+              <Emoji3D e="🖨️" /> Imprimir Pulseira (Gainscha)
             </Button>
           </div>
         </div>

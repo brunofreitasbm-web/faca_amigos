@@ -5,6 +5,7 @@ import { Api } from "../../../api/client.js";
 import type { UnitShiftRow } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { money } from "../../../format.js";
+import { Emoji3D, renderEmoji } from "../../../components/Emoji3D.js";
 
 function fmtDateTime(ms: number | null): string {
   if (ms === null) return "—";
@@ -88,7 +89,7 @@ export function AberturaFechamentoTab() {
           </div>
           <div style={{ marginTop: "20px" }}>
             <Button variant="secondary" onClick={loadData} disabled={loading}>
-              🔄 Atualizar
+              <Emoji3D e="🔄" /> Atualizar
             </Button>
           </div>
         </div>
@@ -125,7 +126,7 @@ export function AberturaFechamentoTab() {
                   <td style={{ padding: "8px" }}>{units.find((u) => u.id === s.unit_id)?.name ?? s.unit_id}</td>
                   <td style={{ padding: "8px" }}>
                     <span style={{ color: s.status === "ABERTO" ? "var(--color-teal-text)" : "var(--text-secondary)", fontWeight: "bold" }}>
-                      {s.status === "ABERTO" ? "🟢 Aberto" : "⚪ Fechado"}
+                      {s.status === "ABERTO" ? renderEmoji("🟢 Aberto") : renderEmoji("⚪ Fechado")}
                     </span>
                   </td>
                   <td style={{ padding: "8px" }}>{fmtDateTime(s.opened_at_ms)}</td>

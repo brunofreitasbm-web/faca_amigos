@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { systemStatus } from "../api/client.js";
 import { isElectronLocal } from "../pwa.js";
+import { renderEmoji } from "./Emoji3D.js";
 
 type Failure = "backend" | "print" | null;
 
@@ -84,7 +85,7 @@ export function SystemStatusOverlay() {
         padding: "24px",
       }}
     >
-      <div style={{ fontSize: "96px" }}>{content.icon}</div>
+      <div style={{ fontSize: "96px" }}>{renderEmoji(content.icon)}</div>
       <p style={{ fontSize: "24px", fontWeight: "bold", maxWidth: "560px", margin: 0 }}>{content.text}</p>
       {failure === "print" && (
         <button

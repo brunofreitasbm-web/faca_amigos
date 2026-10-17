@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Card, Button, BrandLockup } from "@facaamigos/ui";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 interface SecretVaultReaderProps {
   secretId: string;
@@ -93,7 +94,7 @@ export function SecretVaultReader({ secretId }: SecretVaultReaderProps) {
 
       <Card style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "20px", background: "rgba(255,255,255,0.9)", backdropFilter: "blur(10px)", border: "1px solid var(--border-color, #e0e0e0)", borderRadius: "16px", boxShadow: "0 12px 32px rgba(0,0,0,0.08)" }}>
         <div style={{ textAlign: "center" }}>
-          <span style={{ fontSize: "42px", display: "block", marginBottom: "8px" }}>🔒</span>
+          <span style={{ fontSize: "42px", display: "block", marginBottom: "8px" }}><Emoji3D e="🔒" /></span>
           <h2 style={{ fontFamily: "var(--font-display, sans-serif)", margin: "0 0 8px 0", color: "#111827" }}>
             Cofre Seguro de Credenciais
           </h2>
@@ -104,7 +105,7 @@ export function SecretVaultReader({ secretId }: SecretVaultReaderProps) {
 
         {error && (
           <div style={{ padding: "20px", borderRadius: "12px", background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", textAlign: "center" }}>
-            <span style={{ fontSize: "32px", display: "block", marginBottom: "8px" }}>⏰</span>
+            <span style={{ fontSize: "32px", display: "block", marginBottom: "8px" }}><Emoji3D e="⏰" /></span>
             <strong style={{ fontSize: "16px" }}>Link Expirado ou Indisponível</strong>
             <p style={{ margin: "8px 0 0 0", fontSize: "13px", color: "#7f1d1d" }}>
               Este link de acesso ao cofre atingiu seu tempo limite de validade. Caso precise de um novo link, solicite o reenvio diretamente para seu e-mail de desenvolvimento.
@@ -115,11 +116,11 @@ export function SecretVaultReader({ secretId }: SecretVaultReaderProps) {
         {!payload && !error && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
             <div style={{ padding: "12px 16px", borderRadius: "8px", background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e40af", fontSize: "13px", textAlign: "center" }}>
-              ℹ️ <strong>Link Permanente de Integração:</strong> Este link foi configurado para permanecer ativo durante o desenvolvimento da API sem autodestruir no primeiro clique.
+              <Emoji3D e="ℹ️" /> <strong>Link Permanente de Integração:</strong> Este link foi configurado para permanecer ativo durante o desenvolvimento da API sem autodestruir no primeiro clique.
             </div>
 
             <Button variant="primary" onClick={fetchSecret} disabled={loading} style={{ width: "100%", padding: "14px", fontSize: "16px" }}>
-              {loading ? "Descriptografando..." : "🔓 Revelar Credenciais da API"}
+              {loading ? "Descriptografando..." : renderEmoji("🔓 Revelar Credenciais da API")}
             </Button>
           </div>
         )}
@@ -137,7 +138,7 @@ export function SecretVaultReader({ secretId }: SecretVaultReaderProps) {
             </div>
 
             <Button variant="primary" onClick={handleCopy} style={{ width: "100%", padding: "12px" }}>
-              {copied ? "✓ Copiado para a Área de Transferência!" : "📋 Copiar Credenciais"}
+              {copied ? "✓ Copiado para a Área de Transferência!" : renderEmoji("📋 Copiar Credenciais")}
             </Button>
           </div>
         )}

@@ -6,6 +6,7 @@ import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO } from "../bonificacao.js
 import { formatHorarioMin, getAberturaLimiteMin, mesAtualValue, rangeDoMes, type ApuracaoDia, type ApuracaoOperador, type BonusProgramsByUnit } from "../lib/apuracaoBonificacao.js";
 import { useAppState } from "../state/AppState.js";
 import { money } from "../format.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 type Escopo = "UNIDADE" | "TODAS";
 
@@ -120,7 +121,7 @@ export function MinhaBonificacaoScreen() {
   return (
     <div style={{ padding: "16px", maxWidth: "820px", margin: "0 auto" }}>
       <Card style={{ padding: "16px", marginBottom: "16px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px" }}>🎮 Minha Bonificação</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px" }}><Emoji3D e="🎮" /> Minha Bonificação</h2>
         <HelpText style={{ marginBottom: "12px" }}>
           Só os seus números do programa de bonificação — ninguém mais vê o que aparece aqui, e você não edita nada
           nesta tela. O relatório oficial que decide o pagamento é apurado no fim do mês pelo Gerencial.
@@ -176,7 +177,7 @@ export function MinhaBonificacaoScreen() {
               <span style={{ fontSize: "14px", fontWeight: "bold" }}>
                 Hoje: {atualLabel} <span style={{ color: "var(--text-muted)", fontWeight: "normal" }}>(meta {metaLabel} / super {superLabel})</span>
               </span>
-              <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+              <Badge variant={badgeVariant}>{renderEmoji(badgeLabel)}</Badge>
             </div>
             <div className="capacity-bar-track" role="progressbar" aria-valuenow={b.percent} aria-valuemin={0} aria-valuemax={100}>
               <div className="capacity-bar-fill" style={{ width: `${b.percent}%`, backgroundColor: corNivel }} />
@@ -196,7 +197,7 @@ export function MinhaBonificacaoScreen() {
       })()}
 
       <Card style={{ padding: "16px", marginBottom: "16px" }}>
-        <h3 style={{ fontSize: "15px", margin: "0 0 12px" }}>💳 Meu ticket médio do mês</h3>
+        <h3 style={{ fontSize: "15px", margin: "0 0 12px" }}><Emoji3D e="💳" /> Meu ticket médio do mês</h3>
         <div style={{ fontSize: "24px", fontWeight: "bold" }}>{money(ticketMedioMesCents)}</div>
         <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
           {pedidosMes} pedido{pedidosMes === 1 ? "" : "s"} pago{pedidosMes === 1 ? "" : "s"} no mês
@@ -207,7 +208,7 @@ export function MinhaBonificacaoScreen() {
       </Card>
 
       <Card style={{ padding: "16px", marginBottom: "16px" }}>
-        <h3 style={{ fontSize: "15px", margin: "0 0 12px" }}>💰 Bonificação do mês</h3>
+        <h3 style={{ fontSize: "15px", margin: "0 0 12px" }}><Emoji3D e="💰" /> Bonificação do mês</h3>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
           <span style={{ fontSize: "24px", fontWeight: "bold" }}>{money(acumuladoMesCents)}</span>
           {tetoMesCents > 0 && <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>de até {money(tetoMesCents)} no mês</span>}
@@ -234,7 +235,7 @@ export function MinhaBonificacaoScreen() {
 
       {temPlanos && (
         <Card style={{ padding: "16px", marginBottom: "16px" }}>
-          <h3 style={{ fontSize: "15px", margin: "0 0 12px" }}>📦 Planos longos do mês</h3>
+          <h3 style={{ fontSize: "15px", margin: "0 0 12px" }}><Emoji3D e="📦" /> Planos longos do mês</h3>
           {mes
             .filter((m) => m.planosMes.length > 0)
             .map((m) => (
@@ -261,7 +262,7 @@ export function MinhaBonificacaoScreen() {
             <span style={{ fontSize: "20px", fontWeight: "bold" }}>{money(acumuladoPlanosCents)}</span>
             {planosTetoMesCents > 0 && (
               <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                de até {money(planosTetoMesCents)} no mês{mes.some((m) => m.atingiuTetoPlanos) ? " · 🔒 teto" : ""}
+                de até {money(planosTetoMesCents)} no mês{mes.some((m) => m.atingiuTetoPlanos) ? renderEmoji(" · 🔒 teto") : ""}
               </span>
             )}
           </div>
@@ -287,7 +288,7 @@ export function MinhaBonificacaoScreen() {
 
       {streak >= 2 && (
         <Card style={{ padding: "16px", marginBottom: "16px", border: "1px solid var(--color-amber)" }}>
-          <span style={{ fontSize: "15px", fontWeight: "bold" }}>🔥 {streak} dias seguidos batendo o bônus!</span>
+          <span style={{ fontSize: "15px", fontWeight: "bold" }}><Emoji3D e="🔥" /> {streak} dias seguidos batendo o bônus!</span>
         </Card>
       )}
 

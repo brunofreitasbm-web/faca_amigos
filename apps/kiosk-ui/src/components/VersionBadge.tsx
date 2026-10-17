@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Emoji3D } from "./Emoji3D.js";
 
 // __APP_VERSION__/__BUILD_SHA__ são injetadas em build-time pelo `define`
 // em vite.config.ts (tipadas em vite-env.d.ts) — funciona tanto no bundle
@@ -89,9 +90,9 @@ export function VersionBadge() {
       title={isDownloaded ? "Clique para reiniciar e aplicar a nova versão agora" : undefined}
     >
       {isDownloaded ? (
-        <>🚀 Nova versão {updateState.version ?? ""} pronta! (Clique para reiniciar)</>
+        <><Emoji3D e="🚀" /> Nova versão {updateState.version ?? ""} pronta! (Clique para reiniciar)</>
       ) : isDownloading ? (
-        <>⏳ Baixando versão {updateState.version ?? ""} ({updateState.progress ?? 0}%)...</>
+        <><Emoji3D e="⏳" /> Baixando versão {updateState.version ?? ""} ({updateState.progress ?? 0}%)...</>
       ) : (
         <>v{desktopVersion ?? __APP_VERSION__} · {__BUILD_SHA__}</>
       )}

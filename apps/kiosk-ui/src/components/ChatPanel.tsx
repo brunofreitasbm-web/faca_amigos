@@ -8,6 +8,7 @@ import {
   STATUS_LABEL,
   type ChatMessage,
 } from "../lib/chat.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 function hhmm(ms: number): string {
   return new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -130,7 +131,7 @@ export function ChatPanel({ messages, loading, error, onSend, onRetry, onClose }
       {sendError && <p className="chat-panel__error" role="alert">{sendError}</p>}
       {file && (
         <div className="chat-panel__attached">
-          <span>📎 {file.name}</span>
+          <span><Emoji3D e="📎" /> {file.name}</span>
           <button
             type="button"
             onClick={() => {
@@ -157,7 +158,7 @@ export function ChatPanel({ messages, loading, error, onSend, onRetry, onClose }
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
         <button type="button" className="chat-panel__icon-btn" onClick={() => fileRef.current?.click()} aria-label="Anexar foto ou print" title="Anexar foto ou print">
-          📎
+          <Emoji3D e="📎" />
         </button>
         <textarea
           value={text}

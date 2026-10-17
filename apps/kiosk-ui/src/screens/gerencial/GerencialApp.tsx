@@ -32,6 +32,7 @@ import { OwnerAcompanhamentoTab } from "./tabs/OwnerAcompanhamentoTab.js";
 import { NpsDashboardTab } from "./tabs/NpsDashboardTab.js";
 import { GeminiGerencialCopilot } from "../../components/GeminiGerencialCopilot.js";
 import { isElectronLocal } from "../../pwa.js";
+import { Emoji3D, renderEmoji } from "../../components/Emoji3D.js";
 
 /**
  * Cópia de nome fixo do instalador, mantida por scripts/release-kiosk.mjs no
@@ -239,7 +240,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
         {/* Omnibox Busca Rápida */}
         <div style={{ position: "relative", minWidth: "280px", maxWidth: "420px", flex: 1, margin: "0 8px" }}>
           <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-            <span style={{ position: "absolute", left: "12px", color: "var(--text-secondary, #64748b)", fontSize: "14px" }}>🔎</span>
+            <span style={{ position: "absolute", left: "12px", color: "var(--text-secondary, #64748b)", fontSize: "14px" }}><Emoji3D e="🔎" /></span>
             <input
               type="text"
               placeholder="Buscar menu gerencial... (ex: Zoe, Planos, Bonificação)"
@@ -315,7 +316,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                   onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = tab === res.value ? "#eff6ff" : "transparent")}
                 >
-                  <span style={{ fontSize: "18px" }}>{res.icon}</span>
+                  <span style={{ fontSize: "18px" }}>{renderEmoji(res.icon)}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>{res.label}</div>
                     <div style={{ fontSize: "11px", color: "#64748b", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
@@ -353,7 +354,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                 border: "1px solid var(--border-subtle, #cbd5e1)",
               }}
             >
-              <span aria-hidden="true">⬇️</span>
+              <span aria-hidden="true"><Emoji3D e="⬇️" /></span>
             </a>
           )}
           <Button variant="ghost" size="sm" onClick={onExit} style={{ fontSize: "12px", border: "1px solid var(--border-subtle, #cbd5e1)" }}>
@@ -401,7 +402,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                     cursor: "pointer",
                   }}
                 >
-                  <span>{cat.icon}</span>
+                  <span>{renderEmoji(cat.icon)}</span>
                   <span>{cat.label}</span>
                 </button>
               );
@@ -432,7 +433,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                     cursor: "pointer",
                   }}
                 >
-                  <span>{subItem.icon}</span>
+                  <span>{renderEmoji(subItem.icon)}</span>
                   <span>{subItem.label}</span>
                   {subItem.tag && (
                     <span

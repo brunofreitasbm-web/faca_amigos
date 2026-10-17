@@ -10,6 +10,7 @@ import {
   fillContractTemplate,
   printContract,
 } from "../../../contract/contractTemplate.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 /**
  * Gerencial > Contrato — modelo do contrato dos planos acima de 2h.
@@ -117,7 +118,7 @@ export function ContratoTab() {
           Salvar modelo desta unidade
         </Button>
         <Button variant="secondary" onClick={printSample} disabled={loading} title="Imprime o modelo com dados fictícios para conferência">
-          🖨️ Imprimir amostra
+          <Emoji3D e="🖨️" /> Imprimir amostra
         </Button>
         <Button
           variant="ghost"

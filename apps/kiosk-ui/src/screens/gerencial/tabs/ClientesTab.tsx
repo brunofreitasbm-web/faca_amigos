@@ -7,6 +7,7 @@ import { formatPhoneBr, dateBrFromIso } from "@facaamigos/domain";
 import { useConfirm } from "../../../state/ConfirmContext.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { useAuth } from "../../../auth/AuthContext.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 /** Estado editável de um filho dentro do modal — só existe enquanto `editing` é true. */
 interface ChildDraft {
@@ -170,7 +171,7 @@ export function ClientesTab() {
               ))}
             </select>
             <Button variant="secondary" onClick={loadData} title="Recarregar lista">
-              🔄 Atualizar
+              <Emoji3D e="🔄" /> Atualizar
             </Button>
             <Button
               variant="ghost"
@@ -231,7 +232,7 @@ export function ClientesTab() {
                         {c.children && c.children.length > 0 ? (
                           c.children.map((ch) => (
                             <Tag key={ch.id} color="primary">
-                              🧒 {ch.fullName}
+                              <Emoji3D e="🧒" /> {ch.fullName}
                             </Tag>
                           ))
                         ) : (
@@ -301,12 +302,12 @@ export function ClientesTab() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ margin: 0, fontSize: "20px", fontFamily: "var(--font-display)" }}>
-                👤 {selectedCliente.guardian_name}
+                <Emoji3D e="👤" /> {selectedCliente.guardian_name}
               </h3>
               <div style={{ display: "flex", gap: "8px" }}>
                 {!editing && can("clientes.write") && (
                   <Button variant="secondary" size="sm" onClick={() => startEditing(selectedCliente)}>
-                    ✏️ Editar
+                    <Emoji3D e="✏️" /> Editar
                   </Button>
                 )}
                 <Button
@@ -359,7 +360,7 @@ export function ClientesTab() {
                           }}
                         >
                           <div>
-                            <strong>🧒 {ch.fullName}</strong>
+                            <strong><Emoji3D e="🧒" /> {ch.fullName}</strong>
                             {ch.birthDate && (
                               <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                                 Nascido em: {dateBrFromIso(ch.birthDate)}
@@ -450,7 +451,7 @@ export function ClientesTab() {
                     Cancelar
                   </Button>
                   <Button variant="primary" onClick={saveEditing} loading={saving} disabled={saving}>
-                    💾 Salvar alterações
+                    <Emoji3D e="💾" /> Salvar alterações
                   </Button>
                 </div>
               </>

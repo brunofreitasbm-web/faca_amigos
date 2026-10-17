@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Emoji3D } from "./Emoji3D.js";
 
 interface PdfReceiptModalProps {
   pdfUrl: string;
@@ -40,7 +41,7 @@ export function PdfReceiptModal({ pdfUrl, error, onClose }: PdfReceiptModalProps
         <div className="px-6 py-4 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xl">
-              📄
+              <Emoji3D e="📄" />
             </div>
             <div>
               <h3 className="font-bold text-slate-900 dark:text-white text-lg">Cupom Salvo em PDF</h3>
@@ -70,21 +71,21 @@ export function PdfReceiptModal({ pdfUrl, error, onClose }: PdfReceiptModalProps
         {/* Footer Actions */}
         <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            ⏱️ Retenção automática: expirará em 10 dias
+            <Emoji3D e="⏱️" /> Retenção automática: expirará em 10 dias
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
               className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl text-sm transition flex items-center gap-1.5"
             >
-              🖨️ Imprimir
+              <Emoji3D e="🖨️" /> Imprimir
             </button>
             <button
               onClick={handleDownload}
               disabled={downloading}
               className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-pink-600/20 transition flex items-center gap-1.5"
             >
-              ⬇️ Baixar PDF
+              <Emoji3D e="⬇️" /> Baixar PDF
             </button>
             <button
               onClick={onClose}

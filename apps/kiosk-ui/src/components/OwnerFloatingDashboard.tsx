@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext.js";
 import { Api, businessDateFor } from "../api/client.js";
 import type { Unit } from "../api/client.js";
 import { money } from "../format.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 interface UnitSummary {
   unitId: string;
@@ -103,7 +104,7 @@ export function OwnerFloatingDashboard() {
           gap: "8px",
         }}
       >
-        <span>👑 {money(totalRevenueCents)}</span>
+        <span><Emoji3D e="👑" /> {money(totalRevenueCents)}</span>
         <span style={{ color: "#CBD5E1", fontWeight: 500 }}>· {totalSessionsCount} sessões</span>
       </button>
     );
@@ -139,7 +140,7 @@ export function OwnerFloatingDashboard() {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: "13px", fontWeight: 800, color: "#FFFFFF" }}>👑 Hoje</span>
+          <span style={{ fontSize: "13px", fontWeight: 800, color: "#FFFFFF" }}><Emoji3D e="👑" /> Hoje</span>
           <span style={{ fontSize: "11px", color: "#94A3B8" }}>
             {loading ? "Atualizando…" : lastUpdated ? `Atualizado às ${lastUpdated}` : ""}
           </span>
@@ -160,7 +161,7 @@ export function OwnerFloatingDashboard() {
               borderRadius: "6px",
             }}
           >
-            🔄
+            <Emoji3D e="🔄" />
           </button>
           <button
             type="button"
@@ -189,7 +190,7 @@ export function OwnerFloatingDashboard() {
             style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}
           >
             <span style={{ fontSize: "13px", color: "#CBD5E1", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              📍 {u.unitName}
+              <Emoji3D e="📍" /> {u.unitName}
             </span>
             <div style={{ display: "flex", alignItems: "baseline", gap: "6px", flexShrink: 0 }}>
               <span style={{ fontSize: "14px", fontWeight: 800, color: "#2ECFB5" }}>{money(u.revenueCents)}</span>

@@ -26,6 +26,7 @@ import { formatPlanoHoras } from "../contract/contractTemplate.js";
 import { SaidaScreen } from "./SaidaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
 import { WristbandQRCode } from "../components/WristbandQRCode.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 const PAUSE_REASONS: Array<{ value: string; label: string }> = [
   { value: "BANHEIRO", label: "Foi ao banheiro" },
@@ -585,7 +586,7 @@ export function PainelScreen() {
                     />
 
                     <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
-                      🌡️ Ticket médio <strong>{money(ticketMedioCents)}</strong>
+                      <Emoji3D e="🌡️" /> Ticket médio <strong>{money(ticketMedioCents)}</strong>
                     </span>
 
                     <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: zoneColor }}>
@@ -593,7 +594,7 @@ export function PainelScreen() {
                     </span>
 
                     <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
-                      {incentiveText}
+                      {renderEmoji(incentiveText)}
                     </span>
                   </span>
                 );
@@ -649,15 +650,15 @@ export function PainelScreen() {
                     />
 
                     <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
-                      🎮 Bonificação <strong>{atualLabel}</strong>
+                      <Emoji3D e="🎮" /> Bonificação <strong>{atualLabel}</strong>
                     </span>
 
                     <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: corNivel }}>
-                      {badgeLabel}
+                      {renderEmoji(badgeLabel)}
                     </span>
 
                     <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
-                      {bonusIncentiveText}
+                      {renderEmoji(bonusIncentiveText)}
                     </span>
                   </span>
                 );
@@ -668,7 +669,7 @@ export function PainelScreen() {
                   title={bonusRules.map((rule) => `🎁 ${rule.description} (${money(rule.rewardValueCents)})`).join(" · ")}
                   className="metric-progress-chip"
                 >
-                  🏆 <strong>{bonusRules.length}</strong> regra{bonusRules.length > 1 ? "s" : ""} de bônus ativa{bonusRules.length > 1 ? "s" : ""}
+                  <Emoji3D e="🏆" /> <strong>{bonusRules.length}</strong> regra{bonusRules.length > 1 ? "s" : ""} de bônus ativa{bonusRules.length > 1 ? "s" : ""}
                 </span>
               )}
             </div>
@@ -697,7 +698,7 @@ export function PainelScreen() {
               title="Fazer nova entrada/check-in sem sair do Painel (Teclas E ou F2)"
               style={{ gap: "6px", fontWeight: "bold", whiteSpace: "nowrap", height: "36px", borderRadius: "10px", fontSize: "13px", padding: "0 14px" }}
             >
-              ⚡ Novo Check-in (E)
+              <Emoji3D e="⚡" /> Novo Check-in (E)
             </Button>
           </IfCan>
         </div>
@@ -755,7 +756,7 @@ export function PainelScreen() {
           }}
         >
           <strong style={{ fontSize: "13px", color: "var(--color-teal-text)" }}>
-            🕓 {pendingPreCheckins.length} pré-cadastro{pendingPreCheckins.length > 1 ? "s" : ""} aguardando pelo QR de
+            <Emoji3D e="🕓" /> {pendingPreCheckins.length} pré-cadastro{pendingPreCheckins.length > 1 ? "s" : ""} aguardando pelo QR de
             Acesso Rápido
           </strong>
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -788,7 +789,7 @@ export function PainelScreen() {
                 </span>
                 <div>
                   <strong style={{ fontSize: "13px", display: "block" }}>
-                    {item.childName}{(item.inclusiveEligible || (item.sensoryTags?.length ?? 0) > 0 || item.notes?.toLowerCase().includes("neuro")) && !item.childName.includes("🧩") ? " 🧩" : ""}
+                    {item.childName}{(item.inclusiveEligible || (item.sensoryTags?.length ?? 0) > 0 || item.notes?.toLowerCase().includes("neuro")) && !item.childName.includes("🧩") ? renderEmoji(" 🧩") : ""}
                     {item.totalChildren > 1 && (
                       <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> ({item.childIndex + 1}/{item.totalChildren})</span>
                     )}
@@ -860,7 +861,7 @@ export function PainelScreen() {
             }}
           >
             <strong style={{ fontSize: "13px", color: "#5B32C4" }}>
-              💳 {prepaidCreditQueue.length} saldo{prepaidCreditQueue.length > 1 ? "s" : ""} pré-pago
+              <Emoji3D e="💳" /> {prepaidCreditQueue.length} saldo{prepaidCreditQueue.length > 1 ? "s" : ""} pré-pago
               {prepaidCreditQueue.length > 1 ? "s" : ""} aguardando início
             </strong>
             <span style={{ fontSize: "12px", color: "#5B32C4", flexShrink: 0 }}>
@@ -885,7 +886,7 @@ export function PainelScreen() {
                 <div>
                   <strong style={{ fontSize: "13px", display: "block" }}>
                     {item.child_name}
-                    {item.child_inclusive_eligible && !item.child_name.includes("🧩") ? " 🧩" : ""}
+                    {item.child_inclusive_eligible && !item.child_name.includes("🧩") ? renderEmoji(" 🧩") : ""}
                   </strong>
                   <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                     {item.guardian_name} · {formatPlanoHoras(item.remaining_minutes)} · {item.source_name_snapshot}
@@ -902,7 +903,7 @@ export function PainelScreen() {
                       : "Abrir Entrada já preenchida para iniciar a contagem deste saldo"
                   }
                 >
-                  {item.has_active_session ? "Já está no parque" : "▶ Iniciar"}
+                  {item.has_active_session ? "Já está no parque" : renderEmoji("▶ Iniciar")}
                 </Button>
               </div>
             ))}
@@ -925,7 +926,7 @@ export function PainelScreen() {
             altura toda do .painel-scroll de propósito. */}
         {entries.length === 0 && sessionsStatus === "ready" && (
           <div style={{ height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px", gap: "16px", textAlign: "center", color: "var(--text-muted)", background: "var(--surface-card)", borderRadius: "16px", border: "1px dashed var(--border-subtle)" }}>
-            <div style={{ fontSize: "40px" }}>📭</div>
+            <div style={{ fontSize: "40px" }}><Emoji3D e="📭" /></div>
             <div style={{ fontSize: "16px", fontWeight: 500 }}>Nenhuma criança em atividade no momento.</div>
             <Button variant="primary" onClick={() => {
               setPreCheckinPrefill(null);
@@ -1105,13 +1106,13 @@ export function PainelScreen() {
                                 gap: "3px",
                               }}
                             >
-                              <span>📍 {visits} {visits === 1 ? "visita" : "visitas"}</span>
+                              <span><Emoji3D e="📍" /> {visits} {visits === 1 ? "visita" : "visitas"}</span>
                             </Badge>
                           );
                         }
                         return null;
                       })()}
-                      {session.child_name_snapshot}{isNeurodivergent && !session.child_name_snapshot.includes("🧩") ? " 🧩" : ""}
+                      {session.child_name_snapshot}{isNeurodivergent && !session.child_name_snapshot.includes("🧩") ? renderEmoji(" 🧩") : ""}
                       {session.child_birth_date && (
                         <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}>· {formatAge(session.child_birth_date)}</span>
                       )}
@@ -1146,7 +1147,7 @@ export function PainelScreen() {
                         }}
                         title="Clique para visualizar o QR Code da pulseira em tamanho grande"
                       >
-                        <span>📱 QR Code</span>
+                        <span><Emoji3D e="📱" /> QR Code</span>
                       </button>
                     </span>
                     {session.exit_pin && (
@@ -1161,7 +1162,7 @@ export function PainelScreen() {
                     )}
                     {session.rental_kind && (
                       <Badge variant="solid_orange" title="Aluguel avulso de pelúcia — cobrar e recolher a pelúcia na saída">
-                        🧸 Pelúcia · devolver
+                        <Emoji3D e="🧸" /> Pelúcia · devolver
                       </Badge>
                     )}
                     {plan && (
@@ -1191,14 +1192,14 @@ export function PainelScreen() {
                   variant={isPausedTooLong ? "solid_pink" : "solid_amber"}
                   title="Relógio parado — retome quando a criança voltar"
                 >
-                  ⏸ Pausada há {formatElapsed(quote.timing.pausedForMs)}
+                  <Emoji3D e="⏸" /> Pausada há {formatElapsed(quote.timing.pausedForMs)}
                   {isPausedTooLong ? " — retome agora" : ""}
                 </Badge>
               )}
 
               {isExceeded && !isPaused && (
                 <Badge variant="solid_pink" title="Tempo do plano já foi ultrapassado — minutos e valor extra somados em tempo real">
-                  🔴 +{quote.timing.overMinutes} min excedente{overageLine ? ` (+${money(overageLine.cents)})` : ""}
+                  <Emoji3D e="🔴" /> +{quote.timing.overMinutes} min excedente{overageLine ? ` (+${money(overageLine.cents)})` : ""}
                 </Badge>
               )}
 
@@ -1222,7 +1223,7 @@ export function PainelScreen() {
                   }}
                 >
                   <Badge variant="solid_pink" title="O responsável pediu mais tempo pelo painel de acompanhamento no celular">
-                    📱 Pediu +{pendingRenewals.get(session.id)!.minutes} min
+                    <Emoji3D e="📱" /> Pediu +{pendingRenewals.get(session.id)!.minutes} min
                     {pendingRenewals.get(session.id)!.cents != null ? ` — ${money(pendingRenewals.get(session.id)!.cents!)}` : ""}
                   </Badge>
                   <Button
@@ -1249,13 +1250,13 @@ export function PainelScreen() {
                   aqui evita o operador contestar o próprio sistema no caixa. */}
               {!session.rental_kind && (session.package_balance_minutes ?? 0) > 0 && (
                 <Badge variant="solid_orange" title="Este responsável tem pacote pré-pago — o tempo sai do saldo no fechamento">
-                  🎟️ Pacote: {session.package_balance_minutes} min de saldo
+                  <Emoji3D e="🎟️" /> Pacote: {session.package_balance_minutes} min de saldo
                 </Badge>
               )}
 
               {careSummary && (
                 <div style={{ fontSize: "12px", background: "rgba(201, 144, 32, 0.1)", padding: "6px 10px", borderRadius: "8px", color: "var(--color-dark)" }}>
-                  💡 {careSummary}
+                  <Emoji3D e="💡" /> {careSummary}
                 </div>
               )}
 
@@ -1278,7 +1279,7 @@ export function PainelScreen() {
                         setEditRegistrationFor(entry);
                       }}
                     >
-                      <span style={{ fontSize: "16px" }}>✏️</span>
+                      <span style={{ fontSize: "16px" }}><Emoji3D e="✏️" /></span>
                       <span style={ICON_BUTTON_LABEL_STYLE}>Editar</span>
                     </Button>
                   </Tooltip>
@@ -1341,7 +1342,7 @@ export function PainelScreen() {
                     callGuardianBack(entry);
                   }}
                 >
-                  🚻 Chamado de Retorno
+                  <Emoji3D e="🚻" /> Chamado de Retorno
                 </Button>
                 {/* Contingência de saída. Fica no card, e não escondido num
                     menu, porque é usado justamente quando algo já deu errado
@@ -1360,7 +1361,7 @@ export function PainelScreen() {
                     setManualExitFor(entry);
                   }}
                 >
-                  🪪 Saída manual
+                  <Emoji3D e="🪪" /> Saída manual
                 </Button>
                 <IfCan capability="sessao.change_plan">
                   {!session.rental_kind && (
@@ -1391,7 +1392,7 @@ export function PainelScreen() {
                       resumeSession(session.id);
                     }}
                   >
-                    ▶ Retomar
+                    <Emoji3D e="▶" /> Retomar
                   </Button>
                 ) : (
                   <Button
@@ -1405,7 +1406,7 @@ export function PainelScreen() {
                       setPausingFor(pausingFor === session.id ? null : session.id);
                     }}
                   >
-                    ⏸ Pausar
+                    <Emoji3D e="⏸" /> Pausar
                   </Button>
                 )}
               </div>

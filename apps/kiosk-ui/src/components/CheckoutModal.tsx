@@ -9,6 +9,7 @@ import { CashPaymentPad } from "./CashPaymentPad.js";
 import type { ReceiptPrintPayload } from "@facaamigos/domain";
 import { openTapCharge, savePendingTap } from "../lib/infinitepayTap.js";
 import { IfCan } from "../auth/RequireCapability.js";
+import { Emoji3D, renderEmoji } from "./Emoji3D.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 type PaymentMethod = (typeof METHODS)[number];
@@ -365,7 +366,7 @@ export function CheckoutModal({
                 disabled={nfseState === "enfileirando" || nfseState === "aguardando"}
                 title="Emitir a Nota Fiscal de Serviço deste atendimento (só se o Responsável fizer questão) — depois você envia pelo WhatsApp"
               >
-                🧾 Emitir Nota Fiscal Serviço
+                <Emoji3D e="🧾" /> Emitir Nota Fiscal Serviço
               </Button>
             )}
             {nfseState === "aguardando" && (
@@ -383,7 +384,7 @@ export function CheckoutModal({
                   onClick={sendNfseWhatsApp}
                   title="Abre o WhatsApp do Responsável com o comprovante da NFS-e já redigido"
                 >
-                  {nfseSent ? "📱 Reenviar NFS-e por WhatsApp" : "📱 Enviar NFS-e por WhatsApp"}
+                  {nfseSent ? renderEmoji("📱 Reenviar NFS-e por WhatsApp") : renderEmoji("📱 Enviar NFS-e por WhatsApp")}
                 </Button>
                 {nfseSent && (
                   <p style={{ color: "var(--color-text-muted, #6b7280)", fontSize: "13px", margin: 0 }}>
@@ -448,7 +449,7 @@ export function CheckoutModal({
 
         {!isSplit ? (
           <Button variant="ghost" size="sm" onClick={startSplit} style={{ marginBottom: "12px" }} title="Cobrar parte em uma forma e o restante em outra">
-            ➗ Dividir em 2 formas de pagamento
+            <Emoji3D e="➗" /> Dividir em 2 formas de pagamento
           </Button>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "12px 0", padding: "12px", border: "1px dashed var(--border-subtle)", borderRadius: "12px" }}>
@@ -488,7 +489,7 @@ export function CheckoutModal({
 
         {hasPausedSession && (
           <div style={{ background: "#FEF3C7", color: "#92400E", padding: "12px 16px", borderRadius: "8px", border: "1px solid #F59E0B", marginBottom: "12px", fontSize: "14px" }}>
-            ⏸️ <strong>Sessão pausada:</strong> Uma das crianças está com o tempo pausado. Clique em <strong>Retomar</strong> no card no Painel antes de fechar.
+            <Emoji3D e="⏸️" /> <strong>Sessão pausada:</strong> Uma das crianças está com o tempo pausado. Clique em <strong>Retomar</strong> no card no Painel antes de fechar.
           </div>
         )}
 
@@ -515,7 +516,7 @@ export function CheckoutModal({
                 disabled={busy || hasOpenShift === false || hasPausedSession}
                 title="Cobrar por aproximação usando o celular/tablet como maquininha (InfiniteTap)"
               >
-                📲 Cobrar com InfiniteTap
+                <Emoji3D e="📲" /> Cobrar com InfiniteTap
               </Button>
             )}
             <Button
