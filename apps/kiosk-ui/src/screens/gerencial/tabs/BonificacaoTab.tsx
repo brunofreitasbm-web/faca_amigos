@@ -5,6 +5,7 @@ import { Api } from "../../../api/client.js";
 import { mesAtualValue, rangeDoMes, type ApuracaoOperador } from "../../../lib/apuracaoBonificacao.js";
 import { useAppState } from "../../../state/AppState.js";
 import { money } from "../../../format.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 const TETO_MES_CENTS = 20_000;
 
@@ -103,7 +104,7 @@ export function BonificacaoTab() {
                   {money(r.acumuladoPlanosMesCents)}
                   {r.atingiuTetoPlanos && (
                     <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--text-muted)" }} title="Teto do Bônus de Planos Longos atingido">
-                      🔒 teto
+                      <Emoji3D e="🔒" /> teto
                     </span>
                   )}
                 </td>
@@ -111,7 +112,7 @@ export function BonificacaoTab() {
                   {money(r.totalMesCents)}
                   {r.atingiuTeto && (
                     <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--text-muted)" }} title={`Teto de ${money(TETO_MES_CENTS)}/mês atingido`}>
-                      🔒 teto
+                      <Emoji3D e="🔒" /> teto
                     </span>
                   )}
                 </td>

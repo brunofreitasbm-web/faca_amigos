@@ -16,6 +16,7 @@ import { PassagemTurnoGate } from "../components/PassagemTurnoGate.js";
 import { normalizeHandover, validateHandover } from "../lib/passagemTurno.js";
 import type { HandoverDraft } from "../lib/passagemTurno.js";
 import { extensionForMime } from "../lib/imageCompression.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 const METHODS = ["DINHEIRO", "PIX", "CREDITO", "DEBITO"] as const;
 
@@ -699,7 +700,7 @@ export function CaixaScreen() {
                 }
                 onClick={handleSaveEnvelope}
               >
-                {pendingMovementKey ? "Aguardando conexão..." : "💾 Confirmar Registro"}
+                {pendingMovementKey ? "Aguardando conexão..." : renderEmoji("💾 Confirmar Registro")}
               </Button>
             </div>
           </div>
@@ -736,7 +737,7 @@ export function CaixaScreen() {
                 boxShadow: "0 8px 18px rgba(59, 130, 246, 0.3)",
               }}
             >
-              🏁
+              <Emoji3D e="🏁" />
             </div>
             <h1 style={{ fontFamily: "var(--font-display)", fontSize: "22px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
               Turno Fechado com Sucesso!
@@ -787,7 +788,7 @@ export function CaixaScreen() {
 
           {closeResult.countedCashCents !== null && (
             <div style={{ background: "var(--surface-sunken)", borderRadius: "12px", padding: "12px 14px", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "6px" }}>
-              <strong style={{ fontSize: "14px" }}>💵 Conferência da gaveta</strong>
+              <strong style={{ fontSize: "14px" }}><Emoji3D e="💵" /> Conferência da gaveta</strong>
               <SummaryRow label="Dinheiro contado na gaveta" value={money(closeResult.countedCashCents)} />
               <SummaryRow label="Esperado pelo sistema" value={money(closeResult.drawerExpectedCents ?? 0)} />
               <SummaryRow
@@ -905,7 +906,7 @@ export function CaixaScreen() {
         </table>
         </div>
         <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-          <h2 style={{ margin: 0, fontSize: "18px" }}>💵 Conferência do dinheiro na gaveta</h2>
+          <h2 style={{ margin: 0, fontSize: "18px" }}><Emoji3D e="💵" /> Conferência do dinheiro na gaveta</h2>
           <HelpText>
             Conte <strong>todo</strong> o dinheiro em espécie da gaveta (fundo + vendas) antes de separar o envelope. Depois
             informe quanto fica na gaveta para amanhã: o valor do envelope é calculado (contado − fundo) e precisa ser
@@ -940,7 +941,7 @@ export function CaixaScreen() {
             }
           />
           {closingEnvelopeLocked && (
-            <HelpText>🔒 Valores travados: o envelope já foi registrado com base neles.</HelpText>
+            <HelpText><Emoji3D e="🔒" /> Valores travados: o envelope já foi registrado com base neles.</HelpText>
           )}
           <SummaryRow label="Valor para o envelope (contado − fundo)" value={money(cm.envelopeCents)} strong />
           {cm.countedValid && (
@@ -969,7 +970,7 @@ export function CaixaScreen() {
                 {cm.envelopeRegistered
                   ? `✓ Envelope de ${money(cm.envelopeCents)} registrado neste turno`
                   : pendingMovementKey
-                    ? "⏳ Envelope salvo sem conexão — aguardando a rede para confirmar"
+                    ? renderEmoji("⏳ Envelope salvo sem conexão — aguardando a rede para confirmar")
                     : `⚠ Registre o envelope de ${money(cm.envelopeCents)} (com foto) antes de confirmar o fechamento`}
               </p>
               {!cm.envelopeRegistered && !pendingMovementKey && (
@@ -995,7 +996,7 @@ export function CaixaScreen() {
         {error && <p style={{ color: "var(--color-error-text)" }}>{error}</p>}
         {pendingCloseKey && (
           <p style={{ color: "var(--color-amber)" }}>
-            ⏳ Sem conexão no momento da confirmação — o fechamento foi salvo e será concluído automaticamente assim
+            <Emoji3D e="⏳" /> Sem conexão no momento da confirmação — o fechamento foi salvo e será concluído automaticamente assim
             que a rede voltar. Não feche o turno de novo nem saia desta tela.
           </p>
         )}
@@ -1093,7 +1094,7 @@ export function CaixaScreen() {
                           {s.guardianName && <span style={{ display: "block", fontSize: "12px", color: "var(--text-muted)" }}>Resp: {s.guardianName}</span>}
                         </>
                       ) : (
-                        <span title={s.productsSummary ?? undefined}>🛒 {s.productsSummary}</span>
+                        <span title={s.productsSummary ?? undefined}><Emoji3D e="🛒" /> {s.productsSummary}</span>
                       )}
                     </td>
                     <td style={{ padding: "6px 8px" }}>{s.method}</td>
@@ -1111,7 +1112,7 @@ export function CaixaScreen() {
                         if (isRetrying || ["PENDENTE", "ASSINADO", "TRANSMITIDO"].includes(doc.status)) {
                           return (
                             <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "500" }}>
-                              ⏳ Emitindo…
+                              <Emoji3D e="⏳" /> Emitindo…
                             </span>
                           );
                         }
@@ -1123,7 +1124,7 @@ export function CaixaScreen() {
                                 ✅ NFC-e nº {doc.numero ?? "—"}
                               </span>
                               <Button variant="ghost" size="sm" onClick={() => openNfceForSale(s)} title="Ver / Imprimir Cupom Fiscal NFC-e">
-                                📄 Ver cupom
+                                <Emoji3D e="📄" /> Ver cupom
                               </Button>
                             </div>
                           );
@@ -1138,7 +1139,7 @@ export function CaixaScreen() {
                               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center" }}>
                                 <IfCan capability="nfce.retry">
                                   <Button variant="ghost" size="sm" onClick={() => handleRetryNfce(s, doc)} title="Reenviar a NFC-e para a SEFAZ-PA">
-                                    🔄 Tentar Novamente
+                                    <Emoji3D e="🔄" /> Tentar Novamente
                                   </Button>
                                 </IfCan>
                                 <Button
@@ -1159,7 +1160,7 @@ export function CaixaScreen() {
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
                             <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "bold" }}>{doc.status}</span>
                             <Button variant="ghost" size="sm" onClick={() => openNfceForSale(s)} title="Ver detalhes da NFC-e">
-                              📄 Ver cupom
+                              <Emoji3D e="📄" /> Ver cupom
                             </Button>
                           </div>
                         );
@@ -1171,7 +1172,7 @@ export function CaixaScreen() {
                         if (isLoading) {
                           return (
                             <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "500" }}>
-                              ⏳ Emitindo...
+                              <Emoji3D e="⏳" /> Emitindo...
                             </span>
                           );
                         }
@@ -1189,7 +1190,7 @@ export function CaixaScreen() {
                                 onClick={() => handleSendNfseWhatsapp(s, doc)}
                                 title="Enviar NFS-e por WhatsApp ao responsável"
                               >
-                                📱 {wasSent ? "Reenviar Whats" : "Enviar Whats"}
+                                <Emoji3D e="📱" /> {wasSent ? "Reenviar Whats" : "Enviar Whats"}
                               </Button>
                             </div>
                           );
@@ -1225,7 +1226,7 @@ export function CaixaScreen() {
                                   onClick={() => setSelectedSaleForNfce({ sale: s, doc })}
                                   title="Ver Comprovante Auxiliar de Venda, gerar PDF ou enviar por WhatsApp"
                                 >
-                                  📄 Comprovante
+                                  <Emoji3D e="📄" /> Comprovante
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -1233,7 +1234,7 @@ export function CaixaScreen() {
                                   onClick={() => handleEmitNfse(s)}
                                   title="Tentar emitir novamente"
                                 >
-                                  🔄 Reenviar
+                                  <Emoji3D e="🔄" /> Reenviar
                                 </Button>
                               </div>
                             </div>
@@ -1247,7 +1248,7 @@ export function CaixaScreen() {
                             onClick={() => handleEmitNfse(s)}
                             title="Emitir Nota Fiscal de Serviço (NFS-e) sob demanda"
                           >
-                            🧾 Emitir NFS-e
+                            <Emoji3D e="🧾" /> Emitir NFS-e
                           </Button>
                         );
                       })()}
@@ -1292,7 +1293,7 @@ export function CaixaScreen() {
                 disabled={!customWhatsappPhone.trim()}
                 onClick={() => handleSendNfseWhatsapp(whatsappPhoneModal.sale, whatsappPhoneModal.doc, customWhatsappPhone)}
               >
-                📱 Abrir WhatsApp
+                <Emoji3D e="📱" /> Abrir WhatsApp
               </Button>
             </div>
           </div>
@@ -1365,7 +1366,7 @@ export function CaixaScreen() {
                       }
                     }}
                   >
-                    💾 Salvar CPF e Reemitir
+                    <Emoji3D e="💾" /> Salvar CPF e Reemitir
                   </Button>
                 </div>
                 {cpfInputModal.length === 14 && !isValidCpf(cpfInputModal) && (
@@ -1388,7 +1389,7 @@ export function CaixaScreen() {
                   }}
                   title="Abrir Comprovante Auxiliar de Venda para gerar PDF ou enviar por WhatsApp"
                 >
-                  📄 Ver Comprovante / PDF / WhatsApp
+                  <Emoji3D e="📄" /> Ver Comprovante / PDF / WhatsApp
                 </Button>
                 {isNfse ? (
                   <Button
@@ -1399,7 +1400,7 @@ export function CaixaScreen() {
                       handleEmitNfse(sale);
                     }}
                   >
-                    🔄 Tentar Emissão Novamente
+                    <Emoji3D e="🔄" /> Tentar Emissão Novamente
                   </Button>
                 ) : (
                   <IfCan capability="nfce.retry">
@@ -1411,7 +1412,7 @@ export function CaixaScreen() {
                         handleRetryNfce(sale, doc);
                       }}
                     >
-                      🔄 Tentar Novamente
+                      <Emoji3D e="🔄" /> Tentar Novamente
                     </Button>
                   </IfCan>
                 )}
@@ -1518,7 +1519,7 @@ export function CaixaScreen() {
                 boxShadow: "0 8px 20px rgba(16, 185, 129, 0.35)",
               }}
             >
-              🟢
+              <Emoji3D e="🟢" />
             </div>
 
             <h2 style={{ margin: 0, fontSize: "22px", fontFamily: "var(--font-display)", color: "#10b981" }}>
@@ -1561,7 +1562,7 @@ export function CaixaScreen() {
             </div>
 
             <div style={{ fontSize: "14px", color: "var(--text-secondary)", fontWeight: "500", fontStyle: "italic" }}>
-              🚀 Desejamos um ótimo dia e excelentes vendas para toda a equipe!
+              <Emoji3D e="🚀" /> Desejamos um ótimo dia e excelentes vendas para toda a equipe!
             </div>
 
             <Button

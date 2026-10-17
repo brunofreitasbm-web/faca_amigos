@@ -6,6 +6,7 @@ import { Api, businessDateFor } from "../../../api/client.js";
 import { money } from "../../../format.js";
 import { supabase } from "../../../lib/supabase/client.js";
 import { averageScore, summarizeNps } from "../../../lib/nps.js";
+import { Emoji3D, renderEmoji } from "../../../components/Emoji3D.js";
 
 interface UnitMetric {
   unitId: string;
@@ -175,7 +176,7 @@ export function OwnerAcompanhamentoTab() {
                 letterSpacing: "0.5px",
               }}
             >
-              👑 PAINEL OWNER
+              <Emoji3D e="👑" /> PAINEL OWNER
             </span>
             <span style={{ fontSize: "12px", color: "#94a3b8" }}>
               Atualizado às {lastRefreshed.toLocaleTimeString("pt-BR")}
@@ -202,7 +203,7 @@ export function OwnerAcompanhamentoTab() {
             </Select>
           </div>
           <Button variant="secondary" onClick={loadDashboardData} disabled={loading}>
-            {loading ? "Atualizando..." : "🔄 Atualizar"}
+            {loading ? "Atualizando..." : renderEmoji("🔄 Atualizar")}
           </Button>
         </div>
       </div>
@@ -348,7 +349,7 @@ export function OwnerAcompanhamentoTab() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
           <div>
             <h3 style={{ margin: 0, fontSize: "17px", color: "#0f172a", fontFamily: "var(--font-display)" }}>
-              💬 Feed de Avaliações NPS (Playground & Circuito)
+              <Emoji3D e="💬" /> Feed de Avaliações NPS (Playground & Circuito)
             </h3>
             <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#64748b" }}>
               Feed ao vivo das notas de 0 a 10 e opiniões enviadas pelos responsáveis ao término da sessão.
@@ -364,7 +365,7 @@ export function OwnerAcompanhamentoTab() {
 
         {npsLogs.length === 0 ? (
           <HelpText style={{ textAlign: "center", padding: "24px 0" }}>
-            Nenhuma avaliação NPS registrada hoje ainda. As notas respondidas pelos clientes na pesquisa de NPS do WhatsApp (CRM) aparecerão aqui. 🌟
+            Nenhuma avaliação NPS registrada hoje ainda. As notas respondidas pelos clientes na pesquisa de NPS do WhatsApp (CRM) aparecerão aqui. <Emoji3D e="🌟" />
           </HelpText>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>

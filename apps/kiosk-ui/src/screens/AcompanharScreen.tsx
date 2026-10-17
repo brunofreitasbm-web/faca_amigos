@@ -15,6 +15,7 @@ import { OlharCard } from "./acompanhar/OlharCard.js";
 import { olharUrl } from "./acompanhar/olharSite.js";
 import { RenovarCard } from "./acompanhar/RenovarCard.js";
 import { opcoesDeRenovacao } from "./acompanhar/renovarSite.js";
+import { Emoji3D } from "../components/Emoji3D.js";
 
 /**
  * Painel público do responsável — aberto sem login pelo QR mostrado no
@@ -78,7 +79,7 @@ export function AcompanharScreen({ code }: { code: string }) {
 
       {status === "ready" && sessao?.status === "FINALIZADA" && (
         <Card style={{ maxWidth: 420, width: "100%" }} title={sessao.childFirstName}>
-          <p style={{ margin: 0 }}>A visita já foi encerrada. Até a próxima! 💛</p>
+          <p style={{ margin: 0 }}>A visita já foi encerrada. Até a próxima! <Emoji3D e="💛" /></p>
         </Card>
       )}
 

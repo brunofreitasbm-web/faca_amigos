@@ -29,6 +29,7 @@ import {
   SESSION_REPORT_MIN_MINUTES,
 } from "@facaamigos/domain";
 import { money, formatElapsed, formatAge } from "../format.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 // Lista padrão e assertiva — o operador marca em vez de descrever do zero
 // na hora do balcão, com a família esperando. Os cinco primeiros itens são
@@ -1005,7 +1006,7 @@ export function EntradaScreen({
               title="Preencher os dados do Responsável Contratante e imprimir o contrato em A4 (2 vias)"
               style={{ borderColor: "var(--color-teal)", color: "var(--color-teal-text)" }}
             >
-              📄 Imprimir contrato do plano
+              <Emoji3D e="📄" /> Imprimir contrato do plano
             </Button>
           )}
           {lastGuardianId && (
@@ -1024,10 +1025,10 @@ export function EntradaScreen({
             onClick={() => setAcompanharOpen(true)}
             title="Mostrar um QR na tela para o responsável acompanhar o tempo pelo próprio celular"
           >
-            📱 QR de acompanhamento
+            <Emoji3D e="📱" /> QR de acompanhamento
           </Button>
           <Button variant="ghost" size="sm" onClick={reprint} title="Reenviar as duas vias para a impressora">
-            🖨️ Reimprimir
+            <Emoji3D e="🖨️" /> Reimprimir
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setDone(null)} aria-label="Dispensar aviso">
             ✕
@@ -1103,7 +1104,7 @@ export function EntradaScreen({
             >
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <strong style={{ fontSize: "17px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  {childName}{isNeurodivergent && !childName.includes("🧩") ? " 🧩" : ""}
+                  {childName}{isNeurodivergent && !childName.includes("🧩") ? renderEmoji(" 🧩") : ""}
                   {isNeurodivergent && (
                     <Badge
                       variant="teal"
@@ -1339,14 +1340,14 @@ export function EntradaScreen({
                 onClick={() => resetForNextChild(false)}
                 title="Limpar dados do responsável e buscar outro cliente"
               >
-                🔄 Trocar responsável
+                <Emoji3D e="🔄" /> Trocar responsável
               </Button>
             </div>
 
             {siblingMatches.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <span style={{ fontSize: "13px", fontWeight: "bold", color: "var(--color-teal-text)" }}>
-                  👶 Crianças já cadastradas para este responsável ({siblingMatches.length}):
+                  <Emoji3D e="👶" /> Crianças já cadastradas para este responsável ({siblingMatches.length}):
                 </span>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   {siblingMatches.map((sibling) => (
@@ -1358,7 +1359,7 @@ export function EntradaScreen({
                       style={{ borderColor: "var(--color-teal)", background: "#fff", color: "var(--text-main)" }}
                       title={`Fazer check-in para ${sibling.full_name}`}
                     >
-                      🧒 {sibling.full_name} ({formatAge(sibling.birth_date)})
+                      <Emoji3D e="🧒" /> {sibling.full_name} ({formatAge(sibling.birth_date)})
                     </Button>
                   ))}
                 </div>
@@ -1376,7 +1377,7 @@ export function EntradaScreen({
               </Button>
               {siblingCheckinCount >= 1 && (
                 <Tag color="var(--color-gold)" style={{ fontWeight: "bold" }}>
-                  🎉 {siblingCheckinCount + 1}ª Criança deste responsável (Combo Irmãos)
+                  <Emoji3D e="🎉" /> {siblingCheckinCount + 1}ª Criança deste responsável (Combo Irmãos)
                 </Tag>
               )}
             </div>
@@ -1427,7 +1428,7 @@ export function EntradaScreen({
               }}
             >
               <strong style={{ fontSize: "16px", display: "block", color: "var(--color-teal-text)" }}>
-                🕐 Usar banco de horas
+                <Emoji3D e="🕐" /> Usar banco de horas
               </strong>
               <div style={{ fontSize: "18px", color: "var(--color-teal-text)", fontWeight: "bold", marginTop: "2px" }}>
                 {formatPlanoHoras(hourBank.remainingMinutes)} disponíveis
@@ -1455,7 +1456,7 @@ export function EntradaScreen({
               }}
             >
               <strong style={{ fontSize: "16px", display: "block", color: "#5B32C4" }}>
-                💳 Usar saldo pré-pago
+                <Emoji3D e="💳" /> Usar saldo pré-pago
               </strong>
               <div style={{ fontSize: "18px", color: "#5B32C4", fontWeight: "bold", marginTop: "2px" }}>
                 {formatPlanoHoras(childCredit.remainingMinutes)} disponíveis
@@ -1482,7 +1483,7 @@ export function EntradaScreen({
                 background: isBirthdayCourtesy ? "rgba(245, 166, 35, 0.12)" : "var(--surface-card)",
               }}
             >
-              <strong style={{ fontSize: "16px", display: "block" }}>🎂 {birthdayOffer.plan.name}</strong>
+              <strong style={{ fontSize: "16px", display: "block" }}><Emoji3D e="🎂" /> {birthdayOffer.plan.name}</strong>
               <div style={{ fontSize: "18px", fontWeight: "bold", marginTop: "2px", color: "var(--color-primary-hover)" }}>Grátis</div>
               <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                 vale até {new Date(`${birthdayOffer.validUntil}T12:00:00`).toLocaleDateString("pt-BR")} · depois dos 30 min,{" "}
@@ -1582,7 +1583,7 @@ export function EntradaScreen({
                         />
                       ) : (
                         <span aria-hidden style={{ fontSize: "60px", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "96px", height: "96px" }}>
-                          {asset.emoji || "🧸"}
+                          {renderEmoji(asset.emoji || "🧸")}
                         </span>
                       )}
                       <div>
@@ -1619,7 +1620,7 @@ export function EntradaScreen({
               flexWrap: "wrap",
             }}
           >
-            <span style={{ fontSize: "20px" }}>{quickProduct.emoji ?? "🛒"}</span>
+            <span style={{ fontSize: "20px" }}>{renderEmoji(quickProduct.emoji ?? "🛒")}</span>
             <span style={{ flex: 1, minWidth: "180px", fontSize: "14px" }}>
               Oferecer <strong>{quickProduct.name}</strong> por {money(quickProduct.price_cents)}?
             </span>
@@ -1740,7 +1741,7 @@ export function EntradaScreen({
                       }}
                     />
                   ) : (
-                    <span style={{ fontSize: "60px", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "96px", height: "96px" }}>{asset.emoji}</span>
+                    <span style={{ fontSize: "60px", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "96px", height: "96px" }}>{renderEmoji(asset.emoji)}</span>
                   )}
                   <span style={{ fontWeight: "var(--weight-bold)" as unknown as number, fontSize: "15px" }}>{asset.name}</span>
                 </div>
@@ -1782,7 +1783,7 @@ export function EntradaScreen({
         >
           <div style={{ overflow: "hidden", minHeight: 0 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)" }}>
-              <strong style={{ fontSize: "15px" }}>🧩 Cuidados Inclusivos &amp; Tags Sensoriais</strong>
+              <strong style={{ fontSize: "15px" }}><Emoji3D e="🧩" /> Cuidados Inclusivos &amp; Tags Sensoriais</strong>
               <HelpText>
                 Estas informações são impressas na pulseira e no recibo — é assim que o monitor no salão fica sabendo.
               </HelpText>
@@ -1822,7 +1823,7 @@ export function EntradaScreen({
         {couponCode && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Tag color="var(--color-teal)" style={{ fontSize: "13px", padding: "6px 12px" }}>
-              🎟️ Cupom de desconto ativo: <strong>{couponCode}</strong>
+              <Emoji3D e="🎟️" /> Cupom de desconto ativo: <strong>{couponCode}</strong>
             </Tag>
           </div>
         )}
@@ -1986,7 +1987,7 @@ export function EntradaScreen({
           que quebraria se virasse uma URL). Este é só para o responsável
           apontar a câmera do próprio celular, oferecido pela operadora. */}
       {acompanharOpen && done && acompanharUrl && (
-        <Modal title="📱 Apresentar ao Responsável" onClose={() => setAcompanharOpen(false)}>
+        <Modal title={renderEmoji("📱 Apresentar ao Responsável")} onClose={() => setAcompanharOpen(false)}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "8px 0" }}>
             <p
               style={{
@@ -2022,7 +2023,7 @@ export function EntradaScreen({
 
       {/* Modal de Cross-Selling Automático para pacotes >= 1h */}
       {crossSellModalOpen && (
-        <Modal onClose={() => setCrossSellModalOpen(false)} title="🥤 Oportunidade de Venda (Cross-Selling)">
+        <Modal onClose={() => setCrossSellModalOpen(false)} title={renderEmoji("🥤 Oportunidade de Venda (Cross-Selling)")}>
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "4px" }}>
             <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
               O cliente selecionou um pacote de{" "}

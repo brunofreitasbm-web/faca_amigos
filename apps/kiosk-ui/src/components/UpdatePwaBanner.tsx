@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { applyPwaUpdate, subscribePwaUpdate } from "../pwa.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 
 /**
@@ -105,7 +106,7 @@ export function UpdatePwaBanner() {
             flexShrink: 0,
           }}
         >
-          🚀
+          <Emoji3D e="🚀" />
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#FFFFFF" }}>

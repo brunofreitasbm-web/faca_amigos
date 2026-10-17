@@ -13,6 +13,7 @@ import { OfflineQueuedError } from "../../lib/supabase/offlineQueue.js";
 import { useToast } from "../../state/ToastContext.js";
 import { useConfirm } from "../../state/ConfirmContext.js";
 import { LevelSegmented } from "./LevelSegmented.js";
+import { Emoji3D } from "../Emoji3D.js";
 
 const OBS_MAX = 300;
 
@@ -148,7 +149,7 @@ export function SessionReportForm({ report, onSubmitted, onClose }: Props) {
         {late ? (
           <Badge variant="solid_pink">Atrasado — preencha assim mesmo</Badge>
         ) : (
-          <Badge variant={msLeft < 10 * 60_000 ? "amber" : "teal"}>⏱ {formatCountdown(msLeft)}</Badge>
+          <Badge variant={msLeft < 10 * 60_000 ? "amber" : "teal"}><Emoji3D e="⏱" /> {formatCountdown(msLeft)}</Badge>
         )}
         <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
           Voltar

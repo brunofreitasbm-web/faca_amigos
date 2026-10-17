@@ -5,6 +5,7 @@ import { Api } from "../../../api/client.js";
 import type { CashMovement, UnitShiftRow } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { money } from "../../../format.js";
+import { renderEmoji } from "../../../components/Emoji3D.js";
 
 interface FlowNode {
   key: string;
@@ -296,7 +297,7 @@ export function HistoricoTab() {
                 .filter((n) => n.amountCents > 0)
                 .map((n) => (
                   <tr key={n.key} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                    <td style={{ padding: "8px" }}>{n.kind === "in" ? "⬇️ Entrada" : n.kind === "out" ? "⬆️ Saída" : "🔵 Saldo"}</td>
+                    <td style={{ padding: "8px" }}>{n.kind === "in" ? renderEmoji("⬇️ Entrada") : n.kind === "out" ? renderEmoji("⬆️ Saída") : renderEmoji("🔵 Saldo")}</td>
                     <td style={{ padding: "8px" }}>{n.label}</td>
                     <td style={{ padding: "8px", color: "var(--text-secondary)" }}>{n.sublabel}</td>
                     <td style={{ padding: "8px", textAlign: "right", fontWeight: "bold" }}>{money(n.amountCents)}</td>

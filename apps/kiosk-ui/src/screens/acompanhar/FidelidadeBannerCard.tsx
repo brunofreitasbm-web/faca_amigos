@@ -1,4 +1,5 @@
 import { Card } from "@facaamigos/ui";
+import { Emoji3D, renderEmoji } from "../../components/Emoji3D.js";
 
 interface FidelidadeBannerCardProps {
   childFirstName: string;
@@ -41,7 +42,7 @@ export function FidelidadeBannerCard({ childFirstName, visitCount = 8 }: Fidelid
             gap: "6px",
           }}
         >
-          🎁 PROGRAMA DE FIDELIDADE
+          <Emoji3D e="🎁" /> PROGRAMA DE FIDELIDADE
         </span>
         <span
           style={{
@@ -62,26 +63,26 @@ export function FidelidadeBannerCard({ childFirstName, visitCount = 8 }: Fidelid
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
         <strong style={{ fontSize: "16px", color: "#9A3412", lineHeight: 1.3 }}>
           {isEighthVisit
-            ? `🌟 ${childFirstName} está na 8ª visita!`
+            ? renderEmoji(`🌟 ${childFirstName} está na 8ª visita!`)
             : isNinthVisit
-            ? `🔥 Falta apenas 1 visita para os 30 min de cortesia!`
+            ? renderEmoji(`🔥 Falta apenas 1 visita para os 30 min de cortesia!`)
             : isTenthVisit
-            ? `🎉 Parabéns! Esta é a 10ª visita do ciclo!`
-            : `💛 Cartão Fidelidade de ${childFirstName}`}
+            ? renderEmoji(`🎉 Parabéns! Esta é a 10ª visita do ciclo!`)
+            : renderEmoji(`💛 Cartão Fidelidade de ${childFirstName}`)}
         </strong>
 
         <p style={{ margin: 0, fontSize: "14px", color: "#C2410C", lineHeight: 1.5, fontWeight: isEighthVisit ? 600 : 400 }}>
           {isEighthVisit ? (
             <>
-              Depois da próxima sessão (9ª), a 10ª visita traz <strong>30 min de cortesia</strong> para {childFirstName}! 🎁✨
+              Depois da próxima sessão (9ª), a 10ª visita traz <strong>30 min de cortesia</strong> para {childFirstName}! <Emoji3D e="🎁" />✨
             </>
           ) : isNinthVisit ? (
             <>
-              Na próxima visita (10ª), {childFirstName} ganha <strong>30 min de cortesia</strong>! 🎉
+              Na próxima visita (10ª), {childFirstName} ganha <strong>30 min de cortesia</strong>! <Emoji3D e="🎉" />
             </>
           ) : isTenthVisit ? (
             <>
-              Você completou o ciclo! Os <strong>30 min de cortesia</strong> já saíram nesta visita. 🎁
+              Você completou o ciclo! Os <strong>30 min de cortesia</strong> já saíram nesta visita. <Emoji3D e="🎁" />
             </>
           ) : (
             <>
@@ -142,7 +143,7 @@ export function FidelidadeBannerCard({ childFirstName, visitCount = 8 }: Fidelid
                 {isCompleted ? (
                   <span>✓</span>
                 ) : isTarget ? (
-                  <span style={{ fontSize: "14px" }}>🎁</span>
+                  <span style={{ fontSize: "14px" }}><Emoji3D e="🎁" /></span>
                 ) : (
                   <span>{stepNum}</span>
                 )}

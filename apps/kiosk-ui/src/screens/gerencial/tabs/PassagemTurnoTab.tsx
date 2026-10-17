@@ -4,6 +4,7 @@ import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { HandoverHistoryRow } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 function fmtDateTime(ms: number | null): string {
   if (ms === null) return "—";
@@ -93,7 +94,7 @@ export function PassagemTurnoTab() {
           </div>
           <div style={{ marginTop: "20px" }}>
             <Button variant="secondary" onClick={loadData} disabled={loading}>
-              🔄 Atualizar
+              <Emoji3D e="🔄" /> Atualizar
             </Button>
           </div>
         </div>

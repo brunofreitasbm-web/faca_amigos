@@ -12,6 +12,7 @@ import {
   type NpsDashboardData,
 } from "../../../lib/nps.js";
 import { NpsBandBar, NpsDistributionChart, NpsFunnel, NpsTrendChart } from "../../../components/charts/NpsCharts.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 /**
  * Dashboard do NPS (Gerencial › Visão Geral & IA). Lê fa_crm_nps_dashboard e
@@ -270,10 +271,10 @@ export function NpsDashboardTab() {
       {/* Detratores a tratar */}
       {data && data.summary.sent > 0 && (
         <Card style={{ padding: 18 }}>
-          <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600 }}>🚨 Detratores a tratar</h3>
+          <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600 }}><Emoji3D e="🚨" /> Detratores a tratar</h3>
           <HelpText style={{ margin: "0 0 12px", fontSize: 12 }}>Notas de 0 a 6 no período, da mais recente para a mais antiga.</HelpText>
           {detractors.length === 0 ? (
-            <HelpText style={{ margin: 0 }}>Nenhum detrator no período. 🎉</HelpText>
+            <HelpText style={{ margin: 0 }}>Nenhum detrator no período. <Emoji3D e="🎉" /></HelpText>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {detractors.map((r) => (
@@ -287,7 +288,7 @@ export function NpsDashboardTab() {
       {/* Contribuições */}
       {data && data.summary.sent > 0 && (
         <Card style={{ padding: 18 }}>
-          <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600 }}>💬 Contribuições</h3>
+          <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600 }}><Emoji3D e="💬" /> Contribuições</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, alignItems: "center" }}>
             {(["ALL", "PROMOTER", "PASSIVE", "DETRACTOR"] as const).map((b) => (
               <Button key={b} size="sm" variant={band === b ? "primary" : "secondary"} onClick={() => setBand(b)}>

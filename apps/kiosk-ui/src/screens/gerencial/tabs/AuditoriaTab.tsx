@@ -5,6 +5,7 @@ import { Api } from "../../../api/client.js";
 import type { AuditLogEntry, Employee, Unit } from "../../../api/client.js";
 import { ROLE_LABEL } from "../../../auth/capabilities.js";
 import { auditActionLabel, formatAuditDetails } from "./auditLogFormat.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 function startOfDayMs(dateStr: string) {
   return new Date(`${dateStr}T00:00:00`).getTime();
@@ -141,7 +142,7 @@ export function AuditoriaTab() {
           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage <= 1}
         >
-          ⬅️ Anterior
+          <Emoji3D e="⬅️" /> Anterior
         </Button>
         <span style={{ fontSize: "13px", fontWeight: "bold", padding: "0 8px" }}>
           {currentPage} / {totalPages}
@@ -193,10 +194,10 @@ export function AuditoriaTab() {
 
         <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
           <Button variant="secondary" onClick={loadData} disabled={loading}>
-            🔄 Atualizar
+            <Emoji3D e="🔄" /> Atualizar
           </Button>
           <Button variant="secondary" onClick={handleExportCsv} disabled={entries.length === 0}>
-            ⬇️ Exportar CSV
+            <Emoji3D e="⬇️" /> Exportar CSV
           </Button>
         </div>
       </Card>

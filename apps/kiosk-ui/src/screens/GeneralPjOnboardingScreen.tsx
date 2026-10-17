@@ -3,6 +3,7 @@ import { Button, BrandLockup, Card, HelpText, Input, Checkbox, Modal } from "@fa
 import { Api } from "../api/client.js";
 import { useFaceCapture } from "../hooks/useFaceCapture.js";
 import { prepareUpload } from "../lib/imageCompression.js";
+import { Emoji3D } from "../components/Emoji3D.js";
 
 type Status = "loading" | "invalid" | "ready" | "done";
 
@@ -83,7 +84,7 @@ function FaceCaptureModal({
               {captureError || error}
             </p>
             <Button variant="ghost" size="sm" onClick={handleStart} style={{ alignSelf: "flex-start" }}>
-              🔄 Tentar novamente
+              <Emoji3D e="🔄" /> Tentar novamente
             </Button>
           </div>
         )}
@@ -119,7 +120,7 @@ function FaceCaptureModal({
 
             {starting && (
               <div style={{ color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "14px", fontWeight: 500 }}>📷 Inicializando câmera e IA…</span>
+                <span style={{ fontSize: "14px", fontWeight: 500 }}><Emoji3D e="📷" /> Inicializando câmera e IA…</span>
               </div>
             )}
 
@@ -149,7 +150,7 @@ function FaceCaptureModal({
         ) : (
           !starting && (
             <Button variant="primary" size="lg" loading={starting} disabled={!consent || starting} onClick={handleStart}>
-              📸 Ligar Câmera para Registro
+              <Emoji3D e="📸" /> Ligar Câmera para Registro
             </Button>
           )
         )}
@@ -357,7 +358,7 @@ export function GeneralPjOnboardingScreen({ unitId, token }: { unitId: string; t
             </div>
           ) : (
             <Button variant="secondary" onClick={() => setShowFaceModal(true)}>
-              📸 Capturar biometria facial agora
+              <Emoji3D e="📸" /> Capturar biometria facial agora
             </Button>
           )}
         </div>

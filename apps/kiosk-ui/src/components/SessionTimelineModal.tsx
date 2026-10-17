@@ -3,6 +3,7 @@ import { Card, Modal } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import type { ActiveSessionEntry, SessionEvent } from "../api/client.js";
 import { supabase } from "../lib/supabase/client.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 const PAUSE_REASON_LABEL: Record<string, string> = {
   BANHEIRO: "Foi ao banheiro",
@@ -151,7 +152,7 @@ export function SessionTimelineModal({ entry, onClose }: { entry: ActiveSessionE
               <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
                 👤 Colaborador: {s.employeeName ?? "—"}
               </div>
-              {s.detail && <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>💬 Comentário: {s.detail}</div>}
+              {s.detail && <div style={{ fontSize: "12px", color: "var(--text-muted)" }}><Emoji3D e="💬" /> Comentário: {s.detail}</div>}
             </Card>
           ))}
         </div>

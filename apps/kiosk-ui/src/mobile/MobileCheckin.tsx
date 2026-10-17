@@ -4,6 +4,7 @@ import { Api } from "../api/client.js";
 import type { ChildMatch, Plan } from "../api/client.js";
 import { useToast } from "../state/ToastContext.js";
 import { money, formatAge } from "../format.js";
+import { renderEmoji } from "../components/Emoji3D.js";
 
 type PreCheckin = Awaited<ReturnType<typeof Api.preCheckinList>>[number];
 
@@ -231,7 +232,7 @@ export function MobileCheckin({
                 >
                   <div className="m-grow">
                     <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>
-                      {item.childName}{(item.inclusiveEligible || (item.sensoryTags?.length ?? 0) > 0) && !item.childName.includes("🧩") ? " 🧩" : ""}
+                      {item.childName}{(item.inclusiveEligible || (item.sensoryTags?.length ?? 0) > 0) && !item.childName.includes("🧩") ? renderEmoji(" 🧩") : ""}
                     </p>
                     <p style={{ margin: "3px 0 0", fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>
                       resp. {item.guardianName}

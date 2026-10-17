@@ -6,6 +6,7 @@ import type { Coupon, Plan } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 function planLabel(p: Plan): string {
   const duration = p.durationUnit === "HORA" ? `${p.durationValue}h` : `${p.durationValue}min`;
@@ -233,7 +234,7 @@ export function CuponsTab() {
               </span>
             )}
             {scheduleLabel(c) && (
-              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · ⏰ {scheduleLabel(c)}</span>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · <Emoji3D e="⏰" /> {scheduleLabel(c)}</span>
             )}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>

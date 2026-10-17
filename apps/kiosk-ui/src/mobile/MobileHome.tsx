@@ -4,6 +4,7 @@ import type { Unit } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { money } from "../format.js";
 import { usePendingSessionReports } from "../api/useSessionReports.js";
+import { Emoji3D } from "../components/Emoji3D.js";
 
 function initials(name: string): string {
   return name
@@ -150,7 +151,7 @@ export function MobileHome({
               textAlign: "left",
             }}
           >
-            <span aria-hidden="true" style={{ fontSize: 20 }}>📱</span>
+            <span aria-hidden="true" style={{ fontSize: 20 }}><Emoji3D e="📱" /></span>
             <span className="m-grow" style={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.35 }}>
               {pendingRenewalsCount === 1 ? "1 pedido de mais tempo" : `${pendingRenewalsCount} pedidos de mais tempo`}
             </span>
@@ -177,7 +178,7 @@ export function MobileHome({
               textAlign: "left",
             }}
           >
-            <span aria-hidden="true" style={{ fontSize: 20 }}>📝</span>
+            <span aria-hidden="true" style={{ fontSize: 20 }}><Emoji3D e="📝" /></span>
             <span className="m-grow" style={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.35 }}>
               {relatorios.pending.length === 1 ? "1 relatório de sessão pendente" : `${relatorios.pending.length} relatórios de sessão pendentes`}
               {relatorios.overdueCount > 0 ? ` · ${relatorios.overdueCount} atrasado${relatorios.overdueCount > 1 ? "s" : ""}` : ""}

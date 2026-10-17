@@ -5,6 +5,7 @@ import { Api } from "../../../api/client.js";
 import type { EnvelopeMovement } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { money } from "../../../format.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 export function FotosEnvelopeTab() {
   const { units } = useAppState();
@@ -76,7 +77,7 @@ export function FotosEnvelopeTab() {
           </div>
           <div style={{ marginTop: "20px" }}>
             <Button variant="secondary" onClick={loadData} disabled={loading}>
-              🔄 Atualizar
+              <Emoji3D e="🔄" /> Atualizar
             </Button>
           </div>
         </div>

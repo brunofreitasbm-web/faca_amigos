@@ -11,6 +11,7 @@ import { useAuth } from "../../../auth/AuthContext.js";
 import { supabase } from "../../../lib/supabase/client.js";
 import { PlanosLongosSection, type RegisterSave } from "./PlanosLongosSection.js";
 import { BonusProgramSection } from "./BonusProgramSection.js";
+import { Emoji3D, renderEmoji } from "../../../components/Emoji3D.js";
 
 interface WeekdayGoal {
   dayLabel: string;
@@ -465,7 +466,7 @@ export function MetasTab() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
           <div>
             <h2 style={{ margin: 0, fontSize: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
-              🏆 Programa de Bonificação & Metas Comerciais
+              <Emoji3D e="🏆" /> Programa de Bonificação & Metas Comerciais
             </h2>
             <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: "13px" }}>
               Configure os parâmetros de incentivo comercial, simule o faturamento projetado e publique.
@@ -473,7 +474,7 @@ export function MetasTab() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <Button variant="primary" disabled={publishing} onClick={handlePublishProgram} style={{ padding: "8px 20px" }}>
-              {publishing ? "Publicando..." : "💾 Salvar e Publicar Programa"}
+              {publishing ? "Publicando..." : renderEmoji("💾 Salvar e Publicar Programa")}
             </Button>
           </div>
         </div>
@@ -484,7 +485,7 @@ export function MetasTab() {
         {/* CORREÇÃO IMAGEM 1: GRID RESPONSIVO PARA TODAS AS 3 UNIDADES */}
         <Card style={{ padding: "16px" }}>
           <h3 style={{ margin: "0 0 12px", fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
-            🏬 Unidade em Configuração ({units.length} unidades)
+            <Emoji3D e="🏬" /> Unidade em Configuração ({units.length} unidades)
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px" }}>
             {units.map((u) => {
@@ -581,7 +582,7 @@ export function MetasTab() {
         >
           <div>
             <h3 style={{ margin: 0, fontSize: "16px", color: "var(--color-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-              🎛️ Simulador Comercial & Potencial de Faturamento
+              <Emoji3D e="🎛️" /> Simulador Comercial & Potencial de Faturamento
               <span
                 style={{
                   fontSize: "11px",
@@ -629,7 +630,7 @@ export function MetasTab() {
               }}
               style={{ padding: "4px 12px", fontSize: "12px" }}
             >
-              {isSimulationOpen ? "🔼 Recolher Simulação" : "🔽 Abrir Simulador"}
+              {isSimulationOpen ? renderEmoji("🔼 Recolher Simulação") : renderEmoji("🔽 Abrir Simulador")}
             </Button>
           </div>
         </div>
@@ -701,7 +702,7 @@ export function MetasTab() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
           <div>
             <h3 style={{ margin: 0, fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              📊 Metas Diárias Automáticas por Dia da Semana ({activeUnit?.name})
+              <Emoji3D e="📊" /> Metas Diárias Automáticas por Dia da Semana ({activeUnit?.name})
             </h3>
             <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
               ✨ Campos calculados automaticamente via série histórica. Para Circuito, o operador enxerga em locações e o gerencial em R$ (TM R$ {CIRCUITO_TM_REAIS}).
@@ -805,11 +806,11 @@ export function MetasTab() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
           <div>
             <h3 title="Faixas que alimentam o termômetro de Ticket Médio no Painel de cada unidade" style={{ margin: 0, fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              🎯 Meta Estratégica de Ticket Médio
+              <Emoji3D e="🎯" /> Meta Estratégica de Ticket Médio
               {!can("metas.ticket.write") && <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> (exclusivo Owner)</span>}
             </h3>
             <span style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px", display: "block" }}>
-              💡 Metodologia Automática: Série Histórica (30%) + Dia da Semana (40%) + Janela do Dia do Mês (30%) por unidade.
+              <Emoji3D e="💡" /> Metodologia Automática: Série Histórica (30%) + Dia da Semana (40%) + Janela do Dia do Mês (30%) por unidade.
             </span>
           </div>
 
@@ -866,7 +867,7 @@ export function MetasTab() {
 
               {sugg && (
                 <div style={{ fontSize: "12px", color: "var(--text-secondary)", background: "rgba(255, 255, 255, 0.7)", padding: "6px 10px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.05)" }}>
-                  📊 <em>{sugg.reason}</em>
+                  <Emoji3D e="📊" /> <em>{sugg.reason}</em>
                 </div>
               )}
 

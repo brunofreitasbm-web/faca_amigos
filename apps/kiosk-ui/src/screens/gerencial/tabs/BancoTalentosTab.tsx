@@ -4,6 +4,7 @@ import { Card } from "../GCard.js";
 import { Api } from "../../../api/client.js";
 import type { JobApplication } from "../../../api/client.js";
 import { useToast } from "../../../state/ToastContext.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 const OPPORTUNITY_LABEL: Record<JobApplication["opportunity_type"], string> = {
   ESTAGIO: "Estágio",
@@ -137,10 +138,10 @@ export function BancoTalentosTab() {
               <Badge variant={STATUS_BADGE_VARIANT[item.status]}>{STATUS_LABEL[item.status]}</Badge>
             </div>
 
-            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 4px 0" }}>📧 {item.email}</p>
-            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 4px 0" }}>📱 {item.phone}</p>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 4px 0" }}><Emoji3D e="📧" /> {item.email}</p>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 4px 0" }}><Emoji3D e="📱" /> {item.phone}</p>
             {item.course && (
-              <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>🎓 {item.course}</p>
+              <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 12px 0" }}><Emoji3D e="🎓" /> {item.course}</p>
             )}
 
             {/* Checkboxes de Status Rápido */}
@@ -176,7 +177,7 @@ export function BancoTalentosTab() {
 
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "12px" }}>
               <Button variant="secondary" size="sm" onClick={() => handleOpenResume(item)}>
-                📄 Ver currículo
+                <Emoji3D e="📄" /> Ver currículo
               </Button>
               <select
                 value={item.status}

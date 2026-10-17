@@ -5,6 +5,7 @@ import type { Unit, UnitCashStatus, UnitEnvelopeBalance } from "../api/client.js
 import { unitBrandFor } from "../branding/unitBrand.js";
 import { money } from "../format.js";
 import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO, type UnidadeTipo, type BonificacaoHoje } from "../bonificacao.js";
+import { Emoji3D } from "../components/Emoji3D.js";
 
 interface UnitFullStatus {
   unit: Unit;
@@ -313,7 +314,7 @@ export function MobileGerencialHome({
                 <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      🎮 <strong>Bonificação:</strong> {atualBonifLabel} (meta {metaBonifLabel} / super {superBonifLabel})
+                      <Emoji3D e="🎮" /> <strong>Bonificação:</strong> {atualBonifLabel} (meta {metaBonifLabel} / super {superBonifLabel})
                     </span>
                     <Badge variant={badgeBonifVariant}>{badgeBonifLabel}</Badge>
                   </div>
@@ -338,7 +339,7 @@ export function MobileGerencialHome({
               {/* Alerta de Envelopes */}
               {envelope && envelope.pending_cents > 0 && (
                 <p style={{ margin: "10px 0 0", fontSize: 12, fontWeight: 700, color: "#996D18" }}>
-                  💰 {money(envelope.pending_cents)} em {envelope.pending_count} envelope(s) aguardando recolhimento
+                  <Emoji3D e="💰" /> {money(envelope.pending_cents)} em {envelope.pending_count} envelope(s) aguardando recolhimento
                 </p>
               )}
             </button>
@@ -366,7 +367,7 @@ export function MobileGerencialHome({
             <span style={{ fontSize: 18 }}>⭐</span>
             <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)" }}>NPS Atual Resumido</span>
           </div>
-          {npsSummary && npsSummary.score >= 75 && <Badge variant="green">🏆 Zona de Excelência</Badge>}
+          {npsSummary && npsSummary.score >= 75 && <Badge variant="green"><Emoji3D e="🏆" /> Zona de Excelência</Badge>}
         </div>
 
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
@@ -386,16 +387,16 @@ export function MobileGerencialHome({
             <div style={{ width: `${npsSummary?.detractorsPct ?? 0}%`, background: "#ef4444" }} title="Detratores" />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>
-            <span style={{ color: "#10b981" }}>🟢 {npsSummary ? `${npsSummary.promotersPct}%` : "—"} Promotores</span>
-            <span style={{ color: "#f59e0b" }}>🟡 {npsSummary ? `${npsSummary.passivesPct}%` : "—"} Neutros</span>
-            <span style={{ color: "#ef4444" }}>🔴 {npsSummary ? `${npsSummary.detractorsPct}%` : "—"} Detratores</span>
+            <span style={{ color: "#10b981" }}><Emoji3D e="🟢" /> {npsSummary ? `${npsSummary.promotersPct}%` : "—"} Promotores</span>
+            <span style={{ color: "#f59e0b" }}><Emoji3D e="🟡" /> {npsSummary ? `${npsSummary.passivesPct}%` : "—"} Neutros</span>
+            <span style={{ color: "#ef4444" }}><Emoji3D e="🔴" /> {npsSummary ? `${npsSummary.detractorsPct}%` : "—"} Detratores</span>
           </div>
         </div>
 
         {/* Médias de Equipe e Espaço */}
         <div style={{ display: "flex", gap: 16, marginTop: 10, paddingTop: 10, borderTop: "1px dashed rgba(0,0,0,0.08)", fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
           <span>👥 Equipe: <strong style={{ color: "#1D8273" }}>{npsSummary?.avgTeam != null ? `⭐ ${npsSummary.avgTeam}/5.0` : "—"}</strong></span>
-          <span>🏰 Espaço: <strong style={{ color: "#F0196B" }}>{npsSummary?.avgSpace != null ? `⭐ ${npsSummary.avgSpace}/5.0` : "—"}</strong></span>
+          <span><Emoji3D e="🏰" /> Espaço: <strong style={{ color: "#F0196B" }}>{npsSummary?.avgSpace != null ? `⭐ ${npsSummary.avgSpace}/5.0` : "—"}</strong></span>
         </div>
       </div>
 
