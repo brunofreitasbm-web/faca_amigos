@@ -1,0 +1,39 @@
+/* Modo cartão 10x15 cm (150 x 100 mm, deitado). Layout em 200 x 133,33 mm, escala 0,75. */
+@page { size: 150mm 100mm; margin: 0; }
+html, body { width: 150mm; height: 100mm; overflow: hidden; }
+.sheet { display: block; width: 150mm; height: 100mm; }
+.half { display: none; }
+.half.on {
+  display: flex; width: 200mm; height: 133.333mm; border: 0 !important;
+  padding: 5mm 6mm 4.5mm; transform: scale(.75); transform-origin: 0 0;
+}
+.cut { display: none !important; }
+/* Cartão denso: aperta o respiro sem mexer nos tamanhos de fonte */
+.steps { gap: 2.2mm !important; }
+.steps li { font-size: 12pt !important; }
+th, td { padding: .7mm 1.5mm !important; }
+.half h1 { margin-bottom: -.5mm; }
+/* 1b: três colunas cheias, texto menor e selos sem quebra */
+.types { gap: 3mm !important; }
+.type { gap: 1.2mm !important; }
+.type .what, .type .say { font-size: 11.6pt !important; line-height: 1.28 !important; }
+.type .say { padding: .4mm 0 .4mm 2.4mm !important; }
+.type .small { font-size: 9.6pt !important; }
+.type .letter { font-size: 19pt !important; }
+.type .pill { font-size: 9pt !important; padding: .5mm 2mm !important; }
+.type .pays { gap: 1mm !important; }
+.type { padding: 2.4mm 3mm !important; }
+/* onde sobra papel, aumenta */
+.areas .area h2 { font-size: 14.5pt !important; }
+.areas .area p { font-size: 12pt !important; }
+.areas { gap: 3mm !important; }
+.levels span { font-size: 12pt !important; padding: 1.8mm 1mm !important; }
+.fact .val { font-size: 16pt !important; }
+.fact .lbl { font-size: 8.5pt !important; }
+.qa { gap: 5mm 6mm !important; }
+.qa div { font-size: 13pt !important; }
+.qa .q { font-size: 14.5pt !important; }
+.words div { font-size: 12pt !important; }
+.obj, .when { font-size: 12.5pt !important; }
+
+.foot { font-size: 9pt !important; white-space: nowrap; }

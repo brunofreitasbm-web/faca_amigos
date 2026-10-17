@@ -1701,7 +1701,7 @@ async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgram
     unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_bonus_plan_rules")
-        .select("unit_id, kind, ref_id, label, bonus_cents, escada_meta, escada_bonus_cents, active, sort_order")
+        .select("unit_id, kind, ref_id, label, bonus_cents, escada_meta, escada_bonus_cents, active, sort_order, exige_olhar_no_prazo")
         .in("unit_id", unitIds),
     ),
     unwrap<Record<string, unknown>[]>(
@@ -1740,6 +1740,7 @@ async function fetchBonusProgramsByUnit(unitIds: string[]): Promise<BonusProgram
       escadaBonusCents: row.escada_bonus_cents as number,
       active: Boolean(row.active),
       sortOrder: row.sort_order as number,
+      exigeOlharNoPrazo: Boolean(row.exige_olhar_no_prazo),
     });
     rulesByUnit.set(unitId, list);
   }
@@ -1807,7 +1808,7 @@ async function fetchApuracaoDias(
   from: string,
   to: string,
 ): Promise<{ dias: ApuracaoDia[]; units: RawUnit[]; employees: RawEmployee[]; programs: BonusProgramsByUnit }> {
-  const [sessions, orders, shifts, employees, units, programs, guardianPackages] = await Promise.all([
+  const [sessions, orders, shifts, employees, units, programs, guardianPackages, olharNoPrazo] = await Promise.all([
     unwrap<Record<string, unknown>[]>(
       supabase()
         .from("fa_kiosk_sessions")
@@ -1843,6 +1844,11 @@ async function fetchApuracaoDias(
         .in("unit_id", unitIds)
         .gte("business_date", from)
         .lte("business_date", to),
+    ),
+    // Sessões com Olhar FaçaAmigos preenchido em até 40 min: base da regra "1 hora + Olhar".
+    // RPC porque o operador não lê fa_kiosk_session_reports de quem preencheu por ele.
+    unwrap<{ session_id: string }[]>(
+      supabase().rpc("fa_bonus_olhar_no_prazo", { p_unit_ids: unitIds, p_from: from, p_to: to }),
     ),
   ]);
 
@@ -1924,6 +1930,7 @@ async function fetchApuracaoDias(
     units: rawUnits,
     programs,
     guardianPackages: rawGuardianPackages,
+    olharNoPrazoSessionIds: olharNoPrazo.map((r) => r.session_id),
   });
   return { dias, units: rawUnits, employees: rawEmployees, programs };
 }
@@ -4484,6 +4491,7 @@ export const Api = {
             escada_bonus_cents: r.escadaBonusCents,
             active: r.active,
             sort_order: r.sortOrder,
+            exige_olhar_no_prazo: r.kind === "PLANO" && r.exigeOlharNoPrazo,
             updated_at_ms: now,
           })),
           { onConflict: "unit_id,kind,ref_id" },

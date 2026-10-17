@@ -11,11 +11,13 @@ Bônus **fixo por unidade vendida**, não por valor. Valores configuráveis pelo
 
 | Produto | Bônus por unidade | % do preço com cupom | Escada no mês | Prêmio da escada |
 |---|---|---|---|---|
+| 1 hora + Olhar (plano) | R$ 1 | 0,9% de R$ 108 | 100 | + R$ 20 |
 | 2 horas (plano) | R$ 3 | 1,6% de R$ 192 | 12 | + R$ 15 |
 | Day Use (pacote) | R$ 10 | 3,7% de R$ 270 | 2 | + R$ 10 |
 | Porto Seguro (pacote) | R$ 25 | 3,0% de R$ 840 | 1 | + R$ 15 |
 
-- **Teto próprio: R$ 100 por operador por mês**, fora dos R$ 200 do bônus de meta e produtos. 0 = sem teto.
+- **Teto próprio: R$ 200 por operador por mês** (era R$ 100 até 03/10/2026), fora dos R$ 200 do bônus de meta e produtos. 0 = sem teto.
+- **1 hora + Olhar só conta com o Olhar no prazo** (desde 11/10/2026): a criança entra no placar só se o Olhar FaçaAmigos da visita foi preenchido em até 40 min da saída. Preenchido atrasado ou não preenchido, a criança não conta. Quem preenche não importa: o bônus continua indo para o operador do check-in. Em Gerencial > Metas, a coluna "Só com Olhar no prazo" liga a exigência por plano.
 - **Sem travas de caixa.** A trava de abertura e de fechamento continua zerando só o bônus de meta do dia. Venda consultiva não deve ser punida por atraso de abertura. Ponto a confirmar com o dono.
 - Pago na folha do mês seguinte. Placar toda segunda no grupo.
 
@@ -23,6 +25,7 @@ Bônus **fixo por unidade vendida**, não por valor. Valores configuráveis pelo
 
 | Produto | Como o sistema identifica | Quem leva |
 |---|---|---|
+| 1 hora + Olhar | Igual ao 2 horas, e com Olhar preenchido em até 40 min (`fa_kiosk_session_reports.late = false`) | Operador do check-in |
 | 2 horas | Sessão com plano cadastrado na regra, pedido pago, sem uso de saldo de pacote | Operador do check-in |
 | Day Use, Porto Seguro | Linha em `fa_kiosk_guardian_packages` do pacote cadastrado na regra | Operador logado na venda; se não houver, quem fechou o pedido |
 
@@ -37,6 +40,7 @@ Bônus **fixo por unidade vendida**, não por valor. Valores configuráveis pelo
 - **2 horas por troca de plano no Painel** conta para quem fez o check-in, não para quem trocou. O upgrade não grava operador.
 - **Pedido que fecha no mês seguinte** não entra no mês da sessão. É a mesma limitação da receita atual.
 - **Pacote de outra unidade** conta na unidade e no dia da compra, onde quer que seja usado.
+- **Olhar ainda dentro do prazo** não aparece no placar até ser preenchido. O placar do dia sobe depois que o Olhar entra.
 
 ---
 
