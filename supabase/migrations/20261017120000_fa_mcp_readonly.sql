@@ -20,6 +20,7 @@ create table if not exists fa_mcp_api_keys (
 
 -- RLS ligada e sem policy: só a service_role (que ignora RLS) enxerga a tabela.
 alter table fa_mcp_api_keys enable row level security;
+revoke all on table fa_mcp_api_keys from anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 
@@ -98,21 +99,18 @@ returns jsonb language sql stable security definer set search_path to 'public','
         ) s
     ), '[]'::jsonb),
     'por_dia_semana', coalesce((
-      select jsonb_agg(x order by (x->>'isodow')::int)
+      select jsonb_agg(jsonb_build_object('isodow', d.isodow, 'sessoes', d.n) order by d.isodow)
         from (
-          select jsonb_build_object('isodow', extract(isodow from business_date)::int,
-                                    'sessoes', count(*)) as x
+          select extract(isodow from business_date)::int as isodow, count(*) as n
             from ses group by 1
-        ) s
+        ) d
     ), '[]'::jsonb),
     'por_hora_checkin', coalesce((
-      select jsonb_agg(x order by (x->>'hora')::int)
+      select jsonb_agg(jsonb_build_object('hora', h.hora, 'sessoes', h.n) order by h.hora)
         from (
-          select jsonb_build_object(
-                   'hora', extract(hour from to_timestamp(checkin_at_ms / 1000.0) at time zone tz)::int,
-                   'sessoes', count(*)) as x
+          select extract(hour from to_timestamp(checkin_at_ms / 1000.0) at time zone tz)::int as hora, count(*) as n
             from ses group by 1
-        ) s
+        ) h
     ), '[]'::jsonb)
   );
 $$;
