@@ -594,7 +594,7 @@ export function PainelScreen() {
                     </span>
 
                     <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
-                      {incentiveText}
+                      {renderEmoji(incentiveText)}
                     </span>
                   </span>
                 );
@@ -654,11 +654,11 @@ export function PainelScreen() {
                     </span>
 
                     <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: corNivel }}>
-                      {badgeLabel}
+                      {renderEmoji(badgeLabel)}
                     </span>
 
                     <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
-                      {bonusIncentiveText}
+                      {renderEmoji(bonusIncentiveText)}
                     </span>
                   </span>
                 );

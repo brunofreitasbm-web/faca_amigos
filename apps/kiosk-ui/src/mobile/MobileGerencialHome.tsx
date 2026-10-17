@@ -5,7 +5,7 @@ import type { Unit, UnitCashStatus, UnitEnvelopeBalance } from "../api/client.js
 import { unitBrandFor } from "../branding/unitBrand.js";
 import { money } from "../format.js";
 import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO, type UnidadeTipo, type BonificacaoHoje } from "../bonificacao.js";
-import { Emoji3D } from "../components/Emoji3D.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 interface UnitFullStatus {
   unit: Unit;
@@ -316,7 +316,7 @@ export function MobileGerencialHome({
                     <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       <Emoji3D e="🎮" /> <strong>Bonificação:</strong> {atualBonifLabel} (meta {metaBonifLabel} / super {superBonifLabel})
                     </span>
-                    <Badge variant={badgeBonifVariant}>{badgeBonifLabel}</Badge>
+                    <Badge variant={badgeBonifVariant}>{renderEmoji(badgeBonifLabel)}</Badge>
                   </div>
                   <div className="capacity-bar-track" style={{ marginTop: 6, height: 6, background: "rgba(0,0,0,0.06)", borderRadius: 9999, overflow: "hidden" }}>
                     <div

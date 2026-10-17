@@ -177,7 +177,7 @@ export function MinhaBonificacaoScreen() {
               <span style={{ fontSize: "14px", fontWeight: "bold" }}>
                 Hoje: {atualLabel} <span style={{ color: "var(--text-muted)", fontWeight: "normal" }}>(meta {metaLabel} / super {superLabel})</span>
               </span>
-              <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+              <Badge variant={badgeVariant}>{renderEmoji(badgeLabel)}</Badge>
             </div>
             <div className="capacity-bar-track" role="progressbar" aria-valuenow={b.percent} aria-valuemin={0} aria-valuemax={100}>
               <div className="capacity-bar-fill" style={{ width: `${b.percent}%`, backgroundColor: corNivel }} />
