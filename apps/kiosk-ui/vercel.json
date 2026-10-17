@@ -41,6 +41,10 @@
       "destination": "/api/integracao/shopping/v1/vendas"
     },
     {
+      "source": "/mcp",
+      "destination": "/api/mcp"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
