@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createServiceClient } from "./_shopping/common.js";
 import { authenticateMcpRequest } from "./_mcp/auth.js";
 import { registerTools } from "./_mcp/tools.js";
+import { getBaseUrl } from "./_mcp/oauth.js";
 
 /**
  * Servidor MCP somente-leitura (Streamable HTTP, stateless).
@@ -21,7 +22,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = createServiceClient();
   const auth = await authenticateMcpRequest(supabase, req.headers);
-  if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  if (!auth.ok) {
+    // Anuncia o servidor de autorização (RFC 9728) para clientes que usam OAuth.
+    res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${getBaseUrl()}/.well-known/oauth-protected-resource"`);
+    return res.status(auth.status).json({ error: auth.error });
+  }
 
   const server = new McpServer({ name: "facaamigos", version: "1.0.0" });
   registerTools(server, supabase, auth.scope);

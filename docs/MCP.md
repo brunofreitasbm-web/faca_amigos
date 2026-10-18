@@ -39,7 +39,7 @@ Só o hash SHA-256 é gravado. Para revogar: `update fa_mcp_api_keys set revoked
 claude mcp add --transport http facaamigos https://<dominio>/mcp --header "Authorization: Bearer <chave>"
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`; conectores remotos pela UI exigem OAuth, que este servidor não implementa)
+**Claude Desktop** (`claude_desktop_config.json`; conectores remotos pela UI exigem OAuth; veja a seção OAuth abaixo)
 ```json
 { "mcpServers": { "facaamigos": {
   "command": "npx",
@@ -56,8 +56,23 @@ claude mcp add --transport http facaamigos https://<dominio>/mcp --header "Autho
 } } }
 ```
 
+## OAuth (claude.ai web/celular e clientes que não aceitam chave fixa)
+
+O servidor também fala OAuth 2.1 com PKCE (clientes públicos, registro dinâmico). A autorização é
+feita por uma única pessoa, o dono, com uma senha própria:
+
+1. Gere a senha e o SQL: `node scripts/mcp-set-owner-password.mjs` e rode o SQL impresso no Supabase.
+2. No cliente, adicione o conector com a URL `https://<dominio>/mcp` e **sem** cabeçalho. Ele descobre o
+   resto por `/.well-known/oauth-protected-resource` e `/.well-known/oauth-authorization-server`.
+3. Na tela de autorização, confira o endereço de destino mostrado e digite a senha do dono.
+
+Tokens: acesso por 1 h, renovação por 30 dias com rotação; só o hash fica no banco. Cinco senhas
+erradas seguidas bloqueiam a tela por 15 minutos. Para revogar um acesso OAuth:
+`update fa_mcp_oauth_tokens set revoked_at = now()`. Quem autoriza enxerga todas as unidades.
+
+A chave fixa (`fa_mcp_...`) continua funcionando.
+
 ## Limitações
 
-- **App Gemini (gemini.google.com)**: não permite adicionar servidor MCP remoto arbitrário. Use Gemini CLI ou o SDK/AI Studio.
-- **claude.ai web/celular**: exigiria OAuth 2.1; não implementado.
+- **App Gemini (gemini.google.com)**: não confirmado que aceite servidor MCP remoto próprio, mesmo com OAuth. Se não aceitar, use Gemini CLI ou o SDK/AI Studio.
 - Os dados saem para os servidores da Anthropic/Google nas conversas: por isso só agregados.

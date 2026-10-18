@@ -95,7 +95,7 @@ export default defineConfig({
         // public/push-sw.js dentro do sw.js gerado.
         importScripts: ["push-sw.js"],
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/ws/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/ws/, /^\/mcp/, /^\/oauth\//, /^\/\.well-known\//],
         // json/bin: manifests e pesos dos modelos do face-api.js em
         // public/models, self-hosted de propósito (ver faceRecognition.ts)
         // para o reconhecimento facial funcionar offline/com internet

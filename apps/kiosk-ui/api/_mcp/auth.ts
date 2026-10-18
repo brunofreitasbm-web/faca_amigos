@@ -25,6 +25,20 @@ export async function authenticateMcpRequest(
   if (!token) return { ok: false, status: 401, error: "CHAVE_AUSENTE" };
 
   const keyHash = createHash("sha256").update(token).digest("hex");
+
+  // Token OAuth (fa_oat_...): vale para todas as unidades, pois quem autoriza é o dono.
+  if (token.startsWith("fa_oat_")) {
+    const { data: t, error: tErr } = await supabase
+      .from("fa_mcp_oauth_tokens")
+      .select("id, access_expires_at, revoked_at")
+      .eq("access_hash", keyHash)
+      .maybeSingle();
+    if (tErr || !t) return { ok: false, status: 401, error: "CHAVE_INVALIDA" };
+    if (t.revoked_at) return { ok: false, status: 401, error: "CHAVE_REVOGADA" };
+    if (new Date(t.access_expires_at) <= new Date()) return { ok: false, status: 401, error: "TOKEN_EXPIRADO" };
+    return { ok: true, scope: { keyId: t.id, unitIds: null } };
+  }
+
   const { data: keyRow, error } = await supabase
     .from("fa_mcp_api_keys")
     .select("id, unit_ids, revoked_at")
