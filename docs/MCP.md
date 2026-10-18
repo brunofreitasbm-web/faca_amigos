@@ -39,7 +39,7 @@ Só o hash SHA-256 é gravado. Para revogar: `update fa_mcp_api_keys set revoked
 claude mcp add --transport http facaamigos https://<dominio>/mcp --header "Authorization: Bearer <chave>"
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`; conectores remotos pela UI exigem OAuth, que este servidor não implementa)
+**Claude Desktop** (`claude_desktop_config.json`; conectores remotos pela UI exigem OAuth; veja a seção OAuth abaixo)
 ```json
 { "mcpServers": { "facaamigos": {
   "command": "npx",
