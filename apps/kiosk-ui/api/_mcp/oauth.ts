@@ -28,6 +28,13 @@ export function verifyPassword(password: string, stored: string): boolean {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+// ── segredo de cliente confidencial (alta entropia: SHA-256 basta) ──────────
+export function verifyClientSecret(secret: string, storedHash: string): boolean {
+  const a = Buffer.from(sha256(secret));
+  const b = Buffer.from(storedHash);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 // ── PKCE e redirect_uri ────────────────────────────────────────────────────
 export function verifyPkce(verifier: string, challenge: string): boolean {
   if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) return false;
@@ -59,7 +66,7 @@ export const authorizationServerMetadata = (base: string) => ({
   response_types_supported: ["code"],
   grant_types_supported: ["authorization_code", "refresh_token"],
   code_challenge_methods_supported: ["S256"],
-  token_endpoint_auth_methods_supported: ["none"],
+  token_endpoint_auth_methods_supported: ["none", "client_secret_post", "client_secret_basic"],
   scopes_supported: ["mcp:read"],
 });
 
