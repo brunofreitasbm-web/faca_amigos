@@ -12,6 +12,7 @@ import {
   randomToken,
   renderConsentPage,
   sha256,
+  verifyClientSecret,
   verifyPassword,
   verifyPkce,
   type ConsentParams,
@@ -21,6 +22,8 @@ export interface ClientRow {
   client_id: string;
   client_name: string;
   redirect_uris: string[];
+  /** SHA-256 do segredo; ausente/nulo = cliente público (só PKCE). */
+  client_secret_hash?: string | null;
 }
 export interface CodeRow {
   client_id: string;
@@ -64,6 +67,8 @@ export interface OAuthReq {
   action: string;
   query: Record<string, string | undefined>;
   body: Record<string, unknown>;
+  /** Cabeçalhos em minúsculas; só `authorization` é usado (client_secret_basic). */
+  headers?: Record<string, string | undefined>;
 }
 export interface OAuthRes {
   status: number;
@@ -206,8 +211,31 @@ async function authorize(req: OAuthReq, store: OAuthStore, now: Date): Promise<O
   return redirectWith(p.redirect_uri, { code, state: p.state });
 }
 
+/** client_id e segredo vindos do corpo (client_secret_post) ou do cabeçalho Basic (client_secret_basic). */
+function clientCredentials(req: OAuthReq): { id: string; secret: string } {
+  const basic = /^Basic\s+(.+)$/i.exec(req.headers?.authorization ?? "")?.[1];
+  if (basic) {
+    const [id, ...rest] = Buffer.from(basic, "base64").toString("utf8").split(":");
+    try {
+      return { id: decodeURIComponent(id ?? ""), secret: decodeURIComponent(rest.join(":")) };
+    } catch {
+      return { id: "", secret: "" };
+    }
+  }
+  return { id: str(req.body.client_id), secret: str(req.body.client_secret) };
+}
+
 async function token(req: OAuthReq, store: OAuthStore, now: Date): Promise<OAuthRes> {
   const grant = str(req.body.grant_type);
+
+  // Autentica o cliente ANTES de consumir código ou refresh token: segredo errado não queima nada.
+  const creds = clientCredentials(req);
+  const client = creds.id ? await store.getClient(creds.id) : null;
+  if (!client) return oauthError(401, "invalid_client", "Cliente desconhecido.");
+  if (client.client_secret_hash && !(creds.secret && verifyClientSecret(creds.secret, client.client_secret_hash))) {
+    return oauthError(401, "invalid_client", "Segredo do cliente inválido.");
+  }
+  req = { ...req, body: { ...req.body, client_id: client.client_id } };
   const issue = (client_id: string) => {
     const access = randomToken("fa_oat_");
     const refresh = randomToken("fa_ort_");

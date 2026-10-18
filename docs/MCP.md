@@ -72,6 +72,17 @@ erradas seguidas bloqueiam a tela por 15 minutos. Para revogar um acesso OAuth:
 
 A chave fixa (`fa_mcp_...`) continua funcionando.
 
+### App Gemini (Apps conectados personalizados)
+
+O app pede **ID e chave secreta do cliente** e mostra um botão "Copiar URI de redirecionamento".
+1. Clique em "Copiar URI de redirecionamento" e guarde o endereço.
+2. `node scripts/mcp-create-oauth-client.mjs "Gemini" "<URI copiada>"` e rode o SQL impresso no Supabase.
+3. Cole o ID e a chave secreta nos campos do Gemini (URL: `https://<dominio>/mcp`) e avance; entre com a senha do dono.
+
+O token aceita cliente com segredo no corpo (`client_secret_post`) ou no cabeçalho Basic (`client_secret_basic`).
+O segredo errado não consome o código de autorização. Cada chamada de `/oauth/*` deixa uma linha nos
+logs da Vercel (sem senha, segredo, código ou token) para diagnosticar recusas.
+
 ## Limitações
 
 - **App Gemini (gemini.google.com)**: não confirmado que aceite servidor MCP remoto próprio, mesmo com OAuth. Se não aceitar, use Gemini CLI ou o SDK/AI Studio.

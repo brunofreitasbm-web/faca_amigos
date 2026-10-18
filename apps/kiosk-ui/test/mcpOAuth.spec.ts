@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createHash, randomBytes } from "node:crypto";
 import { handleOAuth, type ClientRow, type CodeRow, type ConfigRow, type OAuthStore, type TokenInsert } from "../api/_mcp/oauthFlow";
-import { hashPassword, isValidRedirectUri, verifyPassword, verifyPkce } from "../api/_mcp/oauth";
+import { hashPassword, isValidRedirectUri, sha256, verifyPassword, verifyPkce } from "../api/_mcp/oauth";
 import { authenticateMcpRequest } from "../api/_mcp/auth";
 
 const BASE = "https://app.example.com";
@@ -35,15 +35,15 @@ function memoryStore(password = "senha-do-dono") {
       if (config) config = { ...config, failed_count, locked_until };
     },
   };
-  return { store, tokens, getConfig: () => config, dropConfig: () => (config = null) };
+  return { store, tokens, clients, getConfig: () => config, dropConfig: () => (config = null) };
 }
 
 const pkce = () => {
   const verifier = randomBytes(32).toString("base64url");
   return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
 };
-const call = (store: OAuthStore, action: string, method: string, body: Record<string, unknown> = {}, query: Record<string, string> = {}, now = NOW) =>
-  handleOAuth({ method, action, query, body }, store, BASE, now);
+const call = (store: OAuthStore, action: string, method: string, body: Record<string, unknown> = {}, query: Record<string, string> = {}, now = NOW, headers: Record<string, string> = {}) =>
+  handleOAuth({ method, action, query, body, headers }, store, BASE, now);
 
 async function registerClient(store: OAuthStore, redirect = REDIRECT) {
   const r = await call(store, "register", "POST", { client_name: "Claude", redirect_uris: [redirect] });
@@ -80,7 +80,7 @@ describe("metadados e registro", () => {
   it("anuncia endpoints, S256 e cliente público", async () => {
     const { store } = memoryStore();
     const m = JSON.parse((await call(store, "metadata", "GET")).body);
-    expect(m).toMatchObject({ issuer: BASE, authorization_endpoint: `${BASE}/oauth/authorize`, token_endpoint: `${BASE}/oauth/token`, registration_endpoint: `${BASE}/oauth/register`, code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"] });
+    expect(m).toMatchObject({ issuer: BASE, authorization_endpoint: `${BASE}/oauth/authorize`, token_endpoint: `${BASE}/oauth/token`, registration_endpoint: `${BASE}/oauth/register`, code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none", "client_secret_post", "client_secret_basic"] });
     expect(JSON.parse((await call(store, "resource", "GET")).body)).toMatchObject({ resource: `${BASE}/mcp`, authorization_servers: [BASE] });
   });
   it("recusa registro com redirect_uri inseguro", async () => {
@@ -197,5 +197,62 @@ describe("token OAuth no /mcp", () => {
     expect(await authenticateMcpRequest(fake(row({ access_expires_at: "2020-01-01T00:00:00Z" })), { authorization: "Bearer fa_oat_abc" })).toMatchObject({ error: "TOKEN_EXPIRADO" });
     expect(await authenticateMcpRequest(fake(row({ revoked_at: "2026-01-01" })), { authorization: "Bearer fa_oat_abc" })).toMatchObject({ error: "CHAVE_REVOGADA" });
     expect(await authenticateMcpRequest(fake({ data: null, error: null }), { authorization: "Bearer fa_oat_abc" })).toMatchObject({ error: "CHAVE_INVALIDA" });
+  });
+});
+
+
+describe("cliente confidencial (ex.: Gemini)", () => {
+  const SECRET = "fa_cs_segredo-de-teste";
+  const GOOGLE = "https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-123-app_example_com";
+  let ctx: ReturnType<typeof memoryStore>;
+  beforeEach(() => {
+    ctx = memoryStore();
+    ctx.clients.set("fa_cli_g", { client_id: "fa_cli_g", client_name: "Gemini", redirect_uris: [GOOGLE], client_secret_hash: sha256(SECRET) });
+  });
+  const getCode = async (challenge: string) =>
+    codeFrom(
+      (await call(ctx.store, "authorize", "POST", {
+        response_type: "code", client_id: "fa_cli_g", redirect_uri: GOOGLE, code_challenge: challenge, code_challenge_method: "S256", state: "s", password: "senha-do-dono",
+      })).headers.Location,
+    );
+  const exchange = (code: string, verifier: string, extra: Record<string, unknown> = {}, headers: Record<string, string> = {}) =>
+    call(ctx.store, "token", "POST", { grant_type: "authorization_code", code, client_id: "fa_cli_g", redirect_uri: GOOGLE, code_verifier: verifier, ...extra }, {}, NOW, headers);
+
+  it("aceita o endereço de retorno do Google na autorização", async () => {
+    const r = await call(ctx.store, "authorize", "GET", {}, { response_type: "code", client_id: "fa_cli_g", redirect_uri: GOOGLE, code_challenge: pkce().challenge, code_challenge_method: "S256" });
+    expect(r.status).toBe(200);
+  });
+
+  it("segredo no corpo (client_secret_post) funciona", async () => {
+    const { verifier, challenge } = pkce();
+    expect((await exchange(await getCode(challenge), verifier, { client_secret: SECRET })).status).toBe(200);
+  });
+
+  it("segredo no cabeçalho Basic (client_secret_basic) funciona", async () => {
+    const { verifier, challenge } = pkce();
+    const basic = "Basic " + Buffer.from(`${encodeURIComponent("fa_cli_g")}:${encodeURIComponent(SECRET)}`).toString("base64");
+    expect((await exchange(await getCode(challenge), verifier, { client_id: undefined }, { authorization: basic })).status).toBe(200);
+  });
+
+  it("sem segredo ou com segredo errado: 401, e o código NÃO é consumido", async () => {
+    const { verifier, challenge } = pkce();
+    const code = await getCode(challenge);
+    expect((await exchange(code, verifier)).status).toBe(401);
+    expect((await exchange(code, verifier, { client_secret: "errado" })).status).toBe(401);
+    expect((await exchange(code, verifier, { client_secret: SECRET })).status).toBe(200);
+  });
+
+  it("refresh também exige o segredo", async () => {
+    const { verifier, challenge } = pkce();
+    const tok = JSON.parse((await exchange(await getCode(challenge), verifier, { client_secret: SECRET })).body);
+    const refresh = (extra: Record<string, unknown>) => call(ctx.store, "token", "POST", { grant_type: "refresh_token", refresh_token: tok.refresh_token, client_id: "fa_cli_g", ...extra });
+    expect((await refresh({})).status).toBe(401);
+    expect((await refresh({ client_secret: SECRET })).status).toBe(200);
+  });
+
+  it("cliente desconhecido: 401 invalid_client", async () => {
+    const r = await call(ctx.store, "token", "POST", { grant_type: "authorization_code", client_id: "nao-existe", code: "x", redirect_uri: GOOGLE, code_verifier: pkce().verifier });
+    expect(r.status).toBe(401);
+    expect(JSON.parse(r.body).error).toBe("invalid_client");
   });
 });

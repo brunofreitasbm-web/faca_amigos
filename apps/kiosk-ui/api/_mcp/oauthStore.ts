@@ -18,7 +18,7 @@ export function createOAuthStore(supabase: SupabaseClient): OAuthStore {
     async getClient(id) {
       const { data, error } = await supabase
         .from("fa_mcp_oauth_clients")
-        .select("client_id, client_name, redirect_uris")
+        .select("client_id, client_name, redirect_uris, client_secret_hash")
         .eq("client_id", id)
         .maybeSingle();
       check(error, "getClient");
