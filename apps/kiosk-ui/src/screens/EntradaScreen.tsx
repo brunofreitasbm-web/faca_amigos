@@ -172,7 +172,10 @@ export function EntradaScreen({
   const [customNotes, setCustomNotes] = useState("");
   const [childPhoto, setChildPhoto] = useState<Blob | null>(null);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [couponCode, setCouponCode] = useState("");
+  // Só o cupom escolhido à mão (parceria, Wi-Fi, sugestão da IA). null = vale o
+  // desconto padrão do Playground, derivado em `couponCode` mais abaixo.
+  const [manualCoupon, setManualCoupon] = useState<string | null>(null);
+  const setCouponCode = (code: string) => setManualCoupon(code || null);
   const [showExtras, setShowExtras] = useState(false);
   // Conferência do cupom do portal Wi-Fi (ESPERA-XXXX): o servidor responde de quem é e se ainda vale.
   const [wifiCode, setWifiCode] = useState("");
@@ -259,6 +262,27 @@ export function EntradaScreen({
   const birthdayPlanIdRef = useRef<string | null>(null);
   const isBirthdayCourtesy = Boolean(birthdayOffer && planId === birthdayOffer.plan.id);
   const peluciaAssets = assets.filter((a) => a.kind === "PELUCIA");
+
+  // Desconto padrão do Playground. O "valor cheio" da tabela é só vitrine de
+  // marketing: o valor real cobrado é o com 40% (ou 50% se a criança é
+  // inclusiva). Por isso o desconto é derivado do estado atual, nunca um
+  // estado próprio — antes ele sumia ao zerar a família (o efeito que o
+  // aplicava só reexecutava quando uma dependência mudava) e o card
+  // mostrava o valor cheio.
+  const autoCouponCode = useMemo(() => {
+    if (activity !== "PLAYGROUND" || isPelucia || isBirthdayCourtesy) return "";
+    const pick = (tokens: string[], fallback: string) =>
+      coupons.find(
+        (c) =>
+          c.active !== false &&
+          tokens.some((t) => c.code.toLowerCase().includes(t) || c.description?.toLowerCase().includes(t)),
+      )?.code ?? fallback;
+    return isNeurodivergent
+      ? pick(["50%", "inclusivo", "meia"], "50% MEIA")
+      : pick(["40%", "promocional"], "40% PROMOCIONAL");
+  }, [activity, isNeurodivergent, coupons, isPelucia, isBirthdayCourtesy]);
+  const hasManualCoupon = Boolean(manualCoupon) && !isPelucia && !isBirthdayCourtesy;
+  const couponCode = hasManualCoupon ? manualCoupon! : autoCouponCode;
 
   const [lastGuardianId, setLastGuardianId] = useState<string | null>(null);
   const [siblingMatches, setSiblingMatches] = useState<ChildMatch[]>([]);
@@ -359,48 +383,6 @@ export function EntradaScreen({
     setCustomNotes(prefill.notes ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill?.id]);
-
-  // Aplicação automática de cupons no Playground:
-  // - Criança neurodivergente marcada -> "50% MEIA - Inclusivo"
-  // - Não marcada -> "40% PROMOCIONAL" em todos os planos
-  // Só sobrescreve se o cupom atual ainda for o último aplicado
-  // automaticamente por este efeito — assim um cupom escolhido à mão pelo
-  // operador (ex.: parceria aplicada para toda a entrada da família) não é
-  // apagado quando o próximo irmão reseta o "criança neurodivergente".
-  const lastAutoCouponRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (activity !== "PLAYGROUND") return;
-    // Aluguel de pelúcia: preço cheio, o servidor recusa qualquer cupom.
-    if (isPelucia) return;
-    // Cortesia de aniversário: o servidor também recusa cupom.
-    if (isBirthdayCourtesy) return;
-    if (couponCode && couponCode !== lastAutoCouponRef.current) return;
-
-    let next: string;
-    if (isNeurodivergent) {
-      const match50 = coupons.find(
-        (c) =>
-          c.active !== false &&
-          (c.code.toLowerCase().includes("50%") ||
-            c.code.toLowerCase().includes("inclusivo") ||
-            c.code.toLowerCase().includes("meia") ||
-            c.description?.toLowerCase().includes("inclusivo")),
-      );
-      next = match50 ? match50.code : "50% MEIA - Inclusivo";
-    } else {
-      const match40 = coupons.find(
-        (c) =>
-          c.active !== false &&
-          (c.code.toLowerCase().includes("40%") ||
-            c.code.toLowerCase().includes("promocional") ||
-            c.description?.toLowerCase().includes("promocional")),
-      );
-      next = match40 ? match40.code : "40% PROMOCIONAL";
-    }
-    lastAutoCouponRef.current = next;
-    setCouponCode(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, isNeurodivergent, coupons, isPelucia, isBirthdayCourtesy]);
 
   // Busca única com debounce. Só dígitos quando o operador digitou um número:
   // a coluna de telefone é E.164 ("+5591982501215") e o texto mascarado
@@ -566,8 +548,7 @@ export function EntradaScreen({
       setLastGuardianId(null);
       setSiblingMatches([]);
       setSiblingCheckinCount(0);
-      setCouponCode("");
-      lastAutoCouponRef.current = null;
+      setManualCoupon(null);
     } else {
       const activeTerm = normalizeCpf(cpf) || phone.replace(/\D/g, "");
       if (activeTerm && activeTerm.length >= 3) {
@@ -766,7 +747,7 @@ export function EntradaScreen({
   }
 
   useEffect(() => {
-    if (couponCode && !eligibleCoupons.some((c) => c.code === couponCode)) setCouponCode("");
+    if (manualCoupon && !eligibleCoupons.some((c) => c.code === manualCoupon)) setManualCoupon(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);
 
@@ -1512,7 +1493,7 @@ export function EntradaScreen({
               >
                 <strong style={{ fontSize: "16px", display: "block" }}>{plan.name}</strong>
                 <div style={{ marginTop: "4px" }}>
-                  {discountInfo.discountText ? (
+                  {discountInfo.discountText && hasManualCoupon ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                       <span style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "line-through" }}>
                         {money(discountInfo.originalCents)}
@@ -1528,7 +1509,7 @@ export function EntradaScreen({
                     </div>
                   ) : (
                     <div style={{ fontSize: "18px", color: "var(--color-primary-hover)", fontWeight: "bold" }}>
-                      {money(plan.valueCents)}
+                      {money(discountInfo.finalCents)}
                     </div>
                   )}
                 </div>
@@ -1819,7 +1800,7 @@ export function EntradaScreen({
       {/* Cupom fica atrás de um toque ou visualizado automaticamente */}
       {!isPelucia && !isBirthdayCourtesy && (
       <section style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        {couponCode && (
+        {hasManualCoupon && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Tag color="var(--color-teal)" style={{ fontSize: "13px", padding: "6px 12px" }}>
               🎟️ Cupom de desconto ativo: <strong>{couponCode}</strong>
@@ -1828,12 +1809,12 @@ export function EntradaScreen({
         )}
         {!showExtras ? (
           <Button variant="ghost" size="sm" onClick={() => setShowExtras(true)} style={{ alignSelf: "flex-start" }}>
-            {couponCode ? "Alterar cupom de desconto" : "＋ Aplicar cupom de desconto"}
+            {hasManualCoupon ? "Alterar cupom de desconto" : "＋ Aplicar cupom de parceria"}
           </Button>
         ) : (
           <>
-            <Select label="Cupom de desconto / parceria" value={couponCode} onChange={(e) => setCouponCode(e.target.value)}>
-              <option value="">Nenhum</option>
+            <Select label="Cupom de parceria (substitui o desconto padrão)" value={manualCoupon ?? ""} onChange={(e) => setCouponCode(e.target.value)}>
+              <option value="">Desconto padrão</option>
               {eligibleCoupons.map((c) => (
                 <option key={c.id} value={c.code}>
                   {c.code}
