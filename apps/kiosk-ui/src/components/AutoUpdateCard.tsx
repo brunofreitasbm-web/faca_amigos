@@ -3,6 +3,7 @@ import { Button, Card, HelpText } from "@facaamigos/ui";
 import { Api } from "../api/client.js";
 import { applyPwaUpdate } from "../pwa.js";
 import { useToast } from "../state/ToastContext.js";
+import { Emoji3D, renderEmoji } from "./Emoji3D.js";
 
 export interface UpdateStatusState {
   status: "idle" | "checking" | "available" | "downloading" | "downloaded" | "error";
@@ -103,7 +104,7 @@ export function AutoUpdateCard() {
     <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0 }}>
-          🚀 Versão e Atualização do Sistema
+          <Emoji3D e="🚀" /> Versão e Atualização do Sistema
         </h2>
         {isDownloaded ? (
           <span
@@ -116,7 +117,7 @@ export function AutoUpdateCard() {
               fontWeight: "bold",
             }}
           >
-            🎉 Nova Versão Pronta
+            <Emoji3D e="🎉" /> Nova Versão Pronta
           </span>
         ) : isDownloading ? (
           <span
@@ -129,7 +130,7 @@ export function AutoUpdateCard() {
               fontWeight: "bold",
             }}
           >
-            📥 Baixando... {Math.round(updateState.progress ?? 0)}%
+            <Emoji3D e="📥" /> Baixando... {Math.round(updateState.progress ?? 0)}%
           </span>
         ) : (
           <span
@@ -181,7 +182,7 @@ export function AutoUpdateCard() {
 
       {/* Sucesso / Pronto para instalar */}
       {isDownloaded && (
-        <HelpText icon="🎉" style={{ color: "#28a745" }}>
+        <HelpText icon={renderEmoji("🎉")} style={{ color: "#28a745" }}>
           A versão <strong>{updateState.version || "mais recente"}</strong> já foi baixada com sucesso e está pronta para ser aplicada. Clique no botão abaixo para reiniciar o sistema.
         </HelpText>
       )}
@@ -194,7 +195,7 @@ export function AutoUpdateCard() {
           disabled={isDownloading || applying}
           onClick={handleCheckForUpdates}
         >
-          🔍 Buscar Atualizações Agora
+          <Emoji3D e="🔍" /> Buscar Atualizações Agora
         </Button>
 
         {isDownloaded && (
@@ -204,7 +205,7 @@ export function AutoUpdateCard() {
             loading={applying}
             onClick={handleApplyUpdate}
           >
-            ⚡ Atualizar e Reiniciar Agora
+            <Emoji3D e="⚡" /> Atualizar e Reiniciar Agora
           </Button>
         )}
       </div>

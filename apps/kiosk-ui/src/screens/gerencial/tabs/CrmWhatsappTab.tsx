@@ -9,6 +9,7 @@ import { useAuth } from "../../../auth/AuthContext.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { useConfirm } from "../../../state/ConfirmContext.js";
 import { supabase } from "../../../lib/supabase/client.js";
+import { Emoji3D, renderEmoji } from "../../../components/Emoji3D.js";
 
 const POLL_MS = 10_000;
 /** Mesma janela aplicada no servidor (crm-whatsapp-send); aqui só desabilita o botão. */
@@ -128,7 +129,7 @@ function OptinCampaignCard() {
       <details>
         <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
           <span>
-            <strong>🤝 Campanha de autorização (base atual)</strong>{" "}
+            <strong><Emoji3D e="🤝" /> Campanha de autorização (base atual)</strong>{" "}
             <Tag color={stats ? (running ? "var(--color-success)" : "var(--border-subtle)") : "var(--border-subtle)"}>
               {stats ? (running ? "Em andamento" : "Pausada") : "carregando…"}
             </Tag>
@@ -207,7 +208,7 @@ function MarketingOptinCampaignCard() {
       <details>
         <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
           <span>
-            <strong>🛍️ Campanha de opt-in de marketing</strong>{" "}
+            <strong><Emoji3D e="🛍️" /> Campanha de opt-in de marketing</strong>{" "}
             <Tag color={stats ? (running ? "var(--color-success)" : "var(--border-subtle)") : "var(--border-subtle)"}>
               {stats ? (running ? "Em andamento" : "Pausada") : "carregando…"}
             </Tag>
@@ -423,7 +424,7 @@ function AutomationsCard() {
     <Card style={{ padding: "12px", marginBottom: "12px" }}>
       <details open>
         <summary style={{ cursor: "pointer" }}>
-          <strong>🚀 Mensagens automáticas (ligar / desligar)</strong>
+          <strong><Emoji3D e="🚀" /> Mensagens automáticas (ligar / desligar)</strong>
         </summary>
         {loading ? (
           <HelpText style={{ margin: "8px 0 0" }}>Carregando automações…</HelpText>
@@ -522,7 +523,7 @@ function WhatsappCostCard() {
     <Card style={{ padding: "12px", marginBottom: "12px" }}>
       <details>
         <summary style={{ cursor: "pointer" }}>
-          <strong>💸 Custo e entrega do WhatsApp (últimos {COST_DAYS} dias)</strong>
+          <strong><Emoji3D e="💸" /> Custo e entrega do WhatsApp (últimos {COST_DAYS} dias)</strong>
         </summary>
         {rows == null ? (
           <HelpText style={{ margin: "8px 0 0" }}>Carregando custos…</HelpText>
@@ -753,7 +754,7 @@ function CrmContent() {
               </div>
               <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
                 {c.fa_crm_channels?.label} · {STAGES.find((s) => s.value === c.stage)?.label}
-                {!c.opt_in && " · 🚫 não receber"}
+                {!c.opt_in && renderEmoji(" · 🚫 não receber")}
               </div>
             </button>
           ))}
@@ -805,9 +806,9 @@ function CrmContent() {
                       }}
                     >
                       {m.body}
-                      {m.media.length > 0 && <div style={{ fontSize: "12px", opacity: 0.7 }}>📎 {m.media.length} anexo(s) — abrir no WhatsApp</div>}
+                      {m.media.length > 0 && <div style={{ fontSize: "12px", opacity: 0.7 }}><Emoji3D e="📎" /> {m.media.length} anexo(s) — abrir no WhatsApp</div>}
                       <div style={{ fontSize: "11px", opacity: 0.65, textAlign: "right" }}>
-                        {timeLabel(m.created_at_ms)} {m.direction === "OUT" && (m.status === "read" ? <span style={{ color: "#1a73e8" }}>{STATUS_ICON[m.status]}</span> : STATUS_ICON[m.status])}
+                        {timeLabel(m.created_at_ms)} {m.direction === "OUT" && (m.status === "read" ? <span style={{ color: "#1a73e8" }}>{renderEmoji(STATUS_ICON[m.status])}</span> : renderEmoji(STATUS_ICON[m.status]))}
                         {m.error && <span title={m.error}> {m.error}</span>}
                       </div>
                     </div>
@@ -819,12 +820,12 @@ function CrmContent() {
               {canWrite && (
                 <div style={{ marginTop: "10px" }}>
                   {!selected.opt_in ? (
-                    <HelpText>🚫 Este cliente pediu para não receber mensagens. O envio está bloqueado.</HelpText>
+                    <HelpText><Emoji3D e="🚫" /> Este cliente pediu para não receber mensagens. O envio está bloqueado.</HelpText>
                   ) : (
                     <>
                       {!windowOpen && (
                         <HelpText>
-                          ⏳ Fora da janela de 24h do WhatsApp: só é possível enviar um template aprovado.
+                          <Emoji3D e="⏳" /> Fora da janela de 24h do WhatsApp: só é possível enviar um template aprovado.
                           {templates.length === 0 && " Nenhum template cadastrado ainda."}
                         </HelpText>
                       )}

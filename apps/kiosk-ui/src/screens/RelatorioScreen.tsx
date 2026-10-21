@@ -11,6 +11,7 @@ import { formatCpf, formatPhoneBr } from "@facaamigos/domain";
 import { AssetUsageChart, CheckinsByHourChart, PlansSoldChart, RevenueByDayChart, RevenueByMethodChart, VisitsByDayChart } from "../components/charts/ReportCharts.js";
 import { SortTh, TableFilter, useTableView } from "../components/ReportTable.js";
 import type { TableColumn } from "../lib/tableView.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 type Tab = "VENDAS" | "PLANOS" | "VISITAS" | "CHECKINS_HORA" | "SESSOES" | "ANIVERSARIANTES" | "TURNOS" | "FROTA";
 export type PeriodPreset = "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
@@ -211,7 +212,7 @@ export function VendasTab({ unitId, from, to }: { unitId: string | null; from: s
           title="Dinheiro já recebido por saldos pré-pagos (venda sem 'Iniciar contagem agora') que ainda não foi consumido. Não vence — fica em aberto até a criança usar."
         >
           <strong style={{ fontFamily: "var(--font-display)", fontSize: "15px", color: "#5B32C4" }}>
-            💳 Saldos pré-pagos em aberto: {money(prepaidLiability.estimated_value_cents)}
+            <Emoji3D e="💳" /> Saldos pré-pagos em aberto: {money(prepaidLiability.estimated_value_cents)}
           </strong>
           <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
             {prepaidLiability.credits_count} crédito{prepaidLiability.credits_count > 1 ? "s" : ""} ·{" "}
@@ -624,7 +625,7 @@ function AniversariantesTab() {
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "16px", marginBottom: "20px" }}>
         <div>
           <h3 style={{ margin: 0, fontSize: "18px", display: "flex", alignItems: "center", gap: "8px" }}>
-            🎂 Aniversariantes do Dia
+            <Emoji3D e="🎂" /> Aniversariantes do Dia
             {mode === "today" && (
               <span style={{ fontSize: "12px", fontWeight: "normal", padding: "2px 8px", borderRadius: "12px", background: "rgba(245, 158, 11, 0.15)", color: "#D97706", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
                 Hoje ({formattedTodayDate})
@@ -655,7 +656,7 @@ function AniversariantesTab() {
                 transition: "all 0.2s"
               }}
             >
-              🎂 Hoje ({currentDay}/{currentMonth})
+              <Emoji3D e="🎂" /> Hoje ({currentDay}/{currentMonth})
             </button>
             <button
               type="button"
@@ -672,7 +673,7 @@ function AniversariantesTab() {
                 transition: "all 0.2s"
               }}
             >
-              📅 Ver Mês
+              <Emoji3D e="📅" /> Ver Mês
             </button>
           </div>
 
@@ -707,7 +708,7 @@ function AniversariantesTab() {
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <strong style={{ fontSize: "16px", color: "var(--text-main)" }}>{c.full_name}</strong>
                       <span style={{ fontSize: "12px", background: "#FEF3C7", color: "#B45309", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>
-                        {age > 0 ? `Completando ${age} ano${age > 1 ? "s" : ""} 🎉` : "Novo Bebê 🎈"}
+                        {age > 0 ? renderEmoji(`Completando ${age} ano${age > 1 ? "s" : ""} 🎉`) : renderEmoji("Novo Bebê 🎈")}
                       </span>
                     </div>
 
@@ -727,7 +728,7 @@ function AniversariantesTab() {
 
           {children.length === 0 && (
             <Card style={{ padding: "36px", textAlign: "center" }}>
-              <div style={{ fontSize: "32px", marginBottom: "8px" }}>🎈</div>
+              <div style={{ fontSize: "32px", marginBottom: "8px" }}><Emoji3D e="🎈" /></div>
               <h4 style={{ margin: 0, fontSize: "16px", color: "var(--text-main)" }}>
                 {mode === "today"
                   ? `Nenhum aniversariante hoje (${formattedTodayDate})`
@@ -832,11 +833,11 @@ export function FrotaHeatmapTab({ unitId, from, to }: { unitId: string; from: st
                 color: idle ? "var(--text-primary)" : textColor,
               }}
             >
-              <div style={{ fontSize: "28px" }}>{u.emoji}</div>
+              <div style={{ fontSize: "28px" }}>{renderEmoji(u.emoji)}</div>
               <strong>{u.name}</strong>
               <div style={{ fontSize: "13px" }}>{u.sessions_count} usos</div>
               <div style={{ fontSize: "12px" }}>{Math.round(u.total_minutes / 60)}h no período</div>
-              {idle && <div style={{ fontSize: "12px", fontWeight: "bold" }}>⏸️ parado</div>}
+              {idle && <div style={{ fontSize: "12px", fontWeight: "bold" }}><Emoji3D e="⏸️" /> parado</div>}
             </Card>
           );
         })}

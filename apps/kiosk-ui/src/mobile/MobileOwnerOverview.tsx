@@ -5,6 +5,7 @@ import type { Unit } from "../api/client.js";
 import { unitBrandFor } from "../branding/unitBrand.js";
 import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO, type UnidadeTipo } from "../bonificacao.js";
 import { money } from "../format.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 interface UnitOverview {
   unit: Unit;
@@ -156,9 +157,9 @@ export function MobileOwnerOverview({ units, onBack }: { units: Unit[]; onBack: 
                     <div style={{ marginTop: 12 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
                         <span>
-                          🎮 Bonificação: {atualLabel} (meta {metaLabel} / super {superLabel})
+                          <Emoji3D e="🎮" /> Bonificação: {atualLabel} (meta {metaLabel} / super {superLabel})
                         </span>
-                        <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+                        <Badge variant={badgeVariant}>{renderEmoji(badgeLabel)}</Badge>
                       </div>
                       <div className="capacity-bar-track" style={{ marginTop: 6 }}>
                         <div

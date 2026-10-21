@@ -5,6 +5,7 @@ import { Api } from "../../../api/client.js";
 import type { UnitEnvelopeBalance, UnitCashStatus, PendingEnvelope } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { money } from "../../../format.js";
+import { Emoji3D, renderEmoji } from "../../../components/Emoji3D.js";
 
 export function SaldoEnvelopesTab() {
   const { employee } = useAppState();
@@ -130,7 +131,7 @@ export function SaldoEnvelopesTab() {
             </HelpText>
           </div>
           <Button variant="secondary" onClick={loadData} disabled={loading}>
-            🔄 Atualizar
+            <Emoji3D e="🔄" /> Atualizar
           </Button>
         </div>
       </Card>
@@ -173,7 +174,7 @@ export function SaldoEnvelopesTab() {
               </h3>
               <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                 {b.pending_count > 0
-                  ? `✉️ ${b.pending_count} envelope(s) na loja${b.oldest_pending_at_ms ? ` · mais antigo em ${new Date(b.oldest_pending_at_ms).toLocaleDateString("pt-BR")}` : ""}`
+                  ? renderEmoji(`✉️ ${b.pending_count} envelope(s) na loja${b.oldest_pending_at_ms ? ` · mais antigo em ${new Date(b.oldest_pending_at_ms).toLocaleDateString("pt-BR")}` : ""}`)
                   : "Nenhum envelope aguardando recolhimento"}
               </span>
               {b.last_collected_at_ms && (
@@ -183,7 +184,7 @@ export function SaldoEnvelopesTab() {
               )}
               {cash?.status === "ABERTO" && (
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                  💵 Na gaveta agora: {money(cash.current_cash_cents ?? 0)} (turno aberto)
+                  <Emoji3D e="💵" /> Na gaveta agora: {money(cash.current_cash_cents ?? 0)} (turno aberto)
                 </span>
               )}
 

@@ -7,6 +7,7 @@ import { money } from "../format.js";
 import { CashPaymentPad } from "../components/CashPaymentPad.js";
 import { openTapCharge, savePendingTap } from "../lib/infinitepayTap.js";
 import { NfceModal } from "../components/NfceModal.js";
+import { Emoji3D } from "../components/Emoji3D.js";
 
 interface CartLine {
   product: Product;
@@ -203,7 +204,7 @@ export function PdvScreen() {
             <p style={{ color: "var(--color-teal-text)", margin: 0 }}>{success}</p>
             {lastSaleDoc && (
               <Button variant="secondary" size="sm" onClick={() => setShowNfceModal(true)}>
-                📄 Ver / Imprimir Cupom NFC-e
+                <Emoji3D e="📄" /> Ver / Imprimir Cupom NFC-e
               </Button>
             )}
           </div>
@@ -221,7 +222,7 @@ export function PdvScreen() {
                 onClick={handleTapCharge}
                 title="Cobrar por aproximação usando o celular/tablet como maquininha (InfiniteTap)"
               >
-                📲 Cobrar com InfiniteTap
+                <Emoji3D e="📲" /> Cobrar com InfiniteTap
               </Button>
             )}
             <Button
@@ -247,7 +248,7 @@ export function PdvScreen() {
           title="Ir para o carrinho"
         >
           <span>
-            🛒 {itemCount} {itemCount === 1 ? "item" : "itens"}
+            <Emoji3D e="🛒" /> {itemCount} {itemCount === 1 ? "item" : "itens"}
           </span>
           <span>{money(totalCents)}</span>
           <span>Ver carrinho ▲</span>

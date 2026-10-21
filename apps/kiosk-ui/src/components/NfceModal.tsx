@@ -28,6 +28,7 @@ const STATUS_LABEL: Record<FiscalDoc["status"], string> = {
 };
 
 import { Api } from "../api/client.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 /**
  * Cupom NFC-e de uma venda do PDV.
@@ -326,7 +327,7 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
           </span>
           {isAutorizado && <Tag color="var(--color-teal, #2ECFB5)">✅ Autorizado SEFAZ-PA</Tag>}
           {isContingencia && <Tag color="var(--color-amber, #F59E0B)">⚠️ Contingência Offline</Tag>}
-          {isPendente && <Tag color="var(--color-info, #3B82F6)">⏳ Processando Nota Fiscal</Tag>}
+          {isPendente && <Tag color="var(--color-info, #3B82F6)"><Emoji3D e="⏳" /> Processando Nota Fiscal</Tag>}
           {isErro && <Tag color="var(--color-error-text, #EF4444)">❌ Erro na Emissão</Tag>}
         </div>
       }
@@ -337,7 +338,7 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
     >
       {isPendente && (
         <div style={{ background: "#E0F2FE", color: "#0369A1", padding: "10px 14px", borderRadius: "8px", fontSize: "13px" }}>
-          ⏳ A venda foi registrada com sucesso! A nota fiscal está na fila de transmissão da SEFAZ e será autorizada em segundo plano.
+          <Emoji3D e="⏳" /> A venda foi registrada com sucesso! A nota fiscal está na fila de transmissão da SEFAZ e será autorizada em segundo plano.
         </div>
       )}
 
@@ -355,13 +356,13 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
             <Button variant="secondary" size="sm" onClick={handleOpenPdf} title="Baixar ou visualizar Comprovante Auxiliar de Venda em PDF">
-              📄 Baixar / Ver PDF
+              <Emoji3D e="📄" /> Baixar / Ver PDF
             </Button>
             <Button variant="secondary" size="sm" onClick={handleWhatsAppSend} title="Enviar Comprovante Auxiliar de Venda por WhatsApp">
-              📱 Enviar WhatsApp
+              <Emoji3D e="📱" /> Enviar WhatsApp
             </Button>
             <Button variant="primary" size="sm" onClick={handleRetryNfce} loading={retryBusy}>
-              🔄 Tentar Novamente na SEFAZ
+              <Emoji3D e="🔄" /> Tentar Novamente na SEFAZ
             </Button>
           </div>
         </div>
@@ -423,10 +424,10 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: "8px" }}>
           <Button variant="secondary" onClick={handleWhatsAppSend} title="Enviar resumo do comprovante por WhatsApp para o cliente">
-            📱 Enviar WhatsApp
+            <Emoji3D e="📱" /> Enviar WhatsApp
           </Button>
           <Button variant="secondary" onClick={handleOpenPdf} title="Abrir em nova aba para salvar em PDF ou imprimir em folha A4">
-            📄 Baixar / Ver PDF
+            <Emoji3D e="📄" /> Baixar / Ver PDF
           </Button>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
@@ -434,7 +435,7 @@ export function NfceModal({ doc, unitName, orderCode, items = [], payments = [],
             Fechar
           </Button>
           <Button variant="primary" onClick={handlePrint} title="Imprimir comprovante térmico (80mm)">
-            🖨️ Imprimir
+            <Emoji3D e="🖨️" /> Imprimir
           </Button>
         </div>
       </div>

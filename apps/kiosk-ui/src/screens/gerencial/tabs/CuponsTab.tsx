@@ -6,6 +6,7 @@ import type { Coupon, Plan } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 function planLabel(p: Plan): string {
   const duration = p.durationUnit === "HORA" ? `${p.durationValue}h` : `${p.durationValue}min`;
@@ -144,7 +145,7 @@ export function CuponsTab() {
     <div className="g-split">
       <aside>
       <Card style={{ marginBottom: "10px", background: "var(--surface-sunken)", borderLeft: "4px solid var(--color-primary)", borderRadius: "12px" }}>
-        <h3 style={{ fontSize: "16px", margin: "0 0 8px 0", color: "var(--text-primary)" }}>⭐ Desempenho: Avaliações do Google</h3>
+        <h3 style={{ fontSize: "16px", margin: "0 0 8px 0", color: "var(--text-primary)" }}><Emoji3D e="⭐" /> Desempenho: Avaliações do Google</h3>
         <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>
           <strong>{totalReviewIssued}</strong> descontos (cupons) emitidos
         </p>
@@ -233,7 +234,7 @@ export function CuponsTab() {
               </span>
             )}
             {scheduleLabel(c) && (
-              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · ⏰ {scheduleLabel(c)}</span>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}> · <Emoji3D e="⏰" /> {scheduleLabel(c)}</span>
             )}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>

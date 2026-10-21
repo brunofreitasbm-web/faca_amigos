@@ -4,6 +4,7 @@ import { formatCpf, formatPhoneBr, isValidCpf, isValidPhoneBr } from "@facaamigo
 import { Api } from "../api/client.js";
 import { supabase } from "../lib/supabase/client.js";
 import { useToast } from "../state/ToastContext.js";
+import { Emoji3D, renderEmoji } from "./Emoji3D.js";
 
 export interface EditRegistrationModalProps {
   open: boolean;
@@ -165,7 +166,7 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
   if (!open) return null;
 
   return (
-    <Modal title="✏️ Editar Cadastro & Oportunidades" onClose={onClose}>
+    <Modal title={renderEmoji("✏️ Editar Cadastro & Oportunidades")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: "14px", minWidth: "320px", maxWidth: "480px" }}>
         <HelpText style={{ margin: 0 }}>
           Edite abaixo os dados do responsável e da criança. Atualize a data de nascimento para ativar campanhas de aniversário e combos promocionais.
@@ -186,9 +187,9 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
               gap: "8px",
             }}
           >
-            <span>🎂</span>
+            <span><Emoji3D e="🎂" /></span>
             <div>
-              <strong>{birthdayInfo.isToday ? "ANIVERSÁRIO HOJE! 🎉" : `Aniversário próximo (${birthdayInfo.daysUntil} dias)!`}</strong>
+              <strong>{birthdayInfo.isToday ? renderEmoji("ANIVERSÁRIO HOJE! 🎉") : `Aniversário próximo (${birthdayInfo.daysUntil} dias)!`}</strong>
             </div>
           </div>
         )}
@@ -218,7 +219,7 @@ export function EditRegistrationModal({ open, onClose, onSaved, initialData }: E
 
         <div style={{ borderTop: "1px solid var(--color-border, #eee)", paddingTop: "12px", marginTop: "4px" }}>
           <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "10px", color: "var(--color-text-heading, #111)" }}>
-            👶 Dados da Criança {birthdayInfo && <span style={{ fontSize: "12px", color: "var(--color-muted, #666)", fontWeight: "normal" }}>({birthdayInfo.age} anos)</span>}
+            <Emoji3D e="👶" /> Dados da Criança {birthdayInfo && <span style={{ fontSize: "12px", color: "var(--color-muted, #666)", fontWeight: "normal" }}>({birthdayInfo.age} anos)</span>}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>

@@ -10,6 +10,7 @@ import {
   clampToZoeiaDataStart,
   type GerencialReport,
 } from "../lib/geminiAgent.js";
+import { Emoji3D, renderEmoji } from "./Emoji3D.js";
 
 interface GeminiGerencialCopilotProps {
   metricsSummary?: string;
@@ -246,7 +247,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
             <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>
-              🏢 Unidade em Foco:
+              <Emoji3D e="🏢" /> Unidade em Foco:
             </strong>
             <span style={{ fontSize: "12px", color: "var(--text-muted)", fontStyle: "italic" }}>
               3 Unidades FaçaAmigos
@@ -273,7 +274,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
                     transition: "all 0.15s ease",
                   }}
                 >
-                  <span>{u.badge}</span>
+                  <span>{renderEmoji(u.badge)}</span>
                   {isSelected && <span style={{ marginLeft: "4px" }}>✓</span>}
                 </button>
               );
@@ -286,7 +287,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           {/* PERÍODO */}
           <div style={{ flex: 1, minWidth: "260px" }}>
             <strong style={{ fontSize: "13px", display: "block", marginBottom: "6px", color: "var(--text-primary)" }}>
-              📅 Período de Análise Comercial:
+              <Emoji3D e="📅" /> Período de Análise Comercial:
             </strong>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               <button
@@ -343,7 +344,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           {/* STATUS DA EQUIPE / COLABORADORES */}
           <div style={{ flex: 1, minWidth: "260px" }}>
             <strong style={{ fontSize: "13px", display: "block", marginBottom: "6px", color: "var(--text-primary)" }}>
-              👥 Filtro de Colaboradores:
+              <Emoji3D e="👥" /> Filtro de Colaboradores:
             </strong>
             <button
               type="button"
@@ -410,7 +411,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <Tag style={{ background: "rgba(168, 85, 247, 0.2)", color: "#e9d5ff", border: "1px solid rgba(168, 85, 247, 0.4)" }}>
-              {metricsLoading || loading ? "🔄 Recalculando..." : "🟢 Resposta Confiável"}
+              {metricsLoading || loading ? renderEmoji("🔄 Recalculando...") : renderEmoji("🟢 Resposta Confiável")}
             </Tag>
           </div>
         </div>
@@ -437,10 +438,10 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           {/* PROJEÇÕES & COMO AUMENTAR */}
           <Card style={{ padding: "20px", borderLeft: "4px solid #3b82f6" }}>
             <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#3b82f6", marginBottom: "8px", letterSpacing: "0.5px" }}>
-              📍 {selectedUnitBadge} • {activePeriodLabel}
+              <Emoji3D e="📍" /> {selectedUnitBadge} • {activePeriodLabel}
             </div>
             <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#1d4ed8", display: "flex", alignItems: "center", gap: "8px" }}>
-              📈 Projeções & Alavancagem de Vendas
+              <Emoji3D e="📈" /> Projeções & Alavancagem de Vendas
             </h3>
             <p style={{ fontSize: "14px", fontWeight: "bold", margin: "0 0 8px" }}>{report.projections.forecastText}</p>
             <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 12px" }}>{report.projections.targetText}</p>
@@ -457,7 +458,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           {/* PONTOS DE ATENÇÃO */}
           <Card style={{ padding: "20px", borderLeft: "4px solid #f59e0b" }}>
             <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#d97706", marginBottom: "8px", letterSpacing: "0.5px" }}>
-              📍 {selectedUnitBadge} • {activePeriodLabel}
+              <Emoji3D e="📍" /> {selectedUnitBadge} • {activePeriodLabel}
             </div>
             <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#b45309", display: "flex", alignItems: "center", gap: "8px" }}>
               ⚠️ Pontos de Atenção na Operação
@@ -473,14 +474,14 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
           {/* EFICIÊNCIA DA EQUIPE ATIVA */}
           <Card style={{ padding: "20px", borderLeft: "4px solid #10b981" }}>
             <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#10b981", marginBottom: "8px", letterSpacing: "0.5px" }}>
-              📍 {selectedUnitBadge} • {activePeriodLabel}
+              <Emoji3D e="📍" /> {selectedUnitBadge} • {activePeriodLabel}
             </div>
             <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "#047857", display: "flex", alignItems: "center", gap: "8px" }}>
-              👥 Performance da Equipe Ativa
+              <Emoji3D e="👥" /> Performance da Equipe Ativa
             </h3>
             <div style={{ marginBottom: "12px", background: "rgba(16, 185, 129, 0.08)", padding: "10px 12px", borderRadius: "8px" }}>
               <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", color: "#047857" }}>
-                🌟 Operador Destaque ({report.operatorPerformance.topOperatorName})
+                <Emoji3D e="🌟" /> Operador Destaque ({report.operatorPerformance.topOperatorName})
               </span>
               <p style={{ fontSize: "13px", margin: "4px 0 2px", fontWeight: "bold" }}>{report.operatorPerformance.topOperatorMetric}</p>
               <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{report.operatorPerformance.topOperatorReason}</span>
@@ -488,7 +489,7 @@ export function GeminiGerencialCopilot({ metricsSummary }: GeminiGerencialCopilo
 
             <div style={{ background: "rgba(99, 102, 241, 0.08)", padding: "10px 12px", borderRadius: "8px" }}>
               <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", color: "#4338ca" }}>
-                🎯 Suporte/Treinamento ({report.operatorPerformance.needsTrainingOperatorName})
+                <Emoji3D e="🎯" /> Suporte/Treinamento ({report.operatorPerformance.needsTrainingOperatorName})
               </span>
               <p style={{ fontSize: "13px", margin: "4px 0 2px" }}>{report.operatorPerformance.needsTrainingMetric}</p>
               <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>

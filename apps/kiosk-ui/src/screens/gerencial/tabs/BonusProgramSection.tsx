@@ -15,6 +15,7 @@ import { useToast } from "../../../state/ToastContext.js";
 import { supabase } from "../../../lib/supabase/client.js";
 import { money } from "../../../format.js";
 import type { RegisterSave } from "./PlanosLongosSection.js";
+import { Emoji3D, renderEmoji } from "../../../components/Emoji3D.js";
 
 type GroupKey = "SEG_QUI" | "SEX" | "SAB" | "DOM";
 
@@ -451,7 +452,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-                  🎮 Programa de Bonificação — {unit.name}
+                  <Emoji3D e="🎮" /> Programa de Bonificação — {unit.name}
                   <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "12px", background: "var(--surface-sunken)", color: "var(--text-secondary)" }}>
                     {isCircuito ? "Unidade Quiosque (Metas em Locações)" : "Unidade Loja (Metas em Faturamento R$)"}
                   </span>
@@ -512,11 +513,11 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                 }}
               >
                 <div style={{ position: "absolute", top: "-10px", right: "-10px", fontSize: "70px", opacity: 0.1, userSelect: "none" }}>
-                  💰
+                  <Emoji3D e="💰" />
                 </div>
                 <div>
                   <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase", color: "#a5b4fc" }}>
-                    🎯 FATURAMENTO MENSAL ESPERADO (100% META)
+                    <Emoji3D e="🎯" /> FATURAMENTO MENSAL ESPERADO (100% META)
                   </span>
                   <div style={{ fontSize: "32px", fontWeight: "900", margin: "8px 0 4px", color: "#ffffff", fontFamily: "var(--font-display)" }}>
                     {money(centsFrom(faturamentoEsperadoMeta))}
@@ -547,7 +548,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-secondary)" }}>
-                      📊 ANÁLISE DE HISTÓRICO & VIABILIDADE
+                      <Emoji3D e="📊" /> ANÁLISE DE HISTÓRICO & VIABILIDADE
                     </span>
                     <span
                       style={{
@@ -563,7 +564,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                         gap: "6px",
                       }}
                     >
-                      <span>{statusMeta.icon}</span> METAS {statusMeta.title}
+                      <span>{renderEmoji(statusMeta.icon)}</span> METAS {statusMeta.title}
                     </span>
                   </div>
 
@@ -598,7 +599,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
             {/* SEÇÃO DE SLIDERS POR DIA DA SEMANA */}
             <div>
               <h4 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-                📅 Escalas de Metas por Período da Semana
+                <Emoji3D e="📅" /> Escalas de Metas por Período da Semana
               </h4>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
@@ -627,7 +628,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                       {/* HORÁRIO DE ABERTURA (trava de abertura) */}
                       <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
                         <span>
-                          🕙 Abertura do shopping{" "}
+                          <Emoji3D e="🕙" /> Abertura do shopping{" "}
                           <span style={{ color: "var(--text-muted)" }}>
                             (trava até {formatHorarioMin(form.aberturaMin[g.key] + TOLERANCIA_ABERTURA_MIN)})
                           </span>
@@ -645,7 +646,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                       {/* SLIDER META BASE */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                          <span>🎯 Meta ({isCircuito ? "Locações" : "R$"})</span>
+                          <span><Emoji3D e="🎯" /> Meta ({isCircuito ? "Locações" : "R$"})</span>
                           <strong style={{ color: "#2563EB", fontSize: "14px" }}>
                             {isCircuito ? `${gf.metaValor} locações` : money(centsFrom(gf.metaValor))}
                           </strong>
@@ -664,7 +665,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                       {/* SLIDER SUPERMETA */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                          <span>⚡ Supermeta ({isCircuito ? "Locações" : "R$"})</span>
+                          <span><Emoji3D e="⚡" /> Supermeta ({isCircuito ? "Locações" : "R$"})</span>
                           <strong style={{ color: "#6D28D9", fontSize: "14px" }}>
                             {isCircuito ? `${gf.superValor} locações` : money(centsFrom(gf.superValor))}
                           </strong>
@@ -726,7 +727,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
 
             {/* EXCEÇÕES DE HORÁRIO DE ABERTURA POR DATA */}
             <div>
-              <h4 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: "700" }}>🗓️ Exceções de horário de abertura</h4>
+              <h4 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: "700" }}><Emoji3D e="🗓️" /> Exceções de horário de abertura</h4>
               <HelpText>
                 Para um dia com horário diferente do padrão (feriado, evento, shopping abrindo mais tarde). Vale só para a data
                 informada e substitui o horário do dia da semana; a trava continua sendo a abertura + {TOLERANCIA_ABERTURA_MIN} min.
@@ -766,7 +767,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
             {/* SEÇÃO DE REGRAS EXTRAS E TETOS */}
             <div>
               <h4 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: "700" }}>
-                🎁 Bônus Extras, Produtos e Travas de Controle
+                <Emoji3D e="🎁" /> Bônus Extras, Produtos e Travas de Controle
               </h4>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
@@ -882,7 +883,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                 onClick={() => save(unit)}
                 style={{ padding: "12px 28px", fontSize: "15px", fontWeight: "700", borderRadius: "10px", cursor: "pointer" }}
               >
-                {busyUnitId === unit.id ? "Salvando..." : `💾 Salvar Configurações de ${unit.name}`}
+                {busyUnitId === unit.id ? "Salvando..." : renderEmoji(`💾 Salvar Configurações de ${unit.name}`)}
               </Button>
             </div>
           </Card>

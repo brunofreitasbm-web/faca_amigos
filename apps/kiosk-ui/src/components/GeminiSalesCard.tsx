@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Badge } from "@facaamigos/ui";
 import { OPERATOR_SALES_SUGGESTIONS_ENABLED, type CheckinOffer, type CheckoutOffer } from "../lib/geminiAgent.js";
 import { money } from "../format.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 interface GeminiCheckinSalesCardProps {
   type: "CHECKIN";
@@ -131,12 +132,12 @@ export function GeminiSalesCard(props: GeminiSalesCardProps) {
                 </div>
 
                 <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: "var(--text-primary)", fontWeight: "500", lineHeight: 1.4 }}>
-                  🗣️ <strong>Fale para o responsável:</strong> "{offer.description}"
+                  <Emoji3D e="🗣️" /> <strong>Fale para o responsável:</strong> "{offer.description}"
                 </p>
 
                 {offer.reason && (
                   <span style={{ fontSize: "11px", color: "#6b7280", fontStyle: "italic", display: "block", marginTop: "2px" }}>
-                    💡 <strong>Vantagem ZoeIA:</strong> {offer.reason}
+                    <Emoji3D e="💡" /> <strong>Vantagem ZoeIA:</strong> {offer.reason}
                   </span>
                 )}
               </div>
@@ -178,7 +179,7 @@ export function GeminiSalesCard(props: GeminiSalesCardProps) {
               marginTop: "4px",
             }}
           >
-            <span style={{ fontSize: "14px" }}>🎯</span>
+            <span style={{ fontSize: "14px" }}><Emoji3D e="🎯" /></span>
             <span style={{ fontSize: "12px", color: "#854d0e", fontWeight: "600" }}>
               <strong>Incentivo do Turno:</strong> Cada oferta aplicada agora eleva seu ticket médio e coloca a equipe mais perto da bonificação diária da unidade!
             </span>

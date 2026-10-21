@@ -5,6 +5,7 @@ import { Api } from "../../../api/client.js";
 import type { Employee } from "../../../api/client.js";
 import { useAppState } from "../../../state/AppState.js";
 import { useToast } from "../../../state/ToastContext.js";
+import { renderEmoji } from "../../../components/Emoji3D.js";
 
 interface OcorrenciaRow {
   id: string;
@@ -154,7 +155,7 @@ export function OcorrenciasTab() {
                 <td>{r.fa_kiosk_employees?.full_name ?? "—"}</td>
                 <td>{r.tipo === "ATESTADO" ? "Atestado" : "Falta"}</td>
                 <td style={{ textAlign: "center" }}>{r.days_away}</td>
-                <td style={{ textAlign: "center" }}>{r.document_path ? "📎" : "—"}</td>
+                <td style={{ textAlign: "center" }}>{r.document_path ? renderEmoji("📎") : "—"}</td>
                 <td>{r.notes ?? "—"}</td>
                 <td>{new Date(r.created_at_ms).toLocaleString("pt-BR")}</td>
               </tr>

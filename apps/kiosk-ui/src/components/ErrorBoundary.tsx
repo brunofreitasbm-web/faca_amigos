@@ -1,5 +1,6 @@
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { Emoji3D } from "./Emoji3D.js";
 
 interface Props {
   children?: ReactNode;
@@ -122,10 +123,10 @@ export class ErrorBoundary extends Component<Props, State> {
                   Status de Atualização do Terminal:
                 </div>
                 {updateStatus === "checking" || isChecking ? (
-                  <div style={{ color: "#1976d2", fontSize: "13px" }}>🔍 Buscando atualizações no servidor...</div>
+                  <div style={{ color: "#1976d2", fontSize: "13px" }}><Emoji3D e="🔍" /> Buscando atualizações no servidor...</div>
                 ) : updateStatus === "available" ? (
                   <div style={{ color: "#ed6c02", fontSize: "13px" }}>
-                    ⬇️ Baixando nova versão {updateVersion ? `(${updateVersion})` : ""}: {updateProgress ?? 0}%
+                    <Emoji3D e="⬇️" /> Baixando nova versão {updateVersion ? `(${updateVersion})` : ""}: {updateProgress ?? 0}%
                   </div>
                 ) : updateStatus === "downloaded" ? (
                   <div style={{ color: "#2e7d32", fontSize: "13px", fontWeight: 600 }}>
@@ -145,7 +146,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   onClick={this.handleApplyUpdate}
                   style={{ backgroundColor: "#2e7d32", color: "white", border: "none", padding: "12px 24px", borderRadius: "8px", fontSize: "15px", fontWeight: 600, cursor: "pointer" }}
                 >
-                  🚀 Aplicar Atualização Agora
+                  <Emoji3D e="🚀" /> Aplicar Atualização Agora
                 </button>
               ) : (
                 <>

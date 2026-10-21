@@ -14,6 +14,7 @@ import {
 } from "@facaamigos/domain";
 import { generateMobileAcessoRapidoSuggestions, type MobileOffer } from "../lib/geminiAgent.js";
 import { money } from "../format.js";
+import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
 
 function planDurationMinutes(plan: { durationValue: number; durationUnit: "MINUTO" | "HORA" }): number {
   return plan.durationUnit === "HORA" ? plan.durationValue * 60 : plan.durationValue;
@@ -272,7 +273,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
 
       <div style={{ width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", gap: "16px" }}>
         <div style={{ textAlign: "center" }}>
-          <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "24px" }}>Bora começar a diversão? 🎈</h1>
+          <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "24px" }}>Bora começar a diversão? <Emoji3D e="🎈" /></h1>
           <HelpText>
             {options
               ? `${options.unitName} — 1 minutinho e já garante o lugar de vocês, sem fila.`
@@ -289,7 +290,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
         {preCheckinId && !cancelled && (
           <Card style={{ padding: "24px 20px", textAlign: "center", border: "2px solid var(--color-teal)" }}>
             <strong style={{ display: "block", fontSize: "18px", marginBottom: "4px" }}>
-              Prontinho! 🎉 Já estamos te esperando
+              Prontinho! <Emoji3D e="🎉" /> Já estamos te esperando
             </strong>
             <p style={{ margin: "0 0 18px", fontSize: "14px", color: "var(--text-muted)" }}>
               Dirija-se ao balcão — é só falar o código abaixo para a equipe já saber quem é vocês.
@@ -333,7 +334,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
                         fontSize: "13px",
                       }}
                     >
-                      <span>{(c.childName || `Criança ${i + 1}`) + (c.isNeurodivergent && !c.childName.includes("🧩") ? " 🧩" : "")}</span>
+                      <span>{renderEmoji((c.childName || `Criança ${i + 1}`) + (c.isNeurodivergent && !c.childName.includes("🧩") ? " 🧩" : ""))}</span>
                       <span style={{ fontWeight: 700, color: session ? "var(--color-teal-text)" : "var(--text-muted)" }}>
                         {session ? "✓ Confirmada" : "Aguardando balcão"}
                       </span>
@@ -344,7 +345,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
             )}
             <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>
               E o melhor: assim que a equipe confirmar a entrada, esta mesma tela já mostra quem já foi chamado —
-              não precisa escanear mais nada. 💛
+              não precisa escanear mais nada. <Emoji3D e="💛" />
             </p>
           </Card>
         )}
@@ -361,7 +362,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
           <>
             <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <strong style={{ fontSize: "15px" }}>1. Quem vem brincar? 🧒</strong>
+                <strong style={{ fontSize: "15px" }}>1. Quem vem brincar? <Emoji3D e="🧒" /></strong>
                 {children.length > 1 && (
                   <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{children.length} crianças</span>
                 )}
@@ -382,7 +383,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
                   {children.length > 1 && (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-muted)" }}>
-                        {child.childName ? `${child.childName}${child.isNeurodivergent && !child.childName.includes("🧩") ? " 🧩" : ""}` : `Criança ${index + 1}`}
+                        {child.childName ? renderEmoji(`${child.childName}${child.isNeurodivergent && !child.childName.includes("🧩") ? " 🧩" : ""}`) : `Criança ${index + 1}`}
                       </span>
                       <Button variant="ghost" size="sm" type="button" onClick={() => removeChild(index)}>
                         ✕ Remover
@@ -451,7 +452,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
             </Card>
 
             <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              <strong style={{ fontSize: "15px" }}>2. E o responsável, quem é? 👋</strong>
+              <strong style={{ fontSize: "15px" }}>2. E o responsável, quem é? <Emoji3D e="👋" /></strong>
               <Input label="Nome do responsável" placeholder="Pai, mãe ou acompanhante" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} />
               <Input label="CPF do responsável *" placeholder="000.000.000-00 (Obrigatório)" inputMode="numeric" value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} />
               {cpf.length === 14 && !isValidCpf(cpf) && (
@@ -471,7 +472,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
             </Card>
 
             <Card style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-              <strong style={{ fontSize: "15px" }}>3. Qual plano combina mais? ⏰</strong>
+              <strong style={{ fontSize: "15px" }}>3. Qual plano combina mais? <Emoji3D e="⏰" /></strong>
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                 {selectablePlans.map((plan) => {
                   const isSelected = planId === plan.id;
@@ -517,7 +518,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
                             boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
                           }}
                         >
-                          🏆 Melhor custo-benefício
+                          <Emoji3D e="🏆" /> Melhor custo-benefício
                         </span>
                       )}
                       <strong style={{ fontSize: "15px", display: "block" }}>{plan.name}</strong>
@@ -630,7 +631,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
                     disabled={!options.termsText}
                     style={{ borderRadius: "9999px" }}
                   >
-                    📄 Ler os Termos de Uso
+                    <Emoji3D e="📄" /> Ler os Termos de Uso
                   </Button>
                   {!options.termsText && <HelpText>Termos de Uso ainda não configurados por esta unidade.</HelpText>}
                 </>
@@ -684,7 +685,7 @@ export function AcessoRapidoScreen({ unitId }: { unitId: string }) {
                 onClick={submit}
                 style={{ borderRadius: "9999px", padding: "16px" }}
               >
-                🎈 Garantir o lugar agora
+                <Emoji3D e="🎈" /> Garantir o lugar agora
               </Button>
             </div>
           </>

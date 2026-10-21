@@ -1,5 +1,6 @@
 import { Button } from "@facaamigos/ui";
 import { money } from "../format.js";
+import { Emoji3D } from "./Emoji3D.js";
 
 interface OlharUpsellCardProps {
   /** Nome do plano que o operador acabou de tocar (ex.: "30 minutos"). */
@@ -55,7 +56,7 @@ export function OlharUpsellCard({
       }}
     >
       <strong style={{ fontFamily: "var(--font-display)", fontSize: "16px", color: "var(--color-orange-text)" }}>
-        📋 Ofereça a 1 hora + Olhar FaçaAmigos
+        <Emoji3D e="📋" /> Ofereça a 1 hora + Olhar FaçaAmigos
       </strong>
 
       <blockquote

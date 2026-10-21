@@ -5,6 +5,7 @@ import { isWhatsappRefusal63049, startOfTodayMs, usePendingSessionReports, useUn
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
 import { SessionReportForm, formatCountdown } from "../components/session-report/SessionReportForm.js";
+import { Emoji3D } from "../components/Emoji3D.js";
 
 const STATUS_TEXT: Record<SessionReportWhatsappStatus, { label: string; tone: "teal" | "amber" | "neutral" | "solid_pink" }> = {
   PENDING: { label: "Aguardando envio", tone: "amber" },
@@ -119,7 +120,7 @@ export function RelatorioSessaoScreen() {
         }
       `}</style>
       <div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}>📝 Olhar FaçaAmigos</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", margin: 0 }}><Emoji3D e="📝" /> Olhar FaçaAmigos</h2>
         <HelpText>
           Crianças com plano de 1h ou mais: preencha os 16 itens em até 40 minutos depois da saída. Um toque por item, qualquer
           profissional ou estagiário pode preencher — não é dividido por especialidade. O responsável recebe um resumo no WhatsApp.
@@ -162,7 +163,7 @@ export function RelatorioSessaoScreen() {
           )}
           {!loading && pending.length === 0 && !error && (
             <Card>
-              <div style={{ color: "var(--text-muted)" }}>Nenhum relatório pendente 🎉</div>
+              <div style={{ color: "var(--text-muted)" }}>Nenhum relatório pendente <Emoji3D e="🎉" /></div>
             </Card>
           )}
           {pending.map((p) => {
@@ -184,7 +185,7 @@ export function RelatorioSessaoScreen() {
                 {late ? (
                   <Badge variant="solid_pink">Atrasado</Badge>
                 ) : (
-                  <Badge variant={p.deadline_ms - now < 10 * 60_000 ? "amber" : "teal"}>⏱ {formatCountdown(p.deadline_ms - now)}</Badge>
+                  <Badge variant={p.deadline_ms - now < 10 * 60_000 ? "amber" : "teal"}><Emoji3D e="⏱" /> {formatCountdown(p.deadline_ms - now)}</Badge>
                 )}
               </Card>
             );

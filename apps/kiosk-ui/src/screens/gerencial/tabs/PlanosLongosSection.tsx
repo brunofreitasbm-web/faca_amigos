@@ -8,6 +8,7 @@ import { useAuth } from "../../../auth/AuthContext.js";
 import { IfCan } from "../../../auth/RequireCapability.js";
 import { planRuleKey, type BonusPlanRule } from "../../../lib/apuracaoBonificacao.js";
 import { money } from "../../../format.js";
+import { Emoji3D } from "../../../components/Emoji3D.js";
 
 /** Uma linha por plano ou pacote ativo da unidade; valores em reais (texto) enquanto o Owner digita. */
 interface Row {
@@ -131,7 +132,7 @@ export function PlanosLongosSection({ unit, registerSave }: { unit: Unit; regist
 
   return (
     <Card style={{ padding: "16px", marginTop: "16px" }}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px" }}>📦 Bônus de Planos Longos — {unit.name}</h2>
+      <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: "0 0 8px" }}><Emoji3D e="📦" /> Bônus de Planos Longos — {unit.name}</h2>
       <HelpText style={{ marginBottom: "12px" }}>
         Bônus fixo por unidade vendida (por criança), não por valor. A escada paga um prêmio único ao bater N unidades no mês.
         O teto é separado do teto de metas e produtos, e este bônus não depende das travas de caixa. Zero no teto = sem teto.

@@ -12,6 +12,7 @@ import {
   formatPlanoHoras,
   printContract,
 } from "../contract/contractTemplate.js";
+import { Emoji3D, renderEmoji } from "./Emoji3D.js";
 
 /**
  * Contrato dos planos acima de 2h (banco de horas).
@@ -143,7 +144,7 @@ export function ContractModal({
   }
 
   return (
-    <Modal title="📄 Contrato — plano acima de 2h" onClose={onClose} closeOnBackdrop={false} maxWidth="480px">
+    <Modal title={renderEmoji("📄 Contrato — plano acima de 2h")} onClose={onClose} closeOnBackdrop={false} maxWidth="480px">
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         <HelpText>
           Complete os dados pessoais do <strong>Responsável Contratante</strong> para imprimir o contrato de prestação
@@ -193,7 +194,7 @@ export function ContractModal({
                 title={missing ?? "Salvar os dados e imprimir o contrato em A4 para assinatura"}
                 style={{ borderRadius: "9999px" }}
               >
-                🖨️ Salvar e imprimir contrato
+                <Emoji3D e="🖨️" /> Salvar e imprimir contrato
               </Button>
             </div>
             {missing && <span style={{ fontSize: "12px", color: "var(--text-muted)", textAlign: "right" }}>{missing}</span>}

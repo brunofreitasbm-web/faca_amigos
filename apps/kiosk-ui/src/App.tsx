@@ -64,6 +64,7 @@ import { MobileGerencial } from "./mobile/MobileGerencial.js";
 import { MobileLogin } from "./mobile/MobileLogin.js";
 import { useBackHandler } from "./hooks/useBackHandler.js";
 import { useMobileShell } from "./mobile/useMobileShell.js";
+import { Emoji3D } from "./components/Emoji3D.js";
 
 
 const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon: ReactNode }> = [
@@ -72,10 +73,10 @@ const SCREENS: ReadonlyArray<{ value: Screen; label: string; help: string; icon:
   // liberação agora é o botão flutuante amarelo dentro do Painel (ver
   // PainelScreen.tsx) — evita duas entradas concorrentes para a mesma ação.
   { value: "PAINEL", label: "Painel", help: "Ver todas as crianças que estão no espaço agora, quanto tempo já ficaram e fechar o atendimento (cobrar) quando forem embora", icon: <GridIcon /> },
-  { value: "RELATORIO_SESSAO", label: "Olhar FaçaAmigos", help: "Preencher o mapa de observação das crianças com plano de 1h ou mais, até 40 minutos depois da saída, e enviar o Olhar FaçaAmigos ao responsável por WhatsApp", icon: <span>📝</span> },
+  { value: "RELATORIO_SESSAO", label: "Olhar FaçaAmigos", help: "Preencher o mapa de observação das crianças com plano de 1h ou mais, até 40 minutos depois da saída, e enviar o Olhar FaçaAmigos ao responsável por WhatsApp", icon: <span><Emoji3D e="📝" /></span> },
   { value: "PDV", label: "PDV", help: "Vender produtos avulsos (loja/lanchonete), sem estar ligado a uma entrada", icon: <ShoppingCartIcon /> },
   { value: "CAIXA", label: "Caixa", help: "Abrir e fechar o turno de caixa, conferir o dinheiro e registrar sangria/suprimento", icon: <WalletIcon /> },
-  { value: "MINHA_BONIFICACAO", label: "Minha Bonificação", help: "Consultar só os seus números do programa de bonificação: ticket médio, progresso da meta e acumulado do mês. Somente consulta.", icon: <span>🎮</span> },
+  { value: "MINHA_BONIFICACAO", label: "Minha Bonificação", help: "Consultar só os seus números do programa de bonificação: ticket médio, progresso da meta e acumulado do mês. Somente consulta.", icon: <span><Emoji3D e="🎮" /></span> },
   { value: "RELATORIO", label: "Relatório", help: "Consultar vendas, visitas, planos, movimentação de caixa de períodos anteriores", icon: <ChartBarIcon /> },
   { value: "CONFIGURACOES", label: "Configurações", help: "Ajustar planos, produtos, cupons, colaboradores, unidade, dados fiscais e termos de uso", icon: <GearIcon /> },
 ];
@@ -565,7 +566,7 @@ export function App() {
               title="Conectar celular/tablet lendo um QR Code — instala o aplicativo no aparelho"
               style={{ fontSize: "12px", border: "1px solid var(--color-teal)", color: "var(--color-teal-text)", background: "rgba(29, 155, 132, 0.08)" }}
             >
-              📱 <span className="kiosk-connect-label">Conectar celular/tablet</span>
+              <Emoji3D e="📱" /> <span className="kiosk-connect-label">Conectar celular/tablet</span>
             </Button>
           )}
 

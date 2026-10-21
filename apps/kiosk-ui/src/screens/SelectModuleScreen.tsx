@@ -3,6 +3,7 @@ import { UNIT_BRANDS, unitMatchesBrand } from "../branding/unitBrand.js";
 import { useAppState } from "../state/AppState.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { useMobileShell } from "../mobile/useMobileShell.js";
+import { Emoji3D } from "../components/Emoji3D.js";
 
 /**
  * Tela Principal de Seleção de Módulo:
@@ -180,7 +181,7 @@ export function SelectModuleScreen() {
                   flexShrink: 0,
                 }}
               >
-                📊
+                <Emoji3D e="📊" />
               </div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -350,7 +351,7 @@ export function SelectModuleScreen() {
                   borderRadius: "18px",
                 }}
               >
-                📊
+                <Emoji3D e="📊" />
               </div>
               <Badge variant="vip">Owner</Badge>
             </div>

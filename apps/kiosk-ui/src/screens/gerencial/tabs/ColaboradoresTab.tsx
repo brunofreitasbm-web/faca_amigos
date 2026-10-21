@@ -9,6 +9,7 @@ import { ROLE_LABEL, ROLE_DESCRIPTION, ROLE_OPTIONS, type Role } from "../../../
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
 import { dateBrFromIso, EMPLOYEE_SECTORS, EMPLOYEE_SECTOR_LABEL, type EmployeeSector } from "@facaamigos/domain";
 import { getPublicAppUrl } from "../../../lib/appUrl.js";
+import { Emoji3D, renderEmoji } from "../../../components/Emoji3D.js";
 
 export function ColaboradoresTab() {
   const toast = useToast();
@@ -322,10 +323,10 @@ export function ColaboradoresTab() {
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <Button variant="secondary" onClick={() => setShowInviteModal(true)} style={{ borderRadius: "9999px" }}>
-              🔗 Gerar link de cadastro
+              <Emoji3D e="🔗" /> Gerar link de cadastro
             </Button>
             <Button variant="primary" onClick={() => setShowForm(true)} style={{ borderRadius: "9999px" }}>
-              ⚡ + Novo colaborador rápido
+              <Emoji3D e="⚡" /> + Novo colaborador rápido
             </Button>
           </div>
         </div>
@@ -366,7 +367,7 @@ export function ColaboradoresTab() {
         <Card style={{ padding: "20px", marginBottom: "20px", borderRadius: "18px", border: "2px solid var(--color-primary, #f0196b)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <div>
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}>⚡ Cadastro Rápido de Colaborador</h2>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", margin: 0 }}><Emoji3D e="⚡" /> Cadastro Rápido de Colaborador</h2>
               <HelpText style={{ margin: 0 }}>Apenas Nome, Permissão e PIN são obrigatórios para cadastro imediato.</HelpText>
             </div>
             <Button variant="ghost" size="sm" onClick={() => { setShowForm(false); resetForm(); }}>
@@ -448,7 +449,7 @@ export function ColaboradoresTab() {
       )}
 
       {resetPinTarget && (
-        <Modal onClose={closeResetPin} title={`🔑 Redefinir PIN de ${resetPinTarget.full_name}`}>
+        <Modal onClose={closeResetPin} title={renderEmoji(`🔑 Redefinir PIN de ${resetPinTarget.full_name}`)}>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
               Informe o novo PIN numérico de 6 dígitos que o colaborador usará para login no sistema.
@@ -477,7 +478,7 @@ export function ColaboradoresTab() {
       )}
 
       {unitsTarget && (
-        <Modal onClose={() => setUnitsTarget(null)} title={`🗂️ Unidades de ${unitsTarget.full_name}`}>
+        <Modal onClose={() => setUnitsTarget(null)} title={renderEmoji(`🗂️ Unidades de ${unitsTarget.full_name}`)}>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <p style={{ margin: 0, fontSize: "14px", color: "var(--text-muted)" }}>
               Em quais unidades este colaborador atua? Aparece na Configurações só das unidades marcadas.
@@ -496,7 +497,7 @@ export function ColaboradoresTab() {
       )}
 
       {showInviteModal && (
-        <Modal onClose={closeInviteModal} title="🔗 Gerar link de cadastro">
+        <Modal onClose={closeInviteModal} title={renderEmoji("🔗 Gerar link de cadastro")}>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             {!inviteLink ? (
               <>
@@ -533,7 +534,7 @@ export function ColaboradoresTab() {
                 <Input label="Link de cadastro" value={inviteLink} readOnly onFocus={(e) => e.target.select()} />
                 <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                   <Button variant="primary" onClick={copyInviteLink} style={{ borderRadius: "9999px", flex: 1 }}>
-                    📋 Copiar link
+                    <Emoji3D e="📋" /> Copiar link
                   </Button>
                   <Button variant="ghost" onClick={closeInviteModal}>
                     Fechar
@@ -546,7 +547,7 @@ export function ColaboradoresTab() {
       )}
 
       {showGeneralInviteModal && (
-        <Modal onClose={closeGeneralInviteModal} title="🎓 Link Geral de Estagiário">
+        <Modal onClose={closeGeneralInviteModal} title={renderEmoji("🎓 Link Geral de Estagiário")}>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             {!generalInviteLink ? (
               <>
@@ -581,7 +582,7 @@ export function ColaboradoresTab() {
                 <Input label="Link de cadastro" value={generalInviteLink} readOnly onFocus={(e) => e.target.select()} />
                 <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                   <Button variant="primary" onClick={copyGeneralInviteLink} style={{ borderRadius: "9999px", flex: 1 }}>
-                    📋 Copiar link
+                    <Emoji3D e="📋" /> Copiar link
                   </Button>
                   <Button variant="ghost" onClick={closeGeneralInviteModal}>
                     Fechar
@@ -594,7 +595,7 @@ export function ColaboradoresTab() {
       )}
 
       {showPjInviteModal && (
-        <Modal onClose={closePjInviteModal} title="💼 Link de Auto-Cadastro de Prestador PJ">
+        <Modal onClose={closePjInviteModal} title={renderEmoji("💼 Link de Auto-Cadastro de Prestador PJ")}>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             {!pjInviteLink ? (
               <>
@@ -627,7 +628,7 @@ export function ColaboradoresTab() {
                 <Input label="Link de auto-cadastro PJ" value={pjInviteLink} readOnly onFocus={(e) => e.target.select()} />
                 <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                   <Button variant="primary" onClick={copyPjInviteLink} style={{ borderRadius: "9999px", flex: 1 }}>
-                    📋 Copiar link PJ
+                    <Emoji3D e="📋" /> Copiar link PJ
                   </Button>
                   <Button variant="ghost" onClick={closePjInviteModal}>
                     Fechar
@@ -692,11 +693,11 @@ export function ColaboradoresTab() {
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <strong style={{ fontSize: "16px" }}>{e.full_name}</strong>
                       <span style={{ fontSize: "12px", fontWeight: "bold", padding: "2px 8px", borderRadius: "9999px", background: roleBadgeStyle.bg, color: roleBadgeStyle.color }}>
-                        {roleBadgeStyle.label}
+                        {renderEmoji(roleBadgeStyle.label)}
                       </span>
                       {e.active === false ? <Tag color="var(--text-muted)">Inativo</Tag> : <Tag color="var(--color-teal, #1d9b84)">Ativo</Tag>}
                       {cadastroStatus.get(e.id) ? (
-                        <Tag color="var(--color-teal, #1d9b84)">📋 Cadastro completo</Tag>
+                        <Tag color="var(--color-teal, #1d9b84)"><Emoji3D e="📋" /> Cadastro completo</Tag>
                       ) : (
                         <Tag color="var(--color-warning, #b45309)">⚠️ Cadastro pendente</Tag>
                       )}
@@ -709,7 +710,7 @@ export function ColaboradoresTab() {
                       {e.admission_date ? ` · Admitido: ${dateBrFromIso(e.admission_date)}` : ""}
                     </div>
                     <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                      🗂️ {employeeUnitNames.length > 0 ? employeeUnitNames.join(", ") : "sem unidade atribuída"}
+                      <Emoji3D e="🗂️" /> {employeeUnitNames.length > 0 ? employeeUnitNames.join(", ") : "sem unidade atribuída"}
                     </div>
                   </div>
                 </div>
@@ -749,11 +750,11 @@ export function ColaboradoresTab() {
                   </div>
 
                   <Button variant="ghost" size="sm" onClick={() => openUnitsModal(e)} title="Definir em quais unidades este colaborador atua">
-                    🗂️ Unidades
+                    <Emoji3D e="🗂️" /> Unidades
                   </Button>
 
                   <Button variant="ghost" size="sm" onClick={() => { setResetError(null); setResetPinTarget(e); }} title="Redefinir PIN de login">
-                    🔑 PIN
+                    <Emoji3D e="🔑" /> PIN
                   </Button>
 
                   <Button variant={e.active === false ? "secondary" : "ghost"} size="sm" onClick={() => toggleActive(e)} title={e.active === false ? "Ativar acesso do colaborador" : "Desativar acesso do colaborador"}>

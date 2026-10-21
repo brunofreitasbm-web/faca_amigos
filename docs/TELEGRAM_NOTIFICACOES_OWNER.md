@@ -7,8 +7,10 @@ e-mail (cada um com a sua marca: `sent_at_ms`, `emailed_at_ms`,
 - Migration: `supabase/migrations/20261010042613_fa_owner_telegram.sql`
 - Edge Function: `supabase/functions/owner-telegram-dispatch` (cron a cada minuto)
 - Tipos enviados: ABERTURA, FECHAMENTO, DIVERGENCIA_ABERTURA,
-  DIVERGENCIA_FECHAMENTO, CANDIDATURA_TALENTOS, RESUMO_SEMANAL,
+  DIVERGENCIA_FECHAMENTO, RESUMO_SEMANAL,
   OCORRENCIA_COLABORADOR, AVALIACAO_NEGATIVA. ACOMPANHAMENTO_17H/20H ficam fora.
+  CANDIDATURA_TALENTOS deixou de ir ao Telegram (migration
+  `20261018020000_fa_telegram_sem_candidatura_talentos.sql`); segue por e-mail/push.
 
 ## Configuração (uma vez)
 
@@ -63,7 +65,7 @@ exportado para cá sem alterações em `20261010045759` a `20261010045919`
   hoje R$ 20,00). Divergência abaixo do limiar não vira alerta avulso no
   Telegram (continua no corpo do fechamento e no resumo do dia).
   `fa_owner_telegram_claim_due` foi reescrita para isso e hoje envia: abertura,
-  fechamento, divergências (acima do limiar), candidatura, ocorrência,
+  fechamento, divergências (acima do limiar), ocorrência,
   avaliação negativa, `RESUMO_DIARIO` e `RESUMO_SEMANAL_CONSOLIDADO`. O
   `RESUMO_SEMANAL` antigo não é mais enviado ao Telegram.
 - **Resumos:** `RESUMO_DIARIO` (todo dia 23:30, Belém) e

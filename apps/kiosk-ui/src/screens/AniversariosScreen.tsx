@@ -4,6 +4,7 @@ import { Api } from "../api/client.js";
 import type { Birthday } from "../api/client.js";
 import { useAppState } from "../state/AppState.js";
 import { useToast } from "../state/ToastContext.js";
+import { Emoji3D } from "../components/Emoji3D.js";
 
 /** Hash simples e estável (mesmo id -> sempre o mesmo índice) para a mensagem inicial de cada card. */
 function stableIndex(id: string, mod: number): number {
@@ -112,7 +113,7 @@ export function AniversariosScreen() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
         <div>
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: "28px", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
-            🎂 Módulo de Aniversariantes
+            <Emoji3D e="🎂" /> Módulo de Aniversariantes
           </h1>
           <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "14px" }}>
             Aniversariantes de hoje em {unit?.name ?? "sua unidade"} — envie uma mensagem acolhedora para o responsável.
@@ -146,17 +147,17 @@ export function AniversariosScreen() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
               <div>
                 <h3 style={{ fontSize: "20px", margin: "0 0 4px 0", color: "var(--text-primary)" }}>
-                  {item.full_name} 🎉
+                  {item.full_name} <Emoji3D e="🎉" />
                 </h3>
                 <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
                   Completa <strong>{item.age_turning} anos</strong> — Responsável: <strong>{item.guardian_name}</strong>
                 </p>
               </div>
-              <Badge variant="amber">HOJE! 🎂</Badge>
+              <Badge variant="amber">HOJE! <Emoji3D e="🎂" /></Badge>
             </div>
 
             <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>
-              📞 Contato: {item.phone_e164 || "Não cadastrado"}
+              <Emoji3D e="📞" /> Contato: {item.phone_e164 || "Não cadastrado"}
             </p>
 
             <div
@@ -176,7 +177,7 @@ export function AniversariosScreen() {
 
             <div style={{ display: "flex", gap: "8px" }}>
               <Button variant="ghost" size="sm" onClick={() => shuffleMessage(item)} style={{ flexShrink: 0 }}>
-                🔀 Trocar
+                <Emoji3D e="🔀" /> Trocar
               </Button>
               <Button
                 variant="amber"
@@ -184,7 +185,7 @@ export function AniversariosScreen() {
                 onClick={() => handleSendWhatsApp(item)}
                 style={{ flex: 1, fontWeight: "bold" }}
               >
-                📱 Enviar Felicitação WhatsApp
+                <Emoji3D e="📱" /> Enviar Felicitação WhatsApp
               </Button>
             </div>
           </Card>

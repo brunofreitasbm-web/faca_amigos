@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Card } from "@facaamigos/ui";
 import { trackEvent } from "../../lib/analytics.js";
+import { Emoji3D } from "../../components/Emoji3D.js";
 
 /** Olhar FaçaAmigos de hoje, aberto direto da tela de acompanhamento. */
 export function OlharCard({ childFirstName, url }: { childFirstName: string; url: string }) {
@@ -14,7 +15,7 @@ export function OlharCard({ childFirstName, url }: { childFirstName: string; url
 
   return (
     <Card style={{ display: "flex", flexDirection: "column", gap: "8px", border: "1.5px solid var(--color-teal)" }}>
-      <strong style={{ fontSize: "16px", lineHeight: 1.3 }}>O Olhar FaçaAmigos de {childFirstName} está pronto 💛</strong>
+      <strong style={{ fontSize: "16px", lineHeight: 1.3 }}>O Olhar FaçaAmigos de {childFirstName} está pronto <Emoji3D e="💛" /></strong>
       <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.5, color: "var(--text-muted)" }}>
         Um registro observacional de como {childFirstName} brincou hoje, feito pela nossa equipe. Não é uma avaliação.
       </p>
