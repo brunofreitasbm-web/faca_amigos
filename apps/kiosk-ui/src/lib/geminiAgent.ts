@@ -882,3 +882,303 @@ Responda EXCLUSIVAMENTE em formato JSON:
     },
   ];
 }
+
+export interface OperatorSalesCopilotTip {
+  headline: string;
+  tactic: string;
+  focusItem: string;
+  urgency: "NORMAL" | "ALTA" | "COMEMORACAO";
+  suggestedScript: string;
+}
+
+export interface OperatorSalesCopilotContext {
+  todayRevenueCents: number;
+  targetRevenueCents: number;
+  superRevenueCents?: number;
+  ordersCount: number;
+  ticketMedioCents: number;
+  unitName: string;
+  unitKind: "QUIOSQUE" | "LOJA";
+  bonusLevel: "abaixo" | "meta" | "supermeta";
+  bonusEstimatedCents: number;
+}
+
+/**
+ * Gera orientação comercial tática em tempo real para o operador no PDV/Painel
+ * orientada a bater a meta de faturamento e bonificação do dia.
+ */
+export async function generateOperatorSalesCopilotTip(
+  ctx: OperatorSalesCopilotContext
+): Promise<OperatorSalesCopilotTip> {
+  const isCircuito = ctx.unitKind === "QUIOSQUE";
+  const deltaMetaCents = Math.max(0, ctx.targetRevenueCents - ctx.todayRevenueCents);
+  const deltaSuperCents = Math.max(0, (ctx.superRevenueCents || ctx.targetRevenueCents * 1.3) - ctx.todayRevenueCents);
+
+  const systemInstruction = `Você é a ZoeIA, treinadora comercial do balcão FaçaAmigos.
+Seu foco é exclusivamente elevar o faturamento e ticket médio da unidade, orientando o atendente a bater a meta e supermeta do dia.
+Forneça instruções rápidas, motivadoras e acionáveis para o operador abordar o próximo cliente no check-in/balcão.
+Responda EXCLUSIVAMENTE em formato JSON:
+{
+  "headline": "frase de impacto com 3 a 6 palavras",
+  "tactic": "instrução direta de abordagem prática de 1 a 2 linhas",
+  "focusItem": "produto ou plano chave (ex: Plano 60min, Meia Antiderrapante, Pacote 10h)",
+  "urgency": "NORMAL" | "ALTA" | "COMEMORACAO",
+  "suggestedScript": "fala exata e natural de 1 frase pronta para ler ao cliente"
+}`;
+
+  const prompt = `Unidade: ${ctx.unitName} (${isCircuito ? "Circuito Carrinhos" : "Playground"})
+Faturamento Hoje: R$ ${(ctx.todayRevenueCents / 100).toFixed(2)}
+Meta do Dia: R$ ${(ctx.targetRevenueCents / 100).toFixed(2)} (Falta R$ ${(deltaMetaCents / 100).toFixed(2)})
+Nível Atual: ${ctx.bonusLevel.toUpperCase()}
+Atendimentos: ${ctx.ordersCount} | Ticket Médio: R$ ${(ctx.ticketMedioCents / 100).toFixed(2)}
+Bônus Estimado da Equipe: R$ ${(ctx.bonusEstimatedCents / 100).toFixed(2)}`;
+
+  const rawJson = await callGemini(prompt, systemInstruction);
+  if (rawJson) {
+    try {
+      const parsed = JSON.parse(rawJson);
+      if (parsed?.headline && parsed?.tactic && parsed?.suggestedScript) {
+        return {
+          headline: parsed.headline,
+          tactic: parsed.tactic,
+          focusItem: parsed.focusItem || (isCircuito ? "Bateria Dupla" : "Plano 60min"),
+          urgency: parsed.urgency || "NORMAL",
+          suggestedScript: parsed.suggestedScript,
+        };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  // Fallback determinístico comercial
+  if (ctx.bonusLevel === "supermeta") {
+    return {
+      headline: "Supermeta alcançada! Mantenha o ritmo!",
+      tactic: "A equipe garantiu a bonificação máxima do dia. Continue oferecendo pacotes para antecipar receita da semana.",
+      focusItem: "Pacote 10 Horas",
+      urgency: "COMEMORACAO",
+      suggestedScript: "Aproveite que a criança amou hoje e garanta o Passaporte 10h com 25% de economia por hora!",
+    };
+  }
+
+  if (ctx.bonusLevel === "meta") {
+    const faltaSuperReais = (deltaSuperCents / 100).toFixed(2).replace(".", ",");
+    return {
+      headline: "Meta batida! Rumo à Supermeta!",
+      tactic: `Faltam R$ ${faltaSuperReais} para o bônus máximo. Foque na venda cruzada de meias e upgrade de 30min para 60min.`,
+      focusItem: isCircuito ? "Volta Adicional" : "Upgrade 60 Minutos",
+      urgency: "ALTA",
+      suggestedScript: "Por apenas mais R$ 15, a criança dobra o tempo de brincadeira e aproveita muito mais!",
+    };
+  }
+
+  if (deltaMetaCents <= 15000 && deltaMetaCents > 0) {
+    const faltaReais = (deltaMetaCents / 100).toFixed(2).replace(".", ",");
+    return {
+      headline: "Falta muito pouco para a meta!",
+      tactic: `Apenas R$ ${faltaReais} separam a equipe do bônus! Apresente o plano de 60min e meias antiderrapantes nos próximos 2 atendimentos.`,
+      focusItem: isCircuito ? "Combo 2 Carrinhos" : "Plano 60 Minutos + Meia",
+      urgency: "ALTA",
+      suggestedScript: "Se levar a meia oficial antiderrapante agora, o plano de 60 minutos sai com bônus de tolerância!",
+    };
+  }
+
+  return {
+    headline: "Alavanque o ticket médio agora!",
+    tactic: isCircuito
+      ? "Ofereça o combo de 2 voltas ou bateria estendida logo na largada."
+      : "Pergunte sempre: 'Quer garantir 60 minutos para a criança aproveitar com folga por um valor proporcional menor?'",
+    focusItem: isCircuito ? "Bateria 20 Minutos" : "Plano 60 Minutos",
+    urgency: "NORMAL",
+    suggestedScript: "O plano de 60 minutos é o nosso campeão de escolha, porque a criança aproveita sem pressa e a hora sai muito mais barata.",
+  };
+}
+
+export interface IdleHoursPlanSuggestion {
+  id: string;
+  name: string;
+  durationValue: number;
+  durationUnit: "MINUTO" | "HORA";
+  suggestedValueCents: number;
+  regularValueCents?: number;
+  overageCentsPerMinute: number;
+  color: string;
+  badge: string;
+  targetDays: string;
+  targetHours: string;
+  salesPitch: string;
+  economicBenefit: string;
+}
+
+export interface IdleHoursPricingContext {
+  unitId: string;
+  unitName: string;
+  activity: "PLAYGROUND" | "CARRINHO";
+  currentPlans: Array<{ name: string; valueCents: number; durationValue: number }>;
+}
+
+/**
+ * Analisa horários ociosos (Seg a Qui à tarde) e sugere combos e tarifas
+ * promocionais de precificação dinâmica para elevar a ocupação do parque.
+ */
+export async function generateIdleHoursPlanSuggestions(
+  ctx: IdleHoursPricingContext
+): Promise<IdleHoursPlanSuggestion[]> {
+  const isCircuito = ctx.activity === "CARRINHO";
+  const plansSummary = ctx.currentPlans.map((p) => `${p.name}: R$ ${(p.valueCents / 100).toFixed(2)} (${p.durationValue}m)`).join(", ");
+
+  const systemInstruction = `Você é a ZoeIA, especialista em Yield Management e Precificação Dinâmica para entretenimento infantil em shoppings.
+Seu objetivo é sugerir combos e tarifas promocionais para HORÁRIOS OCIOSOS (especialmente Segunda a Quinta das 12h às 17h), convertendo fluxo ocioso em faturamento sem canibalizar os finais de semana.
+Gere 3 propostas estratégicas de planos.
+Responda EXCLUSIVAMENTE em formato JSON:
+{
+  "suggestions": [
+    {
+      "id": "string único",
+      "name": "Nome atraente do plano (ex: Tarde Divertida 45min)",
+      "durationValue": 45,
+      "durationUnit": "MINUTO",
+      "suggestedValueCents": 3990,
+      "regularValueCents": 5500,
+      "overageCentsPerMinute": 100,
+      "color": "#2ECFB5" | "#F0196B" | "#FFE234" | "#FF7A00" | "#A020EE" | "#1A3F35",
+      "badge": "tag chamativa (ex: Seg a Qui 13h-17h, Combo Happy Hour)",
+      "targetDays": "Segunda a Quinta-feira",
+      "targetHours": "12:00 às 17:00",
+      "salesPitch": "argumento de venda de 1 frase para o balcão",
+      "economicBenefit": "explicação do benefício financeiro"
+    }
+  ]
+}`;
+
+  const prompt = `Unidade: ${ctx.unitName} (${isCircuito ? "Circuito de Carrinhos" : "Playground"})
+Planos de Tabela Atuais: ${plansSummary || "Padrão de mercado"}
+Objetivo: atrair famílias que passeiam no shopping em dias úteis no início da tarde com combos atrativos.`;
+
+  const rawJson = await callGemini(prompt, systemInstruction);
+  if (rawJson) {
+    try {
+      const parsed = JSON.parse(rawJson);
+      if (Array.isArray(parsed?.suggestions) && parsed.suggestions.length > 0) {
+        return parsed.suggestions.map((s: any, idx: number) => ({
+          id: s.id || `combo_ocioso_${idx}`,
+          name: s.name,
+          durationValue: Number(s.durationValue) || 45,
+          durationUnit: "MINUTO",
+          suggestedValueCents: Number(s.suggestedValueCents) || 3990,
+          regularValueCents: s.regularValueCents ? Number(s.regularValueCents) : undefined,
+          overageCentsPerMinute: Number(s.overageCentsPerMinute) || 100,
+          color: s.color || "#FF7A00",
+          badge: s.badge || "Ocupação Ociosa",
+          targetDays: s.targetDays || "Segunda a Quinta",
+          targetHours: s.targetHours || "12h às 17h",
+          salesPitch: s.salesPitch || "Tarifa especial de dia de semana para aproveitar o parque tranquilo.",
+          economicBenefit: s.economicBenefit || "Aumenta faturamento em horários que os custos fixos já estão rodando.",
+        }));
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  // Fallback determinístico inteligente para FaçaAmigos
+  if (isCircuito) {
+    return [
+      {
+        id: "ocioso_circuito_1",
+        name: "Super Bateria Tarde (20 min)",
+        durationValue: 20,
+        durationUnit: "MINUTO",
+        suggestedValueCents: 3500,
+        regularValueCents: 4500,
+        overageCentsPerMinute: 150,
+        color: "#FF7A00",
+        badge: "⚡ Seg a Qui 13h-17h",
+        targetDays: "Segunda a Quinta",
+        targetHours: "13:00 às 17:00",
+        salesPitch: "Bateria estendida exclusiva para dias úteis com mais tempo de pista livre.",
+        economicBenefit: "Ocupa a frota de carrinhos parada nas primeiras horas da tarde.",
+      },
+      {
+        id: "ocioso_circuito_2",
+        name: "Combo Pista Livre (30 min)",
+        durationValue: 30,
+        durationUnit: "MINUTO",
+        suggestedValueCents: 4990,
+        regularValueCents: 6500,
+        overageCentsPerMinute: 150,
+        color: "#2ECFB5",
+        badge: "🏎️ Campeão Seg a Qui",
+        targetDays: "Segunda a Quinta",
+        targetHours: "12:00 às 18:00",
+        salesPitch: "Meia hora inteira de direção livre sem filas no circuito.",
+        economicBenefit: "Eleva o ticket médio dos poucos clientes que chegam no início da tarde.",
+      },
+      {
+        id: "ocioso_circuito_3",
+        name: "Passaporte Dupla Amigos (2 Carrinhos)",
+        durationValue: 15,
+        durationUnit: "MINUTO",
+        suggestedValueCents: 5500,
+        regularValueCents: 7000,
+        overageCentsPerMinute: 150,
+        color: "#A020EE",
+        badge: "👫 2 Carrinhos Juntos",
+        targetDays: "Segunda a Quinta",
+        targetHours: "Dia Todo",
+        salesPitch: "Traga irmão ou amigo e andem juntos com desconto na segunda volta.",
+        economicBenefit: "Gera venda casada imediata de 2 crianças no mesmo atendimento.",
+      },
+    ];
+  }
+
+  return [
+    {
+      id: "ocioso_play_1",
+      name: "Tarde Divertida (45 min)",
+      durationValue: 45,
+      durationUnit: "MINUTO",
+      suggestedValueCents: 3990,
+      regularValueCents: 5000,
+      overageCentsPerMinute: 100,
+      color: "#2ECFB5",
+      badge: "🎈 Seg a Qui 12h-17h",
+      targetDays: "Segunda a Quinta",
+      targetHours: "12:00 às 17:00",
+      salesPitch: "Tempo perfeito para almoçar com calma no shopping enquanto a criança brinca.",
+      economicBenefit: "Atrai o público do almoço do shopping em dias úteis.",
+    },
+    {
+      id: "ocioso_play_2",
+      name: "Happy Hour Kids (60 min)",
+      durationValue: 60,
+      durationUnit: "MINUTO",
+      suggestedValueCents: 4990,
+      regularValueCents: 6500,
+      overageCentsPerMinute: 100,
+      color: "#F0196B",
+      badge: "⏰ Happy Hour 14h-18h",
+      targetDays: "Segunda a Quinta",
+      targetHours: "14:00 às 18:00",
+      salesPitch: "1 hora inteira pelo valor promocional de 30 minutos em dias úteis.",
+      economicBenefit: "Maximiza a permanência da criança e eleva consumo adicional de lanches.",
+    },
+    {
+      id: "ocioso_play_3",
+      name: "Combo Brincar + Meia Oficial",
+      durationValue: 40,
+      durationUnit: "MINUTO",
+      suggestedValueCents: 5490,
+      regularValueCents: 6800,
+      overageCentsPerMinute: 100,
+      color: "#FF7A00",
+      badge: "🧦 Brincadeira + Meia",
+      targetDays: "Segunda a Quinta",
+      targetHours: "12:00 às 18:00",
+      salesPitch: "Entrada com meia antiderrapante oficial inclusa no pacote por um valor único.",
+      economicBenefit: "Desova de estoque de meias e margem líquida direta no combo.",
+    },
+  ];
+}
+

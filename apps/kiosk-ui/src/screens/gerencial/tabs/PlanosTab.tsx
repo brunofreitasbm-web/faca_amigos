@@ -8,6 +8,7 @@ import { useToast } from "../../../state/ToastContext.js";
 import { useConfirm } from "../../../state/ConfirmContext.js";
 import { money } from "../../../format.js";
 import { UnitCheckboxGroup } from "../UnitCheckboxGroup.js";
+import { CombosOciososSection } from "./CombosOciososSection.js";
 
 const PLAN_COLOR_OPTIONS = ["#2ECFB5", "#F0196B", "#FFE234", "#FF7A00", "#A020EE", "#1A3F35"];
 const COLOR_NAMES: Record<string, string> = {
@@ -345,6 +346,20 @@ export function PlanosTab() {
           </div>
         </section>
       ))}
+
+      <CombosOciososSection
+        units={units}
+        onPlanCreated={load}
+        onSelectForEdit={(data) => {
+          setName(data.name);
+          setValueReais(data.valueReais);
+          setDurationValue(data.durationValue);
+          setDurationUnit(data.durationUnit);
+          setOverageReais(data.overageReais);
+          setColor(data.color);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
       </div>
     </div>
   );

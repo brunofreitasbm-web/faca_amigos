@@ -27,6 +27,7 @@ import { SaidaScreen } from "./SaidaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
 import { WristbandQRCode } from "../components/WristbandQRCode.js";
 import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
+import { OperatorSalesCopilot } from "../components/OperatorSalesCopilot.js";
 
 const PAUSE_REASONS: Array<{ value: string; label: string }> = [
   { value: "BANHEIRO", label: "Foi ao banheiro" },
@@ -515,6 +516,16 @@ export function PainelScreen() {
 
   const selectedEntries = entries.filter((e) => selected.has(e.session.id));
 
+  const unitTipo = unit?.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
+  const businessDate = unit ? businessDateFor(Date.now(), unit.business_day_cutoff_hour) : "";
+  const atualBonificacao = unitTipo === "CIRCUITO" ? todayOrdersCount : Math.max(0, todayRevenueCents - todayRentalCents);
+  const dow = businessDate ? diaSemanaISO(businessDate) : 1;
+  const currentGoal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
+  const currentBonus =
+    unit && businessDate
+      ? bonificacaoHoje(unitTipo, businessDate, atualBonificacao, currentGoal, bonusProgram?.locacaoExtraBonusCents ?? 0)
+      : null;
+
   return (
     // height:100% + minHeight:0: o Painel ocupa exatamente o espaço do
     // <main> do shell (ver App.tsx) e nunca mais que isso — só a lista de
@@ -703,6 +714,18 @@ export function PainelScreen() {
           </IfCan>
         </div>
       </div>
+
+      <OperatorSalesCopilot
+        todayRevenueCents={todayRevenueCents - todayRentalCents}
+        targetRevenueCents={currentBonus?.meta || ticketTargetCents || 100000}
+        superRevenueCents={currentBonus?.super || (ticketTargetCents > 0 ? Math.round(ticketTargetCents * 1.3) : 150000)}
+        ordersCount={todayOrdersCount}
+        ticketMedioCents={ticketMedioCents}
+        unitName={unit?.name}
+        unitKind={unit?.kind}
+        bonusLevel={currentBonus?.nivel || "abaixo"}
+        bonusEstimatedCents={currentBonus?.bonusCents || 0}
+      />
 
       {!tipDismissed && entries.length > 0 && (
         <div style={{ position: "relative", flexShrink: 0 }} role="status">
