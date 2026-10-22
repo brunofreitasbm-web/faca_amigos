@@ -915,15 +915,26 @@ export async function generateOperatorSalesCopilotTip(
   const deltaSuperCents = Math.max(0, (ctx.superRevenueCents || ctx.targetRevenueCents * 1.3) - ctx.todayRevenueCents);
 
   const systemInstruction = `Você é a ZoeIA, treinadora comercial do balcão FaçaAmigos.
-Seu foco é exclusivamente elevar o faturamento e ticket médio da unidade, orientando o atendente a bater a meta e supermeta do dia.
-Forneça instruções rápidas, motivadoras e acionáveis para o operador abordar o próximo cliente no check-in/balcão.
+REGRAS OBRIGATÓRIAS DE PRECIFICAÇÃO E PROTOCOLO (TABELA OFICIAL):
+1. TABELA REAL PLAYGROUND:
+   - 30 minutos: R$ 60,00 (Meia Inclusiva CIPTEA: R$ 50,00)
+   - 1 hora (60 min): R$ 108,00 (Meia Inclusiva CIPTEA: R$ 90,00) -> Diferença para dobrar de 30min para 1h: R$ 48,00 (ou R$ 40,00 na meia)
+   - 2 horas: R$ 192,00 (Meia: R$ 160,00)
+   - Meia Nuvem Oficial: R$ 35,00
+2. TABELA REAL CIRCUITO (CARRINHOS):
+   - 30 min carrinhos / 20 min pelúcias: R$ 48,00 fixo (minuto excedente R$ 3,00)
+3. PROTOCOLO PADRÃO DE VENDA DA FAÇAAMIGOS:
+   - Sempre ofereça o passaporte de 1 hora logo na abertura ("tempo ideal para a criança brincar com tranquilidade e os pais descansarem no shopping").
+   - 30 minutos é plano de recuo: ofereça apenas se o cliente hesitar.
+   - NUNCA invente preços ou diferenças fictícias.
+
 Responda EXCLUSIVAMENTE em formato JSON:
 {
   "headline": "frase de impacto com 3 a 6 palavras",
   "tactic": "instrução direta de abordagem prática de 1 a 2 linhas",
-  "focusItem": "produto ou plano chave (ex: Plano 60min, Meia Antiderrapante, Pacote 10h)",
+  "focusItem": "Passaporte 1 Hora | Meia Nuvem | Passaporte 2 Horas | Circuito 30min",
   "urgency": "NORMAL" | "ALTA" | "COMEMORACAO",
-  "suggestedScript": "fala exata e natural de 1 frase pronta para ler ao cliente"
+  "suggestedScript": "fala exata e natural pronta para o operador ler ao cliente com valores reais"
 }`;
 
   const prompt = `Unidade: ${ctx.unitName} (${isCircuito ? "Circuito Carrinhos" : "Playground"})
@@ -941,7 +952,7 @@ Bônus Estimado da Equipe: R$ ${(ctx.bonusEstimatedCents / 100).toFixed(2)}`;
         return {
           headline: parsed.headline,
           tactic: parsed.tactic,
-          focusItem: parsed.focusItem || (isCircuito ? "Bateria Dupla" : "Plano 60min"),
+          focusItem: parsed.focusItem || (isCircuito ? "Circuito 30min" : "Passaporte 1 Hora"),
           urgency: parsed.urgency || "NORMAL",
           suggestedScript: parsed.suggestedScript,
         };
@@ -951,14 +962,14 @@ Bônus Estimado da Equipe: R$ ${(ctx.bonusEstimatedCents / 100).toFixed(2)}`;
     }
   }
 
-  // Fallback determinístico comercial
+  // Fallback determinístico comercial estritamente alinhado à tabela oficial
   if (ctx.bonusLevel === "supermeta") {
     return {
       headline: "Supermeta alcançada! Mantenha o ritmo!",
-      tactic: "A equipe garantiu a bonificação máxima do dia. Continue oferecendo pacotes para antecipar receita da semana.",
-      focusItem: "Pacote 10 Horas",
+      tactic: "A equipe garantiu a bonificação máxima do dia. Mantenha o foco em apresentar a Meia Nuvem e pacotes mensais.",
+      focusItem: isCircuito ? "Volta Adicional" : "Passaporte Mensal Porto Seguro",
       urgency: "COMEMORACAO",
-      suggestedScript: "Aproveite que a criança amou hoje e garanta o Passaporte 10h com 25% de economia por hora!",
+      suggestedScript: "Aproveite para garantir a Meia Nuvem oficial FaçaAmigos para mais segurança na brincadeira!",
     };
   }
 
@@ -966,10 +977,12 @@ Bônus Estimado da Equipe: R$ ${(ctx.bonusEstimatedCents / 100).toFixed(2)}`;
     const faltaSuperReais = (deltaSuperCents / 100).toFixed(2).replace(".", ",");
     return {
       headline: "Meta batida! Rumo à Supermeta!",
-      tactic: `Faltam R$ ${faltaSuperReais} para o bônus máximo. Foque na venda cruzada de meias e upgrade de 30min para 60min.`,
-      focusItem: isCircuito ? "Volta Adicional" : "Upgrade 60 Minutos",
+      tactic: `Faltam R$ ${faltaSuperReais} para o bônus máximo. Siga o protocolo oferecendo sempre 1 hora (R$ 108) na abertura.`,
+      focusItem: isCircuito ? "Circuito 30min" : "Passaporte 1 Hora",
       urgency: "ALTA",
-      suggestedScript: "Por apenas mais R$ 15, a criança dobra o tempo de brincadeira e aproveita muito mais!",
+      suggestedScript: isCircuito
+        ? "No circuito de 30 minutos a criança aproveita a pista inteira com tranquilidade por R$ 48,00!"
+        : "Nosso passaporte padrão é de 1 hora por R$ 108,00, tempo ideal para a criança brincar e os pais passearem com calma.",
     };
   }
 
@@ -977,21 +990,25 @@ Bônus Estimado da Equipe: R$ ${(ctx.bonusEstimatedCents / 100).toFixed(2)}`;
     const faltaReais = (deltaMetaCents / 100).toFixed(2).replace(".", ",");
     return {
       headline: "Falta muito pouco para a meta!",
-      tactic: `Apenas R$ ${faltaReais} separam a equipe do bônus! Apresente o plano de 60min e meias antiderrapantes nos próximos 2 atendimentos.`,
-      focusItem: isCircuito ? "Combo 2 Carrinhos" : "Plano 60 Minutos + Meia",
+      tactic: `Apenas R$ ${faltaReais} para liberar o bônus da equipe! Ofereça a Meia Nuvem (R$ 35) ou o Passaporte de 1h (R$ 108).`,
+      focusItem: isCircuito ? "Circuito 30min" : "Passaporte 1 Hora + Meia Nuvem",
       urgency: "ALTA",
-      suggestedScript: "Se levar a meia oficial antiderrapante agora, o plano de 60 minutos sai com bônus de tolerância!",
+      suggestedScript: isCircuito
+        ? "Garante a volta completa de 30 minutos por R$ 48,00 para curtir sem pressa!"
+        : "Se o cliente hesitar nos 30 min (R$ 60), mostre que por R$ 48 a mais ele leva 1 hora inteira com o Olhar FaçaAmigos incluso!",
     };
   }
 
   return {
-    headline: "Alavanque o ticket médio agora!",
+    headline: "Ofereça 1 hora na abertura!",
     tactic: isCircuito
-      ? "Ofereça o combo de 2 voltas ou bateria estendida logo na largada."
-      : "Pergunte sempre: 'Quer garantir 60 minutos para a criança aproveitar com folga por um valor proporcional menor?'",
-    focusItem: isCircuito ? "Bateria 20 Minutos" : "Plano 60 Minutos",
+      ? "Apresente o circuito de 30 minutos (R$ 48) como a melhor experiência para a criança."
+      : "Regra do balcão: nunca ofereça 30 minutos primeiro. Abra com o Passaporte de 1 Hora (R$ 108,00).",
+    focusItem: isCircuito ? "Circuito 30min" : "Passaporte 1 Hora",
     urgency: "NORMAL",
-    suggestedScript: "O plano de 60 minutos é o nosso campeão de escolha, porque a criança aproveita sem pressa e a hora sai muito mais barata.",
+    suggestedScript: isCircuito
+      ? "Nosso circuito de 30 minutos por R$ 48,00 é o favorito das crianças para pilotar à vontade."
+      : "Nosso passaporte de tranquilidade é de 1 hora por R$ 108,00 — tempo ideal para a criança brincar e vocês descansarem.",
   };
 }
 
