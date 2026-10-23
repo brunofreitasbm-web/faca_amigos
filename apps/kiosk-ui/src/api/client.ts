@@ -1596,7 +1596,12 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
               activity: row.activity as Plan["activity"],
               name: (row.child_credit_name_snapshot as string | null) ?? "Saldo pré-pago",
               valueCents: 0,
-              durationValue: (row.child_credit_allocated_minutes as number | null) ?? 0,
+              // O fechamento (fa_checkout) abate do pacote do responsável o que
+              // o saldo da criança não cobrir; somar aqui mantém o contador e o
+              // total da tela iguais aos do servidor.
+              durationValue:
+                ((row.child_credit_allocated_minutes as number | null) ?? 0) +
+                (raw.packageBalanceByGuardian.get(row.guardian_id as string) ?? 0),
               durationUnit: "MINUTO",
               overageCentsPerMinute: (row.child_credit_overage_cents_per_minute as number | null) ?? 0,
               color: "#7C4DFF",
@@ -2437,6 +2442,25 @@ export const Api = {
       supabase().rpc("fa_kiosk_child_credit_balance", { p_child_ids: childIds }),
     );
     return new Map(rows.map((r) => [r.child_id, r]));
+  },
+
+  /**
+   * Minutos de pacote (ex.: Porto Seguro) dos responsáveis ligados à criança.
+   * Sessão em saldo pré-pago também abate daqui quando o saldo da criança
+   * acaba (fa_checkout), então a Entrada soma os dois ao mostrar o que sobra.
+   */
+  childGuardianPackageMinutes: async (unitId: string, childId: string): Promise<number> => {
+    const links = await unwrap<{ guardian_id: string }[]>(
+      supabase().from("fa_kiosk_child_guardians").select("guardian_id").eq("child_id", childId),
+    );
+    if (links.length === 0) return 0;
+    const rows = await unwrap<{ remaining_minutes: number }[]>(
+      supabase().rpc("fa_kiosk_guardian_package_balance", {
+        p_unit_id: unitId,
+        p_guardian_ids: links.map((l) => l.guardian_id),
+      }),
+    );
+    return rows.reduce((sum, r) => sum + r.remaining_minutes, 0);
   },
 
   /** Saldo de pacote ligado à família mas gravado em OUTRO responsável — o check-in cobraria avulso. */

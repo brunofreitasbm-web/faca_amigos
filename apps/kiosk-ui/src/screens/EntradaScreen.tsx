@@ -228,6 +228,9 @@ export function EntradaScreen({
   // consultado. creditId aponta para o crédito mais antigo (FIFO) — é o
   // que fa_checkin referencia para fixar tarifa/piso da sessão.
   const [childCredit, setChildCredit] = useState<{ remainingMinutes: number; creditId: string } | null>(null);
+  // Minutos de pacote dos responsáveis da criança: o fechamento da sessão em
+  // saldo pré-pago abate daqui quando o saldo da criança acaba.
+  const [childPackageMinutes, setChildPackageMinutes] = useState(0);
   // Saldo de pacote da família gravado em outro responsável: o check-in
   // cobraria avulso, então o operador é avisado antes de confirmar.
   const [foreignPackages, setForeignPackages] = useState<ForeignPackageBalance[]>([]);
@@ -422,9 +425,13 @@ export function EntradaScreen({
     setOffer(null);
     setHourBank(null);
     setChildCredit(null);
+    setChildPackageMinutes(0);
     setForeignPackages([]);
 
     if (unit?.id) {
+      Api.childGuardianPackageMinutes(unit.id, match.id)
+        .then(setChildPackageMinutes)
+        .catch(() => setChildPackageMinutes(0));
       Api.foreignPackageBalances(unit.id, match.id, match.cpf ? normalizeCpf(match.cpf) : null, match.phone_e164)
         .then(setForeignPackages)
         .catch(() => setForeignPackages([]));
@@ -1440,9 +1447,13 @@ export function EntradaScreen({
                 <Emoji3D e="💳" /> Usar saldo pré-pago
               </strong>
               <div style={{ fontSize: "18px", color: "#5B32C4", fontWeight: "bold", marginTop: "2px" }}>
-                {formatPlanoHoras(childCredit.remainingMinutes)} disponíveis
+                {formatPlanoHoras(childCredit.remainingMinutes + childPackageMinutes)} disponíveis
               </div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>sem vencimento · sem custo de entrada</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                {childPackageMinutes > 0
+                  ? `${formatPlanoHoras(childCredit.remainingMinutes)} da criança + ${formatPlanoHoras(childPackageMinutes)} do pacote · o pacote é usado quando o saldo da criança acabar`
+                  : "sem vencimento · sem custo de entrada"}
+              </div>
             </Card>
           )}
           {/* Cortesia de aniversário: só aparece para a criança que a tem,
