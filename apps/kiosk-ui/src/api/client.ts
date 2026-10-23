@@ -861,6 +861,15 @@ export interface ChildCreditBalance {
   credit_id: string;
 }
 
+/** Um pacote com saldo dos responsáveis da criança (`fa_kiosk_child_package_list`). Vence; ver `expires_at_ms`. */
+export interface ChildPackageBalance {
+  package_id: string;
+  package_name: string;
+  remaining_minutes: number;
+  included_minutes: number;
+  expires_at_ms: number;
+}
+
 /** Uma criança com saldo pré-pago aguardando início — fila do Painel (`fa_kiosk_child_credit_queue`). */
 export interface PrepaidCreditQueueItem {
   credit_id: string;
@@ -2445,23 +2454,15 @@ export const Api = {
   },
 
   /**
-   * Minutos de pacote (ex.: Porto Seguro) dos responsáveis ligados à criança.
-   * Sessão em saldo pré-pago também abate daqui quando o saldo da criança
-   * acaba (fa_checkout), então a Entrada soma os dois ao mostrar o que sobra.
+   * Pacotes com saldo (ex.: Porto Seguro) dos responsáveis ligados à criança,
+   * um por linha, na ordem em que o fechamento os abate. A Entrada mostra a
+   * lista antes da sessão; o fechamento da sessão em saldo pré-pago também
+   * abate daqui quando o saldo da criança acaba (fa_checkout).
    */
-  childGuardianPackageMinutes: async (unitId: string, childId: string): Promise<number> => {
-    const links = await unwrap<{ guardian_id: string }[]>(
-      supabase().from("fa_kiosk_child_guardians").select("guardian_id").eq("child_id", childId),
-    );
-    if (links.length === 0) return 0;
-    const rows = await unwrap<{ remaining_minutes: number }[]>(
-      supabase().rpc("fa_kiosk_guardian_package_balance", {
-        p_unit_id: unitId,
-        p_guardian_ids: links.map((l) => l.guardian_id),
-      }),
-    );
-    return rows.reduce((sum, r) => sum + r.remaining_minutes, 0);
-  },
+  childPackages: (unitId: string, childId: string) =>
+    unwrap<ChildPackageBalance[]>(
+      supabase().rpc("fa_kiosk_child_package_list", { p_unit_id: unitId, p_child_id: childId }),
+    ),
 
   /** Saldo de pacote ligado à família mas gravado em OUTRO responsável — o check-in cobraria avulso. */
   foreignPackageBalances: (unitId: string, childId: string, cpf?: string | null, phoneE164?: string | null) =>
