@@ -1,30 +1,15 @@
 # Ficha técnica — API de faturamento FaçaAmigos
 
-**Anexo do e-mail de solicitação de integração.** Documento destinado à
-equipe técnica da administração do shopping.
+Documento destinado à equipe técnica da administração do shopping.
 
 | Item             | Valor                                                                     |
 | ---------------- | ------------------------------------------------------------------------- |
-| Operação         | FaçaAmigos — Playground e Parque Circuito (mesmo CNPJ, contratos distintos) |
 | Versão do layout | 1.0 (campo `layoutVersao` de toda resposta)                               |
 | Protocolo        | HTTPS · REST · JSON (CSV opcional em `/faturamento`)                      |
 | Autenticação     | Chave de API estática, vinculada a uma unidade                            |
 | Escopo           | `FATURAMENTO_LEITURA` — somente leitura                                   |
-| Fuso horário     | America/Belem (UTC−3, sem horário de verão)                               |
+| Fuso horário     | O da unidade, informado em `loja.timezone` (padrão `America/Belem`, UTC−3) |
 | Moeda            | BRL, valores inteiros **em centavos**                                     |
-
-## Unidades
-
-A FaçaAmigos opera dois negócios distintos no mesmo shopping, sob o mesmo
-CNPJ. Cada um tem chave de API própria, e a chave determina qual unidade é
-consultada.
-
-| Unidade         | `unidadeId`                            | LUC        | Código lojista |
-| --------------- | -------------------------------------- | ---------- | -------------- |
-| Playground      | `11111111-1111-1111-1111-111111111111` | `PSB01003` | `PSB-1316`     |
-| Parque Circuito | `e43ba7a8-bd5f-47ad-b81d-dae7ea19d504` | `PSBQF122` | `PSB-1346`     |
-
-CNPJ: `66318630000117` · Razão social: FAÇA AMIGOS BRINQUEDOTECA LTDA
 
 ## 1. Endpoints
 
@@ -61,8 +46,8 @@ guardada apenas como hash (SHA-256).
 | 401    | `{"error":"CHAVE_REVOGADA"}`      | Chave existia e foi revogada                 |
 | 403    | `{"error":"ESCOPO_INSUFICIENTE"}` | Chave sem o escopo `FATURAMENTO_LEITURA`     |
 
-A chave está sempre vinculada a uma unidade. Qualquer parâmetro `unitId` na
-requisição é **ignorado**.
+A chave está sempre vinculada a uma unidade (loja), e é ela que define quais
+dados são retornados. Qualquer parâmetro `unitId` na requisição é **ignorado**.
 
 ## 3. Verificação de credencial
 
@@ -95,7 +80,7 @@ Resposta 200:
 
 ### Dia de apuração
 
-Cada venda é atribuída ao **dia civil (00:00 a 23:59, America/Belem)** do
+Cada venda é atribuída ao **dia civil (00:00 a 23:59, no fuso da unidade)** do
 momento de fechamento da venda (pagamento ou cancelamento). A API não usa
 corte de dia operacional.
 
@@ -127,7 +112,7 @@ GET /integracao/shopping/v1/faturamento?de=AAAA-MM-DD&ate=AAAA-MM-DD
 | `razaoSocial`   | Razão social                         |
 | `luc`           | LUC                                  |
 | `codigoLojista` | Código lojista                       |
-| `timezone`      | `America/Belem`                      |
+| `timezone`      | Fuso da unidade (padrão `America/Belem`) |
 
 `periodo` e cada item de `dias` têm os mesmos campos de valores. `periodo`
 traz `dataInicial` e `dataFinal`; cada item de `dias` traz `data`.
@@ -278,10 +263,7 @@ curl -X GET "https://app.institutofacaamigos.com.br/integracao/shopping/v1/venda
 ## 9. Segurança e limites
 
 - Não há limite de requisições (rate limit).
-- Não há restrição de acesso por IP. Os IPs informados pelo shopping para a
-  plataforma Esphera / Napp (homologação `177.52.105.183`; produção
-  `34.75.87.20` e `177.136.228.177`) constam aqui como referência, mas a API
-  não os valida.
+- Não há restrição de acesso por IP.
 - Registramos apenas a data do último uso de cada chave. Não há log
   individual de requisições nem de tentativas negadas.
 - Para revogar ou trocar uma chave, contate a FaçaAmigos.
