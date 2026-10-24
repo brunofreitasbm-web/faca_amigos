@@ -833,6 +833,8 @@ export interface VipFlag {
   child_id: string;
   visits_in_window: number;
   is_vip: boolean;
+  /** Contador absoluto de visitas (mesmo do programa de fidelidade). */
+  total_visits?: number;
 }
 
 /** Saldo do banco de horas de uma criança (`fa_kiosk_hour_bank_balance`). */
