@@ -89,6 +89,10 @@ A Meta reclassificou os dois como **Marketing** (US$ 0,0625/msg em vez de US$ 0,
 3. Depois da aprovação, chamar de novo com os mesmos nomes: ativa, e os envios passam para eles. Conferir `category` em `fa_crm_templates` (o `crm-whatsapp-cost-sync` grava o que a Meta decidiu): se vier `MARKETING` de novo, o texto ainda não convenceu — não adianta ativar.
 4. Com a versão nova aprovada como UTILITY e ativa, colocar `fa_renovacao_fim_plano_v2` e `fa_visita_boas_vindas` em `RETIRED` e desativá-los.
 
+**Resultado (24/10/26):**
+- `fa_visita_boas_vindas_v2`: aprovada pela Meta como **UTILITY** e ativada; `fa_visita_boas_vindas` (v1) desativada e em `RETIRED`.
+- `fa_renovacao_fim_plano_v3`: aprovada, mas a Meta a **recategorizou como MARKETING** (oferta de minutos pagos é upsell). Sem ganho de custo, a decisão foi **manter a `fa_renovacao_fim_plano_v2`** ativa; a v3 fica inativa e em `RETIRED` para um bootstrap sem `names` não a ativar. O pedido saiu com `allow_category_change: true`; para a Meta rejeitar em vez de recategorizar, seria preciso enviá-lo como `false`.
+
 Também aposentado: `fa_pedido_autorizacao` (opt-in v1, MARKETING). A migration `20261024150000_fa_crm_retire_optin_v1.sql` o desativa (só se houver outro OPTIN ativo, hoje a v3) e o nome entra em `RETIRED`.
 
 Economia esperada se a Meta aceitar: cerca de US$ 36/mês no volume atual (mais do que a taxa total da Twilio por mensagem nos dois sistemas, ~US$ 25/mês).
