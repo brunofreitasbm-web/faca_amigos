@@ -113,6 +113,10 @@ create trigger trg_fa_loyalty_catchup_on_visit
   for each row execute function fa_kiosk_loyalty_catchup_on_visit();
 
 -- Reparo dos casos já presos. p_dry_run = true só lista.
+-- Visitas são espelhadas entre unidades: "prêmios existentes" conta por regra
+-- equivalente (mesma atividade/gatilho/tipo/valor) em qualquer unidade, para
+-- não conceder o mesmo marco duas vezes. O novo prêmio vai para a regra da
+-- unidade da última sessão da criança.
 create or replace function fa_loyalty_backfill_missing_rewards(p_dry_run boolean default true)
 returns table (child_id uuid, child_name text, rule_id uuid, visitas integer, devidos integer, existentes integer, concedidos integer)
 as $$
@@ -121,19 +125,31 @@ declare
   i integer;
 begin
   for r in
-    select c.id as cid, c.full_name, ru.id as rid, t.n::integer as visitas,
-           (t.n / ru.trigger_visits)::integer as devidos,
-           (select count(*) from fa_kiosk_loyalty_rewards w where w.child_id = c.id and w.rule_id = ru.id)::integer as existentes
-    from fa_kiosk_children c
-    join (select vl.child_id, count(*) n from fa_kiosk_visit_log vl group by 1) t on t.child_id = c.id
-    join (select distinct s.child_id, s.unit_id from fa_kiosk_sessions s) cu on cu.child_id = c.id
-    join fa_kiosk_loyalty_rules ru on ru.unit_id = cu.unit_id and ru.active and ru.trigger_visits > 0
-    where (t.n / ru.trigger_visits) > (select count(*) from fa_kiosk_loyalty_rewards w where w.child_id = c.id and w.rule_id = ru.id)
-      and exists (select 1 from fa_kiosk_visit_log v where v.child_id = c.id and (v.activity = ru.activity or ru.activity = 'AMBOS'))
+    with sig as (
+      select distinct activity, trigger_visits, reward_kind, reward_value
+      from fa_kiosk_loyalty_rules where active and trigger_visits > 0
+    ), x as (
+      select c.id as cid, c.full_name, s.*, t.n::integer as visitas,
+        (t.n / s.trigger_visits)::integer as devidos,
+        (select count(*) from fa_kiosk_loyalty_rewards w join fa_kiosk_loyalty_rules ru on ru.id = w.rule_id
+          where w.child_id = c.id and ru.activity = s.activity and ru.trigger_visits = s.trigger_visits
+            and ru.reward_kind = s.reward_kind and ru.reward_value = s.reward_value)::integer as existentes,
+        (select ru.id from fa_kiosk_loyalty_rules ru
+          where ru.active and ru.activity = s.activity and ru.trigger_visits = s.trigger_visits
+            and ru.reward_kind = s.reward_kind and ru.reward_value = s.reward_value
+          order by (ru.unit_id = (select se.unit_id from fa_kiosk_sessions se where se.child_id = c.id
+                                  order by se.checkin_at_ms desc limit 1)) desc limit 1) as rid
+      from fa_kiosk_children c
+      join (select vl.child_id, count(*) n from fa_kiosk_visit_log vl group by 1) t on t.child_id = c.id
+      cross join sig s
+      where exists (select 1 from fa_kiosk_sessions se where se.child_id = c.id)
+        and exists (select 1 from fa_kiosk_visit_log v where v.child_id = c.id and v.activity = s.activity)
+    )
+    select * from x where devidos > existentes
   loop
     if not p_dry_run then
       for i in 1 .. (r.devidos - r.existentes) loop
-        -- earned_at_ms no passado: não casa com nenhuma sessão ativa, fica em aberto para resgate.
+        -- earned_at_ms no passado: não casa com sessão ativa, fica em aberto para resgate.
         insert into fa_kiosk_loyalty_rewards (child_id, rule_id, earned_at_ms)
           values (r.cid, r.rid, (extract(epoch from now()) * 1000)::bigint - 1000 * i);
       end loop;
