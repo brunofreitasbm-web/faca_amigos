@@ -79,6 +79,20 @@ insert into fa_kiosk_app_settings (unit_id, key, value) values ('<uuid da unidad
 ```
 Preços: `PLAYGROUND_OPTIONS`/`CIRCUITO_OPTIONS` na function espelham `copy.ts`/`copyCircuito.ts`; o valor enviado fica congelado em `fa_crm_renewal_alerts.options`. Push já inscrito continua disparando até a sessão acabar (a tela não inscreve mais).
 
+### Custo: `fa_renovacao_fim_plano_v2` e `fa_visita_boas_vindas` viraram MARKETING
+A Meta reclassificou os dois como **Marketing** (US$ 0,0625/msg em vez de US$ 0,0068). Em out/26 (até dia 24) foram 505 + 227 envios = US$ 41 dos US$ 58,6 de marketing do mês, e 47 recusas 63049 na renovação (limite de marketing por contato). Mesmo caso já resolvido no `fa_relatorio_sessao_pdf_v3`.
+
+`crm-templates-bootstrap` tem as versões reescritas, só com o aviso transacional: `fa_renovacao_fim_plano_v3` (mesmas 3 variáveis e botões `RENOVAR_1`/`RENOVAR_2`) e `fa_visita_boas_vindas_v2` (mesmas 3 variáveis). Nenhum dispatcher muda: os dois usam o template mais novo **ativo** do purpose.
+
+1. `supabase functions deploy crm-templates-bootstrap`.
+2. Chamar com `{"names": ["fa_renovacao_fim_plano_v3", "fa_visita_boas_vindas_v2"]}` (antes, `"dryRun": true` para conferir): cria na Twilio e submete à Meta; nascem inativos.
+3. Depois da aprovação, chamar de novo com os mesmos nomes: ativa, e os envios passam para eles. Conferir `category` em `fa_crm_templates` (o `crm-whatsapp-cost-sync` grava o que a Meta decidiu): se vier `MARKETING` de novo, o texto ainda não convenceu — não adianta ativar.
+4. Com a versão nova aprovada como UTILITY e ativa, colocar `fa_renovacao_fim_plano_v2` e `fa_visita_boas_vindas` em `RETIRED` e desativá-los.
+
+Também aposentado: `fa_pedido_autorizacao` (opt-in v1, MARKETING). A migration `20261024150000_fa_crm_retire_optin_v1.sql` o desativa (só se houver outro OPTIN ativo, hoje a v3) e o nome entra em `RETIRED`.
+
+Economia esperada se a Meta aceitar: cerca de US$ 36/mês no volume atual (mais do que a taxa total da Twilio por mensagem nos dois sistemas, ~US$ 25/mês).
+
 ## Avisos da visita (boas-vindas, fim do plano, renovação aplicada, fidelidade)
 `crm-visit-notify-dispatch` roda a cada minuto (pg_cron) e leva para o WhatsApp o que a tela pública de acompanhamento já mostra. Só quem deu aceite de contato no check-in recebe; cada tipo é ligado separadamente por unidade e nasce desligado.
 

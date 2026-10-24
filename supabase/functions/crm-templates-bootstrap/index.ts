@@ -45,7 +45,7 @@ const OFFER_BUTTONS = [{ title: "Quero saber mais", id: "OFERTA_INFO" }, { title
 // Templates substituídos por uma versão nova ou retirados de uso: nunca
 // reativados aqui, mesmo que a Meta os tenha aprovado (as migrations
 // 20261001130000 e 20261001140000 os desativaram).
-const RETIRED = new Set(["fa_lc_aniversario", "fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor", "fa_renovacao_fim_plano", "fa_nps_pos_visita_v2"]);
+const RETIRED = new Set(["fa_lc_aniversario", "fa_lc_upsell_pacote", "fa_lc_cross_atividade", "fa_lc_vip", "fa_lc_winback", "fa_lc_nps_promotor", "fa_renovacao_fim_plano", "fa_nps_pos_visita_v2", "fa_pedido_autorizacao"]);
 
 const TEMPLATES: TemplateDef[] = [
   // Estes dois já tinham content_sid real de antes desta rodada — entram
@@ -101,8 +101,31 @@ const TEMPLATES: TemplateDef[] = [
     quickReplyButtons: [{ title: "+30 min", id: "RENOVAR_1" }, { title: "+60 min", id: "RENOVAR_2" }],
   },
   {
+    // v3: reescrita para a Meta aceitar como UTILITY. A v2 foi reclassificada como MARKETING
+    // (505 envios em out/26 a US$ 0,0625 cada = 47% do custo de marketing do mês; 47 recusas 63049):
+    // "Para continuar sem pressa" e o tom de convite puxam a categoria. Aqui é só o aviso de que o
+    // tempo contratado está acabando e como prorrogar a sessão em andamento — mesmas 3 variáveis,
+    // mesmos botões (RENOVAR_1/RENOVAR_2), então crm-renewal-alert-dispatch e o webhook não mudam.
+    // A v2 segue ativa até esta ser aprovada e ativada (o dispatcher usa a mais nova ativa).
+    // A Meta decide a categoria pelo conteúdo: conferir o resultado depois de aprovada.
+    purpose: "RENOVACAO", name: "fa_renovacao_fim_plano_v3", category: "UTILITY", variableCount: 3,
+    body: "Olá, {{1}}. O tempo contratado de {{2}} termina em poucos minutos. Para prorrogar a sessão em andamento: {{3}}. Toque em uma opção para solicitar a prorrogação no balcão.",
+    sample: { "1": "Ana", "2": "Miguel", "3": "+30 min por R$ 48,00 ou +60 min por R$ 96,00" },
+    quickReplyButtons: [{ title: "+30 min", id: "RENOVAR_1" }, { title: "+60 min", id: "RENOVAR_2" }],
+  },
+  {
     purpose: "VISITA_BOAS_VINDAS", name: "fa_visita_boas_vindas", category: "UTILITY", variableCount: 3,
     body: "Oi {{1}}! {{2}} já está brincando com a gente 💛 Acompanhe o tempo por aqui: {{3}} Qualquer coisa, é só chamar.",
+    sample: { "1": "Ana", "2": "Miguel", "3": "https://app.institutofacaamigos.com.br/?acompanhar=ABC123" },
+  },
+  {
+    // v2: reescrita para a Meta aceitar como UTILITY. A v1 foi reclassificada como MARKETING
+    // (227 envios em out/26 = 23% do custo de marketing do mês): emoji e tom afetivo puxam a
+    // categoria. Aqui é só a confirmação da entrada e o link de acompanhamento do tempo — mesmas 3
+    // variáveis, então crm-visit-notify-dispatch não muda. A v1 segue ativa até esta ser aprovada
+    // e ativada. A Meta decide a categoria pelo conteúdo: conferir o resultado depois de aprovada.
+    purpose: "VISITA_BOAS_VINDAS", name: "fa_visita_boas_vindas_v2", category: "UTILITY", variableCount: 3,
+    body: "Olá, {{1}}. Confirmamos a entrada de {{2}} e o início do tempo contratado. Para acompanhar o tempo restante, acesse: {{3}} Boa visita!",
     sample: { "1": "Ana", "2": "Miguel", "3": "https://app.institutofacaamigos.com.br/?acompanhar=ABC123" },
   },
   {
