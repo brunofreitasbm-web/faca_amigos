@@ -204,7 +204,7 @@ Cada item de `vendas`:
 | Campo           | Tipo    | Definição                                                              |
 | --------------- | ------- | ---------------------------------------------------------------------- |
 | `idVenda`       | string  | Identificador único da venda (UUID)                                    |
-| `dataHora`      | string  | Momento de fechamento, ISO 8601 com deslocamento `-03:00`              |
+| `dataHora`      | string  | Momento de fechamento, ISO 8601, hora local da unidade com o deslocamento do fuso (ex.: `-03:00`) |
 | `valorCentavos` | number  | Valor total da venda                                                   |
 | `cancelado`     | boolean | `true` se a venda foi cancelada                                        |
 | `troca`         | boolean | Reservado; nesta versão é sempre `false`                               |

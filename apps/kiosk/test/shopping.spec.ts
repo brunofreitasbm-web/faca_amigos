@@ -84,6 +84,15 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     expect(formatted).toBe("2026-08-26T21:30:00-03:00");
   });
 
+  it("usa o deslocamento real do fuso da unidade no dataHora", async () => {
+    const { formatIsoTimezone } = await import("../src/server/routes/shopping.js");
+    const ts = new Date("2026-08-27T00:30:00.000Z").getTime();
+    expect(formatIsoTimezone(ts, "America/Manaus")).toBe("2026-08-26T20:30:00-04:00");
+    expect(formatIsoTimezone(ts, "America/Sao_Paulo")).toBe("2026-08-26T21:30:00-03:00");
+    expect(formatIsoTimezone(ts, "Asia/Kolkata")).toBe("2026-08-27T06:00:00+05:30");
+    expect(formatIsoTimezone(ts, "UTC")).toBe("2026-08-27T00:30:00+00:00");
+  });
+
 
   it("retorna o endpoint de vendas item a item sem dados pessoais (LGPD compliant)", async () => {
     const res = await app.inject({
