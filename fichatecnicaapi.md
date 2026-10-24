@@ -228,8 +228,8 @@ Pontos de atenção:
 
 - A lista inclui vendas pagas e canceladas.
 - `periodo.totalVendas` e `periodo.brutoCentavos` contam só vendas **não
-  canceladas** e, quando há paginação, refletem **apenas a página retornada**.
-  Para o total do período, use `/faturamento` ou some todas as páginas.
+  canceladas** e sempre cobrem o **período inteiro**, independentemente da
+  página retornada.
 - `paginacao.totalRegistros` conta todas as vendas do período, canceladas
   inclusive.
 

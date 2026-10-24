@@ -414,8 +414,9 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
       };
     }
 
-    const totalVendas = vendas.filter((v) => !v.cancelado).length;
-    const brutoCentavos = vendas.filter((v) => !v.cancelado).reduce((acc, v) => acc + v.valorCentavos, 0);
+    const vendasPagas = mappedVendas.filter((v) => !v.cancelado);
+    const totalVendas = vendasPagas.length;
+    const brutoCentavos = vendasPagas.reduce((acc, v) => acc + v.valorCentavos, 0);
 
     const responseBody: any = {
       layoutVersao: "1.0",
