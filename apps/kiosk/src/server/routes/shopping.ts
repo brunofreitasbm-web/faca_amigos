@@ -33,7 +33,19 @@ export function formatIsoTimezone(dateInput: number | string | Date, timeZone = 
   let hour = get("hour");
   if (hour === "24") hour = "00";
 
-  const offset = timeZone === "America/Belem" ? "-03:00" : "-03:00";
+  // Deslocamento real do fuso na data informada: hora local lida como UTC menos o instante real.
+  const localAsUtcMs = Date.UTC(
+    Number(get("year")),
+    Number(get("month")) - 1,
+    Number(get("day")),
+    Number(hour),
+    Number(get("minute")),
+    Number(get("second")),
+  );
+  const offsetMin = Math.round((localAsUtcMs - Math.floor(d.getTime() / 1000) * 1000) / 60000);
+  const sign = offsetMin < 0 ? "-" : "+";
+  const abs = Math.abs(offsetMin);
+  const offset = `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
 
   return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}:${get("second")}${offset}`;
 }
@@ -414,8 +426,9 @@ export function registerShoppingRoutes(app: FastifyInstance, ctx: AppContext) {
       };
     }
 
-    const totalVendas = vendas.filter((v) => !v.cancelado).length;
-    const brutoCentavos = vendas.filter((v) => !v.cancelado).reduce((acc, v) => acc + v.valorCentavos, 0);
+    const vendasPagas = mappedVendas.filter((v) => !v.cancelado);
+    const totalVendas = vendasPagas.length;
+    const brutoCentavos = vendasPagas.reduce((acc, v) => acc + v.valorCentavos, 0);
 
     const responseBody: any = {
       layoutVersao: "1.0",

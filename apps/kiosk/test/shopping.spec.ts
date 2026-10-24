@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { openDatabase, migrate } from "@facaamigos/db-local";
+import { openDatabase, migrate, listUnits } from "@facaamigos/db-local";
 import { buildApp } from "../src/server/app.js";
 import { seedDevData } from "../src/server/seed-dev.js";
 import type { FastifyInstance } from "fastify";
 
 let app: FastifyInstance;
+let db: ReturnType<typeof openDatabase>;
 const nowMs = 1_700_000_000_000;
 const clock = () => nowMs;
 
 beforeEach(async () => {
-  const db = openDatabase(":memory:");
+  db = openDatabase(":memory:");
   migrate(db);
   seedDevData(db, nowMs);
   app = await buildApp({ db, hmacKey: "test-key", nowMs: clock });
@@ -83,6 +84,15 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     expect(formatted).toBe("2026-08-26T21:30:00-03:00");
   });
 
+  it("usa o deslocamento real do fuso da unidade no dataHora", async () => {
+    const { formatIsoTimezone } = await import("../src/server/routes/shopping.js");
+    const ts = new Date("2026-08-27T00:30:00.000Z").getTime();
+    expect(formatIsoTimezone(ts, "America/Manaus")).toBe("2026-08-26T20:30:00-04:00");
+    expect(formatIsoTimezone(ts, "America/Sao_Paulo")).toBe("2026-08-26T21:30:00-03:00");
+    expect(formatIsoTimezone(ts, "Asia/Kolkata")).toBe("2026-08-27T06:00:00+05:30");
+    expect(formatIsoTimezone(ts, "UTC")).toBe("2026-08-27T00:30:00+00:00");
+  });
+
 
   it("retorna o endpoint de vendas item a item sem dados pessoais (LGPD compliant)", async () => {
     const res = await app.inject({
@@ -123,5 +133,28 @@ describe("API de Integração com Shopping (Faturamento & Vendas)", () => {
     expect(json.paginacao.limite).toBe(5);
     expect(json.paginacao.totalPaginas).toBeGreaterThanOrEqual(1);
     expect(typeof json.paginacao.totalRegistros).toBe("number");
+  });
+
+  it("totais de periodo do /vendas cobrem o periodo inteiro, nao so a pagina", async () => {
+    const unitId = listUnits(db)[0]!.id;
+    const insert = db.prepare(
+      "INSERT INTO orders (id, unit_id, kind, total_cents, status, closed_at_ms, business_date, created_at_ms) VALUES (?, ?, 'PDV', ?, ?, ?, '2026-03-10', ?)",
+    );
+    const at = Date.UTC(2026, 2, 10, 15);
+    insert.run("o1", unitId, 1000, "PAGA", at, at);
+    insert.run("o2", unitId, 2000, "PAGA", at + 1000, at + 1000);
+    insert.run("o3", unitId, 4000, "PAGA", at + 2000, at + 2000);
+    insert.run("o4", unitId, 8000, "CANCELADA", at + 3000, at + 3000);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/integracao/shopping/v1/vendas?de=2026-03-10&ate=2026-03-10&pagina=1&limite=1",
+      headers: { authorization: "Bearer fa_shp_homolog_token" },
+    });
+    const json = res.json();
+    expect(json.vendas).toHaveLength(1);
+    expect(json.paginacao.totalRegistros).toBe(4);
+    expect(json.periodo.totalVendas).toBe(3);
+    expect(json.periodo.brutoCentavos).toBe(7000);
   });
 });
