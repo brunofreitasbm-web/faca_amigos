@@ -125,7 +125,7 @@ const TEMPLATES: TemplateDef[] = [
     // variáveis, então crm-visit-notify-dispatch não muda. A v1 segue ativa até esta ser aprovada
     // e ativada. A Meta decide a categoria pelo conteúdo: conferir o resultado depois de aprovada.
     purpose: "VISITA_BOAS_VINDAS", name: "fa_visita_boas_vindas_v2", category: "UTILITY", variableCount: 3,
-    body: "Olá, {{1}}. Confirmamos a entrada de {{2}} e o início do tempo contratado. Para acompanhar o tempo restante, acesse: {{3}} Em caso de dúvida, responda esta mensagem.",
+    body: "Olá, {{1}}. Confirmamos a entrada de {{2}} e o início do tempo contratado. Para acompanhar o tempo restante, acesse: {{3}} Boa visita!",
     sample: { "1": "Ana", "2": "Miguel", "3": "https://app.institutofacaamigos.com.br/?acompanhar=ABC123" },
   },
   {
