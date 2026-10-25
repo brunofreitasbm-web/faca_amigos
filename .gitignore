@@ -121,3 +121,6 @@ view-source_*.html
 !.env.example
 !**/.env.example
 .voz/
+
+# Exportações de dados (LGPD): nunca versionar
+exports_lgpd/
