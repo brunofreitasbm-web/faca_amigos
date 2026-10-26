@@ -931,17 +931,23 @@ export function PainelScreen() {
                         </Badge>
                       )}
                       {(() => {
-                        const visits = vipFlagsMap.get(session.child_id)?.visits_in_window;
+                        const vipFlag = vipFlagsMap.get(session.child_id);
+                        const windowVisits = vipFlag?.visits_in_window;
+                        // Selo mostra o contador absoluto; a janela de 30 dias fica no tooltip.
+                        const visits = vipFlag?.total_visits ?? windowVisits;
                         if (vipChildIds.has(session.child_id)) {
                           return (
-                            <Badge variant="vip" title={`Cliente VIP — ${visits ?? 4} visitas nos últimos 30 dias`}>
-                              ★ VIP ({visits ?? 4})
+                            <Badge variant="vip" title={`Cliente VIP — ${visits ?? 4} visitas no total, ${windowVisits ?? 4} nos últimos 30 dias`}>
+                              ★ VIP ({visits ?? 4} visitas)
                             </Badge>
                           );
                         }
                         if (visits !== undefined && visits > 0) {
                           return (
-                            <span style={{ fontSize: "11px", color: "var(--text-muted)" }} title={`${visits} visita(s) nos últimos 30 dias`}>
+                            <span
+                              style={{ fontSize: "11px", color: "var(--text-muted)" }}
+                              title={`${visits} visita(s) no total, ${windowVisits ?? 0} nos últimos 30 dias`}
+                            >
                               {visits} {visits === 1 ? "visita" : "visitas"}
                             </span>
                           );

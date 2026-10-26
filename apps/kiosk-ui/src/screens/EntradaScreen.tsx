@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Button, Checkbox, Input, Select, DateInput, Tag, Badge, HelpText, Modal, StatusBadge, AutismRibbonIcon } from "@facaamigos/ui";
 import { Api, isCouponInSchedule } from "../api/client.js";
-import type { Asset, ChildMatch, Coupon, ForeignPackageBalance, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer, WifiCouponLookup } from "../api/client.js";
+import type { Asset, ChildMatch, ChildPackageBalance, Coupon, ForeignPackageBalance, Package, Plan, Product, PrepaidCreditQueueItem, UpsellOffer, WifiCouponLookup } from "../api/client.js";
 import { UpsellOfferCard } from "../components/UpsellOfferCard.js";
 import { OlharUpsellCard } from "../components/OlharUpsellCard.js";
 import { GeminiSalesCard } from "../components/GeminiSalesCard.js";
@@ -228,6 +228,11 @@ export function EntradaScreen({
   // consultado. creditId aponta para o crédito mais antigo (FIFO) — é o
   // que fa_checkin referencia para fixar tarifa/piso da sessão.
   const [childCredit, setChildCredit] = useState<{ remainingMinutes: number; creditId: string } | null>(null);
+  // Pacotes com saldo dos responsáveis da criança (ex.: Porto Seguro). O
+  // fechamento abate daqui o tempo da visita e, na sessão em saldo pré-pago,
+  // o que o saldo da criança não cobrir.
+  const [childPackages, setChildPackages] = useState<ChildPackageBalance[]>([]);
+  const childPackageMinutes = childPackages.reduce((sum, p) => sum + p.remaining_minutes, 0);
   // Saldo de pacote da família gravado em outro responsável: o check-in
   // cobraria avulso, então o operador é avisado antes de confirmar.
   const [foreignPackages, setForeignPackages] = useState<ForeignPackageBalance[]>([]);
@@ -422,9 +427,13 @@ export function EntradaScreen({
     setOffer(null);
     setHourBank(null);
     setChildCredit(null);
+    setChildPackages([]);
     setForeignPackages([]);
 
     if (unit?.id) {
+      Api.childPackages(unit.id, match.id)
+        .then(setChildPackages)
+        .catch(() => setChildPackages([]));
       Api.foreignPackageBalances(unit.id, match.id, match.cpf ? normalizeCpf(match.cpf) : null, match.phone_e164)
         .then(setForeignPackages)
         .catch(() => setForeignPackages([]));
@@ -1392,6 +1401,37 @@ export function EntradaScreen({
             . Se esta família usa esse saldo, a criança será cobrada como avulsa — corrija o responsável no cadastro antes de confirmar.
           </div>
         )}
+        {/* Saldo de pacote (ex.: Porto Seguro) da família, visto ANTES de abrir a
+            sessão. Informativo: o tempo da visita sai do saldo no fechamento,
+            qualquer que seja o plano escolhido abaixo. Um pacote por linha,
+            na ordem em que são abatidos. */}
+        {matchedChild && childPackages.length > 0 && (
+          <div
+            style={{
+              margin: "0 0 10px 0",
+              padding: "10px 14px",
+              borderRadius: "12px",
+              border: "2px solid var(--color-primary, #FF7A00)",
+              background: "rgba(255, 122, 0, 0.08)",
+              fontSize: "13px",
+            }}
+          >
+            <strong>
+              <Emoji3D e="🎟️" /> Saldo de pacote: {formatPlanoHoras(childPackageMinutes)} disponíveis
+            </strong>
+            <ul style={{ margin: "6px 0 0 0", paddingLeft: "18px" }}>
+              {childPackages.map((p) => (
+                <li key={p.package_id}>
+                  {p.package_name}: {formatPlanoHoras(p.remaining_minutes)} de {formatPlanoHoras(p.included_minutes)} · vence{" "}
+                  {new Date(p.expires_at_ms).toLocaleDateString("pt-BR")}
+                </li>
+              ))}
+            </ul>
+            <div style={{ marginTop: "4px", color: "var(--text-muted)" }}>
+              O tempo da visita sai do saldo no fechamento (exceto aluguel de pelúcia e cortesia de aniversário).
+            </div>
+          </div>
+        )}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           {/* Banco de horas antes dos planos pagos, de propósito: a regra é
               usar o saldo que a família já pagou ANTES de vender plano novo. */}
@@ -1440,9 +1480,13 @@ export function EntradaScreen({
                 <Emoji3D e="💳" /> Usar saldo pré-pago
               </strong>
               <div style={{ fontSize: "18px", color: "#5B32C4", fontWeight: "bold", marginTop: "2px" }}>
-                {formatPlanoHoras(childCredit.remainingMinutes)} disponíveis
+                {formatPlanoHoras(childCredit.remainingMinutes + childPackageMinutes)} disponíveis
               </div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>sem vencimento · sem custo de entrada</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                {childPackageMinutes > 0
+                  ? `${formatPlanoHoras(childCredit.remainingMinutes)} da criança + ${formatPlanoHoras(childPackageMinutes)} do pacote · o pacote é usado quando o saldo da criança acabar`
+                  : "sem vencimento · sem custo de entrada"}
+              </div>
             </Card>
           )}
           {/* Cortesia de aniversário: só aparece para a criança que a tem,

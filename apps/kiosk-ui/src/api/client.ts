@@ -833,6 +833,8 @@ export interface VipFlag {
   child_id: string;
   visits_in_window: number;
   is_vip: boolean;
+  /** Contador absoluto de visitas (mesmo do programa de fidelidade). */
+  total_visits?: number;
 }
 
 /** Saldo do banco de horas de uma criança (`fa_kiosk_hour_bank_balance`). */
@@ -859,6 +861,15 @@ export interface ChildCreditBalance {
   credits_count: number;
   /** Id do crédito mais antigo (FIFO) — o que o fa_checkin referencia para fixar tarifa/piso da sessão. */
   credit_id: string;
+}
+
+/** Um pacote com saldo dos responsáveis da criança (`fa_kiosk_child_package_list`). Vence; ver `expires_at_ms`. */
+export interface ChildPackageBalance {
+  package_id: string;
+  package_name: string;
+  remaining_minutes: number;
+  included_minutes: number;
+  expires_at_ms: number;
 }
 
 /** Uma criança com saldo pré-pago aguardando início — fila do Painel (`fa_kiosk_child_credit_queue`). */
@@ -1596,7 +1607,12 @@ export function computeActiveSessionEntries(raw: ActiveSessionsRaw, nowMs: numbe
               activity: row.activity as Plan["activity"],
               name: (row.child_credit_name_snapshot as string | null) ?? "Saldo pré-pago",
               valueCents: 0,
-              durationValue: (row.child_credit_allocated_minutes as number | null) ?? 0,
+              // O fechamento (fa_checkout) abate do pacote do responsável o que
+              // o saldo da criança não cobrir; somar aqui mantém o contador e o
+              // total da tela iguais aos do servidor.
+              durationValue:
+                ((row.child_credit_allocated_minutes as number | null) ?? 0) +
+                (raw.packageBalanceByGuardian.get(row.guardian_id as string) ?? 0),
               durationUnit: "MINUTO",
               overageCentsPerMinute: (row.child_credit_overage_cents_per_minute as number | null) ?? 0,
               color: "#7C4DFF",
@@ -2438,6 +2454,17 @@ export const Api = {
     );
     return new Map(rows.map((r) => [r.child_id, r]));
   },
+
+  /**
+   * Pacotes com saldo (ex.: Porto Seguro) dos responsáveis ligados à criança,
+   * um por linha, na ordem em que o fechamento os abate. A Entrada mostra a
+   * lista antes da sessão; o fechamento da sessão em saldo pré-pago também
+   * abate daqui quando o saldo da criança acaba (fa_checkout).
+   */
+  childPackages: (unitId: string, childId: string) =>
+    unwrap<ChildPackageBalance[]>(
+      supabase().rpc("fa_kiosk_child_package_list", { p_unit_id: unitId, p_child_id: childId }),
+    ),
 
   /** Saldo de pacote ligado à família mas gravado em OUTRO responsável — o check-in cobraria avulso. */
   foreignPackageBalances: (unitId: string, childId: string, cpf?: string | null, phoneE164?: string | null) =>
