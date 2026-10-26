@@ -59,10 +59,29 @@ function isCircuito(unit: UnitRow): boolean {
   return unit.kind === "QUIOSQUE" || unit.name.toLowerCase().includes("circuito");
 }
 
+function isGraoPara(unit: UnitRow): boolean {
+  const n = (unit.name || "").toLowerCase();
+  return n.includes("grão") || n.includes("grao") || n.includes("bosque");
+}
+
 // LUC e Código de Lojista ainda não têm coluna própria em fa_kiosk_units;
 // as LUCs oficiais da operação seguem os identificadores internos do shopping.
 export function getShoppingUnitMetadata(unit: UnitRow): ShoppingUnitInfo {
   const circuito = isCircuito(unit);
+  const graoPara = isGraoPara(unit);
+
+  if (graoPara) {
+    return {
+      unidadeId: unit.id,
+      nome: unit.name || "FaçaAmigos — Playground (Bosque Grão-Pará)",
+      cnpj: unit.cnpj || "66604382000170",
+      razaoSocial: unit.razao_social || "FACA AMIGOS BRINQUEDOTECA II LTDA",
+      luc: "BGP-PLAY",
+      codigoLojista: "BGP-PLAY",
+      timezone: unit.timezone || "America/Belem",
+    };
+  }
+
   return {
     unidadeId: unit.id,
     nome: unit.name || (circuito ? "FaçaAmigos (Parque Shopping - Circuito)" : "FaçaAmigos (Parque Shopping - Playground)"),

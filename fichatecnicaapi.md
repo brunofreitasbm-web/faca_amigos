@@ -3,7 +3,7 @@
 **Anexo do e-mail de solicitação de integração.** Documento destinado à
 equipe técnica da administração do shopping.
 
-| Operação         | FaçaAmigos — Playground & Parque Circuito (mesmo CNPJ, contratos distintos)|
+| Operação         | FaçaAmigos — Parque Shopping Belém e Shopping Bosque Grão-Pará            |
 | Sistema          | Sistema de gestão e caixa próprio (offline-first, servidor local na loja) |
 | Versão do layout | 1.0                                                                       |
 | Protocolo        | HTTPS · REST · JSON (ou CSV)                                              |
@@ -12,10 +12,10 @@ equipe técnica da administração do shopping.
 | Fuso horário     | America/Belem (UTC−3, sem horário de verão)                               |
 | Moeda            | BRL, valores inteiros **em centavos**                                     |
 
-> **Observação sobre Múltiplas Unidades no Mesmo Shopping:**  
-> A FaçaAmigos opera 2 negócios distintos no mesmo Shopping sob o mesmo CNPJ:
-> 1. **Playground** (Brinquedoteca): LUC `L-142` · Código Lojista `PSB-1316`
-> 2. **Parque Circuito** (Quiosque/Carrinhos): LUC `L-143` · Código Lojista `PSB-1346`  
+> **Unidades e Operações FaçaAmigos:**  
+> 1. **Shopping Bosque Grão-Pará** — Playground: CNPJ `66.604.382/0001-70` · Razão Social `FACA AMIGOS BRINQUEDOTECA II LTDA` · LUC/Lojista: `BGP-PLAY`
+> 2. **Parque Shopping Belém** — Playground: CNPJ `66.318.630/0001-17` · LUC `L-142` · Código Lojista `PSB-1316`
+> 3. **Parque Shopping Belém** — Parque Circuito: CNPJ `66.318.630/0001-17` · LUC `L-143` · Código Lojista `PSB-1346`  
 > Cada operação possui chave de API própria ou parâmetro `unitId`, garantindo a separação total dos relatórios de faturamento e contratos de locação.
 
 

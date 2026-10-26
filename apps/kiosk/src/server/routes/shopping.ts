@@ -81,21 +81,24 @@ export function resolveShoppingUnitLUC(value?: string | null, fallbackIsCircuito
 export function getShoppingUnitMetadata(ctx: AppContext, unitId: string): ShoppingUnitInfo {
   const unit = getUnit(ctx.db, unitId);
   const isCircuito = unit?.kind === "QUIOSQUE" || unit?.name.toLowerCase().includes("circuito");
+  const isGraoPara = unit?.name.toLowerCase().includes("grão") || unit?.name.toLowerCase().includes("grao");
 
-  const cnpj = getAppSetting(ctx.db, unitId, "cnpj") || "12345678000195";
-  const razaoSocial = getAppSetting(ctx.db, unitId, "razaoSocial") || "FaçaAmigos Entretenimento Infantil LTDA";
+  const defaultCnpj = isGraoPara ? "66604382000170" : "66318630000117";
+  const defaultRazao = isGraoPara ? "FACA AMIGOS BRINQUEDOTECA II LTDA" : "FAÇA AMIGOS BRINQUEDOTECA LTDA";
+  const cnpj = getAppSetting(ctx.db, unitId, "cnpj") || defaultCnpj;
+  const razaoSocial = getAppSetting(ctx.db, unitId, "razaoSocial") || defaultRazao;
   
   // Distinção de LUC e Código de Lojista para negócios distintos no mesmo Shopping (mesmo CNPJ, contratos diferentes)
-  const defaultLuc = isCircuito ? "PSBQF122" : "PSB01003";
-  const defaultCodigo = isCircuito ? "PSB-1346" : "PSB-1316";
+  const defaultLuc = isGraoPara ? "BGP-PLAY" : (isCircuito ? "PSBQF122" : "PSB01003");
+  const defaultCodigo = isGraoPara ? "BGP-PLAY" : (isCircuito ? "PSB-1346" : "PSB-1316");
 
   const lucSetting = getAppSetting(ctx.db, unitId, "luc") || getAppSetting(ctx.db, unitId, "LUC");
-  const luc = resolveShoppingUnitLUC(lucSetting ?? defaultLuc, isCircuito);
+  const luc = isGraoPara ? (lucSetting ?? defaultLuc) : resolveShoppingUnitLUC(lucSetting ?? defaultLuc, isCircuito);
   const codigoLojista = getAppSetting(ctx.db, unitId, "codigo_lojista") || defaultCodigo;
 
   return {
     unidadeId: unitId,
-    nome: unit?.name || (isCircuito ? "FaçaAmigos (Parque Shopping - Circuito)" : "FaçaAmigos (Parque Shopping - Playground)"),
+    nome: unit?.name || (isGraoPara ? "FaçaAmigos — Playground (Bosque Grão-Pará)" : (isCircuito ? "FaçaAmigos (Parque Shopping - Circuito)" : "FaçaAmigos (Parque Shopping - Playground)")),
     cnpj,
     razaoSocial,
     luc,
@@ -132,6 +135,11 @@ function authenticateShoppingRequest(ctx: AppContext, req: FastifyRequest, reply
   }
 
   // Mapeamento de chave de API por escopo de unidade (multi-unidade no mesmo shopping)
+  if (token.includes("graopara") || token.includes("grao_para")) {
+    const gpUnit = units.find((u) => u.name.toLowerCase().includes("grão") || u.name.toLowerCase().includes("grao"));
+    return gpUnit ? gpUnit.id : units[0]!.id;
+  }
+
   if (token.includes("circuito") || token.includes("quiosque")) {
     const circuitoUnit = units.find((u) => u.kind === "QUIOSQUE" || u.name.toLowerCase().includes("circuito"));
     return circuitoUnit ? circuitoUnit.id : units[0]!.id;
