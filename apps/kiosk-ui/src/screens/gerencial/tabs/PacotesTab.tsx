@@ -206,7 +206,7 @@ export function PacotesTab() {
                 Editar
               </Button>
               {p.active ? (
-                <Button variant="secondary" style={{ color: "#d32f2f", borderColor: "#d32f2f" }} onClick={() => handleToggleActive(p)} disabled={busy}>
+                <Button variant="secondary" style={{ color: "var(--color-error-text)", borderColor: "var(--color-error)" }} onClick={() => handleToggleActive(p)} disabled={busy}>
                   Excluir
                 </Button>
               ) : (

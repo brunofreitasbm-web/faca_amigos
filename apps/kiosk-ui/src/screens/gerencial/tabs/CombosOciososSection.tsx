@@ -141,8 +141,8 @@ export function CombosOciososSection({
             <Badge
               variant="vip"
               style={{
-                background: "linear-gradient(135deg, #d97706 0%, #7c3aed 100%)",
-                color: "#ffffff",
+                background: "linear-gradient(135deg, var(--color-amber) 0%, var(--color-primary) 100%)",
+                color: "var(--surface-card)",
                 fontWeight: "bold",
                 fontSize: "11px",
                 padding: "3px 8px",
@@ -171,7 +171,7 @@ export function CombosOciososSection({
                 border: "1px solid var(--border-color)",
                 fontSize: "13px",
                 fontWeight: 500,
-                background: "#ffffff",
+                background: "var(--surface-card)",
               }}
             >
               {units.map((u) => (
@@ -217,13 +217,13 @@ export function CombosOciososSection({
                 flexDirection: "column",
                 gap: "8px",
                 borderLeft: `4px solid ${s.color}`,
-                background: "#ffffff",
+                background: "var(--surface-card)",
                 boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                 <div>
-                  <span style={{ fontSize: "11px", fontWeight: "bold", color: "#d97706" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "bold", color: "var(--color-amber-text)" }}>
                     {s.badge}
                   </span>
                   <h4 style={{ margin: "2px 0 0", fontSize: "15px", fontWeight: "bold", color: "var(--text-primary)" }}>
@@ -234,7 +234,7 @@ export function CombosOciososSection({
                   </span>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#16a34a" }}>
+                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "var(--color-success-text)" }}>
                     {money(s.suggestedValueCents)}
                   </div>
                   {s.regularValueCents && (
@@ -252,7 +252,7 @@ export function CombosOciososSection({
                 <strong>Vantagem:</strong> {s.economicBenefit}
               </div>
 
-              <p style={{ margin: 0, fontSize: "12px", fontStyle: "italic", color: "#4338ca" }}>
+              <p style={{ margin: 0, fontSize: "12px", fontStyle: "italic", color: "var(--color-primary-hover)" }}>
                 "{s.salesPitch}"
               </p>
 

@@ -56,19 +56,19 @@ function variablesFor(c: Candidate): Record<string, string> | null {
   return pain ? { "1": guardian, "2": child, "3": pain, "4": MAPEAMENTO_URL } : null;
 }
 
+import { getWhatsAppProvider } from "../_shared/whatsapp/index.ts";
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async () => {
-  const accountSid = Deno.env.get("TWILIO_CRM_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_CRM_AUTH_TOKEN");
-  if (!accountSid || !authToken) return json({ error: "Twilio do CRM não configurado" }, 503);
+  const provider = getWhatsAppProvider();
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   const { data: template } = await admin
     .from("fa_crm_templates")
-    .select("id, content_sid, preview")
+    .select("id, name, content_sid, preview")
     .eq("purpose", "MAPEAMENTO")
     .eq("active", true)
     .order("created_at_ms", { ascending: false })
@@ -150,40 +150,19 @@ Deno.serve(async () => {
       continue;
     }
 
-    let res: Response | null = null;
-    let out: { sid?: string; code?: number; message?: string } = {};
-    try {
-      res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-        method: "POST",
-        headers: {
-          Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          From: `whatsapp:${channel.whatsapp_e164}`,
-          To: `whatsapp:${cand.phone_e164}`,
-          ContentSid: template.content_sid,
-          ContentVariables: JSON.stringify(variables),
-          StatusCallback: WEBHOOK_URL,
-        }),
-      });
-      out = await res.json().catch(() => ({}));
-    } catch (e) {
-      console.error("Twilio inacessível:", e);
-    }
+    const sendRes = await provider.sendTemplate({
+      from: channel.whatsapp_e164,
+      to: cand.phone_e164,
+      templateName: template.name,
+      contentSid: template.content_sid,
+      variables,
+      statusCallbackUrl: WEBHOOK_URL,
+    });
 
-    if (!res || !res.ok) {
+    if (!sendRes.ok) {
       failed++;
-      if (!res || res.status >= 500) {
-        // Falha transitória: solta a trava para a próxima hora tentar de novo
-        // (a janela de 7-9 dias ainda está aberta).
-        await admin.from("fa_crm_mapeamento_invites").delete().eq("id", claim.id);
-      } else {
-        // Recusa definitiva (template/número inválido): registra e não insiste —
-        // o responsável fica marcado como "convidado", ninguém recebe duas vezes.
-        console.error("Twilio recusou convite ao Mapeamento:", out?.code, out?.message);
-        await admin.from("fa_crm_mapeamento_invites").update({ error: `Twilio ${out?.code ?? res.status}` }).eq("id", claim.id);
-      }
+      console.error("Provedor recusou convite ao Mapeamento:", sendRes.errorCode, sendRes.error);
+      await admin.from("fa_crm_mapeamento_invites").update({ error: `${provider.name} ${sendRes.errorCode ?? sendRes.error}` }).eq("id", claim.id);
       continue;
     }
 
@@ -192,7 +171,7 @@ Deno.serve(async () => {
       contact_id: contact!.id,
       direction: "OUT",
       body: template.preview.replace(/\{\{(\d+)\}\}/g, (_m: string, n: string) => variables[n] ?? ""),
-      twilio_sid: out.sid,
+      twilio_sid: sendRes.messageId,
       status: "queued",
       template_id: template.id,
       created_at_ms: sentAt,

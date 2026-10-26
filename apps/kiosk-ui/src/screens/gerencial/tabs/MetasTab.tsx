@@ -523,7 +523,7 @@ export function MetasTab() {
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <label style={{ fontSize: "12px", fontWeight: "600" }}>Teto Mensal (R$)</label>
-                <strong style={{ color: "#D97706", fontSize: "14px" }}>R$ {monthlyCapReais}</strong>
+                <strong style={{ color: "var(--color-amber-text)", fontSize: "14px" }}>R$ {monthlyCapReais}</strong>
               </div>
               <input
                 type="range"
@@ -532,7 +532,7 @@ export function MetasTab() {
                 step="10"
                 value={monthlyCapReais}
                 onChange={(e) => setMonthlyCapReais(e.target.value)}
-                style={{ width: "100%", accentColor: "#D97706", cursor: "pointer" }}
+                style={{ width: "100%", accentColor: "var(--color-amber-text)", cursor: "pointer" }}
               />
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "2px" }}>
                 {[200, 300, 350, 400].map((val) => (
@@ -543,9 +543,9 @@ export function MetasTab() {
                     style={{
                       padding: "2px 8px",
                       borderRadius: "12px",
-                      border: Number(monthlyCapReais) === val ? "1px solid #D97706" : "1px solid var(--border-subtle)",
-                      background: Number(monthlyCapReais) === val ? "rgba(217, 119, 6, 0.15)" : "var(--surface-sunken)",
-                      color: Number(monthlyCapReais) === val ? "#B45309" : "var(--text-secondary)",
+                      border: Number(monthlyCapReais) === val ? "1px solid var(--color-amber-text)" : "1px solid var(--border-subtle)",
+                      background: Number(monthlyCapReais) === val ? "rgba(201, 144, 32, 0.15)" : "var(--surface-sunken)",
+                      color: Number(monthlyCapReais) === val ? "var(--color-amber-text)" : "var(--text-secondary)",
                       fontSize: "11px",
                       fontWeight: "700",
                       cursor: "pointer",
@@ -589,8 +589,8 @@ export function MetasTab() {
                   fontWeight: 600,
                   padding: "2px 8px",
                   borderRadius: "12px",
-                  background: isSimulationOpen ? "rgba(37, 99, 235, 0.1)" : "var(--surface-sunken)",
-                  color: isSimulationOpen ? "#2563eb" : "var(--text-muted)",
+                  background: isSimulationOpen ? "rgba(46, 207, 181, 0.12)" : "var(--surface-sunken)",
+                  color: isSimulationOpen ? "var(--color-teal-text)" : "var(--text-muted)",
                   border: "1px solid var(--border-subtle)",
                 }}
               >
@@ -641,7 +641,7 @@ export function MetasTab() {
             <div style={{ marginBottom: "20px", background: "var(--surface-card)", padding: "16px", borderRadius: "8px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontWeight: "bold" }}>
                 <span>Atingimento da Meta da Equipe:</span>
-                <span style={{ color: simulationPercent >= 100 ? "#16a34a" : "#d97706" }}>{simulationPercent}% da Meta</span>
+                <span style={{ color: simulationPercent >= 100 ? "var(--color-success-text)" : "var(--color-amber-text)" }}>{simulationPercent}% da Meta</span>
               </div>
               <input
                 type="range"
@@ -662,10 +662,10 @@ export function MetasTab() {
             {/* CARDS DE RESULTADO DA SIMULAÇÃO */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
               <div style={{ padding: "12px", background: "rgba(34, 197, 94, 0.08)", borderRadius: "8px", border: "1px solid rgba(34, 197, 94, 0.3)" }}>
-                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#15803d", fontWeight: 700 }}>
+                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "var(--color-success-text)", fontWeight: 700 }}>
                   Faturamento Bruto Projetado
                 </span>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#166534", marginTop: "4px" }}>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "var(--color-success-text)", marginTop: "4px" }}>
                   {money(simulatedMonthlyRevenueReais * 100)}
                 </div>
                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
@@ -674,20 +674,20 @@ export function MetasTab() {
               </div>
 
               <div style={{ padding: "12px", background: "rgba(239, 68, 68, 0.08)", borderRadius: "8px", border: "1px solid rgba(239, 68, 68, 0.3)" }}>
-                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#b91c1c", fontWeight: 700 }}>
+                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "var(--color-error-text)", fontWeight: 700 }}>
                   Custo Total Bonificação
                 </span>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#991b1b", marginTop: "4px" }}>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "var(--color-error-text)", marginTop: "4px" }}>
                   {money(simulatedTotalBonusCost * 100)}
                 </div>
                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Respeitando teto de {money(Number(monthlyCapReais) * 100)}/op</span>
               </div>
 
-              <div style={{ padding: "12px", background: "rgba(59, 130, 246, 0.08)", borderRadius: "8px", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
-                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "#1d4ed8", fontWeight: 700 }}>
+              <div style={{ padding: "12px", background: "rgba(46, 207, 181, 0.08)", borderRadius: "8px", border: "1px solid rgba(46, 207, 181, 0.3)" }}>
+                <span style={{ fontSize: "11px", textTransform: "uppercase", color: "var(--color-teal-text)", fontWeight: 700 }}>
                   Faturamento Líquido Incremental
                 </span>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#1e40af", marginTop: "4px" }}>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "var(--color-teal-text)", marginTop: "4px" }}>
                   {money(simulatedNetRevenueReais * 100)}
                 </div>
                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Faturamento líquido pós-bônus</span>
@@ -729,9 +729,9 @@ export function MetasTab() {
             style={{
               padding: "6px 14px",
               borderRadius: "16px",
-              border: "1px solid #3B82F6",
+              border: "1px solid var(--color-teal)",
               background: "rgba(59, 130, 246, 0.1)",
-              color: "#2563EB",
+              color: "var(--color-teal-text)",
               fontSize: "12px",
               fontWeight: 700,
               cursor: "pointer",
@@ -763,7 +763,7 @@ export function MetasTab() {
                       onChange={(e) => activeUnit && handleGoalChange(activeUnit.id, idx, "meta", Number(e.target.value))}
                     />
                     {isCircuitoActive && (
-                      <div style={{ fontSize: "11px", color: "#2563eb", marginTop: "2px", fontWeight: "600" }}>
+                      <div style={{ fontSize: "11px", color: "var(--color-teal-text)", marginTop: "2px", fontWeight: "600" }}>
                         Equiv. {money(g.meta * CIRCUITO_TM_REAIS * 100)}
                       </div>
                     )}
@@ -775,7 +775,7 @@ export function MetasTab() {
                       onChange={(e) => activeUnit && handleGoalChange(activeUnit.id, idx, "superMeta", Number(e.target.value))}
                     />
                     {isCircuitoActive && (
-                      <div style={{ fontSize: "11px", color: "#6D28D9", marginTop: "2px", fontWeight: "600" }}>
+                      <div style={{ fontSize: "11px", color: "var(--color-amber-text)", marginTop: "2px", fontWeight: "600" }}>
                         Equiv. {money(g.superMeta * CIRCUITO_TM_REAIS * 100)}
                       </div>
                     )}
@@ -822,9 +822,9 @@ export function MetasTab() {
               style={{
                 padding: "8px 16px",
                 borderRadius: "20px",
-                border: "1px solid #10B981",
+                border: "1px solid var(--color-success)",
                 background: "rgba(16, 185, 129, 0.1)",
-                color: "#059669",
+                color: "var(--color-success-text)",
                 cursor: "pointer",
                 fontSize: "13px",
                 fontWeight: "700",
@@ -849,8 +849,8 @@ export function MetasTab() {
               style={{
                 padding: "14px",
                 borderRadius: "10px",
-                background: "var(--surface-sunken, #f8fafc)",
-                border: "1px solid var(--border-subtle, #e2e8f0)",
+                background: "var(--surface-sunken, var(--surface-sunken))",
+                border: "1px solid var(--border-subtle, var(--border-subtle))",
                 display: "flex",
                 flexDirection: "column",
                 gap: "10px",
@@ -859,7 +859,7 @@ export function MetasTab() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
                 <strong style={{ fontSize: "15px", color: "var(--text-primary)" }}>{u.name}</strong>
                 {sugg && (
-                  <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "12px", background: "rgba(59, 130, 246, 0.1)", color: "#2563eb", fontWeight: "600" }}>
+                  <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "12px", background: "rgba(59, 130, 246, 0.1)", color: "var(--color-teal-text)", fontWeight: "600" }}>
                     <Emoji3D e="✨" /> Sugestão Histórica: Mín R$ {sugg.minReais} | Alvo R$ {sugg.targetReais}
                   </span>
                 )}
@@ -898,7 +898,7 @@ export function MetasTab() {
                       borderRadius: "8px",
                       border: "1px solid var(--border-subtle)",
                       background: "var(--surface-elevated)",
-                      color: "#2563eb",
+                      color: "var(--color-teal-text)",
                       cursor: "pointer",
                       fontSize: "12px",
                       fontWeight: "600",

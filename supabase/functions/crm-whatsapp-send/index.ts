@@ -1,8 +1,9 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/http.ts";
 import { requireCapability } from "../_shared/requireCapability.ts";
+import { getWhatsAppProvider } from "../_shared/whatsapp/index.ts";
 
-// Envio de WhatsApp pelo CRM (Twilio, subconta dedicada).
+// Envio de WhatsApp pelo CRM (provedor configurável: Twilio ou Meta).
 //
 // Regras do WhatsApp aplicadas AQUI, no servidor, não na SPA:
 //   1. Só dentro da janela de 24h da última mensagem do cliente vale texto
@@ -28,9 +29,7 @@ Deno.serve(async (req) => {
   const auth = await requireCapability(req, "crm.write");
   if (!auth.ok) return auth.response;
 
-  const accountSid = Deno.env.get("TWILIO_CRM_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_CRM_AUTH_TOKEN");
-  if (!accountSid || !authToken) return jsonResponse(req, { error: "Twilio do CRM não configurado" }, 503);
+  const provider = getWhatsAppProvider();
 
   let input: SendBody;
   try {
@@ -57,44 +56,43 @@ Deno.serve(async (req) => {
 
   const inWindow = contact.last_inbound_ms != null && Date.now() - Number(contact.last_inbound_ms) < WINDOW_MS;
 
-  const form = new URLSearchParams({
-    From: `whatsapp:${channel.whatsapp_e164}`,
-    To: `whatsapp:${contact.phone_e164}`,
-    StatusCallback: WEBHOOK_URL,
-  });
-
   let templateId: string | null = null;
   let stored = text;
+  let result;
+
   if (input.templateId) {
     const { data: tpl } = await admin
       .from("fa_crm_templates")
-      .select("id, content_sid, preview, active")
+      .select("id, name, content_sid, preview, active")
       .eq("id", input.templateId)
       .maybeSingle();
     if (!tpl || !tpl.active) return jsonResponse(req, { error: "template não encontrado" }, 404);
     templateId = tpl.id;
-    form.set("ContentSid", tpl.content_sid);
-    if (input.variables && Object.keys(input.variables).length) form.set("ContentVariables", JSON.stringify(input.variables));
     stored = tpl.preview.replace(/\{\{(\d+)\}\}/g, (_m: string, n: string) => input.variables?.[n] ?? "");
+
+    result = await provider.sendTemplate({
+      from: channel.whatsapp_e164,
+      to: contact.phone_e164,
+      templateName: tpl.name,
+      contentSid: tpl.content_sid,
+      variables: input.variables,
+      statusCallbackUrl: WEBHOOK_URL,
+    });
   } else {
     if (!inWindow) {
       return jsonResponse(req, { error: "fora da janela de 24h — envie um template aprovado", code: "WINDOW_CLOSED" }, 409);
     }
-    form.set("Body", text);
+    result = await provider.sendText({
+      from: channel.whatsapp_e164,
+      to: contact.phone_e164,
+      body: text,
+      statusCallbackUrl: WEBHOOK_URL,
+    });
   }
 
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-    method: "POST",
-    headers: {
-      Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: form,
-  });
-  const out = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    console.error("Twilio recusou envio:", out);
-    return jsonResponse(req, { error: out.message ?? "Twilio recusou o envio", twilioCode: out.code }, 502);
+  if (!result.ok) {
+    console.error("Provedor recusou envio:", result);
+    return jsonResponse(req, { error: result.error ?? "Recusa no envio", twilioCode: result.errorCode }, 502);
   }
 
   const now = Date.now();
@@ -104,7 +102,7 @@ Deno.serve(async (req) => {
     contact_id: contact.id,
     direction: "OUT",
     body: stored,
-    twilio_sid: out.sid,
+    twilio_sid: result.messageId,
     status: "queued",
     template_id: templateId,
     sent_by_employee_id: employee?.id ?? null,
@@ -115,5 +113,5 @@ Deno.serve(async (req) => {
     .update({ last_message_ms: now, last_message_preview: `Você: ${stored}`.slice(0, 140) })
     .eq("id", contact.id);
 
-  return jsonResponse(req, { ok: true, sid: out.sid });
+  return jsonResponse(req, { ok: true, sid: result.messageId });
 });

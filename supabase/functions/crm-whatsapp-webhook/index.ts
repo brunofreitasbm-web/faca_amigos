@@ -5,20 +5,17 @@ import {
 } from "./offer.ts";
 import { handleNps } from "../_shared/npsFlow.ts";
 import { isNpsFinalReply } from "../_shared/nps.ts";
+import { getWhatsAppProvider, MetaWhatsAppProvider } from "../_shared/whatsapp/index.ts";
 
-// Webhook do WhatsApp (Twilio, subconta do CRM). Recebe DOIS tipos de
-// chamada na mesma URL:
-//   - mensagem recebida do cliente (SmsStatus = "received")
-//   - status de mensagem enviada por nós (MessageStatus = sent/delivered/read/failed…)
+// Webhook do WhatsApp (provedor configurável: Twilio ou Meta).
+// Recebe chamadas de:
+//   - mensagem recebida do cliente
+//   - status de mensagem enviada (sent/delivered/read/failed…)
+//   - ecos de mensagem do app WhatsApp Business (coexistência)
+//   - verificação de webhook GET (Meta)
 //
-// verify_jwt = false (ver supabase/config.toml): a Twilio não manda JWT. A
-// autorização é a ASSINATURA X-Twilio-Signature, conferida abaixo com o
-// Auth Token da subconta — sem ela qualquer um poderia injetar conversas.
-// Inline (sem _shared) pelo mesmo motivo de google-review-webhook.
-
-const TWILIO_TOKEN_ENV = "TWILIO_CRM_AUTH_TOKEN";
-const PUBLIC_URL_ENV = "CRM_WEBHOOK_PUBLIC_URL";
-const DEFAULT_PUBLIC_URL = "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/crm-whatsapp-webhook";
+// verify_jwt = false (ver supabase/config.toml): chamadas externas não mandam JWT.
+// A autorização é a ASSINATURA criptográfica (X-Twilio-Signature ou X-Hub-Signature-256).
 
 // Palavras que o cliente manda para parar de receber nossas mensagens
 // (exigência de boa prática do WhatsApp e LGPD art. 18, IX).
@@ -74,7 +71,7 @@ const FAILED_STATUSES = new Set(["failed", "undelivered"]);
 // Erros que dizem respeito ao NÚMERO e não mudam sozinhos: 63024 destinatário inválido,
 // 63003 canal não achou o endereço (sem WhatsApp), 21211 número inválido, 21614 não é celular.
 // 63049 (Meta não entregou ESTA mensagem) e 63016/63018 etc. são da mensagem/template — não bloqueiam.
-const PERMANENT_FAILURE_CODES = new Set(["63024", "63003", "21211", "21614"]);
+const PERMANENT_FAILURE_CODES = new Set(["63024", "63003", "21211", "21614", "131030", "131026"]);
 
 /**
  * Pausa o envio ao número: opt_in = false com motivo DELIVERY_FAILED em todos os canais (os
@@ -102,53 +99,50 @@ async function blockUndeliverable(admin: ReturnType<typeof createClient>, contac
 const STATUS_RANK: Record<string, number> = { received: 0, queued: 1, sent: 2, delivered: 3, read: 4, failed: 5, undelivered: 5 };
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("method_not_allowed", { status: 405 });
+  const provider = getWhatsAppProvider();
 
-  const token = Deno.env.get(TWILIO_TOKEN_ENV);
-  if (!token) {
-    console.error(`${TWILIO_TOKEN_ENV} não configurado — recusando por padrão seguro`);
-    return new Response("webhook não configurado", { status: 503 });
+  // 1. Verificação GET do webhook (Meta Cloud API)
+  if (req.method === "GET") {
+    if (provider instanceof MetaWhatsAppProvider) {
+      const challenge = provider.verifyWebhookChallenge(new URL(req.url));
+      if (challenge) return challenge;
+    }
+    return new Response("method_not_allowed", { status: 405 });
   }
 
-  const form = await req.formData();
-  const params: Record<string, string> = {};
-  for (const [k, v] of form.entries()) params[k] = String(v);
+  if (req.method !== "POST") return new Response("method_not_allowed", { status: 405 });
 
-  const signature = req.headers.get("X-Twilio-Signature") ?? "";
-  const publicUrl = Deno.env.get(PUBLIC_URL_ENV) ?? DEFAULT_PUBLIC_URL;
-  if (!(await validSignature(publicUrl, params, signature, token))) {
+  const rawBody = await req.text();
+  const valid = await provider.verifySignature(req, rawBody);
+  if (!valid) {
     return new Response("assinatura inválida", { status: 403 });
   }
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const sid = params.MessageSid || params.SmsSid;
-  if (!sid) return new Response("sem MessageSid", { status: 400 });
 
   // ── Status de mensagem enviada ──
-  if (params.MessageStatus && params.SmsStatus !== "received") {
-    const next = STATUS_MAP[params.MessageStatus.toLowerCase()];
-    if (!next) return twiml();
+  const statusUpdate = await provider.parseStatus(req, rawBody);
+  if (statusUpdate) {
+    const next = statusUpdate.status;
     const { data: msg } = await admin
       .from("fa_crm_messages")
       .select("id, status, contact_id, delivered_at_ms, read_at_ms, failed_at_ms")
-      .eq("twilio_sid", sid)
+      .eq("twilio_sid", statusUpdate.messageId)
       .maybeSingle();
-    if (!msg) return twiml();
+    if (!msg) return provider.name === "meta" ? new Response("ok", { status: 200 }) : twiml();
 
     const now = Date.now();
-    const errorCode = params.ErrorCode || null;
-    // Os carimbos de entregue/lido/falha são gravados mesmo se o callback chegar
-    // fora de ordem (ex.: "delivered" depois de "read"); o status só avança.
+    const errorCode = statusUpdate.errorCode || null;
     const patch: Record<string, unknown> = {};
     if (next === "delivered" && !msg.delivered_at_ms) patch.delivered_at_ms = now;
     if (next === "read") {
       if (!msg.read_at_ms) patch.read_at_ms = now;
-      if (!msg.delivered_at_ms) patch.delivered_at_ms = now; // leu ⇒ foi entregue
+      if (!msg.delivered_at_ms) patch.delivered_at_ms = now;
     }
     if (FAILED_STATUSES.has(next) && !msg.failed_at_ms) patch.failed_at_ms = now;
     if (errorCode) {
       patch.error_code = errorCode;
-      patch.error = `Twilio ${errorCode}`;
+      patch.error = statusUpdate.errorMessage ?? `Erro ${errorCode}`;
     }
     if ((STATUS_RANK[next] ?? 0) > (STATUS_RANK[msg.status] ?? 0)) {
       patch.status = next;
@@ -156,15 +150,19 @@ Deno.serve(async (req) => {
     }
     if (Object.keys(patch).length) await admin.from("fa_crm_messages").update(patch).eq("id", msg.id);
 
-    // Falha permanente (número sem WhatsApp/inválido): para de enviar a esse número.
     if (errorCode && PERMANENT_FAILURE_CODES.has(errorCode)) await blockUndeliverable(admin, msg.contact_id);
-    return twiml();
+    return provider.name === "meta" ? new Response("ok", { status: 200 }) : twiml();
   }
 
   // ── Mensagem recebida ──
-  const from = stripWhatsapp(params.From ?? "");
-  const to = stripWhatsapp(params.To ?? "");
-  if (!from || !to) return new Response("From/To ausentes", { status: 400 });
+  const inbound = await provider.parseInbound(req, rawBody);
+  if (!inbound) {
+    return provider.name === "meta" ? new Response("ok", { status: 200 }) : twiml();
+  }
+
+  const from = inbound.from;
+  const to = inbound.to;
+  const sid = inbound.messageId;
 
   const { data: channel } = await admin
     .from("fa_crm_channels")
@@ -173,24 +171,18 @@ Deno.serve(async (req) => {
     .eq("active", true)
     .maybeSingle();
   if (!channel) {
-    // Número não cadastrado como canal: aceita (200) para a Twilio não
-    // reentregar, mas não grava — evita criar contato num canal inexistente.
     console.warn("mensagem para número sem canal cadastrado:", to);
-    return twiml();
+    return provider.name === "meta" ? new Response("ok", { status: 200 }) : twiml();
   }
 
-  const body = (params.Body ?? "").trim();
-  const numMedia = Number(params.NumMedia ?? "0") || 0;
-  const media = Array.from({ length: numMedia }, (_, i) => ({
-    url: params[`MediaUrl${i}`],
-    contentType: params[`MediaContentType${i}`],
-  })).filter((m) => m.url);
+  const body = inbound.body;
+  const media = inbound.media.filter((m) => Boolean(m.url || m.id));
   const now = Date.now();
   const preview = (body || (media.length ? "📎 mídia" : "")).slice(0, 140);
 
-  // Idempotência: a Twilio reentrega em timeout. Se o SID já existe, sai.
+  // Idempotência
   const { data: dup } = await admin.from("fa_crm_messages").select("id").eq("twilio_sid", sid).maybeSingle();
-  if (dup) return twiml();
+  if (dup) return provider.name === "meta" ? new Response("ok", { status: 200 }) : twiml();
 
   // Com/sem o 9º dígito: prefere o contato mais antigo (o que recebeu os avisos).
   let { data: contact } = await admin
@@ -205,14 +197,36 @@ Deno.serve(async (req) => {
   if (!contact) {
     const { data: created, error } = await admin
       .from("fa_crm_contacts")
-      .insert({ channel_id: channel.id, phone_e164: from, name: params.ProfileName || null })
+      .insert({ channel_id: channel.id, phone_e164: from, name: inbound.profileName || null })
       .select("id, name, unread_count, stage, opt_in, guardian_id, opt_out_reason")
       .single();
     if (error) {
       console.error("erro ao criar contato:", error);
-      return new Response("erro", { status: 500 }); // Twilio tenta de novo
+      return new Response("erro", { status: 500 });
     }
     contact = created;
+  }
+
+  // Ecos da Coexistência (app WhatsApp Business no celular): registra como mensagem humana e não dispara bot
+  if (inbound.isEcho) {
+    await admin.from("fa_crm_messages").insert({
+      contact_id: contact!.id,
+      direction: "OUT",
+      body,
+      media,
+      twilio_sid: sid,
+      status: "delivered",
+      created_at_ms: now,
+    });
+    await admin
+      .from("fa_crm_contacts")
+      .update({
+        last_message_ms: now,
+        last_message_preview: `Você: ${preview}`,
+        stage: "EM_CONVERSA",
+      })
+      .eq("id", contact!.id);
+    return new Response("ok", { status: 200 });
   }
 
   const word = body.toLowerCase().replace(/[^a-zà-ú]/g, "");
@@ -220,8 +234,6 @@ Deno.serve(async (req) => {
   const optIn = OPT_IN_WORDS.has(word);
 
   if (optOut) {
-    // PARAR encerra qualquer pedido de autorização pendente (geral ou de
-    // marketing) e revoga os dois consentimentos do responsável.
     await admin
       .from("fa_crm_optin_requests")
       .update({ status: "DECLINED", answered_at_ms: now })
@@ -270,7 +282,6 @@ Deno.serve(async (req) => {
       last_message_preview: preview,
       unread_count: (contact!.unread_count ?? 0) + 1,
       stage: contact!.stage === "NOVO" ? "EM_CONVERSA" : contact!.stage === "INATIVO" ? "EM_CONVERSA" : contact!.stage,
-      // Quem escreve tem WhatsApp funcionando: desfaz a pausa por falha de entrega.
       ...(optOut
         ? { opt_in: false, opt_out_reason: "USER_STOP" }
         : optIn || contact!.opt_out_reason === "DELIVERY_FAILED"
@@ -280,23 +291,17 @@ Deno.serve(async (req) => {
     .eq("id", contact!.id);
 
   // ── Resposta automática (opt-out/opt-in, ofertas, renovação e NPS) ──
-  // Botão de oferta vem antes do aceite: "Quero saber mais" não pode virar
-  // opt-in. Sem oferta recente para o contato, segue o fluxo normal.
-  const offer = optOut || optIn ? null : offerButton(params.ButtonPayload, body);
+  const offer = optOut || optIn ? null : offerButton(inbound.buttonPayload, body);
   const offerReply = offer ? await handleOffer(admin, contact!.id, offer, now) : null;
-  // Botão SIM do aviso de excedente (fa_visita_excedente_v2): renova o plano atual.
   const overageReply =
-    optOut || optIn || offerReply || params.ButtonPayload !== OVERAGE_RENEW_PAYLOAD
+    optOut || optIn || offerReply || inbound.buttonPayload !== OVERAGE_RENEW_PAYLOAD
       ? null
       : await handleOverageRenewal(admin, contact!.id, now);
-  // Texto pré-preenchido do card de oferta da tela de acompanhamento ("Quero saber do Porto Seguro").
   const siteKind = optOut || optIn || offerReply || overageReply ? null : siteOfferKeyword(body);
   const siteReply = siteKind ? await handleSiteOffer(admin, contact!, siteKind, now) : null;
-  // Botão "Renovar" da tela de acompanhamento ("Quero renovar +30 min da Maria").
   const renew = optOut || optIn || offerReply || overageReply || siteReply ? null : renewRequest(body);
   const renewReply = renew ? await handleRenewRequest(admin, contact!.id, renew.minutes, renew.childHint, now) : null;
 
-  // Pergunta da pesquisa de NPS no meio da conversa: não leva a mensagem de fechamento (só o agradecimento final leva).
   let npsQuestion = false;
   const npsReply = async () => {
     const r = await handleNps(admin, contact!.id, body, now);
@@ -312,8 +317,6 @@ Deno.serve(async (req) => {
   else if (siteReply) reply = siteReply;
   else if (renewReply) reply = renewReply;
   else if (ACCEPT_WORDS.has(word)) {
-    // Um "SIM"/"QUERO" pode responder aos dois pedidos ao mesmo tempo, se
-    // ambos estiverem em aberto para este contato (geral + marketing).
     const acceptedGeneral = await handleOptinAccept(admin, contact!, from, word, now);
     const acceptedMarketing = await handleMarketingOptinAccept(admin, contact!, from, now);
     if (acceptedGeneral || acceptedMarketing) {
@@ -321,20 +324,19 @@ Deno.serve(async (req) => {
         ? await marketingReply(admin, contact!.id, acceptedMarketing, marketingWelcome(contact!.name, now), now)
         : "Combinado! 💛 Vamos te avisar por aqui sobre suas visitas e, às vezes, pedir sua opinião. Para parar, é só responder PARAR.";
     } else {
-      const choice = renewalChoice(params.ButtonPayload, body);
+      const choice = renewalChoice(inbound.buttonPayload, body);
       reply = choice ? await handleRenewal(admin, contact!.id, choice, now) : null;
       reply ??= await npsReply();
     }
   } else {
-    const choice = renewalChoice(params.ButtonPayload, body);
+    const choice = renewalChoice(inbound.buttonPayload, body);
     reply = choice ? await handleRenewal(admin, contact!.id, choice, now) : null;
     reply ??= await npsReply();
   }
 
-  if (!reply) return twiml();
+  if (!reply) return provider.name === "meta" ? new Response("ok", { status: 200 }) : twiml();
   if (!optOut && !npsQuestion) reply = await withClosing(admin, contact!.id, reply, now);
 
-  // Grava a resposta automática no histórico para a equipe ver a conversa inteira.
   await admin.from("fa_crm_messages").insert({
     contact_id: contact!.id,
     direction: "OUT",
@@ -346,6 +348,11 @@ Deno.serve(async (req) => {
     .from("fa_crm_contacts")
     .update({ last_message_ms: now + 1, last_message_preview: `Você: ${reply}`.slice(0, 140) })
     .eq("id", contact!.id);
+
+  if (provider.name === "meta") {
+    await provider.sendText({ from: to, to: from, body: reply });
+    return new Response("ok", { status: 200, headers: { "Content-Type": "application/json" } });
+  }
   return twiml(`<Message>${reply.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</Message>`);
 });
 

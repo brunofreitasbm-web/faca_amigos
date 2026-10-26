@@ -167,7 +167,7 @@ export function OwnerAcompanhamentoTab() {
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
             <span
               style={{
-                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                background: "linear-gradient(135deg, var(--color-success) 0%, var(--color-success-text) 100%)",
                 color: "#ffffff",
                 fontSize: "11px",
                 fontWeight: "bold",
@@ -178,11 +178,11 @@ export function OwnerAcompanhamentoTab() {
             >
               <Emoji3D e="👑" /> PAINEL OWNER
             </span>
-            <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
               Atualizado às {lastRefreshed.toLocaleTimeString("pt-BR")}
             </span>
           </div>
-          <h2 style={{ margin: 0, fontSize: "22px", fontFamily: "var(--font-display)", color: "#f8fafc" }}>
+          <h2 style={{ margin: 0, fontSize: "22px", fontFamily: "var(--font-display)", color: "var(--surface-sunken)" }}>
             Visualização & Acompanhamento Geral
           </h2>
         </div>
@@ -217,71 +217,71 @@ export function OwnerAcompanhamentoTab() {
         }}
       >
         {/* Card Faturamento vs Meta */}
-        <Card style={{ padding: "20px", borderLeft: "4px solid #0d9488" }}>
-          <span style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", textTransform: "uppercase" }}>
+        <Card style={{ padding: "20px", borderLeft: "4px solid var(--color-teal-text)" }}>
+          <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", textTransform: "uppercase" }}>
             Faturamento Consolidado
           </span>
-          <div style={{ fontSize: "28px", fontWeight: "bold", color: "#0f172a", margin: "6px 0 2px" }}>
+          <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--text-primary)", margin: "6px 0 2px" }}>
             {money(totalRevenue)}
           </div>
           {totalGoal > 0 ? (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#475569", marginBottom: "4px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-secondary)", marginBottom: "4px" }}>
                 <span>Meta: {money(totalGoal)}</span>
                 <strong>{goalPercent}%</strong>
               </div>
-              <div style={{ width: "100%", height: "6px", background: "#e2e8f0", borderRadius: "9999px", overflow: "hidden" }}>
+              <div style={{ width: "100%", height: "6px", background: "var(--border-subtle)", borderRadius: "9999px", overflow: "hidden" }}>
                 <div
                   style={{
                     width: `${goalPercent}%`,
                     height: "100%",
-                    background: "linear-gradient(90deg, #0d9488 0%, #10b981 100%)",
+                    background: "linear-gradient(90deg, var(--color-teal-text) 0%, var(--color-success) 100%)",
                   }}
                 />
               </div>
             </div>
           ) : (
-            <span style={{ fontSize: "12px", color: "#94a3b8" }}>Sem meta configurada</span>
+            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Sem meta configurada</span>
           )}
         </Card>
 
         {/* Card Total de Vendas */}
-        <Card style={{ padding: "20px", borderLeft: "4px solid #3b82f6" }}>
-          <span style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", textTransform: "uppercase" }}>
+        <Card style={{ padding: "20px", borderLeft: "4px solid var(--color-teal)" }}>
+          <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", textTransform: "uppercase" }}>
             Total de Vendas / Ingressos
           </span>
-          <div style={{ fontSize: "28px", fontWeight: "bold", color: "#0f172a", margin: "6px 0 2px" }}>
+          <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--text-primary)", margin: "6px 0 2px" }}>
             {totalOrders}
           </div>
-          <span style={{ fontSize: "12px", color: "#64748b" }}>Atendimentos registrados hoje</span>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Atendimentos registrados hoje</span>
         </Card>
 
         {/* Card Sessões Ativas Agora */}
-        <Card style={{ padding: "20px", borderLeft: "4px solid #8b5cf6" }}>
-          <span style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", textTransform: "uppercase" }}>
+        <Card style={{ padding: "20px", borderLeft: "4px solid var(--color-amber)" }}>
+          <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", textTransform: "uppercase" }}>
             Crianças Brincando Agora
           </span>
-          <div style={{ fontSize: "28px", fontWeight: "bold", color: "#0f172a", margin: "6px 0 2px" }}>
+          <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--text-primary)", margin: "6px 0 2px" }}>
             {totalActiveSessions}
           </div>
           {totalOverdueSessions > 0 ? (
-            <span style={{ fontSize: "12px", fontWeight: "bold", color: "#ef4444" }}>
+            <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--color-error)" }}>
               ⚠️ {totalOverdueSessions} com tempo excedido
             </span>
           ) : (
-            <span style={{ fontSize: "12px", color: "#10b981" }}>✓ Todas no prazo</span>
+            <span style={{ fontSize: "12px", color: "var(--color-success)" }}>✓ Todas no prazo</span>
           )}
         </Card>
 
         {/* Card Média NPS */}
-        <Card style={{ padding: "20px", borderLeft: "4px solid #f59e0b" }}>
-          <span style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", textTransform: "uppercase" }}>
+        <Card style={{ padding: "20px", borderLeft: "4px solid var(--color-amber)" }}>
+          <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", textTransform: "uppercase" }}>
             NPS
           </span>
-          <div style={{ fontSize: "28px", fontWeight: "bold", color: "#0f172a", margin: "6px 0 2px" }}>
+          <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--text-primary)", margin: "6px 0 2px" }}>
             {npsSummary.nps !== null ? (npsSummary.nps > 0 ? `+${npsSummary.nps}` : npsSummary.nps) : "—"}
           </div>
-          <span style={{ fontSize: "12px", color: "#64748b" }}>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
             {npsLogs.length} avaliações · nota média {avgNps ?? "—"}/10
             {avgTeam !== null && ` · equipe ${avgTeam.toFixed(1)}/5`}
             {avgSpace !== null && ` · espaço ${avgSpace.toFixed(1)}/5`}
@@ -291,7 +291,7 @@ export function OwnerAcompanhamentoTab() {
 
       {/* Detalhamento por Unidade */}
       <div>
-        <h3 style={{ fontSize: "17px", color: "#0f172a", fontFamily: "var(--font-display)", marginBottom: "12px" }}>
+        <h3 style={{ fontSize: "17px", color: "var(--text-primary)", fontFamily: "var(--font-display)", marginBottom: "12px" }}>
           Acompanhamento por Operação
         </h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px" }}>
@@ -300,7 +300,7 @@ export function OwnerAcompanhamentoTab() {
             return (
               <Card key={m.unitId} style={{ padding: "18px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                  <strong style={{ fontSize: "16px", color: "#0f172a" }}>{m.unitName}</strong>
+                  <strong style={{ fontSize: "16px", color: "var(--text-primary)" }}>{m.unitName}</strong>
                   <Badge variant={m.kind === "QUIOSQUE" ? "vip" : "teal"}>
                     {m.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND"}
                   </Badge>
@@ -308,30 +308,30 @@ export function OwnerAcompanhamentoTab() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
-                    <span style={{ color: "#64748b" }}>Faturamento:</span>
-                    <strong style={{ color: "#0f172a" }}>{money(m.revenueCents)}</strong>
+                    <span style={{ color: "var(--text-muted)" }}>Faturamento:</span>
+                    <strong style={{ color: "var(--text-primary)" }}>{money(m.revenueCents)}</strong>
                   </div>
 
                   {m.goalCents > 0 && (
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                      <span style={{ color: "#64748b" }}>Meta ({money(m.goalCents)}):</span>
-                      <strong style={{ color: unitGoalPercent && unitGoalPercent >= 100 ? "#10b981" : "#0d9488" }}>
+                      <span style={{ color: "var(--text-muted)" }}>Meta ({money(m.goalCents)}):</span>
+                      <strong style={{ color: unitGoalPercent && unitGoalPercent >= 100 ? "var(--color-success)" : "var(--color-teal-text)" }}>
                         {unitGoalPercent}% Atingido
                       </strong>
                     </div>
                   )}
 
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                    <span style={{ color: "#64748b" }}>Vendas Realizadas:</span>
+                    <span style={{ color: "var(--text-muted)" }}>Vendas Realizadas:</span>
                     <strong>{m.ordersCount} pedidos</strong>
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                    <span style={{ color: "#64748b" }}>Sessões Ativas:</span>
+                    <span style={{ color: "var(--text-muted)" }}>Sessões Ativas:</span>
                     <span>
                       <strong>{m.activeSessionsCount} ativas</strong>
                       {m.overdueSessionsCount > 0 && (
-                        <span style={{ color: "#ef4444", fontWeight: "bold", marginLeft: "6px" }}>
+                        <span style={{ color: "var(--color-error)", fontWeight: "bold", marginLeft: "6px" }}>
                           ({m.overdueSessionsCount} excedidas)
                         </span>
                       )}
@@ -348,17 +348,17 @@ export function OwnerAcompanhamentoTab() {
       <Card style={{ padding: "20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: "17px", color: "#0f172a", fontFamily: "var(--font-display)" }}>
+            <h3 style={{ margin: 0, fontSize: "17px", color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
               <Emoji3D e="💬" /> Feed de Avaliações NPS (Playground & Circuito)
             </h3>
-            <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#64748b" }}>
+            <p style={{ margin: "2px 0 0", fontSize: "13px", color: "var(--text-muted)" }}>
               Feed ao vivo das notas de 0 a 10 e opiniões enviadas pelos responsáveis ao término da sessão.
             </p>
           </div>
           {avgNps !== null && (
             <div style={{ textAlign: "right" }}>
-              <span style={{ fontSize: "20px", fontWeight: "bold", color: "#0d9488" }}>{avgNps} / 10</span>
-              <div style={{ fontSize: "11px", color: "#64748b" }}>Nota Global Média</div>
+              <span style={{ fontSize: "20px", fontWeight: "bold", color: "var(--color-teal-text)" }}>{avgNps} / 10</span>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>Nota Global Média</div>
             </div>
           )}
         </div>
@@ -371,21 +371,21 @@ export function OwnerAcompanhamentoTab() {
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {npsLogs.map((log) => {
               const maxScore = Math.max(log.playgroundScore ?? -1, log.circuitoScore ?? -1);
-              let scoreBadgeBg = "#e2e8f0";
-              let scoreBadgeColor = "#334155";
+              let scoreBadgeBg = "var(--border-subtle)";
+              let scoreBadgeColor = "var(--text-secondary)";
               let scoreLabel = "Neutro";
 
               if (maxScore >= 9) {
-                scoreBadgeBg = "#dcfce7";
-                scoreBadgeColor = "#15803d";
+                scoreBadgeBg = "rgba(40, 200, 128, 0.12)";
+                scoreBadgeColor = "var(--color-success-text)";
                 scoreLabel = "Promotor ⭐";
               } else if (maxScore >= 7) {
-                scoreBadgeBg = "#fef3c7";
-                scoreBadgeColor = "#b45309";
+                scoreBadgeBg = "rgba(201, 144, 32, 0.12)";
+                scoreBadgeColor = "var(--color-amber-text)";
                 scoreLabel = "Neutro";
               } else if (maxScore >= 0) {
-                scoreBadgeBg = "#fee2e2";
-                scoreBadgeColor = "#b91c1c";
+                scoreBadgeBg = "rgba(232, 48, 48, 0.1)";
+                scoreBadgeColor = "var(--color-error-text)";
                 scoreLabel = "Detrator";
               }
 
@@ -395,8 +395,8 @@ export function OwnerAcompanhamentoTab() {
                   style={{
                     padding: "14px 16px",
                     borderRadius: "12px",
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
+                    background: "var(--surface-sunken)",
+                    border: "1px solid var(--border-subtle)",
                     display: "flex",
                     flexDirection: "column",
                     gap: "8px",
@@ -416,11 +416,11 @@ export function OwnerAcompanhamentoTab() {
                       >
                         {renderEmoji(scoreLabel)}
                       </span>
-                      <span style={{ fontSize: "12px", color: "#64748b" }}>
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                         Código: <strong>{log.code}</strong>
                       </span>
                     </div>
-                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                       {log.createdAt ? new Date(log.createdAt).toLocaleTimeString("pt-BR") : ""}
                     </span>
                   </div>
@@ -428,32 +428,32 @@ export function OwnerAcompanhamentoTab() {
                   <div style={{ display: "flex", gap: "16px", fontSize: "13px" }}>
                     {log.playgroundScore !== null && (
                       <div>
-                        <span style={{ color: "#64748b" }}>Playground: </span>
-                        <strong style={{ color: "#0f172a" }}>{log.playgroundScore} / 10</strong>
+                        <span style={{ color: "var(--text-muted)" }}>Playground: </span>
+                        <strong style={{ color: "var(--text-primary)" }}>{log.playgroundScore} / 10</strong>
                       </div>
                     )}
                     {log.circuitoScore !== null && (
                       <div>
-                        <span style={{ color: "#64748b" }}>Circuito: </span>
-                        <strong style={{ color: "#0f172a" }}>{log.circuitoScore} / 10</strong>
+                        <span style={{ color: "var(--text-muted)" }}>Circuito: </span>
+                        <strong style={{ color: "var(--text-primary)" }}>{log.circuitoScore} / 10</strong>
                       </div>
                     )}
                     {log.teamScore != null && (
                       <div>
-                        <span style={{ color: "#64748b" }}>Equipe: </span>
-                        <strong style={{ color: "#0f172a" }}>{log.teamScore} / 5</strong>
+                        <span style={{ color: "var(--text-muted)" }}>Equipe: </span>
+                        <strong style={{ color: "var(--text-primary)" }}>{log.teamScore} / 5</strong>
                       </div>
                     )}
                     {log.spaceScore != null && (
                       <div>
-                        <span style={{ color: "#64748b" }}>Espaço: </span>
-                        <strong style={{ color: "#0f172a" }}>{log.spaceScore} / 5</strong>
+                        <span style={{ color: "var(--text-muted)" }}>Espaço: </span>
+                        <strong style={{ color: "var(--text-primary)" }}>{log.spaceScore} / 5</strong>
                       </div>
                     )}
                   </div>
 
                   {log.feedback && (
-                    <div style={{ fontSize: "13px", color: "#334155", fontStyle: "italic", background: "#ffffff", padding: "8px 12px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                    <div style={{ fontSize: "13px", color: "var(--text-secondary)", fontStyle: "italic", background: "var(--surface-card)", padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
                       "{log.feedback}"
                     </div>
                   )}

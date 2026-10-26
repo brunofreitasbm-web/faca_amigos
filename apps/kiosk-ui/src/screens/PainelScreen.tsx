@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CSSProperties } from "react";
-import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon, Tooltip, ClockIcon, ArrowClockwiseIcon } from "@facaamigos/ui";
+import { Card, Button, Select, StatusBadge, Badge, Tag, AsyncState, Modal, PrinterIcon, ShoppingCartIcon, PlusIcon, SignOutIcon, XIcon, HelpText, RevealPin, AutismRibbonIcon, ClockIcon, ArrowClockwiseIcon } from "@facaamigos/ui";
 import { Api, businessDateFor } from "../api/client.js";
 import type { ActiveSessionEntry, Plan, Package, Asset, BonusRule, VipFlag } from "../api/client.js";
 import { bonificacaoHoje, dentroDoPiloto, diaSemanaISO } from "../bonificacao.js";
@@ -27,7 +26,7 @@ import { SaidaScreen } from "./SaidaScreen.js";
 import { PdvScreen } from "./PdvScreen.js";
 import { WristbandQRCode } from "../components/WristbandQRCode.js";
 import { Emoji3D, renderEmoji } from "../components/Emoji3D.js";
-import { OperatorSalesCopilot } from "../components/OperatorSalesCopilot.js";
+import { MetaDoDia } from "../components/MetaDoDia.js";
 
 const PAUSE_REASONS: Array<{ value: string; label: string }> = [
   { value: "BANHEIRO", label: "Foi ao banheiro" },
@@ -39,31 +38,6 @@ const PAUSE_REASONS: Array<{ value: string; label: string }> = [
 // para evitar (criança some do controle de tempo) — por isso o card
 // pisca depois desse limite, igual ao alerta de excedente.
 const PAUSE_ALERT_MS = 10 * 60_000;
-
-// Botões do grupo compacto (Sessão/Mudar Plano/Pulseira): eram só-ícone
-// com a explicação escondida no Tooltip — que só aparece no hover, e o
-// balcão opera em tela touch, sem mouse parado em cima de nada. Agora cada
-// um mostra um rótulo curto sempre visível embaixo do ícone; o Tooltip
-// continua por cima só como reforço pra quem usa teclado/mouse.
-const ICON_BUTTON_STYLE: CSSProperties = {
-  minWidth: "44px",
-  height: "44px",
-  padding: "2px 8px",
-  borderRadius: "12px",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "1px",
-  fontSize: "16px",
-};
-
-const ICON_BUTTON_LABEL_STYLE: CSSProperties = {
-  fontSize: "9px",
-  lineHeight: 1,
-  fontWeight: "normal",
-  whiteSpace: "nowrap",
-};
 
 /**
  * Painel do parque (seção 1.3/6 do plano): contagem ascendente,
@@ -127,6 +101,24 @@ export function PainelScreen() {
   // espaço fixo da tela mesmo sem nenhuma ação pendente do operador.
   const [prepaidQueueOpen, setPrepaidQueueOpen] = useState(false);
   const [tipDismissed, setTipDismissed] = useState(() => localStorage.getItem("facaamigos_panel_tip_dismissed") === "true");
+  // Menu "⋯ Mais" do card (Editar/Sessão/Pulseira/Trocar Plano) — só um aberto por vez.
+  const [moreMenuFor, setMoreMenuFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!moreMenuFor) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!(e.target as Element).closest?.("[data-more-menu]")) setMoreMenuFor(null);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreMenuFor(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [moreMenuFor]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -533,198 +525,46 @@ export function PainelScreen() {
     // meta do dia e os botões flutuantes ficam sempre visíveis, sem rolar
     // a página inteira, no computador, tablet ou celular.
     <div className="painel-shell" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", padding: "clamp(10px, 1.5vw, 16px)", gap: "10px" }}>
+      {/* Cabeçalho só com o que é estado do espaço (subtítulo + ocupação).
+          O botão "Novo Check-in" que ficava aqui saiu: era a 3ª porta para
+          a mesma ação — o botão redondo "+" (64px, canto inferior) e o
+          atalho E/F2 já cobrem, e o estado vazio mantém o seu. */}
       <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px 16px" }}>
-        {/* Esquerda: Identificação + Indicadores em linha aproveitando o espaço horizontal */}
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px 12px", minWidth: 0 }}>
-          <h1 className="sr-only">Painel</h1>
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "13px", fontWeight: 500, whiteSpace: "nowrap" }}>
-            {unit.kind === "QUIOSQUE"
-              ? "Acompanhamento em tempo real dos carrinhos no circuito"
-              : "Acompanhamento em tempo real das crianças no playground"}
-          </p>
-
-          {/* Faixa compacta de indicadores (Ticket Médio, Bonificação, Regras):
-              posicionada em linha no cabeçalho para aproveitar o espaço horizontal vazio
-              e liberar área vertical para os cards das crianças/carrinhos logo abaixo. */}
-          {(ticketTargetCents > 0 || bonusRules.length > 0 || (unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)))) && (
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" }}>
-              {ticketTargetCents > 0 && (() => {
-                const percent = Math.min(120, Math.round((ticketMedioCents / ticketTargetCents) * 100));
-                const progressTrackWidth = Math.min(100, percent);
-
-                let zoneColor = "#3b82f6";
-                let zoneGradient = "linear-gradient(90deg, #3b82f6, #60a5fa)";
-                let badgeClass = "";
-
-                if (percent < 50) {
-                  zoneColor = "#ef4444";
-                  zoneGradient = "linear-gradient(90deg, #ef4444, #f59e0b)";
-                } else if (percent < 75) {
-                  zoneColor = "#d97706";
-                  zoneGradient = "linear-gradient(90deg, #f59e0b, #eab308)";
-                } else if (percent < 100) {
-                  zoneColor = "#16a34a";
-                  zoneGradient = "linear-gradient(90deg, #eab308, #10b981)";
-                } else if (percent < 120) {
-                  zoneColor = "#059669";
-                  zoneGradient = "linear-gradient(90deg, #10b981, #047857)";
-                  badgeClass = "meta-batida";
-                } else {
-                  zoneColor = "#b45309";
-                  zoneGradient = "linear-gradient(90deg, #f59e0b, #eab308, #3b82f6)";
-                  badgeClass = "super-meta";
-                }
-
-                const deltaCents = ticketTargetCents - ticketMedioCents;
-                let incentiveText = "";
-                if (deltaCents > 0) {
-                  incentiveText = `Falta R$ ${(deltaCents / 100).toFixed(2).replace(".", ",")} p/ meta`;
-                } else {
-                  incentiveText = `🔥 Meta Batida! (+${percent - 100}%)`;
-                }
-
-                return (
-                  <span
-                    title={`Ticket médio de hoje: ${money(ticketMedioCents)} (mín ${money(ticketMinCents)} / alvo ${money(ticketTargetCents)}) — ${incentiveText}`}
-                    className="metric-progress-chip"
-                  >
-                    <div
-                      className="metric-progress-track"
-                      style={{
-                        width: `${progressTrackWidth}%`,
-                        background: zoneGradient,
-                      }}
-                    />
-
-                    <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
-                      <Emoji3D e="🌡️" /> Ticket médio <strong>{money(ticketMedioCents)}</strong>
-                    </span>
-
-                    <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: zoneColor }}>
-                      {percent}%
-                    </span>
-
-                    <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
-                      {renderEmoji(incentiveText)}
-                    </span>
-                  </span>
-                );
-              })()}
-
-              {unit && dentroDoPiloto(businessDateFor(Date.now(), unit.business_day_cutoff_hour)) && (() => {
-                const tipo = unit.kind === "QUIOSQUE" ? "CIRCUITO" : "PLAYGROUND";
-                const businessDate = businessDateFor(Date.now(), unit.business_day_cutoff_hour);
-                const atual = tipo === "CIRCUITO" ? todayOrdersCount : Math.max(0, todayRevenueCents - todayRentalCents);
-                const dow = diaSemanaISO(businessDate);
-                const goal = bonusProgram?.goals.find((g) => g.weekday === dow) ?? null;
-                const b = bonificacaoHoje(tipo, businessDate, atual, goal, bonusProgram?.locacaoExtraBonusCents ?? 0);
-                if (!b) return null;
-
-                const percentBonus = b.meta > 0 ? Math.min(120, Math.round((b.atual / b.meta) * 100)) : 0;
-                const progressTrackWidth = Math.min(100, percentBonus);
-
-                const corNivel = b.nivel === "supermeta" ? "#d97706" : b.nivel === "meta" ? "#059669" : "#2563eb";
-                const bonusGradient = b.nivel === "supermeta"
-                  ? "linear-gradient(90deg, #f59e0b, #eab308, #3b82f6)"
-                  : b.nivel === "meta"
-                    ? "linear-gradient(90deg, #10b981, #059669)"
-                    : "linear-gradient(90deg, #3b82f6, #10b981)";
-                const badgeClass = b.nivel === "supermeta" ? "super-meta" : b.nivel === "meta" ? "meta-batida" : "";
-
-                const badgeLabel = b.nivel === "supermeta" ? "🏆 Supermeta" : b.nivel === "meta" ? "🥈 Meta batida" : `${percentBonus}%`;
-                const atualLabel = tipo === "CIRCUITO" ? `${b.atual} locações` : money(b.atual);
-                const metaLabel = tipo === "CIRCUITO" ? `${b.meta}` : money(b.meta);
-                const superLabel = tipo === "CIRCUITO" ? `${b.super}` : money(b.super);
-
-                let bonusIncentiveText = "";
-                if (b.nivel === "abaixo") {
-                  const delta = b.meta - b.atual;
-                  bonusIncentiveText = tipo === "CIRCUITO" ? `Falta ${delta} loc. p/ bônus!` : `Falta ${money(delta)} p/ bônus!`;
-                } else if (b.nivel === "meta") {
-                  const deltaSuper = b.super - b.atual;
-                  bonusIncentiveText = tipo === "CIRCUITO" ? `Falta ${deltaSuper} loc. p/ SUPERMETA!` : `Falta ${money(deltaSuper)} p/ SUPERMETA!`;
-                } else {
-                  bonusIncentiveText = `🏆 SUPERMETA ALCANÇADA!`;
-                }
-
-                return (
-                  <span
-                    title={`Programa de Bonificação (piloto de 08/09, 2º ciclo até 05/11): ${atualLabel} (meta ${metaLabel} / super ${superLabel}) — bônus estimado ${money(b.bonusCents)}`}
-                    className="metric-progress-chip"
-                  >
-                    <div
-                      className="metric-progress-track"
-                      style={{
-                        width: `${progressTrackWidth}%`,
-                        background: bonusGradient,
-                      }}
-                    />
-
-                    <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
-                      <Emoji3D e="🎮" /> Bonificação <strong>{atualLabel}</strong>
-                    </span>
-
-                    <span className={`metric-progress-chip-pill ${badgeClass}`} style={{ backgroundColor: corNivel }}>
-                      {renderEmoji(badgeLabel)}
-                    </span>
-
-                    <span className="metric-progress-incentive" style={{ zIndex: 1 }}>
-                      {renderEmoji(bonusIncentiveText)}
-                    </span>
-                  </span>
-                );
-              })()}
-
-              {bonusRules.length > 0 && (
-                <span
-                  title={bonusRules.map((rule) => `🎁 ${rule.description} (${money(rule.rewardValueCents)})`).join(" · ")}
-                  className="metric-progress-chip"
-                >
-                  <Emoji3D e="🏆" /> <strong>{bonusRules.length}</strong> regra{bonusRules.length > 1 ? "s" : ""} de bônus ativa{bonusRules.length > 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Lado Direito: Gauge de Ocupação do Parque & Botão de Check-in compactos */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-          <div style={{ minWidth: "220px", flex: "0 1 280px" }} className="capacity-container">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "2px 8px", fontSize: "12px", fontWeight: "bold" }}>
-              <span>Ocupação: {currentOccupancy} / {maxCapacity} {unit.kind === "QUIOSQUE" ? "carrinhos" : "crianças"}</span>
-              <span style={{ color: capacityTextColor, fontSize: "11px" }}>{occupancyPercent}% ({capacityLabel})</span>
-            </div>
-            <div className="capacity-bar-track" role="progressbar" aria-valuenow={occupancyPercent} aria-valuemin={0} aria-valuemax={100}>
-              <div className="capacity-bar-fill" style={{ width: `${occupancyPercent}%`, backgroundColor: capacityColor }} />
-            </div>
+        <h1 className="sr-only">Painel</h1>
+        <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "13px", fontWeight: 500 }}>
+          {unit.kind === "QUIOSQUE"
+            ? "Acompanhamento em tempo real dos carrinhos no circuito"
+            : "Acompanhamento em tempo real das crianças no playground"}
+        </p>
+        <div style={{ minWidth: "220px", flex: "0 1 280px" }} className="capacity-container">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "2px 8px", fontSize: "12px", fontWeight: "bold" }}>
+            <span>Ocupação: {currentOccupancy} / {maxCapacity} {unit.kind === "QUIOSQUE" ? "carrinhos" : "crianças"}</span>
+            <span style={{ color: capacityTextColor, fontSize: "11px" }}>{occupancyPercent}% ({capacityLabel})</span>
           </div>
-          <IfCan capability="sessao.checkin">
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => {
-                setPreCheckinPrefill(null);
-                setEntradaOpen(true);
-              }}
-              title="Fazer nova entrada/check-in sem sair do Painel (Teclas E ou F2)"
-              style={{ gap: "6px", fontWeight: "bold", whiteSpace: "nowrap", height: "36px", borderRadius: "10px", fontSize: "13px", padding: "0 14px" }}
-            >
-              <Emoji3D e="⚡" /> Novo Check-in (E)
-            </Button>
-          </IfCan>
+          <div className="capacity-bar-track" role="progressbar" aria-valuenow={occupancyPercent} aria-valuemin={0} aria-valuemax={100}>
+            <div className="capacity-bar-fill" style={{ width: `${occupancyPercent}%`, backgroundColor: capacityColor }} />
+          </div>
         </div>
       </div>
 
-      <OperatorSalesCopilot
-        todayRevenueCents={todayRevenueCents - todayRentalCents}
-        targetRevenueCents={currentBonus?.meta || ticketTargetCents || 100000}
-        superRevenueCents={currentBonus?.super || (ticketTargetCents > 0 ? Math.round(ticketTargetCents * 1.3) : 150000)}
-        ordersCount={todayOrdersCount}
+      <MetaDoDia
+        tipo={unitTipo}
+        bonus={businessDate && dentroDoPiloto(businessDate) ? currentBonus : null}
         ticketMedioCents={ticketMedioCents}
-        unitName={unit?.name}
-        unitKind={unit?.kind}
-        bonusLevel={currentBonus?.nivel || "abaixo"}
-        bonusEstimatedCents={currentBonus?.bonusCents || 0}
+        ticketMinCents={ticketMinCents}
+        ticketTargetCents={ticketTargetCents}
+        bonusRules={bonusRules}
+        copilot={{
+          todayRevenueCents: todayRevenueCents - todayRentalCents,
+          targetRevenueCents: currentBonus?.meta || ticketTargetCents || 100000,
+          superRevenueCents: currentBonus?.super || (ticketTargetCents > 0 ? Math.round(ticketTargetCents * 1.3) : 150000),
+          ordersCount: todayOrdersCount,
+          ticketMedioCents,
+          unitName: unit.name,
+          unitKind: unit.kind,
+          bonusLevel: currentBonus?.nivel || "abaixo",
+          bonusEstimatedCents: currentBonus?.bonusCents || 0,
+        }}
       />
 
       {!tipDismissed && entries.length > 0 && (
@@ -1025,6 +865,8 @@ export function PainelScreen() {
               }}
               style={{
                 cursor: isPaused ? "default" : "pointer",
+                // Menu "⋯ Mais" abre para cima a partir do rodapé — não pode ser cortado pelo card.
+                overflow: "visible",
                 display: "flex",
                 flexDirection: "column",
                 borderRadius: "16px",
@@ -1042,28 +884,13 @@ export function PainelScreen() {
                 opacity: isPaused ? 0.85 : 1,
               }}
             >
-              {/* Símbolo do autismo com fundo transparente, sutil no fundo para sinalização discreta do operador sem atrapalhar a visualização */}
-              {isNeurodivergent && (
-                <div
-                  aria-hidden="true"
-                  title="Criança Neurodivergente / TEA — Sinalização para o operador"
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    bottom: "10px",
-                    opacity: 0.12,
-                    pointerEvents: "none",
-                    zIndex: 0,
-                    userSelect: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <AutismRibbonIcon width={58} height={72} />
-                </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "relative", zIndex: 1 }}>
+              {/* Ordem do card segue a leitura do operador: QUEM (nome,
+                  sempre no mesmo lugar) → QUANTO (tempo e valor lado a
+                  lado — é o par que decide a cobrança) → ALERTAS → AÇÕES
+                  no rodapé. Antes os selos vinham antes do nome (o nome
+                  "andava" de card para card) e o valor ficava no rodapé,
+                  separado do tempo por dois grupos de botões. */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                 <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", minWidth: 0, flex: 1 }}>
                   {asset && (
                     asset.photo_url ? (
@@ -1081,65 +908,55 @@ export function PainelScreen() {
                     )
                   )}
                   <div style={{ minWidth: 0 }}>
-                    <strong className="painel-card-name" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      {/* Selo estático com o Símbolo oficial do Autismo, ao lado do nome:
-                          sinaliza ao operador de forma visual e acolhedora. */}
+                    <strong className="painel-card-name" style={{ display: "block" }}>
+                      {session.child_name_snapshot.replace(/\s*🧩/g, "")}
+                      {session.child_birth_date && (
+                        <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}> · {formatAge(session.child_birth_date)}</span>
+                      )}
+                    </strong>
+                    {/* Um único sinal de neurodivergência (o selo com texto).
+                        Antes eram três ao mesmo tempo — selo + 🧩 no nome +
+                        fita no fundo do card — e o que se repete em todo
+                        card deixa de chamar atenção. A pulseira impressa
+                        continua com 🧩 (ver "Imprimir pulseira" abaixo). */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px 6px", flexWrap: "wrap", margin: "4px 0 2px" }}>
                       {isNeurodivergent && (
                         <Badge
                           variant="teal"
                           title="Criança com Autismo / Neurodivergente — Atendimento Inclusivo"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "5px",
-                            padding: "2px 7px",
-                            background: "rgba(0, 168, 89, 0.08)",
-                            border: "1px solid rgba(0, 168, 89, 0.25)",
-                          }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "2px 7px" }}
                         >
                           <AutismRibbonIcon width={13} height={16} style={{ flexShrink: 0 }} />
                           <span>Neurodivergente</span>
                         </Badge>
                       )}
                       {(() => {
-                        const vipFlag = vipFlagsMap.get(session.child_id);
-                        const visits = vipFlag?.visits_in_window;
+                        const visits = vipFlagsMap.get(session.child_id)?.visits_in_window;
                         if (vipChildIds.has(session.child_id)) {
                           return (
                             <Badge variant="vip" title={`Cliente VIP — ${visits ?? 4} visitas nos últimos 30 dias`}>
-                              ★ VIP ({visits ?? 4} visitas)
+                              ★ VIP ({visits ?? 4})
                             </Badge>
                           );
                         }
                         if (visits !== undefined && visits > 0) {
                           return (
-                            <Badge
-                              variant="neutral"
-                              title={`${visits} visita(s) nos últimos 30 dias`}
-                              style={{
-                                fontSize: "11px",
-                                padding: "2px 7px",
-                                background: "rgba(0, 0, 0, 0.05)",
-                                border: "1px solid var(--border-subtle)",
-                                color: "var(--text-muted)",
-                                borderRadius: "6px",
-                                fontWeight: "600",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "3px",
-                              }}
-                            >
-                              <span><Emoji3D e="📍" /> {visits} {visits === 1 ? "visita" : "visitas"}</span>
-                            </Badge>
+                            <span style={{ fontSize: "11px", color: "var(--text-muted)" }} title={`${visits} visita(s) nos últimos 30 dias`}>
+                              {visits} {visits === 1 ? "visita" : "visitas"}
+                            </span>
                           );
                         }
                         return null;
                       })()}
-                      {session.child_name_snapshot}{isNeurodivergent && !session.child_name_snapshot.includes("🧩") ? renderEmoji(" 🧩") : ""}
-                      {session.child_birth_date && (
-                        <span style={{ fontSize: "12px", fontWeight: "normal", color: "var(--text-muted)" }}>· {formatAge(session.child_birth_date)}</span>
+                      {plan && (
+                        <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>
                       )}
-                    </strong>
+                      {session.rental_kind && (
+                        <Badge variant="solid_orange" title="Aluguel avulso de pelúcia — cobrar e recolher a pelúcia na saída">
+                          <Emoji3D e="🧸" /> Pelúcia · devolver
+                        </Badge>
+                      )}
+                    </div>
                     {session.guardian_name_snapshot && (
                       <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Responsável: {session.guardian_name_snapshot}</span>
                     )}
@@ -1183,32 +1000,28 @@ export function PainelScreen() {
                         {session.rental_kind ? "Pelúcia" : "Carrinho"}: {asset.name}
                       </span>
                     )}
-                    {session.rental_kind && (
-                      <Badge variant="solid_orange" title="Aluguel avulso de pelúcia — cobrar e recolher a pelúcia na saída">
-                        <Emoji3D e="🧸" /> Pelúcia · devolver
-                      </Badge>
-                    )}
-                    {plan && (
-                      <Tag color={plan.color} title="Plano de permanência escolhido para esta criança">{plan.name}</Tag>
-                    )}
                   </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px", flexShrink: 0 }}>
-                  {isSelected && !isPaused && (
-                    <Badge variant="solid_pink" title="Esta sessão entra no próximo fechamento">
-                      ✓ Selecionada
-                    </Badge>
-                  )}
-                </div>
+                {isSelected && !isPaused && (
+                  <Badge variant="solid_pink" title="Esta sessão entra no próximo fechamento" style={{ flexShrink: 0 }}>
+                    ✓ Selecionada
+                  </Badge>
+                )}
               </div>
 
-              <StatusBadge
-                phase={displayPhase}
-                detail={formatElapsed(quote.timing.elapsedMs)}
-                size="lg"
-                title={isPaused ? "Tempo congelado enquanto a sessão está pausada" : "Tempo de permanência desde a entrada — base para a cobrança"}
-                style={isPaused ? { opacity: 0.6 } : undefined}
-              />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <StatusBadge
+                  phase={displayPhase}
+                  detail={formatElapsed(quote.timing.elapsedMs)}
+                  size="lg"
+                  title={isPaused ? "Tempo congelado enquanto a sessão está pausada" : "Tempo de permanência desde a entrada — base para a cobrança"}
+                  style={isPaused ? { opacity: 0.6 } : undefined}
+                />
+                <span style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Valor atual</span>
+                  <strong className="painel-card-total" style={{ color: "var(--color-primary-hover)" }}>{money(quote.totalCents)}</strong>
+                </span>
+              </div>
 
               {isPaused && (
                 <Badge
@@ -1283,157 +1096,6 @@ export function PainelScreen() {
                 </div>
               )}
 
-              {/* Sessão/Mudar Plano/Pulseira: ações de consulta/exceção (não
-                  as urgentes como Chamado de Retorno ou Saída manual, que
-                  continuam por extenso abaixo), por isso viraram grupo
-                  compacto — mas cada botão leva um rótulo curto sempre
-                  visível embaixo do ícone (ver ICON_BUTTON_LABEL_STYLE
-                  acima), não só um Tooltip de hover. */}
-              <div style={{ display: "flex", gap: "6px" }}>
-                <IfCan capability="clientes.write">
-                  <Tooltip label="Editar dados cadastrais: responsável, telefone, CPF e criança">
-                    <Button
-                      variant="ghost"
-                      size="md"
-                      aria-label="Editar dados cadastrais"
-                      style={ICON_BUTTON_STYLE}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditRegistrationFor(entry);
-                      }}
-                    >
-                      <span style={{ fontSize: "16px" }}><Emoji3D e="✏️" /></span>
-                      <span style={ICON_BUTTON_LABEL_STYLE}>Editar</span>
-                    </Button>
-                  </Tooltip>
-                </IfCan>
-                <Tooltip label="Ver linha do tempo completa desta sessão: chegada, plano, pausas e retomadas">
-                  <Button
-                    variant="ghost"
-                    size="md"
-                    aria-label="Ver linha do tempo da sessão"
-                    style={ICON_BUTTON_STYLE}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTimelineFor(entry);
-                    }}
-                  >
-                    <ClockIcon />
-                    <span style={ICON_BUTTON_LABEL_STYLE}>Sessão</span>
-                  </Button>
-                </Tooltip>
-                <Tooltip label="Imprimir Pulseira Térmica">
-                  <Button
-                    variant="ghost"
-                    size="md"
-                    aria-label="Imprimir Pulseira Térmica"
-                    style={ICON_BUTTON_STYLE}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPrintData({
-                        wristbandCode,
-                        childName: (session.child_inclusive_eligible || (session.sensory_tags?.length ?? 0) > 0 || session.notes?.toLowerCase().includes("neuro")) && !session.child_name_snapshot.includes("🧩")
-                          ? `${session.child_name_snapshot} 🧩`
-                          : session.child_name_snapshot,
-                        guardianName: session.guardian_name_snapshot || "Responsável",
-                        phone: session.guardian_phone_snapshot || "",
-                        entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                        notes: careSummary || undefined,
-                      });
-                    }}
-                  >
-                    <PrinterIcon />
-                    <span style={ICON_BUTTON_LABEL_STYLE}>Pulseira</span>
-                  </Button>
-                </Tooltip>
-              </div>
-
-              {/* "sm" em vez de "md" aqui: estes três continuam por extenso
-                  (são os urgentes/frequentes, ver comentário abaixo sobre
-                  Saída manual), mas "md" tinha 44px de altura pensados pra
-                  botão isolado — em pilha de até 3 linhas no card estreito
-                  do celular isso é 24px de rolagem a mais só de padding. */}
-              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  loading={actionBusy.has(session.id)}
-                  disabled={actionBusy.has(session.id)}
-                  title="Chamado de retorno urgente — o responsável precisa vir buscar/atender a criança agora (banheiro, quer ir embora)"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    callGuardianBack(entry);
-                  }}
-                >
-                  <Emoji3D e="🚻" /> Chamado de Retorno
-                </Button>
-                {/* Contingência de saída. Fica no card, e não escondido num
-                    menu, porque é usado justamente quando algo já deu errado
-                    e o operador está sob pressão com a família na frente. */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={isPaused || actionBusy.has(session.id)}
-                  title={
-                    isPaused
-                      ? "Retome a contagem antes de liberar a criança"
-                      : "Recibo perdido ou etiqueta danificada: liberar conferindo o documento do responsável"
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setManualExitFor(entry);
-                  }}
-                >
-                  <Emoji3D e="🪪" /> Saída manual
-                </Button>
-                <IfCan capability="sessao.change_plan">
-                  {!session.rental_kind && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={actionBusy.has(session.id)}
-                    title="Trocar o plano de permanência desta sessão"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPendingPlanId("");
-                      setChangingPlanFor(changingPlanFor === session.id ? null : session.id);
-                    }}
-                  >
-                    <ArrowClockwiseIcon /> Trocar Plano
-                  </Button>
-                  )}
-                </IfCan>
-                {isPaused ? (
-                  <Button
-                    variant="teal"
-                    size="sm"
-                    loading={actionBusy.has(session.id)}
-                    disabled={actionBusy.has(session.id)}
-                    title="Retomar a contagem do tempo desta sessão"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      resumeSession(session.id);
-                    }}
-                  >
-                    <Emoji3D e="▶" /> Retomar
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={actionBusy.has(session.id)}
-                    title="Pausar a contagem do tempo — banheiro, saiu do espaço, etc."
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPendingPauseReason("");
-                      setPausingFor(pausingFor === session.id ? null : session.id);
-                    }}
-                  >
-                    <Emoji3D e="⏸" /> Pausar
-                  </Button>
-                )}
-              </div>
-
               {pausingFor === session.id && (
                 <div style={{ display: "flex", gap: "6px" }} onClick={(e) => e.stopPropagation()}>
                   <Select
@@ -1494,9 +1156,145 @@ export function PainelScreen() {
                 </div>
               )}
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto", paddingTop: "8px", borderTop: "1px dashed var(--border-subtle)" }}>
-                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Valor Atual:</span>
-                <strong className="painel-card-total" style={{ color: "var(--color-primary-hover)" }}>{money(quote.totalCents)}</strong>
+              {/* Rodapé de ações. À vista só o que é urgente ou contingência
+                  sob pressão (Chamado, Pausar/Retomar, Saída manual — esta
+                  usada justamente quando algo já deu errado, com a família
+                  na frente). Consulta e correção (Editar, Sessão, Pulseira,
+                  Trocar Plano) vão para "⋯ Mais": eram 7 botões por card,
+                  multiplicados por cada criança na tela. */}
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", marginTop: "auto", paddingTop: "8px", borderTop: "1px dashed var(--border-subtle)" }}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={actionBusy.has(session.id)}
+                  disabled={actionBusy.has(session.id)}
+                  title="Chamado de retorno urgente — o responsável precisa vir buscar/atender a criança agora (banheiro, quer ir embora)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    callGuardianBack(entry);
+                  }}
+                >
+                  <Emoji3D e="🚻" /> Chamado de Retorno
+                </Button>
+                {isPaused ? (
+                  <Button
+                    variant="teal"
+                    size="sm"
+                    loading={actionBusy.has(session.id)}
+                    disabled={actionBusy.has(session.id)}
+                    title="Retomar a contagem do tempo desta sessão"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      resumeSession(session.id);
+                    }}
+                  >
+                    <Emoji3D e="▶" /> Retomar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={actionBusy.has(session.id)}
+                    title="Pausar a contagem do tempo — banheiro, saiu do espaço, etc."
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingPauseReason("");
+                      setPausingFor(pausingFor === session.id ? null : session.id);
+                    }}
+                  >
+                    <Emoji3D e="⏸" /> Pausar
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isPaused || actionBusy.has(session.id)}
+                  title={
+                    isPaused
+                      ? "Retome a contagem antes de liberar a criança"
+                      : "Recibo perdido ou etiqueta danificada: liberar conferindo o documento do responsável"
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setManualExitFor(entry);
+                  }}
+                >
+                  <Emoji3D e="🪪" /> Saída manual
+                </Button>
+                <div data-more-menu style={{ position: "relative", marginLeft: "auto" }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-haspopup="menu"
+                    aria-expanded={moreMenuFor === session.id}
+                    aria-label="Mais ações desta sessão"
+                    title="Editar cadastro, ver sessão, imprimir pulseira, trocar plano"
+                    onClick={() => setMoreMenuFor(moreMenuFor === session.id ? null : session.id)}
+                  >
+                    ⋯ Mais
+                  </Button>
+                  {moreMenuFor === session.id && (
+                    <div role="menu" className="more-menu">
+                      <IfCan capability="clientes.write">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setMoreMenuFor(null);
+                            setEditRegistrationFor(entry);
+                          }}
+                        >
+                          <Emoji3D e="✏️" /> Editar cadastro
+                        </button>
+                      </IfCan>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMoreMenuFor(null);
+                          setTimelineFor(entry);
+                        }}
+                      >
+                        <ClockIcon /> Linha do tempo da sessão
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMoreMenuFor(null);
+                          setPrintData({
+                            wristbandCode,
+                            childName: isNeurodivergent && !session.child_name_snapshot.includes("🧩")
+                              ? `${session.child_name_snapshot} 🧩`
+                              : session.child_name_snapshot,
+                            guardianName: session.guardian_name_snapshot || "Responsável",
+                            phone: session.guardian_phone_snapshot || "",
+                            entryTime: new Date(session.checkin_at_ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                            notes: careSummary || undefined,
+                          });
+                        }}
+                      >
+                        <PrinterIcon /> Imprimir pulseira
+                      </button>
+                      <IfCan capability="sessao.change_plan">
+                        {!session.rental_kind && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            disabled={actionBusy.has(session.id)}
+                            onClick={() => {
+                              setMoreMenuFor(null);
+                              setPendingPlanId("");
+                              setChangingPlanFor(session.id);
+                            }}
+                          >
+                            <ArrowClockwiseIcon /> Trocar plano
+                          </button>
+                        )}
+                      </IfCan>
+                    </div>
+                  )}
+                </div>
               </div>
             </Card>
           );

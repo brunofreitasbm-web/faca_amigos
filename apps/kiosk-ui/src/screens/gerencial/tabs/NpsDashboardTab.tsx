@@ -29,11 +29,11 @@ const when = (ms: number) => new Date(ms).toLocaleString("pt-BR", { day: "2-digi
 const waLink = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "")}`;
 
 function Delta({ value, unit = "", invert = false }: { value: number | null; unit?: string; invert?: boolean }) {
-  if (value == null) return <span style={{ fontSize: 12, color: "#94a3b8" }}>sem período anterior</span>;
-  if (value === 0) return <span style={{ fontSize: 12, color: "#64748b" }}>= período anterior</span>;
+  if (value == null) return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>sem período anterior</span>;
+  if (value === 0) return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>= período anterior</span>;
   const good = invert ? value < 0 : value > 0;
   return (
-    <span style={{ fontSize: 12, fontWeight: 600, color: good ? "#15803d" : "#b91c1c" }}>
+    <span style={{ fontSize: 12, fontWeight: 600, color: good ? "var(--color-success-text)" : "var(--color-error-text)" }}>
       {value > 0 ? "▲" : "▼"} {Math.abs(value).toString().replace(".", ",")}
       {unit} vs período anterior
     </span>
@@ -44,8 +44,8 @@ function Kpi({ label, value, color, children }: { label: string; value: string; 
   return (
     <Card style={{ padding: 18 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>{label}</span>
-        <span style={{ fontSize: 30, fontWeight: 800, color: color ?? "#0f172a", lineHeight: 1.1 }}>{value}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>{label}</span>
+        <span style={{ fontSize: 30, fontWeight: 800, color: color ?? "var(--text-primary)", lineHeight: 1.1 }}>{value}</span>
         {children}
       </div>
     </Card>
@@ -175,8 +175,8 @@ export function NpsDashboardTab() {
       </div>
 
       {error && (
-        <Card style={{ padding: 16, borderLeft: "4px solid #ef4444" }}>
-          <p style={{ margin: 0, color: "#b91c1c" }}>{error}</p>
+        <Card style={{ padding: 16, borderLeft: "4px solid var(--color-error)" }}>
+          <p style={{ margin: 0, color: "var(--color-error-text)" }}>{error}</p>
         </Card>
       )}
 
@@ -194,19 +194,19 @@ export function NpsDashboardTab() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 }}>
                 <Kpi label="NPS" value={s.nps == null ? "—" : s.nps > 0 ? `+${s.nps}` : String(s.nps)} color={npsValueColor(s.nps)}>
                   <Delta value={deltaPoints(s.nps, prev.nps)} unit=" pts" />
-                  <span style={{ fontSize: 12, color: "#64748b" }}>{s.scored} resposta(s) · nota média {fmt1(s.avgScore)}</span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{s.scored} resposta(s) · nota média {fmt1(s.avgScore)}</span>
                 </Kpi>
                 <Kpi label="Equipe (1–5)" value={fmt1(s.avgTeam)}>
                   <Delta value={deltaPoints(s.avgTeam, prev.avgTeam)} />
-                  <span style={{ fontSize: 12, color: "#64748b" }}>{s.teamAnswered} avaliação(ões)</span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{s.teamAnswered} avaliação(ões)</span>
                 </Kpi>
                 <Kpi label="Espaço (1–5)" value={fmt1(s.avgSpace)}>
                   <Delta value={deltaPoints(s.avgSpace, prev.avgSpace)} />
-                  <span style={{ fontSize: 12, color: "#64748b" }}>{s.spaceAnswered} avaliação(ões)</span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{s.spaceAnswered} avaliação(ões)</span>
                 </Kpi>
                 <Kpi label="Taxa de resposta" value={responseRate == null ? "—" : `${responseRate}%`}>
                   <Delta value={deltaPoints(responseRate, pct(prev.scored, prev.sent))} unit=" pts" />
-                  <span style={{ fontSize: 12, color: "#64748b" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
                     {s.scored} de {s.sent} enviada(s)
                   </span>
                 </Kpi>
@@ -238,7 +238,7 @@ export function NpsDashboardTab() {
                 <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600 }}>Por unidade</h3>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 520 }}>
                   <thead>
-                    <tr style={{ textAlign: "left", color: "#64748b", fontSize: 12 }}>
+                    <tr style={{ textAlign: "left", color: "var(--text-muted)", fontSize: 12 }}>
                       <th style={{ padding: "6px 8px" }}>Unidade</th>
                       <th style={{ padding: "6px 8px" }}>Enviadas</th>
                       <th style={{ padding: "6px 8px" }}>Respostas</th>
@@ -249,7 +249,7 @@ export function NpsDashboardTab() {
                   </thead>
                   <tbody>
                     {data.byUnit.map((u) => (
-                      <tr key={u.unit_id ?? "none"} style={{ borderTop: "1px solid #e2e8f0" }}>
+                      <tr key={u.unit_id ?? "none"} style={{ borderTop: "1px solid var(--border-subtle)" }}>
                         <td style={{ padding: "8px" }}>{u.name}</td>
                         <td style={{ padding: "8px" }}>{u.sent}</td>
                         <td style={{ padding: "8px" }}>{u.scored}</td>
@@ -301,7 +301,7 @@ export function NpsDashboardTab() {
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Buscar no texto…"
               aria-label="Buscar nas contribuições"
-              style={{ flex: "1 1 200px", minHeight: 36, borderRadius: 8, border: "1px solid #cbd5e1", padding: "0 10px", font: "inherit", fontSize: 14 }}
+              style={{ flex: "1 1 200px", minHeight: 36, borderRadius: 8, border: "1px solid var(--border-subtle)", padding: "0 10px", font: "inherit", fontSize: 14 }}
             />
           </div>
           {comments.length === 0 && !commentsLoading ? (
@@ -328,21 +328,21 @@ export function NpsDashboardTab() {
 
 function CommentItem({ row, showContact = false }: { row: NpsCommentRow; showContact?: boolean }) {
   return (
-    <div style={{ padding: "12px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ padding: "12px 14px", borderRadius: 10, background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)", display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 12px", fontSize: 13 }}>
         <span style={{ background: npsBandColor(row.score), color: "#fff", fontWeight: 700, borderRadius: 6, padding: "2px 8px" }}>
           {row.score}/10
         </span>
         {row.score_team != null && <span>Equipe <strong>{row.score_team}/5</strong></span>}
         {row.score_space != null && <span>Espaço <strong>{row.score_space}/5</strong></span>}
-        <span style={{ color: "#64748b" }}>{row.unit_name ?? "Unidade não informada"}</span>
-        <span style={{ color: "#94a3b8", marginLeft: "auto", fontSize: 12 }}>{when(row.scored_at_ms ?? row.sent_at_ms)}</span>
+        <span style={{ color: "var(--text-muted)" }}>{row.unit_name ?? "Unidade não informada"}</span>
+        <span style={{ color: "var(--text-muted)", marginLeft: "auto", fontSize: 12 }}>{when(row.scored_at_ms ?? row.sent_at_ms)}</span>
       </div>
       {row.feedback && (
-        <div style={{ fontSize: 14, color: "#334155", fontStyle: "italic" }}>“{row.feedback}”</div>
+        <div style={{ fontSize: 14, color: "var(--text-secondary)", fontStyle: "italic" }}>“{row.feedback}”</div>
       )}
       {showContact && (row.contact_name || row.contact_phone) && (
-        <div style={{ fontSize: 13, color: "#334155" }}>
+        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
           {row.contact_name ?? "Responsável"}
           {row.contact_phone && (
             <>

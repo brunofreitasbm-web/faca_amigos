@@ -132,10 +132,12 @@ export type SendResult =
   | { ok: true; sid: string; messageId: string | null }
   | { ok: false; error: string; twilioCode?: number };
 
-/** Faz o POST na Twilio e registra a mensagem OUT no CRM (mesmo formato de crm-whatsapp-send). */
+import { getWhatsAppProvider } from "./whatsapp/index.ts";
+
+/** Faz o envio via provedor de WhatsApp (Twilio ou Meta) e registra a mensagem OUT no CRM. */
 export async function sendWhatsapp(
   admin: SupabaseClient,
-  creds: TwilioCreds,
+  _creds: TwilioCreds | null,
   args: { channel: CrmChannel; contact: CrmContact; sentByEmployeeId: string | null; content: OutgoingContent },
 ): Promise<SendResult> {
   const { channel, contact, content } = args;
@@ -144,35 +146,37 @@ export async function sendWhatsapp(
     return { ok: false, error: "fora da janela de 24h — exige template aprovado" };
   }
 
-  const form = new URLSearchParams({
-    From: `whatsapp:${channel.whatsapp_e164}`,
-    To: `whatsapp:${contact.phone_e164}`,
-    StatusCallback: webhookUrl(),
-  });
+  const provider = getWhatsAppProvider();
+
   let stored: string;
   let templateId: string | null = null;
+  let result;
+
   if (content.kind === "TEMPLATE") {
-    form.set("ContentSid", content.template.content_sid);
-    form.set("ContentVariables", JSON.stringify(content.variables));
     templateId = content.template.id;
     stored = content.template.preview.replace(/\{\{(\d+)\}\}/g, (_m: string, n: string) => content.variables[n] ?? "");
+
+    result = await provider.sendTemplate({
+      from: channel.whatsapp_e164,
+      to: contact.phone_e164,
+      templateName: content.template.name,
+      contentSid: content.template.content_sid,
+      variables: content.variables,
+      statusCallbackUrl: webhookUrl(),
+    });
   } else {
-    form.set("Body", content.body);
     stored = content.body;
+    result = await provider.sendText({
+      from: channel.whatsapp_e164,
+      to: contact.phone_e164,
+      body: content.body,
+      statusCallbackUrl: webhookUrl(),
+    });
   }
 
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${creds.accountSid}/Messages.json`, {
-    method: "POST",
-    headers: {
-      Authorization: "Basic " + btoa(`${creds.accountSid}:${creds.authToken}`),
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: form,
-  });
-  const out = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    console.error("Twilio recusou envio:", out?.code, out?.message);
-    return { ok: false, error: out?.message ?? "Twilio recusou o envio", twilioCode: out?.code };
+  if (!result.ok) {
+    console.error("Provedor recusou envio:", result);
+    return { ok: false, error: result.error ?? "Recusa no envio", twilioCode: typeof result.errorCode === "number" ? result.errorCode : undefined };
   }
 
   const now = Date.now();
@@ -182,7 +186,7 @@ export async function sendWhatsapp(
       contact_id: contact.id,
       direction: "OUT",
       body: stored,
-      twilio_sid: out.sid,
+      twilio_sid: result.messageId,
       status: "queued",
       template_id: templateId,
       sent_by_employee_id: args.sentByEmployeeId,
@@ -195,5 +199,5 @@ export async function sendWhatsapp(
     .update({ last_message_ms: now, last_message_preview: `Você: ${stored}`.slice(0, 140) })
     .eq("id", contact.id);
 
-  return { ok: true, sid: out.sid as string, messageId: (msg?.id as string | undefined) ?? null };
+  return { ok: true, sid: (result.messageId as string) ?? "", messageId: (msg?.id as string | undefined) ?? null };
 }

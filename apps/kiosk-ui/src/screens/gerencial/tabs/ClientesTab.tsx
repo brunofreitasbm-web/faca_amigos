@@ -134,7 +134,7 @@ export function ClientesTab() {
             {[
               { label: "Responsáveis", value: totalGuardians, color: "var(--color-primary)" },
               { label: "Crianças", value: totalChildren, color: "var(--text-primary)" },
-              { label: "Visitas", value: totalVisits, color: "#10b981" },
+              { label: "Visitas", value: totalVisits, color: "var(--color-teal-text)" },
             ].map((k) => (
               <div key={k.label} style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
                 <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{k.label}</span>

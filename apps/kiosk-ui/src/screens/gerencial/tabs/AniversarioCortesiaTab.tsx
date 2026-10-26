@@ -34,9 +34,9 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
   return (
     <Card style={{ padding: 18 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>{label}</span>
-        <span style={{ fontSize: 28, fontWeight: 800, color: "#0f172a", lineHeight: 1.1 }}>{value}</span>
-        {hint && <span style={{ fontSize: 12, color: "#64748b" }}>{hint}</span>}
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>{label}</span>
+        <span style={{ fontSize: 28, fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1 }}>{value}</span>
+        {hint && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{hint}</span>}
       </div>
     </Card>
   );
@@ -128,11 +128,11 @@ export function AniversarioCortesiaTab() {
             </HelpText>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginTop: 8 }}>
               <div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Recebeu a cortesia</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>Recebeu a cortesia</span>
                 <CohortSummary rows={treated} />
               </div>
               <div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Controle</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>Controle</span>
                 <CohortSummary rows={control} />
               </div>
             </div>
@@ -141,7 +141,7 @@ export function AniversarioCortesiaTab() {
           <Card style={{ padding: 0, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ textAlign: "left", color: "#64748b" }}>
+                <tr style={{ textAlign: "left", color: "var(--text-muted)" }}>
                   {["Criança", "Aniversário", "Grupo", "Enviada", "Usou", "Unidade", "Min. adicionais", "Comprou depois", "Visitas na janela", "Pago na janela"].map((h) => (
                     <th key={h} style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                       {h}

@@ -405,7 +405,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
         if (ratioHistorico < 0.95) {
           statusMeta = {
             title: "FRACA",
-            color: "#EF4444",
+            color: "var(--color-error)",
             bg: "rgba(239, 68, 68, 0.12)",
             icon: "🔴",
             desc: "Meta estipulada está abaixo da média histórica da unidade. Baixo estímulo para a equipe alavancar vendas.",
@@ -413,7 +413,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
         } else if (ratioHistorico <= 1.25) {
           statusMeta = {
             title: "REALISTA",
-            color: "#10B981",
+            color: "var(--color-success)",
             bg: "rgba(16, 185, 129, 0.12)",
             icon: "🟢",
             desc: "Meta equilibrada e pé no chão, perfeitamente alinhada ao crescimento sustentável da unidade.",
@@ -421,7 +421,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
         } else {
           statusMeta = {
             title: "AGRESSIVA",
-            color: "#8B5CF6",
+            color: "var(--color-amber)",
             bg: "rgba(139, 92, 246, 0.12)",
             icon: "⚡",
             desc: "Meta desafiadora e de alta performance! Foco em acelerar o ticket médio e volume de locações.",
@@ -441,7 +441,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
               padding: "24px",
               borderRadius: "16px",
               background: "var(--surface-elevated, #ffffff)",
-              border: "1px solid var(--border-subtle, #e2e8f0)",
+              border: "1px solid var(--border-subtle, var(--border-subtle))",
               boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05)",
               display: "flex",
               flexDirection: "column",
@@ -468,21 +468,21 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                 <button
                   type="button"
                   onClick={() => applyPreset(unit.id, 0.05)}
-                  style={{ padding: "6px 12px", borderRadius: "20px", border: "1px solid #10B981", background: "rgba(16, 185, 129, 0.08)", color: "#059669", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
+                  style={{ padding: "6px 12px", borderRadius: "20px", border: "1px solid var(--color-success)", background: "rgba(16, 185, 129, 0.08)", color: "var(--color-success-text)", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
                 >
                   +5% Crescimento
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset(unit.id, 0.15)}
-                  style={{ padding: "6px 12px", borderRadius: "20px", border: "1px solid #3B82F6", background: "rgba(59, 130, 246, 0.08)", color: "#2563EB", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
+                  style={{ padding: "6px 12px", borderRadius: "20px", border: "1px solid var(--color-teal)", background: "rgba(59, 130, 246, 0.08)", color: "var(--color-teal-text)", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
                 >
                   +15% Aceleração
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset(unit.id, 0.30)}
-                  style={{ padding: "6px 12px", borderRadius: "20px", border: "1px solid #8B5CF6", background: "rgba(139, 92, 246, 0.08)", color: "#6D28D9", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
+                  style={{ padding: "6px 12px", borderRadius: "20px", border: "1px solid var(--color-amber)", background: "rgba(139, 92, 246, 0.08)", color: "var(--color-amber-text)", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
                 >
                   +30% Super Meta
                 </button>
@@ -555,7 +555,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                         padding: "4px 12px",
                         borderRadius: "20px",
                         background: statusMeta.color,
-                        color: "#ffffff",
+                        color: "var(--text-on-primary)",
                         fontWeight: "800",
                         fontSize: "13px",
                         letterSpacing: "0.5px",
@@ -611,8 +611,8 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                       style={{
                         padding: "16px",
                         borderRadius: "12px",
-                        background: "var(--surface-sunken, #f8fafc)",
-                        border: "1px solid var(--border-subtle, #e2e8f0)",
+                        background: "var(--surface-sunken, var(--surface-sunken))",
+                        border: "1px solid var(--border-subtle, var(--border-subtle))",
                         display: "flex",
                         flexDirection: "column",
                         gap: "14px",
@@ -647,7 +647,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
                           <span><Emoji3D e="🎯" /> Meta ({isCircuito ? "Locações" : "R$"})</span>
-                          <strong style={{ color: "#2563EB", fontSize: "14px" }}>
+                          <strong style={{ color: "var(--color-teal-text)", fontSize: "14px" }}>
                             {isCircuito ? `${gf.metaValor} locações` : money(centsFrom(gf.metaValor))}
                           </strong>
                         </div>
@@ -658,7 +658,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                           step={isCircuito ? "1" : "50"}
                           value={gf.metaValor}
                           onChange={(e) => updateGroup(unit.id, g.key, { metaValor: Number(e.target.value) })}
-                          style={{ width: "100%", accentColor: "#2563EB", cursor: "pointer" }}
+                          style={{ width: "100%", accentColor: "var(--color-teal-text)", cursor: "pointer" }}
                         />
                       </div>
 
@@ -666,7 +666,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
                           <span><Emoji3D e="⚡" /> Supermeta ({isCircuito ? "Locações" : "R$"})</span>
-                          <strong style={{ color: "#6D28D9", fontSize: "14px" }}>
+                          <strong style={{ color: "var(--color-amber-text)", fontSize: "14px" }}>
                             {isCircuito ? `${gf.superValor} locações` : money(centsFrom(gf.superValor))}
                           </strong>
                         </div>
@@ -677,7 +677,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                           step={isCircuito ? "1" : "50"}
                           value={gf.superValor}
                           onChange={(e) => updateGroup(unit.id, g.key, { superValor: Number(e.target.value) })}
-                          style={{ width: "100%", accentColor: "#6D28D9", cursor: "pointer" }}
+                          style={{ width: "100%", accentColor: "var(--color-amber-text)", cursor: "pointer" }}
                         />
                       </div>
 
@@ -694,9 +694,9 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                             step="1"
                             value={gf.metaBonusReais}
                             onChange={(e) => updateGroup(unit.id, g.key, { metaBonusReais: Number(e.target.value) })}
-                            style={{ width: "100%", accentColor: "#059669" }}
+                            style={{ width: "100%", accentColor: "var(--color-success-text)" }}
                           />
-                          <div style={{ fontSize: "12px", fontWeight: "700", color: "#059669" }}>
+                          <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--color-success-text)" }}>
                             {money(centsFrom(gf.metaBonusReais))}
                           </div>
                         </div>
@@ -712,9 +712,9 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                             step="1"
                             value={gf.superBonusReais}
                             onChange={(e) => updateGroup(unit.id, g.key, { superBonusReais: Number(e.target.value) })}
-                            style={{ width: "100%", accentColor: "#7C3AED" }}
+                            style={{ width: "100%", accentColor: "var(--color-amber-text)" }}
                           />
-                          <div style={{ fontSize: "12px", fontWeight: "700", color: "#7C3AED" }}>
+                          <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--color-amber-text)" }}>
                             {money(centsFrom(gf.superBonusReais))}
                           </div>
                         </div>
@@ -775,7 +775,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                 <div style={{ padding: "12px", borderRadius: "10px", background: "var(--surface-sunken)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
                     <span>Teto Máximo Mensal (R$)</span>
-                    <strong style={{ color: "#D97706" }}>{money(centsFrom(form.tetoMesReais))}</strong>
+                    <strong style={{ color: "var(--color-amber-text)" }}>{money(centsFrom(form.tetoMesReais))}</strong>
                   </div>
                   <input
                     type="range"
@@ -784,7 +784,7 @@ export function BonusProgramSection({ units, registerSave }: { units: Unit[]; re
                     step="10"
                     value={form.tetoMesReais}
                     onChange={(e) => updateConfig(unit.id, { tetoMesReais: Number(e.target.value) })}
-                    style={{ width: "100%", accentColor: "#D97706", marginTop: "6px" }}
+                    style={{ width: "100%", accentColor: "var(--color-amber-text)", marginTop: "6px" }}
                   />
                 </div>
 

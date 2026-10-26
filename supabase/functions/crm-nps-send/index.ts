@@ -21,6 +21,8 @@ const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 const WEBHOOK_URL =
   Deno.env.get("CRM_WEBHOOK_PUBLIC_URL") ?? "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/crm-whatsapp-webhook";
 
+import { getWhatsAppProvider } from "../_shared/whatsapp/index.ts";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
   if (req.method !== "POST") return jsonResponse(req, { error: "method_not_allowed" }, 405);
@@ -33,9 +35,7 @@ Deno.serve(async (req) => {
     return jsonResponse(req, { error: "Envio de pesquisa de NPS permitido apenas entre 8h e 23h" }, 400);
   }
 
-  const accountSid = Deno.env.get("TWILIO_CRM_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_CRM_AUTH_TOKEN");
-  if (!accountSid || !authToken) return jsonResponse(req, { error: "Twilio do CRM não configurado" }, 503);
+  const provider = getWhatsAppProvider();
 
   let input: { contactIds?: string[] };
   try {
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
   const { data: template } = await admin
     .from("fa_crm_templates")
-    .select("id, content_sid, preview")
+    .select("id, name, content_sid, preview")
     .eq("purpose", "NPS")
     .eq("active", true)
     .order("created_at_ms", { ascending: false })
@@ -120,25 +120,16 @@ Deno.serve(async (req) => {
       result.failed++;
       continue;
     }
-    const form = new URLSearchParams({
-      From: `whatsapp:${channel.whatsapp_e164}`,
-      To: `whatsapp:${c.phone_e164}`,
-      ContentSid: template.content_sid,
-      ContentVariables: JSON.stringify(npsVariables(firstName, unitOptions)),
-      StatusCallback: WEBHOOK_URL,
+    const sendRes = await provider.sendTemplate({
+      from: channel.whatsapp_e164,
+      to: c.phone_e164,
+      templateName: template.name,
+      contentSid: template.content_sid,
+      variables: npsVariables(firstName, unitOptions),
+      statusCallbackUrl: WEBHOOK_URL,
     });
-
-    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-      method: "POST",
-      headers: {
-        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: form,
-    });
-    const out = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error("Twilio recusou NPS:", c.id, out?.code, out?.message);
+    if (!sendRes.ok) {
+      console.error("Provedor recusou NPS:", c.id, sendRes.errorCode, sendRes.error);
       await admin.from("fa_crm_nps_surveys").delete().eq("id", survey.id);
       result.failed++;
       continue;
@@ -148,7 +139,7 @@ Deno.serve(async (req) => {
       contact_id: c.id,
       direction: "OUT",
       body: renderNpsPreview(template.preview, firstName, unitOptions),
-      twilio_sid: out.sid,
+      twilio_sid: sendRes.messageId,
       status: "queued",
       template_id: template.id,
       sent_by_employee_id: employee?.id ?? null,

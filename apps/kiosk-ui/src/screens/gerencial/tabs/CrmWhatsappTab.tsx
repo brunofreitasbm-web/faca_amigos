@@ -799,7 +799,7 @@ function CrmContent() {
                         padding: "8px 12px",
                         borderRadius: "12px",
                         background: m.direction === "OUT" ? "var(--color-teal, #2ECFB5)" : "var(--surface, #fff)",
-                        color: m.direction === "OUT" ? "#0b2b26" : "inherit",
+                        color: m.direction === "OUT" ? "var(--color-dark)" : "inherit",
                         whiteSpace: "pre-wrap",
                         wordBreak: "break-word",
                         fontSize: "14px",

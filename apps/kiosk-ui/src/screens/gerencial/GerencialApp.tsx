@@ -218,8 +218,8 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
   }, [searchQuery]);
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--background-default, #f8fafc)" }}>
-      <div style={{ flexShrink: 0, height: "3px", background: "linear-gradient(90deg, #6366f1 0%, #3b82f6 50%, #10b981 100%)" }} />
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--background-default, var(--surface-sunken))" }}>
+      <div style={{ flexShrink: 0, height: "3px", background: "linear-gradient(90deg, var(--color-teal) 0%, var(--color-primary) 50%, var(--color-amber) 100%)" }} />
 
       {/* Header Desktop Full Width */}
       <header
@@ -229,8 +229,8 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
           alignItems: "center",
           gap: "12px",
           padding: "6px 20px",
-          borderBottom: "1px solid var(--border-subtle, #e2e8f0)",
-          background: "var(--surface-card, #ffffff)",
+          borderBottom: "1px solid var(--border-subtle)",
+          background: "var(--surface-card)",
           flexWrap: "wrap",
           boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
         }}
@@ -240,7 +240,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
         {/* Omnibox Busca Rápida */}
         <div style={{ position: "relative", minWidth: "280px", maxWidth: "420px", flex: 1, margin: "0 8px" }}>
           <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-            <span style={{ position: "absolute", left: "12px", color: "var(--text-secondary, #64748b)", fontSize: "14px" }}><Emoji3D e="🔎" /></span>
+            <span style={{ position: "absolute", left: "12px", color: "var(--text-secondary, var(--text-muted))", fontSize: "14px" }}><Emoji3D e="🔎" /></span>
             <input
               type="text"
               placeholder="Buscar menu gerencial... (ex: Zoe, Planos, Bonificação)"
@@ -251,8 +251,8 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                 padding: "5px 12px 5px 36px",
                 fontSize: "13px",
                 borderRadius: "8px",
-                border: "1px solid var(--border-subtle, #cbd5e1)",
-                background: "var(--surface-input, #f1f5f9)",
+                border: "1px solid var(--border-subtle)",
+                background: "var(--surface-input, var(--surface-sunken))",
                 outline: "none",
                 transition: "all 0.2s ease",
               }}
@@ -266,7 +266,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                   border: "none",
                   background: "transparent",
                   cursor: "pointer",
-                  color: "#64748b",
+                  color: "var(--text-muted)",
                   fontSize: "12px",
                 }}
               >
@@ -285,15 +285,15 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                 right: 0,
                 maxHeight: "320px",
                 overflowY: "auto",
-                background: "#ffffff",
-                border: "1px solid #cbd5e1",
+                background: "var(--surface-card)",
+                border: "1px solid var(--border-subtle)",
                 borderRadius: "10px",
                 boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
                 zIndex: 1000,
                 padding: "6px",
               }}
             >
-              <div style={{ padding: "6px 10px", fontSize: "11px", fontWeight: "bold", color: "#64748b", textTransform: "uppercase" }}>
+              <div style={{ padding: "6px 10px", fontSize: "11px", fontWeight: "bold", color: "var(--text-muted)", textTransform: "uppercase" }}>
                 {searchResults.length} módulo(s) encontrado(s)
               </div>
               {searchResults.map((res) => (
@@ -310,16 +310,16 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
-                    background: tab === res.value ? "#eff6ff" : "transparent",
+                    background: tab === res.value ? "rgba(240, 25, 107, 0.06)" : "transparent",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = tab === res.value ? "#eff6ff" : "transparent")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-sunken)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = tab === res.value ? "rgba(240, 25, 107, 0.06)" : "transparent")}
                 >
                   <span style={{ fontSize: "18px" }}>{renderEmoji(res.icon)}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>{res.label}</div>
-                    <div style={{ fontSize: "11px", color: "#64748b", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{res.label}</div>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                       {res.categoryLabel} · {res.description}
                     </div>
                   </div>
@@ -331,8 +331,8 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
           {employee && (
-            <span style={{ fontSize: "13px", color: "var(--text-secondary, #475569)", fontWeight: 600 }}>
-              {employee.full_name} · <span style={{ color: "#3b82f6" }}>{ROLE_LABEL[employee.role]}</span>
+            <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: 600 }}>
+              {employee.full_name} · <span style={{ color: "var(--color-primary)" }}>{ROLE_LABEL[employee.role]}</span>
             </span>
           )}
           {/* No Electron o app já está instalado: o ícone só faz sentido no navegador. */}
@@ -351,16 +351,16 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                 fontSize: "16px",
                 textDecoration: "none",
                 borderRadius: "8px",
-                border: "1px solid var(--border-subtle, #cbd5e1)",
+                border: "1px solid var(--border-subtle)",
               }}
             >
               <span aria-hidden="true"><Emoji3D e="⬇️" /></span>
             </a>
           )}
-          <Button variant="ghost" size="sm" onClick={onExit} style={{ fontSize: "12px", border: "1px solid var(--border-subtle, #cbd5e1)" }}>
+          <Button variant="ghost" size="sm" onClick={onExit} style={{ fontSize: "12px", border: "1px solid var(--border-subtle)" }}>
             Sair do Gerencial
           </Button>
-          <Button variant="ghost" size="sm" onClick={onLogout} style={{ fontSize: "12px", border: "1px solid var(--border-subtle, #cbd5e1)" }}>
+          <Button variant="ghost" size="sm" onClick={onLogout} style={{ fontSize: "12px", border: "1px solid var(--border-subtle)" }}>
             Sair
           </Button>
         </div>
@@ -373,8 +373,8 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
           style={{
             flexShrink: 0,
             padding: "8px 20px 0",
-            background: "var(--surface-card, #ffffff)",
-            borderBottom: "1px solid var(--border-subtle, #e2e8f0)",
+            background: "var(--surface-card)",
+            borderBottom: "1px solid var(--border-subtle)",
           }}
         >
           {/* Categorias: uma linha de abas */}
@@ -396,9 +396,9 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                     fontSize: "13px",
                     fontWeight: isActive ? 700 : 500,
                     border: "none",
-                    borderBottom: isActive ? "3px solid #3b82f6" : "3px solid transparent",
+                    borderBottom: isActive ? "3px solid var(--color-primary)" : "3px solid transparent",
                     background: "transparent",
-                    color: isActive ? "#1e40af" : "var(--text-secondary, #475569)",
+                    color: isActive ? "var(--color-primary-hover)" : "var(--text-secondary)",
                     cursor: "pointer",
                   }}
                 >
@@ -427,9 +427,9 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                     borderRadius: "6px",
                     fontSize: "12px",
                     fontWeight: isSelected ? 700 : 500,
-                    border: isSelected ? "1px solid #3b82f6" : "1px solid var(--border-subtle, #cbd5e1)",
-                    background: isSelected ? "#3b82f6" : "var(--surface-input, #f8fafc)",
-                    color: isSelected ? "#ffffff" : "var(--text-primary, #334155)",
+                    border: isSelected ? "1px solid var(--color-primary)" : "1px solid var(--border-subtle)",
+                    background: isSelected ? "var(--color-primary)" : "var(--surface-input, var(--surface-sunken))",
+                    color: isSelected ? "var(--text-on-primary)" : "var(--text-primary)",
                     cursor: "pointer",
                   }}
                 >
@@ -441,8 +441,8 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                         fontSize: "9px",
                         padding: "0 4px",
                         borderRadius: "4px",
-                        background: isSelected ? "rgba(255,255,255,0.25)" : "#e2e8f0",
-                        color: isSelected ? "#ffffff" : "#475569",
+                        background: isSelected ? "rgba(255,255,255,0.25)" : "var(--border-subtle)",
+                        color: isSelected ? "var(--text-on-primary)" : "var(--text-secondary)",
                         fontWeight: 700,
                       }}
                     >
@@ -459,7 +459,7 @@ export function GerencialApp({ onExit, onLogout }: { onExit: () => void; onLogou
                 flex: "1 1 240px",
                 minWidth: 0,
                 fontSize: "11px",
-                color: "var(--text-secondary, #64748b)",
+                color: "var(--text-secondary, var(--text-muted))",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",

@@ -47,6 +47,27 @@ export function ColaboradoresTab() {
   const [unitsTargetIds, setUnitsTargetIds] = useState<string[]>([]);
   const [unitsBusy, setUnitsBusy] = useState(false);
 
+  // "⋯ Mais" por colaborador: Unidades/PIN/Desativar são ações ocasionais —
+  // ficavam no mesmo nível visual que os dois seletores (Permissão, Setor),
+  // que são os que o gestor troca com frequência. Lei de Hick: menos opções
+  // sempre à vista, decisão mais rápida por card. Mesmo padrão do Painel.
+  const [moreMenuFor, setMoreMenuFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!moreMenuFor) return;
+    const onPointerDown = (ev: PointerEvent) => {
+      if (!(ev.target as Element).closest?.("[data-more-menu]")) setMoreMenuFor(null);
+    };
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") setMoreMenuFor(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [moreMenuFor]);
+
   // Link de convite individual: o Owner decide permissão/unidade(s)/
   // admissão aqui — quem preenche o convite depois só completa os próprios
   // dados pessoais, nunca escolhe o próprio nível de acesso.
@@ -650,14 +671,14 @@ export function ColaboradoresTab() {
           .map((e) => {
             const roleBadgeStyle =
               e.role === "PRESTADOR_PJ" || e.contract_type === "PJ"
-                ? { bg: "rgba(16, 185, 129, 0.12)", color: "#047857", label: "💼 Prestador PJ" }
+                ? { bg: "rgba(16, 185, 129, 0.12)", color: "var(--color-success-text)", label: "💼 Prestador PJ" }
                 : e.role === "ADMIN"
                 ? { bg: "rgba(124, 58, 237, 0.12)", color: "#6d28d9", label: "👑 Admin" }
                 : e.role === "GERENTE"
                 ? { bg: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8", label: "⭐ Gerente" }
                 : e.role === "ESTAGIARIO"
-                ? { bg: "rgba(180, 83, 9, 0.12)", color: "#b45309", label: "🎓 Estagiário" }
-                : { bg: "rgba(13, 148, 136, 0.12)", color: "#0f766e", label: "👤 Operador" };
+                ? { bg: "rgba(180, 83, 9, 0.12)", color: "var(--color-amber-text)", label: "🎓 Estagiário" }
+                : { bg: "rgba(13, 148, 136, 0.12)", color: "var(--color-teal-text)", label: "👤 Operador" };
           const employeeUnitNames = (e.unitIds ?? []).map((id) => units.find((u) => u.id === id)?.name).filter(Boolean);
 
           return (
@@ -668,6 +689,8 @@ export function ColaboradoresTab() {
                 borderRadius: "16px",
                 opacity: e.active === false ? 0.6 : 1,
                 border: e.active === false ? "1px dashed var(--border-subtle)" : "1px solid var(--border-subtle)",
+                // O menu "⋯ Mais" abre para baixo a partir do rodapé do card — não pode ser cortado.
+                overflow: "visible",
               }}
             >
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -699,7 +722,7 @@ export function ColaboradoresTab() {
                       {cadastroStatus.get(e.id) ? (
                         <Tag color="var(--color-teal, #1d9b84)"><Emoji3D e="📋" /> Cadastro completo</Tag>
                       ) : (
-                        <Tag color="var(--color-warning, #b45309)">⚠️ Cadastro pendente</Tag>
+                        <Tag color="var(--color-warning, var(--color-amber-text))">⚠️ Cadastro pendente</Tag>
                       )}
                     </div>
                     <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>
@@ -749,17 +772,32 @@ export function ColaboradoresTab() {
                   </Select>
                   </div>
 
-                  <Button variant="ghost" size="sm" onClick={() => openUnitsModal(e)} title="Definir em quais unidades este colaborador atua">
-                    <Emoji3D e="🗂️" /> Unidades
-                  </Button>
-
-                  <Button variant="ghost" size="sm" onClick={() => { setResetError(null); setResetPinTarget(e); }} title="Redefinir PIN de login">
-                    <Emoji3D e="🔑" /> PIN
-                  </Button>
-
-                  <Button variant={e.active === false ? "secondary" : "ghost"} size="sm" onClick={() => toggleActive(e)} title={e.active === false ? "Ativar acesso do colaborador" : "Desativar acesso do colaborador"}>
-                    {e.active === false ? "Reativar" : "Desativar"}
-                  </Button>
+                  <div data-more-menu style={{ position: "relative", marginLeft: "auto" }}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-haspopup="menu"
+                      aria-expanded={moreMenuFor === e.id}
+                      aria-label={`Mais ações de ${e.full_name}`}
+                      title="Unidades, redefinir PIN, ativar/desativar"
+                      onClick={() => setMoreMenuFor(moreMenuFor === e.id ? null : e.id)}
+                    >
+                      ⋯ Mais
+                    </Button>
+                    {moreMenuFor === e.id && (
+                      <div role="menu" className="more-menu">
+                        <button type="button" role="menuitem" onClick={() => { setMoreMenuFor(null); openUnitsModal(e); }}>
+                          <Emoji3D e="🗂️" /> Unidades
+                        </button>
+                        <button type="button" role="menuitem" onClick={() => { setMoreMenuFor(null); setResetError(null); setResetPinTarget(e); }}>
+                          <Emoji3D e="🔑" /> Redefinir PIN
+                        </button>
+                        <button type="button" role="menuitem" onClick={() => { setMoreMenuFor(null); toggleActive(e); }}>
+                          {e.active === false ? "Reativar acesso" : "Desativar acesso"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>

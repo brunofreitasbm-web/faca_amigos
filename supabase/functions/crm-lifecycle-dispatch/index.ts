@@ -32,6 +32,8 @@ const WEBHOOK_URL =
   Deno.env.get("CRM_WEBHOOK_PUBLIC_URL") ?? "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/crm-whatsapp-webhook";
 const GOOGLE_REVIEW_URL = Deno.env.get("GOOGLE_REVIEW_URL") ?? "https://g.page/r/review";
 
+import { getWhatsAppProvider } from "../_shared/whatsapp/index.ts";
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -45,19 +47,17 @@ Deno.serve(async () => {
   const now = Date.now();
   if (!withinSendWindow(now)) return json({ ok: true, skipped: "fora da janela de envio (10h-20h Belém)" });
 
-  const accountSid = Deno.env.get("TWILIO_CRM_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_CRM_AUTH_TOKEN");
-  if (!accountSid || !authToken) return json({ error: "Twilio do CRM não configurado" }, 503);
+  const provider = getWhatsAppProvider();
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   const { data: tpls } = await admin
     .from("fa_crm_templates")
-    .select("id, content_sid, preview, purpose, variable_count")
+    .select("id, name, content_sid, preview, purpose, variable_count")
     .in("purpose", [...new Set(Object.values(PURPOSE))])
     .eq("active", true)
     .order("created_at_ms", { ascending: false });
-  const templateByPurpose = new Map<string, { id: string; content_sid: string; preview: string; variable_count: number }>();
+  const templateByPurpose = new Map<string, { id: string; name: string; content_sid: string; preview: string; variable_count: number }>();
   for (const t of tpls ?? []) if (!templateByPurpose.has(t.purpose)) templateByPurpose.set(t.purpose, t);
   if (!templateByPurpose.size) return json({ ok: true, skipped: "nenhum template de ciclo de vida ativo" });
 
@@ -187,49 +187,32 @@ Deno.serve(async () => {
       }
     }
 
-    let res: Response | null = null;
-    let out: { sid?: string; code?: number; message?: string } = {};
-    try {
-      res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-        method: "POST",
-        headers: {
-          Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          From: `whatsapp:${channel.whatsapp_e164}`,
-          To: `whatsapp:${cand.phone_e164}`,
-          ContentSid: template.content_sid,
-          ContentVariables: JSON.stringify(variables),
-          StatusCallback: WEBHOOK_URL,
-        }),
-      });
-      out = await res.json().catch(() => ({}));
-    } catch (e) {
-      console.error("Twilio inacessível:", e);
-    }
+    const sendRes = await provider.sendTemplate({
+      from: channel.whatsapp_e164,
+      to: cand.phone_e164,
+      templateName: template.name,
+      contentSid: template.content_sid,
+      variables,
+      statusCallbackUrl: WEBHOOK_URL,
+    });
 
-    if (!res || !res.ok) {
+    if (!sendRes.ok) {
       failed++;
       if (birthdayChildId && birthdayDate) {
         await admin.rpc("fa_crm_birthday_void", { p_child_id: birthdayChildId, p_birthday: birthdayDate });
       }
-      if (!res || res.status >= 500) {
-        await admin.from("fa_crm_automation_sends").delete().eq("id", claim.id);
-      } else {
-        console.error(`Twilio recusou ${cand.kind}:`, out?.code, out?.message);
-        await admin.from("fa_crm_automation_sends").update({ status: "FAILED", error: `Twilio ${out?.code ?? res.status}` }).eq("id", claim.id);
-      }
+      console.error(`Provedor recusou ${cand.kind}:`, sendRes.errorCode, sendRes.error);
+      await admin.from("fa_crm_automation_sends").update({ status: "FAILED", error: `${provider.name} ${sendRes.errorCode ?? sendRes.error}` }).eq("id", claim.id);
       continue;
     }
 
     const sentAt = Date.now();
-    await admin.from("fa_crm_automation_sends").update({ status: "SENT", twilio_sid: out.sid, sent_at_ms: sentAt }).eq("id", claim.id);
+    await admin.from("fa_crm_automation_sends").update({ status: "SENT", twilio_sid: sendRes.messageId, sent_at_ms: sentAt }).eq("id", claim.id);
     await admin.from("fa_crm_messages").insert({
       contact_id: contact!.id,
       direction: "OUT",
       body: template.preview.replace(/\{\{(\d+)\}\}/g, (_m: string, n: string) => variables[n] ?? ""),
-      twilio_sid: out.sid,
+      twilio_sid: sendRes.messageId,
       status: "queued",
       template_id: template.id,
       created_at_ms: sentAt,

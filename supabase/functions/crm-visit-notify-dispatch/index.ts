@@ -102,13 +102,13 @@ async function overagePlan(admin: ReturnType<typeof createClient>, sessionId: st
   return { label, price: brl(plan.value_cents) };
 }
 
+import { getWhatsAppProvider } from "../_shared/whatsapp/index.ts";
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async () => {
-  const accountSid = Deno.env.get("TWILIO_CRM_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_CRM_AUTH_TOKEN");
-  if (!accountSid || !authToken) return json({ error: "Twilio do CRM não configurado" }, 503);
+  const provider = getWhatsAppProvider();
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -218,39 +218,19 @@ Deno.serve(async () => {
       continue;
     }
 
-    let res: Response | null = null;
-    let out: { sid?: string; code?: number; message?: string } = {};
-    try {
-      res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-        method: "POST",
-        headers: {
-          Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          From: `whatsapp:${channel.whatsapp_e164}`,
-          To: `whatsapp:${cand.phone_e164}`,
-          ContentSid: template.content_sid,
-          ContentVariables: JSON.stringify(variables),
-          StatusCallback: WEBHOOK_URL,
-        }),
-      });
-      out = await res.json().catch(() => ({}));
-    } catch (e) {
-      console.error("Twilio inacessível:", e);
-    }
+    const sendRes = await provider.sendTemplate({
+      from: channel.whatsapp_e164,
+      to: cand.phone_e164,
+      templateName: template.name,
+      contentSid: template.content_sid,
+      variables,
+      statusCallbackUrl: WEBHOOK_URL,
+    });
 
-    if (!res || !res.ok) {
+    if (!sendRes.ok) {
       failed++;
-      if (!res || res.status >= 500) {
-        // Falha transitória: solta a trava para o próximo minuto tentar de novo
-        // (a janela do aviso ainda está aberta).
-        await admin.from("fa_crm_visit_notifications").delete().eq("id", claim.id);
-      } else {
-        // Recusa definitiva (template/número inválido): registra e não insiste.
-        console.error(`Twilio recusou ${cand.kind}:`, out?.code, out?.message);
-        await admin.from("fa_crm_visit_notifications").update({ error: `Twilio ${out?.code ?? res.status}` }).eq("id", claim.id);
-      }
+      console.error(`Provedor recusou ${cand.kind}:`, sendRes.errorCode, sendRes.error);
+      await admin.from("fa_crm_visit_notifications").update({ error: `${provider.name} ${sendRes.errorCode ?? sendRes.error}` }).eq("id", claim.id);
       continue;
     }
 
@@ -259,7 +239,7 @@ Deno.serve(async () => {
       contact_id: contact!.id,
       direction: "OUT",
       body,
-      twilio_sid: out.sid,
+      twilio_sid: sendRes.messageId,
       status: "queued",
       template_id: template.id,
       created_at_ms: sentAt,
