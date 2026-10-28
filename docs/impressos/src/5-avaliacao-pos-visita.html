@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Balcão — Avise da avaliação</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .lead { display: grid; grid-template-columns: 1.55fr 1fr; gap: 4mm; flex: 1; min-height: 0; }
+  .say-big { background: #FFF0E0; border-left: 1.8mm solid var(--orange); border-radius: 4mm; padding: 3mm 4mm; }
+  .say-big .t { font-family: 'Fredoka One', sans-serif; font-size: 11pt; color: var(--orange-text); text-transform: uppercase; letter-spacing: .06em; }
+  .say-big p { font-size: 19pt; line-height: 1.28; font-weight: 700; margin: 1mm 0 0; }
+  .say-big .why { margin-top: 2.5mm; font-size: 12pt; font-weight: 800; color: var(--pink-text); }
+  .chk { display: flex; flex-direction: column; gap: 2.6mm; margin-top: 3.5mm; }
+  .chk div { display: flex; gap: 2.5mm; align-items: flex-start; font-size: 14pt; line-height: 1.25; font-weight: 800; }
+  .chk i { flex: none; width: 6.5mm; height: 6.5mm; border-radius: 1.6mm; background: var(--teal-text); color: #fff; font-style: normal; text-align: center; line-height: 6.5mm; font-size: 12pt; }
+  .q { display: flex; flex-direction: column; gap: 1.6mm; }
+  .q div { display: flex; align-items: center; gap: 2.2mm; font-size: 13.5pt; font-weight: 800; background: #fff; border-radius: 3mm; padding: 1.3mm 2.4mm; }
+  .q b { flex: none; font-family: 'Fredoka One', sans-serif; font-weight: 400; background: var(--dark); color: #fff; border-radius: 2mm; min-width: 12mm; text-align: center; padding: .4mm 1.5mm; font-size: 11pt; }
+  .notol { font-size: 12.5pt; line-height: 1.3; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <section class="half">
+    <div class="head">
+      <img src="logo.png" alt="FaçaAmigos">
+      <span class="tag">Lembrete · na saída</span>
+    </div>
+    <h1>Avise: vai chegar uma <span class="hl">avaliação</span></h1>
+
+    <div class="lead">
+      <div>
+        <div class="say-big">
+          <div class="t">Fale assim, na hora da saída</div>
+          <p>"Daqui a algumas horas a gente te manda uma avaliação rápida no WhatsApp. Leva 1 minuto e a sua resposta é <b>muito importante pra gente</b>."</p>
+        </div>
+        <div class="chk">
+          <div><i>✓</i><span>Confira o <b>WhatsApp</b> do responsável antes da saída.</span></div>
+          <div><i>✓</i><span>Responder é só <b>digitar o número</b>. Peça com um sorriso.</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:3mm;">
+        <div class="box teal" style="padding:2.4mm 3mm;">
+          <h2 style="font-size:13pt;color:var(--teal-text)">O que vai chegar</h2>
+          <div class="q">
+            <div><b>0 a 10</b>Recomendaria?</div>
+            <div><b>1 a 5</b>Equipe</div>
+            <div><b>1 a 5</b>Espaço</div>
+            <div><b>texto</b>Comentário</div>
+          </div>
+        </div>
+        <div class="box yellow notol">
+          <b>Não é o Olhar.</b> O Olhar é o resumo da brincadeira. A avaliação pergunta como foi a visita.
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>Chega de 2 a 6 horas depois da saída. Não prometa "agora".</span>
+      <span>Já respondeu há menos de 30 dias? Não chega de novo.</span>
+    </div>
+  </section>
+</div>
+</body>
+</html>

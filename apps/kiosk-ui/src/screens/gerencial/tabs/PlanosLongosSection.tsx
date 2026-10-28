@@ -22,6 +22,8 @@ interface Row {
   bonusReais: string;
   escadaMeta: string;
   escadaBonusReais: string;
+  /** Só plano: conta a criança só com o Olhar FaçaAmigos preenchido em até 40 min. */
+  exigeOlharNoPrazo: boolean;
 }
 
 const toCents = (reais: string): number => Math.max(0, Math.round(Number(reais.replace(",", ".")) * 100) || 0);
@@ -70,6 +72,7 @@ export function PlanosLongosSection({ unit, registerSave }: { unit: Unit; regist
             bonusReais: toReais(rule?.bonusCents ?? 0),
             escadaMeta: String(rule?.escadaMeta ?? 0),
             escadaBonusReais: toReais(rule?.escadaBonusCents ?? 0),
+            exigeOlharNoPrazo: rule?.exigeOlharNoPrazo ?? false,
           };
         });
         setRows(linhas);
@@ -105,6 +108,7 @@ export function PlanosLongosSection({ unit, registerSave }: { unit: Unit; regist
       escadaBonusCents: toCents(r.escadaBonusReais),
       active: r.active,
       sortOrder: i + 1,
+      exigeOlharNoPrazo: r.kind === "PLANO" && r.exigeOlharNoPrazo,
     }));
     await Api.setBonusPlanRules(unit.id, rules, toCents(tetoReais));
   }
@@ -136,6 +140,7 @@ export function PlanosLongosSection({ unit, registerSave }: { unit: Unit; regist
       <HelpText style={{ marginBottom: "12px" }}>
         Bônus fixo por unidade vendida (por criança), não por valor. A escada paga um prêmio único ao bater N unidades no mês.
         O teto é separado do teto de metas e produtos, e este bônus não depende das travas de caixa. Zero no teto = sem teto.
+        "Só com Olhar no prazo": a criança só conta se o Olhar FaçaAmigos foi preenchido em até 40 min da saída.
       </HelpText>
 
       {erro && <div style={{ color: "var(--color-error-text)", marginBottom: "12px" }}>{erro}</div>}
@@ -156,6 +161,7 @@ export function PlanosLongosSection({ unit, registerSave }: { unit: Unit; regist
                 <th>Bônus por unidade (R$)</th>
                 <th>Escada (unid. no mês)</th>
                 <th>Prêmio da escada (R$)</th>
+                <th>Só com Olhar no prazo</th>
               </tr>
             </thead>
             <tbody>
@@ -197,6 +203,19 @@ export function PlanosLongosSection({ unit, registerSave }: { unit: Unit; regist
                       disabled={!r.active}
                       onChange={(e) => update(r.key, { escadaBonusReais: e.target.value })}
                     />
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    {r.kind === "PLANO" ? (
+                      <input
+                        type="checkbox"
+                        checked={r.exigeOlharNoPrazo}
+                        disabled={!r.active}
+                        aria-label={`Só conta com Olhar no prazo: ${r.label}`}
+                        onChange={(e) => update(r.key, { exigeOlharNoPrazo: e.target.checked })}
+                      />
+                    ) : (
+                      <span style={{ color: "var(--text-muted)" }}>—</span>
+                    )}
                   </td>
                 </tr>
               ))}

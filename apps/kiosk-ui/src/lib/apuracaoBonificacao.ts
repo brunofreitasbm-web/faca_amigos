@@ -16,6 +16,10 @@
 // (fa_kiosk_bonus_plan_rules); docs/bonificacao/programa-planos-longos-out-2026.md.
 // Mantenha em sincronia com docs/bonificacao/apuracao_bonificacao.sql.
 //
+// Regra de PLANO com `exigeOlharNoPrazo` (o "1 hora + Olhar") só conta a
+// criança cujo Olhar FaçaAmigos foi preenchido em até 40 min da saída
+// (`olharNoPrazoSessionIds`, de fa_kiosk_session_reports.late = false).
+//
 // Aluguel avulso de pelúcia no Playground (`rental_kind`): fica fora de
 // sessões, sessões de 1h+ e faturamento; conta 1 item com o bônus baixo de
 // produto para quem fechou o pedido. Mesma regra do SQL.
@@ -45,6 +49,8 @@ export interface BonusPlanRule {
   escadaBonusCents: number;
   active: boolean;
   sortOrder: number;
+  /** Só PLANO: a criança só conta com o Olhar FaçaAmigos preenchido em até 40 min da saída. */
+  exigeOlharNoPrazo: boolean;
 }
 
 export function planRuleKey(kind: BonusPlanRule["kind"], refId: string): string {
@@ -223,6 +229,8 @@ export interface ApuracaoInput {
   programs: BonusProgramsByUnit;
   /** Pacotes vendidos no período; ausente = nenhuma venda de pacote a contar. */
   guardianPackages?: RawGuardianPackage[];
+  /** Sessões com Olhar preenchido no prazo; ausente = nenhuma (regra que exige o Olhar não conta). */
+  olharNoPrazoSessionIds?: string[];
 }
 
 export interface ApuracaoDia {
@@ -372,11 +380,13 @@ export function apurarBonificacaoPorDia(input: ApuracaoInput): ApuracaoDia[] {
     cur.bonusCents += rule.bonusCents;
     planosByKey.set(key, cur);
   };
+  const olharNoPrazo = new Set(input.olharNoPrazoSessionIds ?? []);
   for (const s of realSessions) {
     if (!s.checkin_by_employee_id || s.uses_package || !s.plan_id || !s.order_id) continue;
     const ruleKey = planRuleKey("PLANO", s.plan_id);
     const rule = rulesByUnit.get(s.unit_id)?.get(ruleKey);
     if (!rule) continue;
+    if (rule.exigeOlharNoPrazo && !olharNoPrazo.has(s.id)) continue;
     const o = orderById.get(s.order_id);
     if (!o || o.status !== "PAGA") continue;
     addPlano(revKey(s.unit_id, s.business_date, s.checkin_by_employee_id), ruleKey, rule);

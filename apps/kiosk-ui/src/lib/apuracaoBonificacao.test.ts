@@ -124,9 +124,9 @@ describe("bônus de planos longos", () => {
   const KPS = planRuleKey("PACOTE", PKG_PORTO);
 
   const rules: BonusPlanRule[] = [
-    { kind: "PLANO", refId: PLANO_2H, label: "2 horas", bonusCents: 300, escadaMeta: 12, escadaBonusCents: 1500, active: true, sortOrder: 1 },
-    { kind: "PACOTE", refId: PKG_DAY_USE, label: "DAY USE", bonusCents: 1000, escadaMeta: 2, escadaBonusCents: 1000, active: true, sortOrder: 2 },
-    { kind: "PACOTE", refId: PKG_PORTO, label: "PORTO SEGURO", bonusCents: 2500, escadaMeta: 1, escadaBonusCents: 1500, active: true, sortOrder: 3 },
+    { kind: "PLANO", refId: PLANO_2H, label: "2 horas", bonusCents: 300, escadaMeta: 12, escadaBonusCents: 1500, active: true, sortOrder: 1, exigeOlharNoPrazo: false },
+    { kind: "PACOTE", refId: PKG_DAY_USE, label: "DAY USE", bonusCents: 1000, escadaMeta: 2, escadaBonusCents: 1000, active: true, sortOrder: 2, exigeOlharNoPrazo: false },
+    { kind: "PACOTE", refId: PKG_PORTO, label: "PORTO SEGURO", bonusCents: 2500, escadaMeta: 1, escadaBonusCents: 1500, active: true, sortOrder: 3, exigeOlharNoPrazo: false },
   ];
   const programPlanos: BonusProgramConfig = { ...program, planosTetoMesCents: 10000, planRules: rules };
 
@@ -181,6 +181,29 @@ describe("bônus de planos longos", () => {
       orders: [pedido("o1", 19200)],
     });
     expect(dia?.bonusPlanosCents ?? 0).toBe(0);
+  });
+
+  it("regra que exige Olhar: só conta a criança com Olhar preenchido no prazo", () => {
+    const comOlhar = { ...programPlanos, planRules: rules.map((r) => (r.refId === PLANO_2H ? { ...r, exigeOlharNoPrazo: true } : r)) };
+    const base = {
+      programs: { [PLAYGROUND]: comOlhar },
+      sessions: [sessao("s1", "o1", PLANO_2H, null), sessao("s2", "o1", PLANO_2H, null)],
+      orders: [pedido("o1", 38400)],
+    };
+    const [semLista] = apurar(base);
+    expect(semLista?.bonusPlanosCents ?? 0).toBe(0);
+    const [umNoPrazo] = apurar({ ...base, olharNoPrazoSessionIds: ["s2"] });
+    expect(umNoPrazo?.planosVendidos).toEqual({ [K2H]: 1 });
+    expect(umNoPrazo?.bonusPlanosCents).toBe(300);
+  });
+
+  it("regra sem a exigência ignora o Olhar", () => {
+    const [dia] = apurar({
+      sessions: [sessao("s1", "o1", PLANO_2H, null)],
+      orders: [pedido("o1", 19200)],
+      olharNoPrazoSessionIds: [],
+    });
+    expect(dia?.bonusPlanosCents).toBe(300);
   });
 
   it("irmãos no mesmo pedido: uma unidade por criança", () => {
