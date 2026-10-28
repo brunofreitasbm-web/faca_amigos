@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json",
     "bundle": "node scripts/bundle.mjs",
     "start:electron": "pnpm run bundle && electron .",
-    "dist": "pnpm run bundle && electron-builder --win",
+    "dist": "pnpm run bundle && electron-builder --win nsis",
+    "dist:store": "pnpm run bundle && electron-builder --win appx",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
