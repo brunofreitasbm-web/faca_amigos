@@ -2,7 +2,7 @@
   "name": "@facaamigos/ui",
   "private": true,
   "version": "0.1.0",
-  "description": "Design system FaçaAmigos — tokens e componentes React, compartilhados por kiosk-ui e backoffice",
+  "description": "Design system FaçaAmigos — tokens e componentes React para kiosk-ui",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
