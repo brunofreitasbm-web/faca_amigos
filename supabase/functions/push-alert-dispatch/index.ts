@@ -77,5 +77,34 @@ Deno.serve(async (req) => {
   );
 
   const failed = results.filter((r) => r.status === "rejected").length;
-  return jsonResponse({ checked: rows.length, sent: rows.length - failed, failed });
+
+  // "O Olhar FaçaAmigos está pronto": inscrições cuja sessão já tem o PDF gerado
+  // (fa_push_claim_olhar marca cada uma como avisada na mesma instrução). O push
+  // só abre o painel, que mostra o botão do PDF — o token não vai no payload.
+  const { data: olhar, error: olharError } = await adminClient.rpc("fa_push_claim_olhar", { p_now_ms: nowMs });
+  if (olharError) console.error("[push-alert] fa_push_claim_olhar falhou", olharError.message);
+  const olharRows = (olhar ?? []) as typeof rows;
+  const olharResults = await Promise.allSettled(
+    olharRows.map((row) =>
+      webpush.sendNotification(
+        { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
+        JSON.stringify({
+          title: "Faça Amigos",
+          body: row.child_first_name
+            ? `O Olhar FaçaAmigos de ${row.child_first_name} está pronto 💛 Toque para abrir.`
+            : "O Olhar FaçaAmigos está pronto 💛 Toque para abrir.",
+          url: `/?acompanhar=${row.access_code}`,
+        }),
+      ),
+    ),
+  );
+  const olharFailed = olharResults.filter((r) => r.status === "rejected").length;
+  for (const r of olharResults) {
+    if (r.status === "rejected") console.error("[push-alert] push do Olhar falhou", (r.reason as { statusCode?: number })?.statusCode ?? r.reason);
+  }
+
+  return jsonResponse({
+    checked: rows.length, sent: rows.length - failed, failed,
+    olhar: { checked: olharRows.length, sent: olharRows.length - olharFailed, failed: olharFailed },
+  });
 });
