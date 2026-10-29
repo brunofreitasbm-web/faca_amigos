@@ -448,9 +448,16 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
             }}
           >
             <span style={{ fontSize: "14px", color: "var(--text-muted)" }}>Total a pagar</span>
-            <strong style={{ fontSize: "30px", color: "var(--color-primary-hover)", fontFamily: "var(--font-display)" }}>
-              {money(entry.quote.totalCents)}
-            </strong>
+            <div style={{ textAlign: "right" }}>
+              <strong style={{ fontSize: "30px", color: entry.quote.totalCents === 0 ? "var(--color-teal-hover, #007A3E)" : "var(--color-primary-hover)", fontFamily: "var(--font-display)" }}>
+                {money(entry.quote.totalCents)}
+              </strong>
+              {entry.quote.totalCents === 0 && (entry.session.package_balance_minutes ?? 0) > 0 && (
+                <div style={{ fontSize: "12px", color: "#1A3F35", fontWeight: 600 }}>
+                  🎟️ Coberto pelo saldo do pacote ({entry.session.package_balance_minutes} min disponíveis)
+                </div>
+              )}
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: "8px" }}>
@@ -462,9 +469,9 @@ export function SaidaScreen({ entriesOverride }: SaidaScreenProps = {}) {
               size="lg"
               onClick={openCheckout}
               style={{ borderRadius: "9999px", flex: 1 }}
-              title="Cobrar e liberar a criança"
+              title={entry.quote.totalCents === 0 ? "Liberar saída sem cobrança" : "Cobrar e liberar a criança"}
             >
-              Cobrar e liberar<span className="saida-kbd"> (Enter)</span>
+              {entry.quote.totalCents === 0 ? "Liberar saída (R$ 0,00)" : "Cobrar e liberar"}<span className="saida-kbd"> (Enter)</span>
             </Button>
           </div>
         </div>

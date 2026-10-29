@@ -429,29 +429,39 @@ export function CheckoutModal({
         <hr />
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "20px" }}>
           <span>Total</span>
-          <span>{money(totalCents)}</span>
+          <span style={{ color: totalCents === 0 ? "var(--color-teal-hover, #007A3E)" : undefined }}>{money(totalCents)}</span>
         </div>
 
-        <div style={{ display: "flex", gap: "8px", margin: "16px 0", flexWrap: "wrap" }}>
-          {METHODS.map((m) => (
-            <Button
-              key={m}
-              variant={method === m ? "primary" : "secondary"}
-              size="sm"
-              onClick={() => setMethod(m)}
-              disabled={isSplit && m === secondMethod}
-              title={`Pagar via ${m}`}
-            >
-              {m}
-            </Button>
-          ))}
-        </div>
-
-        {!isSplit ? (
-          <Button variant="ghost" size="sm" onClick={startSplit} style={{ marginBottom: "12px" }} title="Cobrar parte em uma forma e o restante em outra">
-            <Emoji3D e="➗" /> Dividir em 2 formas de pagamento
-          </Button>
+        {totalCents === 0 ? (
+          <div style={{ margin: "14px 0", padding: "12px 14px", borderRadius: "12px", background: "rgba(26, 63, 53, 0.08)", border: "1px solid rgba(26, 63, 53, 0.2)", color: "#1A3F35", fontSize: "14px", fontWeight: 600 }}>
+            <Emoji3D e="🎟️" /> Atendimento 100% coberto pelo saldo de pacote / cortesia.
+          </div>
         ) : (
+          <>
+            <div style={{ display: "flex", gap: "8px", margin: "16px 0", flexWrap: "wrap" }}>
+              {METHODS.map((m) => (
+                <Button
+                  key={m}
+                  variant={method === m ? "primary" : "secondary"}
+                  size="sm"
+                  onClick={() => setMethod(m)}
+                  disabled={isSplit && m === secondMethod}
+                  title={`Pagar via ${m}`}
+                >
+                  {m}
+                </Button>
+              ))}
+            </div>
+
+            {!isSplit ? (
+              <Button variant="ghost" size="sm" onClick={startSplit} style={{ marginBottom: "12px" }} title="Cobrar parte em uma forma e o restante em outra">
+                <Emoji3D e="➗" /> Dividir em 2 formas de pagamento
+              </Button>
+            ) : null}
+          </>
+        )}
+
+        {isSplit && totalCents > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "12px 0", padding: "12px", border: "1px dashed var(--border-subtle)", borderRadius: "12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong style={{ fontSize: "13px" }}>Pagamento dividido</strong>
@@ -529,10 +539,12 @@ export function CheckoutModal({
                   ? "Abra o turno na tela Caixa antes de fechar o atendimento"
                   : hasPausedSession
                   ? "Retome a contagem da sessão no Painel antes de fechar"
+                  : totalCents === 0
+                  ? "Liberar a criança com saldo do pacote / cortesia"
                   : "Confirmar pagamento e imprimir cupom de saída"
               }
             >
-              Confirmar pagamento
+              {totalCents === 0 ? "Liberar saída (Sem cobrança)" : "Confirmar pagamento"}
             </Button>
           </div>
         )}

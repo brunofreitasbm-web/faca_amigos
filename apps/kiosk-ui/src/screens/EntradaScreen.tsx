@@ -432,7 +432,12 @@ export function EntradaScreen({
 
     if (unit?.id) {
       Api.childPackages(unit.id, match.id)
-        .then(setChildPackages)
+        .then((pkgs) => {
+          setChildPackages(pkgs);
+          if (pkgs.length > 0 && pkgs.some((p) => p.remaining_minutes > 0)) {
+            setPlanId(PACKAGE_BALANCE);
+          }
+        })
         .catch(() => setChildPackages([]));
       Api.foreignPackageBalances(unit.id, match.id, match.cpf ? normalizeCpf(match.cpf) : null, match.phone_e164)
         .then(setForeignPackages)
@@ -579,6 +584,9 @@ export function EntradaScreen({
   // comprado numa visita anterior sem virar um plano de verdade.
   const CHILD_CREDIT = "CHILD_CREDIT";
   const usingChildCredit = planId === CHILD_CREDIT;
+  // Sentinela de uso de saldo de pacote existente (Porto Seguro etc.)
+  const PACKAGE_BALANCE = "PACKAGE_BALANCE";
+  const usingPackageBalance = planId === PACKAGE_BALANCE;
 
   // "▶ Iniciar" da fila do Painel: reusa o MESMO pickMatch() da busca
   // manual — um único caminho de criação de sessão em vez de duplicar a
@@ -623,7 +631,19 @@ export function EntradaScreen({
   const selectedPlan =
     plans.find((p) => p.id === planId) ??
     packagePlans.find((p) => p.id === planId) ??
-    (isBirthdayCourtesy ? birthdayOffer?.plan : undefined);
+    (isBirthdayCourtesy ? birthdayOffer?.plan : undefined) ??
+    (usingPackageBalance
+      ? {
+          id: PACKAGE_BALANCE,
+          activity: "PLAYGROUND" as const,
+          name: childPackages[0]?.package_name ? `${childPackages[0].package_name} (Saldo)` : "Porto Seguro (Saldo)",
+          valueCents: 0,
+          durationValue: childPackageMinutes,
+          durationUnit: "MINUTO" as const,
+          overageCentsPerMinute: 0,
+          color: "#1A3F35",
+        }
+      : undefined);
   const threshold = 120;
 
   // Cupons restritos a um plano (ex.: "N ESTRELAS", só no plano de 30min)
@@ -646,7 +666,7 @@ export function EntradaScreen({
   // toda no plano atual com o minuto adicional.
   const olharOffer = useMemo(() => {
     if (olharOfferDismissed || activity !== "PLAYGROUND") return null;
-    if (!selectedPlan || isPelucia || isBirthdayCourtesy || usingPackage || usingHourBank || usingChildCredit) return null;
+    if (!selectedPlan || isPelucia || isBirthdayCourtesy || usingPackage || usingHourBank || usingChildCredit || usingPackageBalance) return null;
     const currentMinutes = planDurationMinutes(selectedPlan);
     if (currentMinutes >= SESSION_REPORT_MIN_MINUTES) return null;
     const target = regularPlans.find((p) => planDurationMinutes(p) === SESSION_REPORT_MIN_MINUTES);
@@ -802,7 +822,11 @@ export function EntradaScreen({
         unitId: unit.id,
         activity,
         assetId: assetId ?? undefined,
-        planId: usingHourBank || usingPackage || usingChildCredit ? null : planId!,
+        planId: usingHourBank || usingPackage || usingChildCredit
+          ? null
+          : usingPackageBalance
+            ? (plans.find((p) => p.activity === "PLAYGROUND" && p.active)?.id ?? plans[0]?.id ?? planId!)
+            : planId!,
         useHourBank: usingHourBank,
         packageId: usingPackage ? selectedPackageId : undefined,
         childCreditId: usingChildCredit ? childCredit?.creditId : undefined,
@@ -814,7 +838,7 @@ export function EntradaScreen({
           cpf: normalizeCpf(cpf),
           phoneE164: normalizePhoneE164(phone),
         },
-        couponCode: usingHourBank || usingChildCredit || isPelucia || isBirthdayCourtesy ? undefined : couponCode || undefined,
+        couponCode: usingHourBank || usingChildCredit || usingPackageBalance || isPelucia || isBirthdayCourtesy ? undefined : couponCode || undefined,
         notes: customNotes.trim() || undefined,
         sensoryTags: selectedSensoryTags,
         preCheckinId: preCheckinId ?? undefined,
@@ -1433,6 +1457,31 @@ export function EntradaScreen({
           </div>
         )}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          {/* Saldo de pacote (ex.: Porto Seguro): opção prioritária quando a família já tem saldo */}
+          {matchedChild && childPackageMinutes > 0 && activity === "PLAYGROUND" && (
+            <Card
+              onClick={() => setPlanId(PACKAGE_BALANCE)}
+              title="Usar o saldo de pacote já contratado (Porto Seguro) da família"
+              style={{
+                cursor: "pointer",
+                padding: "14px 18px",
+                minWidth: "180px",
+                borderRadius: "16px",
+                border: usingPackageBalance ? "2px solid #1A3F35" : "2px dashed #1A3F35",
+                background: usingPackageBalance ? "rgba(26, 63, 53, 0.12)" : "var(--surface-card)",
+              }}
+            >
+              <strong style={{ fontSize: "16px", display: "block", color: "#1A3F35" }}>
+                <Emoji3D e="🎟️" /> Usar saldo do pacote
+              </strong>
+              <div style={{ fontSize: "18px", color: "#1A3F35", fontWeight: "bold", marginTop: "2px" }}>
+                {formatPlanoHoras(childPackageMinutes)} disponíveis
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                {childPackages[0]?.package_name || "Porto Seguro"} · sem custo de entrada
+              </div>
+            </Card>
+          )}
           {/* Banco de horas antes dos planos pagos, de propósito: a regra é
               usar o saldo que a família já pagou ANTES de vender plano novo. */}
           {matchedChild && hourBank && (
