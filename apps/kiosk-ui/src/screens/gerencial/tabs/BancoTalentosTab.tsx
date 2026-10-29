@@ -13,6 +13,13 @@ const OPPORTUNITY_LABEL: Record<JobApplication["opportunity_type"], string> = {
   PJ: "PJ",
 };
 
+const UNIT_LABEL: Record<string, string> = {
+  PARQUE_SHOPPING: "Parque Shopping Belém",
+  BOSQUE_GRAO_PARA: "Shopping Bosque Grão-Pará",
+  CLINICA_FATIMA: "Clínica Umarizal",
+  AMBAS: "Qualquer unidade / Sem preferência",
+};
+
 const STATUS_LABEL: Record<JobApplication["status"], string> = {
   NOVO: "Novo",
   LIDO: "Lido",
@@ -52,6 +59,7 @@ export function BancoTalentosTab() {
   const toast = useToast();
   const [items, setItems] = useState<JobApplication[]>([]);
   const [statusFilter, setStatusFilter] = useState<JobApplication["status"] | "TODOS">("TODOS");
+  const [unitFilter, setUnitFilter] = useState<string>("TODAS");
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -87,13 +95,46 @@ export function BancoTalentosTab() {
     }
   }
 
-  const visibleItems = statusFilter === "TODOS" ? items : items.filter((i) => i.status === statusFilter);
+  const visibleItems = items.filter((i) => {
+    if (statusFilter !== "TODOS" && i.status !== statusFilter) return false;
+    if (unitFilter !== "TODAS") {
+      if (unitFilter === "SEM_UNIDADE") {
+        if (i.preferred_unit) return false;
+      } else if (i.preferred_unit !== unitFilter) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--text-secondary)" }}>Filtrar por Status:</span>
+          <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--text-secondary)" }}>Unidade:</span>
+          <select
+            value={unitFilter}
+            onChange={(e) => setUnitFilter(e.target.value)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "12px",
+              border: "1px solid var(--border-subtle)",
+              background: "var(--surface-card)",
+              color: "var(--text-primary)",
+              fontSize: "14px",
+              fontWeight: "bold",
+            }}
+          >
+            <option value="TODAS">Todas as Unidades</option>
+            <option value="PARQUE_SHOPPING">Parque Shopping</option>
+            <option value="BOSQUE_GRAO_PARA">Shopping Bosque Grão-Pará</option>
+            <option value="CLINICA_FATIMA">Clínica Umarizal</option>
+            <option value="AMBAS">Qualquer unidade / Sem preferência</option>
+            <option value="SEM_UNIDADE">Não informada</option>
+          </select>
+        </div>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--text-secondary)" }}>Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as JobApplication["status"] | "TODOS")}
@@ -134,6 +175,23 @@ export function BancoTalentosTab() {
                 <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
                   {item.desired_area} · {OPPORTUNITY_LABEL[item.opportunity_type]}
                 </p>
+                <div style={{ marginTop: "6px" }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "2px 8px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      background: "var(--surface-sunken)",
+                      color: item.preferred_unit ? "var(--brand-primary, #0d9488)" : "var(--text-muted)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    📍 {item.preferred_unit ? (UNIT_LABEL[item.preferred_unit] || item.preferred_unit) : "Unidade não informada"}
+                  </span>
+                </div>
               </div>
               <Badge variant={STATUS_BADGE_VARIANT[item.status]}>{STATUS_LABEL[item.status]}</Badge>
             </div>

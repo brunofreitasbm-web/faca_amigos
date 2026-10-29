@@ -59,6 +59,7 @@ Deno.serve(async (req) => {
           phone: cand.phone,
           course: cand.course,
           desired_area: cand.desired_area,
+          preferred_unit: cand.preferred_unit || null,
           opportunity_type: cand.opportunity_type,
           status: cand.status,
           created_at_ms: cand.created_at_ms,

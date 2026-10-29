@@ -194,6 +194,7 @@ export interface JobApplication {
   course: string | null;
   desired_area: string;
   opportunity_type: "ESTAGIO" | "REMUNERADO" | "BOLSA" | "PJ";
+  preferred_unit?: string | null;
   resume_path: string;
   status: "NOVO" | "LIDO" | "ESPERA" | "ENTREVISTA" | "EM_ANALISE" | "CONTATADO" | "ARQUIVADO";
   created_at_ms: number;
@@ -2900,7 +2901,7 @@ export const Api = {
     unwrap<JobApplication[]>(
       supabase()
         .from("fa_kiosk_job_applications")
-        .select("id, full_name, email, phone, course, desired_area, opportunity_type, resume_path, status, created_at_ms")
+        .select("id, full_name, email, phone, course, desired_area, preferred_unit, opportunity_type, resume_path, status, created_at_ms")
         .order("created_at_ms", { ascending: false }),
     ),
   updateJobApplicationStatus: async (id: string, status: JobApplication["status"]) => {
