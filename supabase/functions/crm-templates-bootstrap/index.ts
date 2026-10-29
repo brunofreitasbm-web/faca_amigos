@@ -32,6 +32,8 @@ interface TemplateDef {
   quickReplyButtons?: { title: string; id: string }[];
   /** Botão de link (twilio/call-to-action). A variável de URL é o sufixo `{{n}}` no fim da url. */
   urlButton?: { title: string; url: string };
+  /** Pede à Meta que REJEITE em vez de recategorizar para MARKETING (allow_category_change: false). */
+  strictCategory?: boolean;
 }
 
 // Corpo provisório, alinhado ao design e às variáveis que cada Edge Function
@@ -115,6 +117,17 @@ const TEMPLATES: TemplateDef[] = [
     purpose: "RENOVACAO", name: "fa_renovacao_fim_plano_v3", category: "UTILITY", variableCount: 3,
     body: "Olá, {{1}}. O tempo contratado de {{2}} termina em poucos minutos. Para prorrogar a sessão em andamento: {{3}}. Toque em uma opção para solicitar a prorrogação no balcão.",
     sample: { "1": "Ana", "2": "Miguel", "3": "+30 min por R$ 48,00 ou +60 min por R$ 96,00" },
+    quickReplyButtons: [{ title: "+30 min", id: "RENOVAR_1" }, { title: "+60 min", id: "RENOVAR_2" }],
+  },
+  {
+    // v4: tentativa de UTILITY sem preço nem convite. A v3 foi recategorizada como MARKETING por
+    // trazer os valores dos minutos extras no corpo; aqui só o estado da sessão, e os valores vão
+    // na resposta do webhook ao toque (texto livre, dentro da janela de 24h). strictCategory:
+    // se a Meta não aceitar como UTILITY, REJEITA (nada muda) em vez de recategorizar.
+    // Nasce inativo; só ativar se fa_crm_templates.category vier UTILITY. Dispatcher já omite {{3}}.
+    purpose: "RENOVACAO", name: "fa_renovacao_fim_plano_v4", category: "UTILITY", variableCount: 2, strictCategory: true,
+    body: "Olá, {{1}}. O tempo contratado de {{2}} termina em poucos minutos. Toque abaixo para falar com o balcão sobre a sessão em andamento.",
+    sample: { "1": "Ana", "2": "Miguel" },
     quickReplyButtons: [{ title: "+30 min", id: "RENOVAR_1" }, { title: "+60 min", id: "RENOVAR_2" }],
   },
   {
@@ -376,7 +389,7 @@ Deno.serve(async (req) => {
       const approvalRes = await fetch(`${CONTENT_API}/${row.content_sid}/ApprovalRequests/whatsapp`, {
         method: "POST",
         headers: { Authorization: auth, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: def.name, category: def.category }),
+        body: JSON.stringify({ name: def.name, category: def.category, ...(def.strictCategory ? { allow_category_change: false } : {}) }),
       });
       const approval = await approvalRes.json().catch(() => ({}));
       results.push({
@@ -420,7 +433,7 @@ Deno.serve(async (req) => {
     const approvalRes = await fetch(`${CONTENT_API}/${contentSid}/ApprovalRequests/whatsapp`, {
       method: "POST",
       headers: { Authorization: auth, "Content-Type": "application/json" },
-      body: JSON.stringify({ name: def.name, category: def.category }),
+      body: JSON.stringify({ name: def.name, category: def.category, ...(def.strictCategory ? { allow_category_change: false } : {}) }),
     });
     const approval = await approvalRes.json().catch(() => ({}));
     const submitted = approvalRes.ok;

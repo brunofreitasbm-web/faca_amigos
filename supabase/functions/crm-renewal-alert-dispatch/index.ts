@@ -11,6 +11,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Inline (sem _shared) pelo mesmo motivo das demais functions de cron.
 
 const MAX_PER_RUN = 30;
+// Teto de avisos por dia (fuso Belém, UTC-3), somando texto livre e template.
+const DAILY_CAP = 60;
+const BELEM_OFFSET_MS = 3 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WINDOW_MS = DAY_MS;
 const WEBHOOK_URL =
   Deno.env.get("CRM_WEBHOOK_PUBLIC_URL") ?? "https://ivjvpdzsfjdpyabbzzuj.supabase.co/functions/v1/crm-whatsapp-webhook";
 
@@ -76,7 +81,16 @@ Deno.serve(async () => {
   let skipped = 0;
   let failed = 0;
 
-  for (const cand of (candidates ?? []).slice(0, MAX_PER_RUN)) {
+  const dayStartMs = Math.floor((Date.now() - BELEM_OFFSET_MS) / DAY_MS) * DAY_MS + BELEM_OFFSET_MS;
+  const { count: sentToday } = await admin
+    .from("fa_crm_renewal_alerts")
+    .select("id", { count: "exact", head: true })
+    .gte("sent_at_ms", dayStartMs)
+    .is("error", null);
+  const remainingToday = DAILY_CAP - (sentToday ?? 0);
+  if (remainingToday <= 0) return json({ ok: true, skipped: `teto diário de ${DAILY_CAP} avisos atingido` });
+
+  for (const cand of (candidates ?? []).slice(0, Math.min(MAX_PER_RUN, remainingToday))) {
     const channel = channelFor(cand.activity);
     const options = optionsFor(cand.activity, cand.asset_kind, cand.duration_minutes);
     if (!channel || !options) {
@@ -86,7 +100,7 @@ Deno.serve(async () => {
 
     let { data: contact } = await admin
       .from("fa_crm_contacts")
-      .select("id, name, opt_in")
+      .select("id, name, opt_in, last_inbound_ms")
       .eq("channel_id", channel.id)
       .eq("phone_e164", cand.phone_e164)
       .maybeSingle();
@@ -94,7 +108,7 @@ Deno.serve(async () => {
       const { data: created, error: insErr } = await admin
         .from("fa_crm_contacts")
         .insert({ channel_id: channel.id, phone_e164: cand.phone_e164, name: cand.guardian_name, guardian_id: cand.guardian_id })
-        .select("id, name, opt_in")
+        .select("id, name, opt_in, last_inbound_ms")
         .single();
       if (insErr) {
         failed++;
@@ -122,7 +136,9 @@ Deno.serve(async () => {
     const child = cand.child_first_name || "seu filho(a)";
     // Newline não é permitido em variável de template do WhatsApp.
     const optionsText = options.map((o) => `+${o.minutes} min por ${brl(o.cents)}`).join(" ou ");
-    const variables = { "1": guardianFirst, "2": child, "3": optionsText };
+    const variables: Record<string, string> = { "1": guardianFirst, "2": child, "3": optionsText };
+    // Templates sem preço no corpo (v4) não têm {{3}}: a Twilio recusa variável sobrando.
+    if (!template.preview.includes("{{3}}")) delete variables["3"];
 
     // Mesmo texto (mesma criança, mesmas opções) para o mesmo contato nos últimos 30 min — várias
     // sessões da mesma criança geravam 3 a 5 avisos em 2 minutos. Registra na trava e pula.
@@ -134,14 +150,22 @@ Deno.serve(async () => {
       continue;
     }
 
-    const sendRes = await provider.sendTemplate({
-      from: channel.whatsapp_e164,
-      to: cand.phone_e164,
-      templateName: template.name,
-      contentSid: template.content_sid,
-      variables,
-      statusCallbackUrl: WEBHOOK_URL,
-    });
+    // Janela de 24h aberta (o responsável escreveu há pouco): texto livre, sem custo de template.
+    // Os números "1"/"2" são tratados pelo webhook como os botões.
+    const windowOpen = !!contact!.last_inbound_ms && Date.now() - Number(contact!.last_inbound_ms) < WINDOW_MS;
+    const freeBody = `Oi ${guardianFirst}! O tempo de ${child} termina em poucos minutos. Para continuar sem pressa, responda: ${options
+      .map((o, i) => `${i + 1} para +${o.minutes} min por ${brl(o.cents)}`)
+      .join(" ou ")}.`;
+    const sendRes = windowOpen
+      ? await provider.sendText({ from: channel.whatsapp_e164, to: cand.phone_e164, body: freeBody, statusCallbackUrl: WEBHOOK_URL })
+      : await provider.sendTemplate({
+          from: channel.whatsapp_e164,
+          to: cand.phone_e164,
+          templateName: template.name,
+          contentSid: template.content_sid,
+          variables,
+          statusCallbackUrl: WEBHOOK_URL,
+        });
 
     if (!sendRes.ok) {
       failed++;
@@ -154,10 +178,10 @@ Deno.serve(async () => {
     await admin.from("fa_crm_messages").insert({
       contact_id: contact!.id,
       direction: "OUT",
-      body,
+      body: windowOpen ? freeBody : body,
       twilio_sid: sendRes.messageId,
       status: "queued",
-      template_id: template.id,
+      template_id: windowOpen ? null : template.id,
       created_at_ms: sentAt,
     });
     await admin
